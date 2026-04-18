@@ -122,7 +122,7 @@ namespace PickShell {
     }
 
     void Shell::cmdVersion(std::ostream &out) {
-        out << "Pick System Developer Edition " << pick_system::version_string << "\n";
+        out << pick_system::system_title << " " << pick_system::version_string << "\n";
         out << "Build: " << __DATE__ << "\n";
     }
 

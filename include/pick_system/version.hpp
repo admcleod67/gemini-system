@@ -8,5 +8,6 @@ namespace pick_system {
 #endif
 
 inline constexpr const char* version_string = PICK_SYSTEM_VERSION;
+inline constexpr const char* system_title = "Pick System Developer Edition";
 
 }  // namespace pick_system
