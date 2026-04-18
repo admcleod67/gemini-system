@@ -110,22 +110,22 @@ namespace PickVM {
                     break;
 
                 case OpCode::Add: {
-                    int b = intFromStackValue(pop(), "ADD");
-                    int a = intFromStackValue(pop(), "ADD");
+                    int b = intFromStackValue(pop(), opCodeName(instr.op));
+                    int a = intFromStackValue(pop(), opCodeName(instr.op));
                     push(a + b);
                     break;
                 }
 
                 case OpCode::Sub: {
-                    int b = intFromStackValue(pop(), "SUB");
-                    int a = intFromStackValue(pop(), "SUB");
+                    int b = intFromStackValue(pop(), opCodeName(instr.op));
+                    int a = intFromStackValue(pop(), opCodeName(instr.op));
                     push(a - b);
                     break;
                 }
 
                 case OpCode::Concat: {
-                    std::string b = stringFromStackValue(pop(), "CONCAT");
-                    std::string a = stringFromStackValue(pop(), "CONCAT");
+                    std::string b = stringFromStackValue(pop(), opCodeName(instr.op));
+                    std::string a = stringFromStackValue(pop(), opCodeName(instr.op));
                     push(a + b);
                     break;
                 }
@@ -144,13 +144,13 @@ namespace PickVM {
                 }
 
                 case OpCode::PrintInt: {
-                    int v = intFromStackValue(pop(), "PRINT_INT");
+                    int v = intFromStackValue(pop(), opCodeName(instr.op));
                     out() << v << std::endl;
                     break;
                 }
 
                 case OpCode::PrintStr: {
-                    std::string v = stringFromStackValue(pop(), "PRINT_STR");
+                    std::string v = stringFromStackValue(pop(), opCodeName(instr.op));
                     out() << v << std::endl;
                     break;
                 }
@@ -163,7 +163,7 @@ namespace PickVM {
 
                 case OpCode::JumpIfZero: {
                     int target = intOperandAtIp(instr, ip_);
-                    int v = intFromStackValue(pop(), "JZ");
+                    int v = intFromStackValue(pop(), opCodeName(instr.op));
                     if (v == 0) {
                         ip_ = static_cast<std::size_t>(target);
                         continue;
