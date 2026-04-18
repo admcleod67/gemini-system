@@ -8,40 +8,45 @@
 
 #include "Parser.h"
 
+using PickVM::LoadedBytecode;
 using PickVM::OpCode;
 using PickVM::Parser;
 
 TEST_CASE("parser empty stream") {
     Parser parser;
     std::istringstream in("");
-    auto prog = parser.parse(in);
-    CHECK(prog.empty());
+    LoadedBytecode lb = parser.parse(in);
+    CHECK(lb.program.empty());
 }
 
 TEST_CASE("parser comment only line yields no opcodes") {
     Parser parser;
     std::istringstream in("# just a comment\n");
-    auto prog = parser.parse(in);
-    CHECK(prog.empty());
+    LoadedBytecode lb = parser.parse(in);
+    CHECK(lb.program.empty());
 }
 
 TEST_CASE("parser PUSH_INT and HALT") {
     Parser parser;
     std::istringstream in("PUSH_INT 42\nHALT");
-    auto prog = parser.parse(in);
-    REQUIRE(prog.size() == 2);
-    CHECK(prog[0].op == OpCode::PushInt);
-    CHECK(std::get<int>(prog[0].operand) == 42);
-    CHECK(prog[1].op == OpCode::Halt);
+    LoadedBytecode lb = parser.parse(in);
+    REQUIRE(lb.program.size() == 2);
+    CHECK(lb.program[0].op == OpCode::PushInt);
+    CHECK(std::get<int>(lb.program[0].operand) == 42);
+    CHECK(lb.program[1].op == OpCode::Halt);
+    REQUIRE(lb.sourceLinePerInstr.size() == 2);
+    CHECK(lb.sourceLinePerInstr[0] == 1);
+    CHECK(lb.sourceLinePerInstr[1] == 2);
 }
 
 TEST_CASE("parser label and PUSH_STR quoted") {
     Parser parser;
     std::istringstream in("start: PUSH_STR \"hello\"\nHALT");
-    auto prog = parser.parse(in);
-    REQUIRE(prog.size() == 2);
-    CHECK(prog[0].op == OpCode::PushStr);
-    CHECK(std::get<std::string>(prog[0].operand) == "hello");
+    LoadedBytecode lb = parser.parse(in);
+    REQUIRE(lb.program.size() == 2);
+    CHECK(lb.program[0].op == OpCode::PushStr);
+    CHECK(std::get<std::string>(lb.program[0].operand) == "hello");
+    CHECK(lb.labels.at("start") == 0);
 }
 
 TEST_CASE("parser ADD CONCAT PRINT_INT PRINT_STR") {
@@ -58,13 +63,13 @@ TEST_CASE("parser ADD CONCAT PRINT_INT PRINT_STR") {
         "PUSH_STR \"hi\"\n"
         "PRINT_STR\n"
         "HALT\n");
-    auto prog = parser.parse(in);
-    REQUIRE(prog.size() == 11);
-    CHECK(prog[2].op == OpCode::Add);
-    CHECK(prog[5].op == OpCode::Concat);
-    CHECK(prog[7].op == OpCode::PrintInt);
-    CHECK(prog[9].op == OpCode::PrintStr);
-    CHECK(prog[10].op == OpCode::Halt);
+    LoadedBytecode lb = parser.parse(in);
+    REQUIRE(lb.program.size() == 11);
+    CHECK(lb.program[2].op == OpCode::Add);
+    CHECK(lb.program[5].op == OpCode::Concat);
+    CHECK(lb.program[7].op == OpCode::PrintInt);
+    CHECK(lb.program[9].op == OpCode::PrintStr);
+    CHECK(lb.program[10].op == OpCode::Halt);
 }
 
 TEST_CASE("parser JUMP and JZ resolved") {
@@ -80,12 +85,14 @@ TEST_CASE("parser JUMP and JZ resolved") {
         "PUSH_INT 99\n"
         "end:\n"
         "HALT\n");
-    auto prog = parser.parse(in);
-    REQUIRE(prog.size() == 8);
-    CHECK(prog[1].op == OpCode::JumpIfZero);
-    CHECK(std::get<int>(prog[1].operand) == 4);
-    CHECK(prog[5].op == OpCode::Jump);
-    CHECK(std::get<int>(prog[5].operand) == 7);
+    LoadedBytecode lb = parser.parse(in);
+    REQUIRE(lb.program.size() == 8);
+    CHECK(lb.program[1].op == OpCode::JumpIfZero);
+    CHECK(std::get<int>(lb.program[1].operand) == 4);
+    CHECK(lb.program[5].op == OpCode::Jump);
+    CHECK(std::get<int>(lb.program[5].operand) == 7);
+    CHECK(lb.labels.at("skip") == 4);
+    CHECK(lb.labels.at("end") == 7);
 }
 
 TEST_CASE("parser label only then opcode") {
@@ -94,9 +101,9 @@ TEST_CASE("parser label only then opcode") {
         "entry:\n"
         "PUSH_INT 1\n"
         "HALT\n");
-    auto prog = parser.parse(in);
-    REQUIRE(prog.size() == 2);
-    CHECK(prog[0].op == OpCode::PushInt);
+    LoadedBytecode lb = parser.parse(in);
+    REQUIRE(lb.program.size() == 2);
+    CHECK(lb.program[0].op == OpCode::PushInt);
 }
 
 TEST_CASE("parser invalid PUSH_INT") {
@@ -142,14 +149,14 @@ TEST_CASE("parser DUP DROP SUB") {
         "PUSH_INT 2\n"
         "SUB\n"
         "HALT\n");
-    auto prog = parser.parse(in);
-    REQUIRE(prog.size() == 6);
-    CHECK(prog[0].op == OpCode::PushInt);
-    CHECK(prog[1].op == OpCode::Dup);
-    CHECK(prog[2].op == OpCode::Drop);
-    CHECK(prog[3].op == OpCode::PushInt);
-    CHECK(prog[4].op == OpCode::Sub);
-    CHECK(prog[5].op == OpCode::Halt);
+    LoadedBytecode lb = parser.parse(in);
+    REQUIRE(lb.program.size() == 6);
+    CHECK(lb.program[0].op == OpCode::PushInt);
+    CHECK(lb.program[1].op == OpCode::Dup);
+    CHECK(lb.program[2].op == OpCode::Drop);
+    CHECK(lb.program[3].op == OpCode::PushInt);
+    CHECK(lb.program[4].op == OpCode::Sub);
+    CHECK(lb.program[5].op == OpCode::Halt);
 }
 
 TEST_CASE("parser parseFile missing file") {

@@ -160,3 +160,129 @@ TEST_CASE("shell DUMP-STACK routes dump to out") {
     CHECK_FALSE(quit);
     CHECK(out.str() == "Stack: [ 9 ]\n");
 }
+
+TEST_CASE("shell STEP DUMP-PROGRAM DUMP-LABELS without loaded program") {
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    std::ostringstream out;
+    bool quit = false;
+    sh.handleLine("STEP", out, quit);
+    CHECK(out.str() == "No program loaded\n");
+    out.str("");
+    sh.handleLine("DUMP-PROGRAM", out, quit);
+    CHECK(out.str() == "No program loaded\n");
+    out.str("");
+    sh.handleLine("DUMP-LABELS", out, quit);
+    CHECK(out.str() == "No program loaded\n");
+}
+
+TEST_CASE("shell BREAKPOINT and BREAKPOINTS without RUN") {
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    std::ostringstream out;
+    bool quit = false;
+    sh.handleLine("BREAKPOINT 0", out, quit);
+    CHECK(out.str().empty());
+    out.str("");
+    sh.handleLine("BREAKPOINTS", out, quit);
+    CHECK(out.str() == "Breakpoints: 0\n");
+}
+
+TEST_CASE("shell CLEAR-BREAKPOINT and CLEAR-BREAKPOINTS") {
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    std::ostringstream out;
+    bool quit = false;
+    sh.handleLine("BREAKPOINT 1", out, quit);
+    sh.handleLine("BREAKPOINT 2", out, quit);
+    sh.handleLine("CLEAR-BREAKPOINT 9", out, quit);
+    CHECK(out.str() == "No such breakpoint\n");
+    out.str("");
+    sh.handleLine("CLEAR-BREAKPOINTS", out, quit);
+    sh.handleLine("BREAKPOINTS", out, quit);
+    CHECK(out.str() == "No breakpoints\n");
+}
+
+TEST_CASE("shell RUN drops out-of-range breakpoints with message") {
+    auto dir = uniqueTempDir();
+    std::filesystem::create_directories(dir);
+    {
+        std::ofstream f(dir / "tiny.tbc");
+        f << "PUSH_INT 1\nHALT\n";
+    }
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setProgramsRoot(dir);
+    std::ostringstream out;
+    bool quit = false;
+    sh.handleLine("BREAKPOINT 5", out, quit);
+    sh.handleLine("RUN tiny.tbc", out, quit);
+    CHECK_FALSE(quit);
+    CHECK(out.str().find("Removed invalid breakpoint(s): 5") != std::string::npos);
+}
+
+TEST_CASE("shell RUN TRACE ON includes HALT line") {
+    auto dir = uniqueTempDir();
+    std::filesystem::create_directories(dir);
+    {
+        std::ofstream f(dir / "t.tbc");
+        f << "PUSH_INT 7\nHALT\n";
+    }
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setProgramsRoot(dir);
+    std::ostringstream out;
+    bool quit = false;
+    sh.handleLine("TRACE ON", out, quit);
+    sh.handleLine("RUN t.tbc", out, quit);
+    CHECK(out.str().find("0: PUSH_INT 7") != std::string::npos);
+    CHECK(out.str().find("1: HALT") != std::string::npos);
+}
+
+TEST_CASE("shell DUMP-PROGRAM and DUMP-LABELS after RUN") {
+    auto dir = uniqueTempDir();
+    std::filesystem::create_directories(dir);
+    {
+        std::ofstream f(dir / "lbl.tbc");
+        f << "start: PUSH_INT 3\nHALT\n";
+    }
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setProgramsRoot(dir);
+    std::ostringstream out;
+    bool quit = false;
+    sh.handleLine("RUN lbl.tbc", out, quit);
+    out.str("");
+    sh.handleLine("DUMP-PROGRAM", out, quit);
+    CHECK(out.str().find("0: PUSH_INT 3") != std::string::npos);
+    CHECK(out.str().find("1: HALT") != std::string::npos);
+    out.str("");
+    sh.handleLine("DUMP-LABELS", out, quit);
+    CHECK(out.str().find("start -> 0") != std::string::npos);
+}
+
+TEST_CASE("shell breakpoint hit then STEP then RUN completes") {
+    auto dir = uniqueTempDir();
+    std::filesystem::create_directories(dir);
+    {
+        std::ofstream f(dir / "bp.tbc");
+        f << "PUSH_INT 10\nPUSH_INT 20\nADD\nHALT\n";
+    }
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setProgramsRoot(dir);
+    std::ostringstream out;
+    bool quit = false;
+    sh.handleLine("BREAKPOINT 2", out, quit);
+    sh.handleLine("RUN bp.tbc", out, quit);
+    CHECK(out.str().find("Breakpoint hit at 2") != std::string::npos);
+    REQUIRE(rt.stack().size() == 2);
+    out.str("");
+    sh.handleLine("STEP", out, quit);
+    CHECK(out.str().find("2: ADD") != std::string::npos);
+    out.str("");
+    sh.handleLine("RUN", out, quit);
+    CHECK_FALSE(quit);
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<int>(rt.stack()[0]) == 30);
+}

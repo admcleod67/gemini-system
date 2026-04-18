@@ -5,6 +5,8 @@ add_library(pick-core
         core/vm/Runtime.h
         core/vm/Parser.cpp
         core/vm/Parser.h
+        core/vm/InstructionPrint.cpp
+        core/vm/InstructionPrint.h
         tcl/Shell.cpp
         tcl/Shell.h
 )

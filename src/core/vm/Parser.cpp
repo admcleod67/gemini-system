@@ -60,7 +60,7 @@ namespace PickVM {
         }
     }
 
-    std::vector<Instruction> Parser::parse(std::istream &in) {
+    LoadedBytecode Parser::parse(std::istream &in) {
         labelMap_.clear();
         intermediateLines_.clear();
 
@@ -84,8 +84,10 @@ namespace PickVM {
         }
 
         // Pass 2: convert to instructions
-        std::vector<Instruction> program;
-        program.reserve(intermediateLines_.size());
+        LoadedBytecode loaded;
+        loaded.labels = labelMap_;
+        loaded.program.reserve(intermediateLines_.size());
+        loaded.sourceLinePerInstr.reserve(intermediateLines_.size());
 
         for (const auto &pl: intermediateLines_) {
             Instruction inst;
@@ -141,14 +143,15 @@ namespace PickVM {
                     "Unknown opcode at line " + std::to_string(pl.sourceLine) + ": " + pl.opcode);
             }
 
-            program.push_back(inst);
+            loaded.sourceLinePerInstr.push_back(pl.sourceLine);
+            loaded.program.push_back(inst);
         }
 
-        validateJumpTargets(program);
-        return program;
+        validateJumpTargets(loaded.program);
+        return loaded;
     }
 
-    std::vector<Instruction> Parser::parseFile(const std::string &filename) {
+    LoadedBytecode Parser::parseFile(const std::string &filename) {
         std::ifstream in(filename);
         if (!in)
             throw std::runtime_error("Cannot open bytecode file: " + filename);

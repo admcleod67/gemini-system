@@ -42,7 +42,15 @@ namespace PickVM {
 
         void loadProgram(const std::vector<Instruction> &program);
 
+        // Execute until halt or instruction pointer past end (same observable behavior as before).
         void run();
+
+        // Single instruction. Returns false when execution stops (HALT or no more instructions).
+        bool step();
+
+        std::size_t instructionPointer() const { return ip_; }
+
+        bool isLoaded() const { return !program_.empty(); }
 
         // Debug helper (optional)
         void dumpStack() const;

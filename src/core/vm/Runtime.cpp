@@ -3,6 +3,7 @@
 //
 
 #include "Runtime.h"
+#include "InstructionPrint.h"
 
 #include <iostream>
 #include <sstream>
@@ -11,28 +12,10 @@
 
 namespace PickVM {
     namespace {
-        const char *opCodeName(OpCode op) {
-            switch (op) {
-                case OpCode::Halt: return "HALT";
-                case OpCode::PushInt: return "PUSH_INT";
-                case OpCode::PushStr: return "PUSH_STR";
-                case OpCode::Add: return "ADD";
-                case OpCode::Sub: return "SUB";
-                case OpCode::Concat: return "CONCAT";
-                case OpCode::Dup: return "DUP";
-                case OpCode::Drop: return "DROP";
-                case OpCode::PrintInt: return "PRINT_INT";
-                case OpCode::PrintStr: return "PRINT_STR";
-                case OpCode::Jump: return "JUMP";
-                case OpCode::JumpIfZero: return "JZ";
-            }
-            return "UNKNOWN";
-        }
-
         int intOperandAtIp(const Instruction &instr, std::size_t ip) {
             if (!std::holds_alternative<int>(instr.operand)) {
                 std::ostringstream oss;
-                oss << "Instruction " << ip << " (" << opCodeName(instr.op) << "): expected int operand";
+                oss << "Instruction " << ip << " (" << PickVM::opCodeName(instr.op) << "): expected int operand";
                 throw std::runtime_error(oss.str());
             }
             return std::get<int>(instr.operand);
@@ -41,7 +24,7 @@ namespace PickVM {
         std::string stringOperandAtIp(const Instruction &instr, std::size_t ip) {
             if (!std::holds_alternative<std::string>(instr.operand)) {
                 std::ostringstream oss;
-                oss << "Instruction " << ip << " (" << opCodeName(instr.op) << "): expected string operand";
+                oss << "Instruction " << ip << " (" << PickVM::opCodeName(instr.op) << "): expected string operand";
                 throw std::runtime_error(oss.str());
             }
             return std::get<std::string>(instr.operand);
@@ -93,92 +76,101 @@ namespace PickVM {
         return v;
     }
 
-    void Runtime::run() {
-        while (ip_ < program_.size()) {
-            const Instruction &instr = program_[ip_];
+    bool Runtime::step() {
+        if (ip_ >= program_.size()) {
+            return false;
+        }
 
-            switch (instr.op) {
-                case OpCode::Halt:
-                    return;
+        const Instruction &instr = program_[ip_];
 
-                case OpCode::PushInt:
-                    push(intOperandAtIp(instr, ip_));
-                    break;
+        switch (instr.op) {
+            case OpCode::Halt:
+                ip_ = program_.size();
+                return false;
 
-                case OpCode::PushStr:
-                    push(stringOperandAtIp(instr, ip_));
-                    break;
+            case OpCode::PushInt:
+                push(intOperandAtIp(instr, ip_));
+                break;
 
-                case OpCode::Add: {
-                    int b = intFromStackValue(pop(), opCodeName(instr.op));
-                    int a = intFromStackValue(pop(), opCodeName(instr.op));
-                    push(a + b);
-                    break;
-                }
+            case OpCode::PushStr:
+                push(stringOperandAtIp(instr, ip_));
+                break;
 
-                case OpCode::Sub: {
-                    int b = intFromStackValue(pop(), opCodeName(instr.op));
-                    int a = intFromStackValue(pop(), opCodeName(instr.op));
-                    push(a - b);
-                    break;
-                }
-
-                case OpCode::Concat: {
-                    std::string b = stringFromStackValue(pop(), opCodeName(instr.op));
-                    std::string a = stringFromStackValue(pop(), opCodeName(instr.op));
-                    push(a + b);
-                    break;
-                }
-
-                case OpCode::Dup: {
-                    if (stack_.empty()) {
-                        throw std::runtime_error("VM stack underflow");
-                    }
-                    push(stack_.back());
-                    break;
-                }
-
-                case OpCode::Drop: {
-                    pop();
-                    break;
-                }
-
-                case OpCode::PrintInt: {
-                    int v = intFromStackValue(pop(), opCodeName(instr.op));
-                    out() << v << std::endl;
-                    break;
-                }
-
-                case OpCode::PrintStr: {
-                    std::string v = stringFromStackValue(pop(), opCodeName(instr.op));
-                    out() << v << std::endl;
-                    break;
-                }
-
-                case OpCode::Jump: {
-                    int target = intOperandAtIp(instr, ip_);
-                    ip_ = static_cast<std::size_t>(target);
-                    continue;
-                }
-
-                case OpCode::JumpIfZero: {
-                    int target = intOperandAtIp(instr, ip_);
-                    int v = intFromStackValue(pop(), opCodeName(instr.op));
-                    if (v == 0) {
-                        ip_ = static_cast<std::size_t>(target);
-                        continue;
-                    }
-                    break;
-                }
-
-                default: {
-                    std::ostringstream oss;
-                    oss << "Unknown opcode at ip " << ip_;
-                    throw std::runtime_error(oss.str());
-                }
+            case OpCode::Add: {
+                int b = intFromStackValue(pop(), PickVM::opCodeName(instr.op));
+                int a = intFromStackValue(pop(), PickVM::opCodeName(instr.op));
+                push(a + b);
+                break;
             }
 
-            ip_++;
+            case OpCode::Sub: {
+                int b = intFromStackValue(pop(), PickVM::opCodeName(instr.op));
+                int a = intFromStackValue(pop(), PickVM::opCodeName(instr.op));
+                push(a - b);
+                break;
+            }
+
+            case OpCode::Concat: {
+                std::string b = stringFromStackValue(pop(), PickVM::opCodeName(instr.op));
+                std::string a = stringFromStackValue(pop(), PickVM::opCodeName(instr.op));
+                push(a + b);
+                break;
+            }
+
+            case OpCode::Dup: {
+                if (stack_.empty()) {
+                    throw std::runtime_error("VM stack underflow");
+                }
+                push(stack_.back());
+                break;
+            }
+
+            case OpCode::Drop: {
+                pop();
+                break;
+            }
+
+            case OpCode::PrintInt: {
+                int v = intFromStackValue(pop(), PickVM::opCodeName(instr.op));
+                out() << v << std::endl;
+                break;
+            }
+
+            case OpCode::PrintStr: {
+                std::string v = stringFromStackValue(pop(), PickVM::opCodeName(instr.op));
+                out() << v << std::endl;
+                break;
+            }
+
+            case OpCode::Jump: {
+                int target = intOperandAtIp(instr, ip_);
+                ip_ = static_cast<std::size_t>(target);
+                return ip_ < program_.size();
+            }
+
+            case OpCode::JumpIfZero: {
+                int target = intOperandAtIp(instr, ip_);
+                int v = intFromStackValue(pop(), PickVM::opCodeName(instr.op));
+                if (v == 0) {
+                    ip_ = static_cast<std::size_t>(target);
+                    return ip_ < program_.size();
+                }
+                break;
+            }
+
+            default: {
+                std::ostringstream oss;
+                oss << "Unknown opcode at ip " << ip_;
+                throw std::runtime_error(oss.str());
+            }
+        }
+
+        ++ip_;
+        return ip_ < program_.size();
+    }
+
+    void Runtime::run() {
+        while (step()) {
         }
     }
 

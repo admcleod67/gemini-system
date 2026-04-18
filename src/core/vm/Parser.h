@@ -14,6 +14,12 @@
 #include <unordered_map>
 
 namespace PickVM {
+    struct LoadedBytecode {
+        std::vector<Instruction> program;
+        std::unordered_map<std::string, int> labels;
+        std::vector<int> sourceLinePerInstr; // 1-based .tbc line per instruction, parallel to program
+    };
+
     struct ParsedLine {
         std::string label; // empty if none
         std::string opcode; // e.g. "PUSH_INT"
@@ -24,10 +30,10 @@ namespace PickVM {
     class Parser {
     public:
         // Load text bytecode from a stream (newline-separated), resolve labels
-        std::vector<Instruction> parse(std::istream &in);
+        LoadedBytecode parse(std::istream &in);
 
-        // Load a text bytecode file, resolve labels, and return instructions
-        std::vector<Instruction> parseFile(const std::string &filename);
+        // Load a text bytecode file, resolve labels
+        LoadedBytecode parseFile(const std::string &filename);
 
     private:
         static ParsedLine parseLine(const std::string &line);

@@ -7,11 +7,14 @@
 
 #pragma once
 
+#include "../core/vm/Parser.h"
 #include "../core/vm/Runtime.h"
 
 #include <filesystem>
 #include <iosfwd>
+#include <optional>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 namespace PickShell {
@@ -48,6 +51,34 @@ namespace PickShell {
         void cmdDumpStack(std::ostream &out);
 
         void cmdListPrograms(std::ostream &out);
+
+        void cmdTrace(const std::vector<std::string> &tokens, std::ostream &out);
+
+        void cmdStep(std::ostream &out);
+
+        void cmdBreakpoint(const std::vector<std::string> &tokens, std::ostream &out);
+
+        void cmdBreakpoints(std::ostream &out);
+
+        void cmdClearBreakpoint(const std::vector<std::string> &tokens, std::ostream &out);
+
+        void cmdClearBreakpoints(std::ostream &out);
+
+        void cmdDumpProgram(std::ostream &out);
+
+        void cmdDumpLabels(std::ostream &out);
+
+        void executeVmLoop(std::ostream &out);
+
+        void pruneBreakpointsForProgram(std::size_t programSize, std::ostream &out);
+
+        bool programImageLoaded() const;
+
+        std::optional<PickVM::LoadedBytecode> lastLoaded_;
+        bool trace_{false};
+        std::unordered_set<std::size_t> breakpoints_;
+        bool suspended_{false};
+        std::optional<std::size_t> resumePastBreakpointIp_;
     };
 } // namespace PickShell
 

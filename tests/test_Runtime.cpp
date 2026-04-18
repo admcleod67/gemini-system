@@ -27,6 +27,29 @@ TEST_CASE("runtime push int add halt") {
     CHECK(std::get<int>(rt.stack()[0]) == 5);
 }
 
+TEST_CASE("runtime step matches run for add program") {
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, 2},
+        {OpCode::PushInt, 3},
+        {OpCode::Add, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    Runtime rt;
+    rt.loadProgram(prog);
+    while (rt.step()) {
+    }
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<int>(rt.stack()[0]) == 5);
+    CHECK(rt.instructionPointer() >= prog.size());
+}
+
+TEST_CASE("runtime empty program step does nothing") {
+    Runtime rt;
+    rt.loadProgram({});
+    CHECK_FALSE(rt.step());
+    CHECK(rt.instructionPointer() == 0);
+}
+
 TEST_CASE("runtime push str and concat") {
     std::vector<Instruction> prog = {
         {OpCode::PushStr, std::string{"hel"}},
