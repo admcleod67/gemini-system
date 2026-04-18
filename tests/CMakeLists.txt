@@ -21,13 +21,7 @@ add_executable(
         test_Runtime.cpp
         test_Shell.cpp
 )
-target_include_directories(
-        pick-tests
-        PRIVATE
-        ${CMAKE_SOURCE_DIR}/src/core/vm
-        ${CMAKE_SOURCE_DIR}/src/tcl
-)
-target_link_libraries(pick-tests PRIVATE pick-core doctest_headers)
+target_link_libraries(pick-tests PRIVATE pick-tcl doctest_headers)
 target_compile_definitions(
         pick-tests
         PRIVATE "PICK_SYSTEM_VERSION=\"${PROJECT_VERSION}\""

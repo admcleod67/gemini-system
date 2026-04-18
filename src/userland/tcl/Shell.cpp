@@ -1,6 +1,4 @@
 #include "Shell.h"
-#include "../core/vm/InstructionPrint.h"
-#include "../core/vm/Parser.h"
 #include <pick_system/version.hpp>
 
 #include <algorithm>

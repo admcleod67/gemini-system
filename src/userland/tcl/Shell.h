@@ -7,8 +7,7 @@
 
 #pragma once
 
-#include "../core/vm/Parser.h"
-#include "../core/vm/Runtime.h"
+#include <pickvm/core.hpp>
 
 #include <filesystem>
 #include <iosfwd>

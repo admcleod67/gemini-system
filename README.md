@@ -24,9 +24,10 @@ Artifacts include **`pick-system`** (minimal host entry point), **`pick-cli`** (
 
 ## Layout (high level)
 
-- **`src/core/vm/`** — bytecode parser and VM runtime
-- **`src/tcl/`** — developer shell (`Shell`) driving the runtime
+- **`src/core/vm/`** — bytecode parser and VM runtime (`pick-core`)
+- **`src/userland/tcl/`** — developer shell (`Shell`, `pick-tcl`)
 - **`include/pick_system/`** — shared headers (e.g. version)
+- **`include/pickvm/`** — public VM umbrella header (`core.hpp`)
 - **`tests/`** — **doctest**-based tests
 - **`programs/`** — sample `.tbc` bytecode files
 

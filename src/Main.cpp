@@ -1,7 +1,8 @@
-#include <pick_system/version.hpp>
+#include <cstdio>
 
-#include "core/vm/Runtime.h"
-#include "tcl/Shell.h"
+#include <pick_system/version.hpp>
+#include <pickvm/core.hpp>
+#include <Shell.h>
 
 int main() {
   std::printf("%s %s\n", pick_system::system_title, pick_system::version_string);
