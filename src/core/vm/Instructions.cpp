@@ -43,11 +43,25 @@ ParsedLine parseLine(const std::string& raw) {
     return out;
 }
 
-std::vector<Instruction> loadTextBytecode(const std::string& filename) {
-    std::ifstream in(filename);
-    if (!in)
-        throw std::runtime_error("Cannot open bytecode file: " + filename);
+static void validateJumpTargets(const std::vector<Instruction>& program) {
+    for (std::size_t i = 0; i < program.size(); ++i) {
+        const Instruction& inst = program[i];
+        if (inst.op != OpCode::Jump && inst.op != OpCode::JumpIfZero) {
+            continue;
+        }
+        if (!std::holds_alternative<int>(inst.operand)) {
+            throw std::runtime_error(
+                "Jump instruction at index " + std::to_string(i) + " has no int target");
+        }
+        const int t = std::get<int>(inst.operand);
+        if (t < 0 || static_cast<std::size_t>(t) >= program.size()) {
+            throw std::runtime_error(
+                "Jump target out of range at instruction " + std::to_string(i) + ": " + std::to_string(t));
+        }
+    }
+}
 
+std::vector<Instruction> loadTextBytecodeStream(std::istream& in) {
     std::vector<ParsedLine> lines;
     std::unordered_map<std::string, int> labelMap;
 
@@ -55,12 +69,15 @@ std::vector<Instruction> loadTextBytecode(const std::string& filename) {
     {
         std::string line;
         int index = 0;
+        int physLine = 0;
         while (std::getline(in, line)) {
+            ++physLine;
             ParsedLine pl = parseLine(line);
             if (!pl.label.empty()) {
                 labelMap[pl.label] = index;
             }
             if (!pl.opcode.empty()) {
+                pl.sourceLine = physLine;
                 lines.push_back(pl);
                 index++;
             }
@@ -79,7 +96,12 @@ std::vector<Instruction> loadTextBytecode(const std::string& filename) {
         }
         else if (pl.opcode == "PUSH_INT") {
             inst.op = OpCode::PushInt;
-            inst.operand = std::stoi(pl.operand);
+            try {
+                inst.operand = std::stoi(pl.operand);
+            } catch (const std::exception&) {
+                throw std::runtime_error(
+                    "Invalid PUSH_INT operand at line " + std::to_string(pl.sourceLine) + ": '" + pl.operand + "'");
+            }
         }
         else if (pl.opcode == "PUSH_STR") {
             inst.op = OpCode::PushStr;
@@ -102,20 +124,39 @@ std::vector<Instruction> loadTextBytecode(const std::string& filename) {
         }
         else if (pl.opcode == "JUMP") {
             inst.op = OpCode::Jump;
-            inst.operand = labelMap.at(pl.operand);
+            try {
+                inst.operand = labelMap.at(pl.operand);
+            } catch (const std::out_of_range&) {
+                throw std::runtime_error(
+                    "Unknown label for JUMP at line " + std::to_string(pl.sourceLine) + ": " + pl.operand);
+            }
         }
         else if (pl.opcode == "JZ") {
             inst.op = OpCode::JumpIfZero;
-            inst.operand = labelMap.at(pl.operand);
+            try {
+                inst.operand = labelMap.at(pl.operand);
+            } catch (const std::out_of_range&) {
+                throw std::runtime_error(
+                    "Unknown label for JZ at line " + std::to_string(pl.sourceLine) + ": " + pl.operand);
+            }
         }
         else {
-            throw std::runtime_error("Unknown opcode: " + pl.opcode);
+            throw std::runtime_error(
+                "Unknown opcode at line " + std::to_string(pl.sourceLine) + ": " + pl.opcode);
         }
 
         program.push_back(inst);
     }
 
+    validateJumpTargets(program);
     return program;
+}
+
+std::vector<Instruction> loadTextBytecode(const std::string& filename) {
+    std::ifstream in(filename);
+    if (!in)
+        throw std::runtime_error("Cannot open bytecode file: " + filename);
+    return loadTextBytecodeStream(in);
 }
 
 } // namespace PickVM

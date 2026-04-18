@@ -42,6 +42,9 @@ namespace PickVM {
         // Debug helper (optional)
         void dumpStack() const;
 
+        // Read-only stack view for tests and diagnostics
+        const std::vector<Value>& stack() const { return stack_; }
+
     private:
         std::vector<Instruction> program_;
         std::vector<Value> stack_;

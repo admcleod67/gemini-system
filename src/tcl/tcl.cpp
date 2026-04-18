@@ -4,6 +4,8 @@
 
 #include "tcl.h"
 
+#include <pick_system/version.hpp>
+
 #include <filesystem>
 
 #include "../core/vm/VM.h"
@@ -84,7 +86,7 @@ void repl(PickVM::VM& vm) {
 
         // VERSION
         if (cmd == "VERSION") {
-            std::cout << "Pick System (minimal) v0.1\n";
+            std::cout << "pick-system " << pick_system::version_string << "\n";
             continue;
         }
 
