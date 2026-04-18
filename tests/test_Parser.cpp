@@ -133,6 +133,25 @@ TEST_CASE("parser unknown label JZ") {
     CHECK_THROWS_AS(parser.parse(in), std::runtime_error);
 }
 
+TEST_CASE("parser DUP DROP SUB") {
+    Parser parser;
+    std::istringstream in(
+        "PUSH_INT 5\n"
+        "DUP\n"
+        "DROP\n"
+        "PUSH_INT 2\n"
+        "SUB\n"
+        "HALT\n");
+    auto prog = parser.parse(in);
+    REQUIRE(prog.size() == 6);
+    CHECK(prog[0].op == OpCode::PushInt);
+    CHECK(prog[1].op == OpCode::Dup);
+    CHECK(prog[2].op == OpCode::Drop);
+    CHECK(prog[3].op == OpCode::PushInt);
+    CHECK(prog[4].op == OpCode::Sub);
+    CHECK(prog[5].op == OpCode::Halt);
+}
+
 TEST_CASE("parser parseFile missing file") {
     Parser parser;
     CHECK_THROWS_AS(parser.parseFile("/nonexistent/pick_system/no_such_file.tbc"), std::runtime_error);

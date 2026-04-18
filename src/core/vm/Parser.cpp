@@ -108,6 +108,12 @@ namespace PickVM {
                 inst.operand = s;
             } else if (pl.opcode == "ADD") {
                 inst.op = OpCode::Add;
+            } else if (pl.opcode == "SUB") {
+                inst.op = OpCode::Sub;
+            } else if (pl.opcode == "DUP") {
+                inst.op = OpCode::Dup;
+            } else if (pl.opcode == "DROP") {
+                inst.op = OpCode::Drop;
             } else if (pl.opcode == "CONCAT") {
                 inst.op = OpCode::Concat;
             } else if (pl.opcode == "PRINT_INT") {

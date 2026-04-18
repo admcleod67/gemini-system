@@ -201,3 +201,116 @@ TEST_CASE("runtime PushStr malformed operand") {
     rt.loadProgram(prog);
     CHECK_THROWS_AS(rt.run(), std::runtime_error);
 }
+
+TEST_CASE("runtime DUP then ADD") {
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, 1},
+        {OpCode::Dup, Value{}},
+        {OpCode::Add, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    Runtime rt;
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<int>(rt.stack()[0]) == 2);
+}
+
+TEST_CASE("runtime DUP string") {
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"x"}},
+        {OpCode::Dup, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    Runtime rt;
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 2);
+    CHECK(std::get<std::string>(rt.stack()[0]) == "x");
+    CHECK(std::get<std::string>(rt.stack()[1]) == "x");
+}
+
+TEST_CASE("runtime DROP") {
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, 1},
+        {OpCode::PushInt, 2},
+        {OpCode::Drop, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    Runtime rt;
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<int>(rt.stack()[0]) == 1);
+}
+
+TEST_CASE("runtime SUB five minus two") {
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, 5},
+        {OpCode::PushInt, 2},
+        {OpCode::Sub, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    Runtime rt;
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<int>(rt.stack()[0]) == 3);
+}
+
+TEST_CASE("runtime SUB stack order is a minus b") {
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, 2},
+        {OpCode::PushInt, 5},
+        {OpCode::Sub, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    Runtime rt;
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<int>(rt.stack()[0]) == -3);
+}
+
+TEST_CASE("runtime DUP empty stack") {
+    std::vector<Instruction> prog = {
+        {OpCode::Dup, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    Runtime rt;
+    rt.loadProgram(prog);
+    CHECK_THROWS_AS(rt.run(), std::runtime_error);
+}
+
+TEST_CASE("runtime DROP empty stack") {
+    std::vector<Instruction> prog = {
+        {OpCode::Drop, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    Runtime rt;
+    rt.loadProgram(prog);
+    CHECK_THROWS_AS(rt.run(), std::runtime_error);
+}
+
+TEST_CASE("runtime SUB one value") {
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, 1},
+        {OpCode::Sub, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    Runtime rt;
+    rt.loadProgram(prog);
+    CHECK_THROWS_AS(rt.run(), std::runtime_error);
+}
+
+TEST_CASE("runtime SUB wrong types") {
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"a"}},
+        {OpCode::PushStr, std::string{"b"}},
+        {OpCode::Sub, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    Runtime rt;
+    rt.loadProgram(prog);
+    CHECK_THROWS_AS(rt.run(), std::runtime_error);
+}

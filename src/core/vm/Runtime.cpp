@@ -17,7 +17,10 @@ namespace PickVM {
                 case OpCode::PushInt: return "PUSH_INT";
                 case OpCode::PushStr: return "PUSH_STR";
                 case OpCode::Add: return "ADD";
+                case OpCode::Sub: return "SUB";
                 case OpCode::Concat: return "CONCAT";
+                case OpCode::Dup: return "DUP";
+                case OpCode::Drop: return "DROP";
                 case OpCode::PrintInt: return "PRINT_INT";
                 case OpCode::PrintStr: return "PRINT_STR";
                 case OpCode::Jump: return "JUMP";
@@ -113,10 +116,30 @@ namespace PickVM {
                     break;
                 }
 
+                case OpCode::Sub: {
+                    int b = intFromStackValue(pop(), "SUB");
+                    int a = intFromStackValue(pop(), "SUB");
+                    push(a - b);
+                    break;
+                }
+
                 case OpCode::Concat: {
                     std::string b = stringFromStackValue(pop(), "CONCAT");
                     std::string a = stringFromStackValue(pop(), "CONCAT");
                     push(a + b);
+                    break;
+                }
+
+                case OpCode::Dup: {
+                    if (stack_.empty()) {
+                        throw std::runtime_error("VM stack underflow");
+                    }
+                    push(stack_.back());
+                    break;
+                }
+
+                case OpCode::Drop: {
+                    pop();
                     break;
                 }
 

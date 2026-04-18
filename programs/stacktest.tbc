@@ -7,7 +7,6 @@ start:
     DUP
     PRINT_INT      # prints 30
     DROP
-    PRINT_INT      # prints 30
     PRINT_INT      # prints 20
     PRINT_INT      # prints 10
     HALT
