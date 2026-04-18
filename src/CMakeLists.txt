@@ -7,7 +7,7 @@ add_executable(pick-system Main.cpp)
 target_link_libraries(pick-system PRIVATE pick-tcl)
 pick_system_enable_warnings(pick-system)
 
-add_executable(pick-cli core/cli/Main.cpp)
+add_executable(pick-cli userland/cli/Main.cpp)
 target_link_libraries(pick-cli PRIVATE pick-tcl)
 pick_system_enable_warnings(pick-cli)
 
