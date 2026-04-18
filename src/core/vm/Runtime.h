@@ -11,7 +11,6 @@
 #include <vector>
 
 namespace PickVM {
-
     enum class OpCode {
         Halt,
         PushInt,
@@ -36,7 +35,7 @@ namespace PickVM {
         Runtime();
 
         // nullptr selects std::cout (default). Used by tests to capture PRINT / dumpStack.
-        void setOutputStream(std::ostream* out);
+        void setOutputStream(std::ostream *out) const;
 
         void loadProgram(const std::vector<Instruction> &program);
 
@@ -46,22 +45,21 @@ namespace PickVM {
         void dumpStack() const;
 
         // Read-only stack view for tests and diagnostics
-        const std::vector<Value>& stack() const { return stack_; }
+        const std::vector<Value> &stack() const { return stack_; }
 
     private:
         std::vector<Instruction> program_;
         std::vector<Value> stack_;
         std::size_t ip_; // Instruction pointer
-        mutable std::ostream* outStream_{nullptr};
+        mutable std::ostream *outStream_{nullptr};
 
-        std::ostream& out() const;
+        std::ostream &out() const;
 
         // Helpers
         void push(const Value &v);
 
         Value pop();
     };
-
 } // namespace PickVM
 
 #endif // PICK_SYSTEM_VM_RUNTIME_H

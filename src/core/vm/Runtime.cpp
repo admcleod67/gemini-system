@@ -10,63 +10,60 @@
 #include <string>
 
 namespace PickVM {
+    namespace {
+        const char *opCodeName(OpCode op) {
+            switch (op) {
+                case OpCode::Halt: return "HALT";
+                case OpCode::PushInt: return "PUSH_INT";
+                case OpCode::PushStr: return "PUSH_STR";
+                case OpCode::Add: return "ADD";
+                case OpCode::Concat: return "CONCAT";
+                case OpCode::PrintInt: return "PRINT_INT";
+                case OpCode::PrintStr: return "PRINT_STR";
+                case OpCode::Jump: return "JUMP";
+                case OpCode::JumpIfZero: return "JZ";
+            }
+            return "UNKNOWN";
+        }
 
-namespace {
+        int intOperandAtIp(const Instruction &instr, std::size_t ip) {
+            if (!std::holds_alternative<int>(instr.operand)) {
+                std::ostringstream oss;
+                oss << "Instruction " << ip << " (" << opCodeName(instr.op) << "): expected int operand";
+                throw std::runtime_error(oss.str());
+            }
+            return std::get<int>(instr.operand);
+        }
 
-const char* opCodeName(OpCode op) {
-    switch (op) {
-        case OpCode::Halt: return "HALT";
-        case OpCode::PushInt: return "PUSH_INT";
-        case OpCode::PushStr: return "PUSH_STR";
-        case OpCode::Add: return "ADD";
-        case OpCode::Concat: return "CONCAT";
-        case OpCode::PrintInt: return "PRINT_INT";
-        case OpCode::PrintStr: return "PRINT_STR";
-        case OpCode::Jump: return "JUMP";
-        case OpCode::JumpIfZero: return "JZ";
-    }
-    return "UNKNOWN";
-}
+        std::string stringOperandAtIp(const Instruction &instr, std::size_t ip) {
+            if (!std::holds_alternative<std::string>(instr.operand)) {
+                std::ostringstream oss;
+                oss << "Instruction " << ip << " (" << opCodeName(instr.op) << "): expected string operand";
+                throw std::runtime_error(oss.str());
+            }
+            return std::get<std::string>(instr.operand);
+        }
 
-int intOperandAtIp(const Instruction& instr, std::size_t ip) {
-    if (!std::holds_alternative<int>(instr.operand)) {
-        std::ostringstream oss;
-        oss << "Instruction " << ip << " (" << opCodeName(instr.op) << "): expected int operand";
-        throw std::runtime_error(oss.str());
-    }
-    return std::get<int>(instr.operand);
-}
+        int intFromStackValue(const Value &v, const char *ctx) {
+            if (!std::holds_alternative<int>(v)) {
+                throw std::runtime_error(std::string(ctx) + ": expected int on stack");
+            }
+            return std::get<int>(v);
+        }
 
-std::string stringOperandAtIp(const Instruction& instr, std::size_t ip) {
-    if (!std::holds_alternative<std::string>(instr.operand)) {
-        std::ostringstream oss;
-        oss << "Instruction " << ip << " (" << opCodeName(instr.op) << "): expected string operand";
-        throw std::runtime_error(oss.str());
-    }
-    return std::get<std::string>(instr.operand);
-}
+        std::string stringFromStackValue(const Value &v, const char *ctx) {
+            if (!std::holds_alternative<std::string>(v)) {
+                throw std::runtime_error(std::string(ctx) + ": expected string on stack");
+            }
+            return std::get<std::string>(v);
+        }
+    } // namespace
 
-int intFromStackValue(const Value& v, const char* ctx) {
-    if (!std::holds_alternative<int>(v)) {
-        throw std::runtime_error(std::string(ctx) + ": expected int on stack");
-    }
-    return std::get<int>(v);
-}
-
-std::string stringFromStackValue(const Value& v, const char* ctx) {
-    if (!std::holds_alternative<std::string>(v)) {
-        throw std::runtime_error(std::string(ctx) + ": expected string on stack");
-    }
-    return std::get<std::string>(v);
-}
-
-} // namespace
-
-    std::ostream& Runtime::out() const {
+    std::ostream &Runtime::out() const {
         return outStream_ ? *outStream_ : std::cout;
     }
 
-    void Runtime::setOutputStream(std::ostream* out) {
+    void Runtime::setOutputStream(std::ostream *out) const {
         outStream_ = out;
     }
 
@@ -173,5 +170,4 @@ std::string stringFromStackValue(const Value& v, const char* ctx) {
         }
         out() << "]\n";
     }
-
 } // namespace PickVM

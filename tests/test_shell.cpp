@@ -91,8 +91,7 @@ TEST_CASE("shell RUN missing file") {
 
 TEST_CASE("shell RUN executes bytecode from programs root") {
     auto dir = uniqueTempDir();
-    std::filesystem::create_directories(dir);
-    {
+    std::filesystem::create_directories(dir); {
         std::ofstream f(dir / "mini.tbc");
         f << "PUSH_INT 5\nHALT\n";
     }
