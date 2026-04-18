@@ -3,6 +3,9 @@
 //
 
 #include "tcl.h"
+
+#include <filesystem>
+
 #include "../core/vm/VM.h"
 #include "../core/vm/Instructions.h"
 
@@ -37,6 +40,29 @@ void repl(PickVM::VM& vm) {
 
         const std::string& cmd = tokens[0];
 
+        // DUMP-STACK
+        if (cmd == "DUMP-STACK") {
+            vm.dumpStack();
+            continue;
+        }
+
+        if (cmd == "LIST-PROGRAMS") {
+            std::cout << "Programs:\n";
+
+            std::error_code ec;
+            if (!std::filesystem::exists("programs", ec)) {
+                std::cout << "  (Directory 'programs' not found in current directory)\n";
+                continue;
+            }
+
+            for (const auto& entry : std::filesystem::directory_iterator("programs")) {
+                if (entry.path().extension() == ".tbc") {
+                    std::cout << "  " << entry.path().filename().string() << "\n";
+                }
+            }
+            continue;
+        }
+
         // QUIT
         if (cmd == "QUIT") {
             std::cout << "Exiting TCL\n";
@@ -49,6 +75,9 @@ void repl(PickVM::VM& vm) {
             std::cout << "  ECHO <text>\n";
             std::cout << "  RUN <file>\n";
             std::cout << "  HELP\n";
+            std::cout << "  DUMP-STACK\n";
+            std::cout << "  LIST-PROGRAMS\n";
+            std::cout << "  VERSION\n";
             std::cout << "  QUIT\n";
             continue;
         }
