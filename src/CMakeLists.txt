@@ -5,8 +5,8 @@ add_library(pick-core
         core/vm/Runtime.h
         core/vm/Parser.cpp
     core/vm/Parser.h
-        tcl/shell.cpp
-        tcl/shell.h
+        tcl/Shell.cpp
+        tcl/Shell.h
 )
 
 target_include_directories(

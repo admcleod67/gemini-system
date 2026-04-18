@@ -62,6 +62,14 @@ std::string stringFromStackValue(const Value& v, const char* ctx) {
 
 } // namespace
 
+    std::ostream& Runtime::out() const {
+        return outStream_ ? *outStream_ : std::cout;
+    }
+
+    void Runtime::setOutputStream(std::ostream* out) {
+        outStream_ = out;
+    }
+
     Runtime::Runtime()
         : ip_(0) {
     }
@@ -117,13 +125,13 @@ std::string stringFromStackValue(const Value& v, const char* ctx) {
 
                 case OpCode::PrintInt: {
                     int v = intFromStackValue(pop(), "PRINT_INT");
-                    std::cout << v << std::endl;
+                    out() << v << std::endl;
                     break;
                 }
 
                 case OpCode::PrintStr: {
                     std::string v = stringFromStackValue(pop(), "PRINT_STR");
-                    std::cout << v << std::endl;
+                    out() << v << std::endl;
                     break;
                 }
 
@@ -155,15 +163,15 @@ std::string stringFromStackValue(const Value& v, const char* ctx) {
     }
 
     void Runtime::dumpStack() const {
-        std::cout << "Stack: [ ";
+        out() << "Stack: [ ";
         for (const auto &v: stack_) {
             if (std::holds_alternative<int>(v)) {
-                std::cout << std::get<int>(v) << " ";
+                out() << std::get<int>(v) << " ";
             } else {
-                std::cout << "\"" << std::get<std::string>(v) << "\" ";
+                out() << "\"" << std::get<std::string>(v) << "\" ";
             }
         }
-        std::cout << "]\n";
+        out() << "]\n";
     }
 
 } // namespace PickVM

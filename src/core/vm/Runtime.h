@@ -5,6 +5,7 @@
 #ifndef PICK_SYSTEM_VM_RUNTIME_H
 #define PICK_SYSTEM_VM_RUNTIME_H
 
+#include <iosfwd>
 #include <string>
 #include <variant>
 #include <vector>
@@ -34,6 +35,9 @@ namespace PickVM {
     public:
         Runtime();
 
+        // nullptr selects std::cout (default). Used by tests to capture PRINT / dumpStack.
+        void setOutputStream(std::ostream* out);
+
         void loadProgram(const std::vector<Instruction> &program);
 
         void run();
@@ -48,6 +52,9 @@ namespace PickVM {
         std::vector<Instruction> program_;
         std::vector<Value> stack_;
         std::size_t ip_; // Instruction pointer
+        mutable std::ostream* outStream_{nullptr};
+
+        std::ostream& out() const;
 
         // Helpers
         void push(const Value &v);
