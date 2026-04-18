@@ -1,0 +1,8 @@
+# Build and print "Hello, world"
+
+start:
+    PUSH_STR "Hello"
+    PUSH_STR ", world"
+    CONCAT
+    PRINT_STR
+    HALT

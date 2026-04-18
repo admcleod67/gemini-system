@@ -1,0 +1,4 @@
+start:
+    PUSH_STR "Hello, world"
+    PRINT_STR
+    HALT

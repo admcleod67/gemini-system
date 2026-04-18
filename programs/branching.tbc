@@ -1,0 +1,19 @@
+# If x == 0 print "zero" else print "nonzero"
+
+start:
+    PUSH_INT 0      # change to 1 to test other branch
+    DUP
+    JZ is_zero
+    JUMP is_nonzero
+
+is_zero:
+    PUSH_STR "zero"
+    PRINT_STR
+    JUMP end
+
+is_nonzero:
+    PUSH_STR "nonzero"
+    PRINT_STR
+
+end:
+    HALT

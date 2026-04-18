@@ -1,0 +1,14 @@
+# Countdown from 5 to 1
+
+start:
+    PUSH_INT 5
+loop:
+    DUP
+    PRINT_INT
+    PUSH_INT 1
+    SUB
+    DUP
+    JZ end
+    JUMP loop
+end:
+    HALT

@@ -1,0 +1,13 @@
+# Push three values, duplicate, drop, print
+
+start:
+    PUSH_INT 10
+    PUSH_INT 20
+    PUSH_INT 30
+    DUP
+    PRINT_INT      # prints 30
+    DROP
+    PRINT_INT      # prints 30
+    PRINT_INT      # prints 20
+    PRINT_INT      # prints 10
+    HALT
