@@ -2,7 +2,7 @@
 // Created by Allan McLeod on 18/04/2026.
 //
 
-#include "VM.h"
+#include "Runtime.h"
 
 #include <iostream>
 #include <sstream>
@@ -62,21 +62,21 @@ std::string stringFromStackValue(const Value& v, const char* ctx) {
 
 } // namespace
 
-    VM::VM()
+    Runtime::Runtime()
         : ip_(0) {
     }
 
-    void VM::loadProgram(const std::vector<Instruction> &program) {
+    void Runtime::loadProgram(const std::vector<Instruction> &program) {
         program_ = program;
         ip_ = 0;
         stack_.clear();
     }
 
-    void VM::push(const Value &v) {
+    void Runtime::push(const Value &v) {
         stack_.push_back(v);
     }
 
-    Value VM::pop() {
+    Value Runtime::pop() {
         if (stack_.empty()) {
             throw std::runtime_error("VM stack underflow");
         }
@@ -85,7 +85,7 @@ std::string stringFromStackValue(const Value& v, const char* ctx) {
         return v;
     }
 
-    void VM::run() {
+    void Runtime::run() {
         while (ip_ < program_.size()) {
             const Instruction &instr = program_[ip_];
 
@@ -154,7 +154,7 @@ std::string stringFromStackValue(const Value& v, const char* ctx) {
         }
     }
 
-    void VM::dumpStack() const {
+    void Runtime::dumpStack() const {
         std::cout << "Stack: [ ";
         for (const auto &v: stack_) {
             if (std::holds_alternative<int>(v)) {

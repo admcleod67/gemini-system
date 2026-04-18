@@ -1,12 +1,12 @@
 include(${CMAKE_SOURCE_DIR}/cmake/PickSystemWarnings.cmake)
 
 add_library(pick-core
-        core/vm/VM.cpp
-        core/vm/VM.h
-        core/vm/Instructions.cpp
-        core/vm/Instructions.h
-        tcl/tcl.cpp
-        tcl/tcl.h
+        core/vm/Runtime.cpp
+        core/vm/Runtime.h
+        core/vm/Parser.cpp
+    core/vm/Parser.h
+        tcl/shell.cpp
+        tcl/shell.h
 )
 
 target_include_directories(

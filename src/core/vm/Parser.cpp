@@ -2,7 +2,7 @@
 // Created by Allan McLeod on 18/04/2026.
 //
 
-#include "Instructions.h"
+#include "Parser.h"
 
 #include <fstream>
 #include <sstream>
@@ -10,14 +10,14 @@
 
 namespace PickVM {
 
-static std::string trim(const std::string& s) {
+std::string Parser::trim(const std::string& s) {
     size_t a = s.find_first_not_of(" \t\n\r");
     if (a == std::string::npos) return "";
     size_t b = s.find_last_not_of(" \t\n\r");
     return s.substr(a, b - a + 1);
 }
 
-ParsedLine parseLine(const std::string& raw) {
+ParsedLine Parser::parseLine(const std::string& raw) {
     ParsedLine out;
     std::string line = trim(raw);
 
@@ -43,7 +43,7 @@ ParsedLine parseLine(const std::string& raw) {
     return out;
 }
 
-static void validateJumpTargets(const std::vector<Instruction>& program) {
+void Parser::validateJumpTargets(const std::vector<Instruction>& program) {
     for (std::size_t i = 0; i < program.size(); ++i) {
         const Instruction& inst = program[i];
         if (inst.op != OpCode::Jump && inst.op != OpCode::JumpIfZero) {
@@ -61,9 +61,9 @@ static void validateJumpTargets(const std::vector<Instruction>& program) {
     }
 }
 
-std::vector<Instruction> loadTextBytecodeStream(std::istream& in) {
-    std::vector<ParsedLine> lines;
-    std::unordered_map<std::string, int> labelMap;
+std::vector<Instruction> Parser::parse(std::istream& in) {
+    labelMap_.clear();
+    intermediateLines_.clear();
 
     // Pass 1: read lines and collect labels
     {
@@ -74,11 +74,11 @@ std::vector<Instruction> loadTextBytecodeStream(std::istream& in) {
             ++physLine;
             ParsedLine pl = parseLine(line);
             if (!pl.label.empty()) {
-                labelMap[pl.label] = index;
+                labelMap_[pl.label] = index;
             }
             if (!pl.opcode.empty()) {
                 pl.sourceLine = physLine;
-                lines.push_back(pl);
+                intermediateLines_.push_back(pl);
                 index++;
             }
         }
@@ -86,9 +86,9 @@ std::vector<Instruction> loadTextBytecodeStream(std::istream& in) {
 
     // Pass 2: convert to instructions
     std::vector<Instruction> program;
-    program.reserve(lines.size());
+    program.reserve(intermediateLines_.size());
 
-    for (const auto& pl : lines) {
+    for (const auto& pl : intermediateLines_) {
         Instruction inst;
 
         if (pl.opcode == "HALT") {
@@ -125,7 +125,7 @@ std::vector<Instruction> loadTextBytecodeStream(std::istream& in) {
         else if (pl.opcode == "JUMP") {
             inst.op = OpCode::Jump;
             try {
-                inst.operand = labelMap.at(pl.operand);
+                inst.operand = labelMap_.at(pl.operand);
             } catch (const std::out_of_range&) {
                 throw std::runtime_error(
                     "Unknown label for JUMP at line " + std::to_string(pl.sourceLine) + ": " + pl.operand);
@@ -134,7 +134,7 @@ std::vector<Instruction> loadTextBytecodeStream(std::istream& in) {
         else if (pl.opcode == "JZ") {
             inst.op = OpCode::JumpIfZero;
             try {
-                inst.operand = labelMap.at(pl.operand);
+                inst.operand = labelMap_.at(pl.operand);
             } catch (const std::out_of_range&) {
                 throw std::runtime_error(
                     "Unknown label for JZ at line " + std::to_string(pl.sourceLine) + ": " + pl.operand);
@@ -152,11 +152,11 @@ std::vector<Instruction> loadTextBytecodeStream(std::istream& in) {
     return program;
 }
 
-std::vector<Instruction> loadTextBytecode(const std::string& filename) {
+std::vector<Instruction> Parser::parseFile(const std::string& filename) {
     std::ifstream in(filename);
     if (!in)
         throw std::runtime_error("Cannot open bytecode file: " + filename);
-    return loadTextBytecodeStream(in);
+    return parse(in);
 }
 
 } // namespace PickVM

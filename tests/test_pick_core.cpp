@@ -6,44 +6,47 @@
 #include <variant>
 #include <vector>
 
-#include "Instructions.h"
-#include "VM.h"
+#include "Parser.h"
+#include "Runtime.h"
 
 using PickVM::Instruction;
 using PickVM::OpCode;
-using PickVM::VM;
+using PickVM::Runtime;
 using PickVM::Value;
 
 TEST_CASE("parseLine empty and comment") {
-    auto a = PickVM::parseLine("");
-    CHECK(a.opcode.empty());
-    auto b = PickVM::parseLine("   ");
-    CHECK(b.opcode.empty());
-    auto c = PickVM::parseLine("# comment");
-    CHECK(c.opcode.empty());
+    PickVM::Parser parser;
+    std::istringstream in("");
+    auto prog = parser.parse(in);
+    CHECK(prog.empty());
 }
 
-TEST_CASE("parseLine opcode and operand") {
-    auto pl = PickVM::parseLine("PUSH_INT 42");
-    CHECK(pl.label.empty());
-    CHECK(pl.opcode == "PUSH_INT");
-    CHECK(pl.operand == "42");
+TEST_CASE("parse opcode and operand") {
+    PickVM::Parser parser;
+    std::istringstream in("PUSH_INT 42\nHALT");
+    auto prog = parser.parse(in);
+    REQUIRE(prog.size() == 2);
+    CHECK(prog[0].op == OpCode::PushInt);
+    CHECK(std::get<int>(prog[0].operand) == 42);
 }
 
-TEST_CASE("parseLine label and quoted string") {
-    auto pl = PickVM::parseLine("start: PUSH_STR \"hello\"");
-    CHECK(pl.label == "start");
-    CHECK(pl.opcode == "PUSH_STR");
-    CHECK(pl.operand == "\"hello\"");
+TEST_CASE("parse label and quoted string") {
+    PickVM::Parser parser;
+    std::istringstream in("start: PUSH_STR \"hello\"\nHALT");
+    auto prog = parser.parse(in);
+    REQUIRE(prog.size() == 2);
+    CHECK(prog[0].op == OpCode::PushStr);
+    CHECK(std::get<std::string>(prog[0].operand) == "hello");
 }
 
-TEST_CASE("loadTextBytecodeStream minimal program") {
+TEST_CASE("parse minimal program") {
     std::istringstream in(
         "PUSH_INT 2\n"
         "PUSH_INT 3\n"
         "ADD\n"
         "HALT\n");
-    auto prog = PickVM::loadTextBytecodeStream(in);
+    PickVM::Parser parser;
+    auto prog = parser.parse(in);
     REQUIRE(prog.size() == 4);
     CHECK(prog[0].op == OpCode::PushInt);
     CHECK(std::get<int>(prog[0].operand) == 2);
@@ -53,18 +56,20 @@ TEST_CASE("loadTextBytecodeStream minimal program") {
     CHECK(prog[3].op == OpCode::Halt);
 }
 
-TEST_CASE("loadTextBytecodeStream jump target out of range") {
+TEST_CASE("parse jump target out of range") {
     std::istringstream in(
         "start: PUSH_INT 1\n"
         "JUMP end\n"
         "HALT\n"
         "end:\n");
-    CHECK_THROWS_AS(PickVM::loadTextBytecodeStream(in), std::runtime_error);
+    PickVM::Parser parser;
+    CHECK_THROWS_AS(parser.parse(in), std::runtime_error);
 }
 
-TEST_CASE("loadTextBytecodeStream invalid PUSH_INT") {
+TEST_CASE("parse invalid PUSH_INT") {
     std::istringstream in("PUSH_INT not_a_number\nHALT\n");
-    CHECK_THROWS_AS(PickVM::loadTextBytecodeStream(in), std::runtime_error);
+    PickVM::Parser parser;
+    CHECK_THROWS_AS(parser.parse(in), std::runtime_error);
 }
 
 TEST_CASE("VM push add halt stack") {
@@ -74,7 +79,7 @@ TEST_CASE("VM push add halt stack") {
         {OpCode::Add, Value{}},
         {OpCode::Halt, Value{}},
     };
-    VM vm;
+    Runtime vm;
     vm.loadProgram(prog);
     vm.run();
     REQUIRE(vm.stack().size() == 1);

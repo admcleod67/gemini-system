@@ -2,13 +2,12 @@
 // Created by Allan McLeod on 18/04/2026.
 //
 
-#ifndef PICK_SYSTEM_VM_H
-#define PICK_SYSTEM_VM_H
+#ifndef PICK_SYSTEM_VM_RUNTIME_H
+#define PICK_SYSTEM_VM_RUNTIME_H
 
 #include <string>
 #include <variant>
 #include <vector>
-#include <unordered_map>
 
 namespace PickVM {
 
@@ -31,9 +30,9 @@ namespace PickVM {
         Value operand; // Only used for PUSH_INT, PUSH_STR, JUMP targets, etc.
     };
 
-    class VM {
+    class Runtime {
     public:
-        VM();
+        Runtime();
 
         void loadProgram(const std::vector<Instruction> &program);
 
@@ -58,4 +57,4 @@ namespace PickVM {
 
 } // namespace PickVM
 
-#endif //PICK_SYSTEM_VM_H
+#endif // PICK_SYSTEM_VM_RUNTIME_H
