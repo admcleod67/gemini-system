@@ -21,11 +21,11 @@ target_compile_definitions(
 
 pick_system_enable_warnings(pick-core)
 
-add_executable(pick-system main.cpp)
+add_executable(pick-system Main.cpp)
 target_link_libraries(pick-system PRIVATE pick-core)
 pick_system_enable_warnings(pick-system)
 
-add_executable(pick-cli core/cli/main.cpp)
+add_executable(pick-cli core/cli/Main.cpp)
 target_link_libraries(pick-cli PRIVATE pick-core)
 pick_system_enable_warnings(pick-cli)
 

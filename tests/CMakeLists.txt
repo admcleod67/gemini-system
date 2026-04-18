@@ -16,10 +16,10 @@ target_include_directories(doctest_headers SYSTEM INTERFACE ${doctest_SOURCE_DIR
 
 add_executable(
         pick-tests
-        test_main.cpp
-        test_parser.cpp
-        test_runtime.cpp
-        test_shell.cpp
+        test_Main.cpp
+        test_Parser.cpp
+        test_Runtime.cpp
+        test_Shell.cpp
 )
 target_include_directories(
         pick-tests
