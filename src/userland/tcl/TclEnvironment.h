@@ -9,12 +9,16 @@
 
 #include <optional>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
 namespace PickShell {
+    // Names are case-insensitive; keys are stored in ASCII uppercase.
     class TclEnvironment {
     public:
+        [[nodiscard]] static std::string canonicalVariableName(std::string_view name);
+
         [[nodiscard]] bool set(std::string name, std::string value);
 
         [[nodiscard]] std::optional<std::string> get(const std::string &name) const;

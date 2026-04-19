@@ -44,6 +44,8 @@ namespace PickShell {
 
         void cmdEcho(const std::vector<std::string> &tokens, std::ostream &out);
 
+        [[nodiscard]] std::string expandEchoToken(const std::string &token) const;
+
         void cmdRun(const std::vector<std::string> &tokens, std::ostream &out);
 
         void cmdHelp(std::ostream &out);

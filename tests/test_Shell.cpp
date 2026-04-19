@@ -50,6 +50,46 @@ TEST_CASE("shell ECHO spacing") {
     CHECK(out.str() == "one two\n");
 }
 
+TEST_CASE("shell ECHO variable substitution") {
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    std::ostringstream out;
+    bool quit = false;
+    sh.handleLine("SET GREETING hello", out, quit);
+    out.str("");
+    sh.handleLine("ECHO $greeting", out, quit);
+    CHECK(out.str() == "hello\n");
+}
+
+TEST_CASE("shell ECHO two variables and plus") {
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    std::ostringstream out;
+    bool quit = false;
+    sh.handleLine("SET A 10", out, quit);
+    sh.handleLine("SET B 20", out, quit);
+    out.str("");
+    sh.handleLine("ECHO $A + $B", out, quit);
+    CHECK(out.str() == "10 + 20\n");
+}
+
+TEST_CASE("shell ECHO unset variable empty and literal dollar") {
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    std::ostringstream out;
+    bool quit = false;
+    sh.handleLine("SET a x", out, quit);
+    out.str("");
+    sh.handleLine("ECHO $a $missing $a", out, quit);
+    CHECK(out.str() == "x  x\n");
+    out.str("");
+    sh.handleLine("ECHO $", out, quit);
+    CHECK(out.str() == "$\n");
+    out.str("");
+    sh.handleLine("ECHO $bad-name", out, quit);
+    CHECK(out.str() == "$bad-name\n");
+}
+
 TEST_CASE("shell QUIT sets quit") {
     PickVM::Runtime rt;
     PickShell::Shell sh(rt);
@@ -79,7 +119,7 @@ TEST_CASE("shell SET GET multi-token value") {
     CHECK_FALSE(quit);
     CHECK(out.str().empty());
     out.str("");
-    sh.handleLine("GET msg", out, quit);
+    sh.handleLine("GET MSG", out, quit);
     CHECK(out.str() == "hello world\n");
 }
 
@@ -127,7 +167,7 @@ TEST_CASE("shell LIST-VARS sorted and empty") {
     sh.handleLine("SET a 2", out, quit);
     out.str("");
     sh.handleLine("LIST-VARS", out, quit);
-    CHECK(out.str() == "Variables:\n  a\n  z\n");
+    CHECK(out.str() == "Variables:\n  A\n  Z\n");
 }
 
 TEST_CASE("shell LIST-VARS takes no arguments") {

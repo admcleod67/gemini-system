@@ -2,11 +2,13 @@
 #include <pick_system/version.hpp>
 
 #include <algorithm>
+#include <cctype>
 #include <cstddef>
 #include <iostream>
 #include <optional>
 #include <sstream>
 #include <filesystem>
+#include <string_view>
 #include <vector>
 
 namespace PickShell {
@@ -191,9 +193,39 @@ namespace PickShell {
         out << "Unknown command: " << cmd << "\n";
     }
 
+    namespace {
+        bool echoVarNameChar(const char c) {
+            return std::isalnum(static_cast<unsigned char>(c)) != 0 || c == '_';
+        }
+    } // namespace
+
+    std::string Shell::expandEchoToken(const std::string &token) const {
+        if (token.size() == 1 && token[0] == '$') {
+            return token;
+        }
+        if (token.size() >= 2 && token[0] == '$') {
+            bool ok = true;
+            for (std::size_t i = 1; i < token.size(); ++i) {
+                if (!echoVarNameChar(token[i])) {
+                    ok = false;
+                    break;
+                }
+            }
+            if (ok) {
+                const std::string_view tail(token.data() + 1, token.size() - 1);
+                return env_.get(std::string(tail)).value_or("");
+            }
+        }
+        return token;
+    }
+
     void Shell::cmdEcho(const std::vector<std::string> &tokens, std::ostream &out) {
-        for (size_t i = 1; i < tokens.size(); i++)
-            out << tokens[i] << (i == tokens.size() - 1 ? "" : " ");
+        for (size_t i = 1; i < tokens.size(); ++i) {
+            out << expandEchoToken(tokens[i]);
+            if (i + 1 < tokens.size()) {
+                out << ' ';
+            }
+        }
         out << "\n";
     }
 
@@ -402,8 +434,8 @@ namespace PickShell {
 
     void Shell::cmdHelp(std::ostream &out) {
         out << "Commands:\n";
-        out << "  ECHO <text>\n";
-        out << "  SET <name> <words...>   set variable (value = remaining tokens, may be empty)\n";
+        out << "  ECHO <text>   tokens space-separated; $Name expands (unset -> empty)\n";
+        out << "  SET <name> <words...>   set variable (names case-insensitive, stored uppercase)\n";
         out << "  GET <name>\n";
         out << "  LIST-VARS\n";
         out << "  UNSET <name>\n";

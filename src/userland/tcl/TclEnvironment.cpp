@@ -1,19 +1,29 @@
 #include "TclEnvironment.h"
 
 #include <algorithm>
+#include <cctype>
 #include <utility>
 
 namespace PickShell {
+    std::string TclEnvironment::canonicalVariableName(const std::string_view name) {
+        std::string out(name);
+        for (char &c: out) {
+            c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+        }
+        return out;
+    }
+
     bool TclEnvironment::set(std::string name, std::string value) {
         if (name.empty()) {
             return false;
         }
-        variables_[std::move(name)] = std::move(value);
+        variables_[canonicalVariableName(name)] = std::move(value);
         return true;
     }
 
     std::optional<std::string> TclEnvironment::get(const std::string &name) const {
-        const auto it = variables_.find(name);
+        const std::string key = canonicalVariableName(name);
+        const auto it = variables_.find(key);
         if (it == variables_.end()) {
             return std::nullopt;
         }
@@ -21,7 +31,8 @@ namespace PickShell {
     }
 
     bool TclEnvironment::unset(const std::string &name) {
-        return variables_.erase(name) != 0U;
+        const std::string key = canonicalVariableName(name);
+        return variables_.erase(key) != 0U;
     }
 
     std::vector<std::string> TclEnvironment::names() const {

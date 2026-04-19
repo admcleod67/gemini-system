@@ -12,9 +12,25 @@ TEST_CASE("TclEnvironment set get and overwrite") {
     CHECK(*env.get("a") == "2");
 }
 
+TEST_CASE("TclEnvironment set lower then upper same key") {
+    PickShell::TclEnvironment env;
+    CHECK(env.set("a", "1"));
+    CHECK(env.set("A", "2"));
+    REQUIRE(env.get("a"));
+    CHECK(*env.get("a") == "2");
+    CHECK(env.names().size() == 1);
+}
+
 TEST_CASE("TclEnvironment get missing returns nullopt") {
     PickShell::TclEnvironment env;
     CHECK_FALSE(env.get("missing").has_value());
+}
+
+TEST_CASE("TclEnvironment get case insensitive") {
+    PickShell::TclEnvironment env;
+    CHECK(env.set("greeting", "hi"));
+    REQUIRE(env.get("GREETING"));
+    CHECK(*env.get("GREETING") == "hi");
 }
 
 TEST_CASE("TclEnvironment set rejects empty name") {
@@ -37,9 +53,14 @@ TEST_CASE("TclEnvironment names sorted") {
     CHECK(env.set("m", "3"));
     const std::vector<std::string> n = env.names();
     REQUIRE(n.size() == 3);
-    CHECK(n[0] == "a");
-    CHECK(n[1] == "m");
-    CHECK(n[2] == "z");
+    CHECK(n[0] == "A");
+    CHECK(n[1] == "M");
+    CHECK(n[2] == "Z");
+}
+
+TEST_CASE("TclEnvironment canonicalVariableName") {
+    CHECK(PickShell::TclEnvironment::canonicalVariableName("foo") == "FOO");
+    CHECK(PickShell::TclEnvironment::canonicalVariableName("BAR") == "BAR");
 }
 
 TEST_CASE("TclEnvironment clear") {
