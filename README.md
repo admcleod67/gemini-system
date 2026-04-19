@@ -19,8 +19,14 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
-Artifacts include **`pick-system`** (minimal host entry point), **`pick-cli`** (interactive shell over the VM), and *
-*`pick-tests`** (unit tests).
+Artifacts include **`pick-system`** (minimal host entry point), **`pick-cli`** (interactive shell over the VM), and **`pick-tests`** (unit tests).
+
+## Documentation
+
+More detail lives under **[`docs/`](docs/README.md)**:
+
+- **[Bytecode VM](docs/vm.md)** — `.tbc` format, opcodes, parser and runtime.
+- **[Developer shell (TCL)](docs/tcl-shell.md)** — REPL commands, trace, breakpoints.
 
 ## Layout (high level)
 
@@ -30,6 +36,7 @@ Artifacts include **`pick-system`** (minimal host entry point), **`pick-cli`** (
 - **`include/pickvm/`** — public VM umbrella header (`core.hpp`)
 - **`tests/`** — **doctest**-based tests
 - **`programs/`** — sample `.tbc` bytecode files
+- **`docs/`** — VM and shell documentation
 
 ## License
 

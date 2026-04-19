@@ -1,0 +1,67 @@
+# Developer shell (TCL)
+
+The **Pick/TCL Developer Shell** is a small line-oriented REPL that loads **`.tbc`** bytecode, drives the VM (`PickVM::Runtime`), and offers debugging-oriented commands. It is built as the **`pick-tcl`** library and used by **`pick-system`** and **`pick-cli`**.
+
+- **Prompt:** `TCL> `
+- **Input:** one line per command; tokens are **whitespace-separated** (filenames with spaces are not supported in the tokenizer).
+
+## Programs directory
+
+**`RUN`** resolves relative paths against the **programs root** (default directory name **`programs`**, relative to the process current working directory unless changed in code via **`Shell::setProgramsRoot`**).
+
+**`LIST-PROGRAMS`** lists **`.tbc`** files in that root.
+
+## Commands
+
+| Command | Description |
+|---------|-------------|
+| **`HELP`** | Short command list (same information as this table, in the binary). |
+| **`VERSION`** | Title, project version string, and build date. |
+| **`QUIT`** | Exit the shell; clears loaded program state in the VM and shell-held bytecode metadata. |
+| **`ECHO`** … | Echo remaining tokens, space-separated. |
+| **`RUN`** *file* | Parse *file*, prune invalid breakpoints (see below), load into the VM, then execute (with trace/breakpoints as configured). |
+| **`RUN`** | **Resume** after a breakpoint: no filename, only when execution is **suspended** at a breakpoint; continues until the next breakpoint, **`HALT`**, or end of program. |
+| **`LIST-PROGRAMS`** | List `.tbc` files under the programs root. |
+| **`DUMP-STACK`** | Print the VM stack (uses the command output stream). |
+| **`TRACE ON`** / **`TRACE OFF`** | Enable or disable per-instruction tracing during **`RUN`** / resume loops. Does not require a loaded program. |
+| **`STEP`** | Single-step **one** instruction if a program is loaded; prints the same line format as trace for that step. |
+| **`BREAKPOINT`** *n* | Record a breakpoint at instruction index *n* (non-negative integer). May be set **before** any **`RUN`**. Label-based breakpoints are not supported. |
+| **`BREAKPOINTS`** | List breakpoints (sorted). If none: **`No breakpoints`**. |
+| **`CLEAR-BREAKPOINT`** *n* | Remove breakpoint *n*; if missing: **`No such breakpoint`**. |
+| **`CLEAR-BREAKPOINTS`** | Remove all breakpoints. |
+| **`DUMP-PROGRAM`** | Disassemble the **currently loaded** program (same mnemonic style as trace). |
+| **`DUMP-LABELS`** | Print **`label -> index`** for the loaded program, sorted by label name. If no labels: **`No labels`**. |
+
+Unknown first token: **`Unknown command: …`**.
+
+## Loaded program and messages
+
+These commands require a **program image** in the shell **and** a non-empty program in the VM (after a successful **`RUN`** parse/load, including when paused on a breakpoint or finished at **`HALT`**):
+
+- **`STEP`**, **`DUMP-PROGRAM`**, **`DUMP-LABELS`**
+
+Otherwise they print exactly:
+
+**`No program loaded`**
+
+**`STEP`** when the IP is already past the end (finished run): **`Program finished`**.
+
+## Trace and breakpoints
+
+- **Trace:** when **`TRACE ON`**, before each **`step()`**, the shell prints one line via **`formatInstructionLine`** (0-based IP, mnemonic, operands, optional **`(line L)`**). **`HALT`** is included as a line immediately before it executes.
+- **Breakpoints:** checked **before** executing the instruction at the current IP. On hit, the shell prints **`Breakpoint hit at`** *ip* and **does not** advance the IP until you **`STEP`**, **`RUN`** (resume), or clear breakpoints.
+- **Resume:** bare **`RUN`** sets a one-shot skip so the instruction at the stopped-at PC is not treated as a breakpoint again immediately, allowing progress after a hit.
+
+## Breakpoint validation
+
+On each successful **`RUN`** *file*, breakpoint indices **`>= program.size()`** are **removed** from the set and a single line is printed:
+
+**`Removed invalid breakpoint(s):`** *indices…* (sorted).
+
+## Errors
+
+Parse/runtime failures during **`RUN`** print **`Error:`** followed by the exception message. The VM’s output stream is cleared back to default after the attempt.
+
+## See also
+
+- [Bytecode VM](vm.md) — opcode reference and parser/runtime details.
