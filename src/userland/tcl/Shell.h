@@ -9,6 +9,7 @@
 
 #include <pickvm/core.hpp>
 
+#include "FileSystem.h"
 #include "TclEnvironment.h"
 
 #include <filesystem>
@@ -28,6 +29,11 @@ namespace PickShell {
 
         const std::filesystem::path &programsRoot() const { return programsRoot_; }
 
+        // Root for CREATE-FILE / DELETE-FILE / LIST-FILES / READ / WRITE (default "filesystem").
+        void setFileSystemRoot(std::filesystem::path root);
+
+        const std::filesystem::path &fileSystemRoot() const { return filesystemRoot_; }
+
         // One line of input; all command output goes to out. For interactive use, pass std::cout.
         void handleLine(const std::string &line, std::ostream &out, bool &quit);
 
@@ -37,6 +43,8 @@ namespace PickShell {
         PickVM::Runtime &runtime_;
         TclEnvironment env_;
         std::filesystem::path programsRoot_{"programs"};
+        std::filesystem::path filesystemRoot_{"filesystem"};
+        PickFS::FileSystem fileSystem_;
 
         static std::vector<std::string> tokenize(const std::string &line);
 
@@ -55,6 +63,16 @@ namespace PickShell {
         void cmdDumpStack(std::ostream &out);
 
         void cmdListPrograms(std::ostream &out);
+
+        void cmdCreateFile(const std::vector<std::string> &tokens, std::ostream &out);
+
+        void cmdDeleteFile(const std::vector<std::string> &tokens, std::ostream &out);
+
+        void cmdListFiles(const std::vector<std::string> &tokens, std::ostream &out);
+
+        void cmdRead(const std::vector<std::string> &tokens, std::ostream &out);
+
+        void cmdWrite(const std::vector<std::string> &tokens, std::ostream &out);
 
         void cmdTrace(const std::vector<std::string> &tokens, std::ostream &out);
 

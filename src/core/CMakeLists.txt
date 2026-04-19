@@ -5,6 +5,12 @@ add_library(pick-core
         vm/Parser.h
         vm/InstructionPrint.cpp
         vm/InstructionPrint.h
+        filesystem/Record.cpp
+        filesystem/Record.h
+        filesystem/Catalog.cpp
+        filesystem/Catalog.h
+        filesystem/FileSystem.cpp
+        filesystem/FileSystem.h
 )
 
 target_include_directories(
@@ -12,6 +18,7 @@ target_include_directories(
         PUBLIC
         "${CMAKE_SOURCE_DIR}/include"
         "${CMAKE_CURRENT_SOURCE_DIR}/vm"
+        "${CMAKE_CURRENT_SOURCE_DIR}/filesystem"
 )
 
 target_compile_definitions(

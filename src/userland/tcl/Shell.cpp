@@ -12,11 +12,16 @@
 
 namespace PickShell {
     Shell::Shell(PickVM::Runtime &runtime)
-        : runtime_(runtime) {
+        : runtime_(runtime), fileSystem_(filesystemRoot_) {
     }
 
     void Shell::setProgramsRoot(std::filesystem::path root) {
         programsRoot_ = std::move(root);
+    }
+
+    void Shell::setFileSystemRoot(std::filesystem::path root) {
+        filesystemRoot_ = std::move(root);
+        fileSystem_.setRoot(filesystemRoot_);
     }
 
     std::vector<std::string> Shell::tokenize(const std::string &line) {
@@ -138,6 +143,26 @@ namespace PickShell {
         }
         if (cmd == "LIST-PROGRAMS") {
             cmdListPrograms(out);
+            return;
+        }
+        if (cmd == "CREATE-FILE") {
+            cmdCreateFile(tokens, out);
+            return;
+        }
+        if (cmd == "DELETE-FILE") {
+            cmdDeleteFile(tokens, out);
+            return;
+        }
+        if (cmd == "LIST-FILES") {
+            cmdListFiles(tokens, out);
+            return;
+        }
+        if (cmd == "READ") {
+            cmdRead(tokens, out);
+            return;
+        }
+        if (cmd == "WRITE") {
+            cmdWrite(tokens, out);
             return;
         }
         if (cmd == "TRACE") {
@@ -451,6 +476,11 @@ namespace PickShell {
         out << "  RUN <file>     load and run a .tbc (paths relative to programs root)\n";
         out << "  RUN            resume after a breakpoint (same program in memory)\n";
         out << "  LIST-PROGRAMS\n";
+        out << "  CREATE-FILE <name>\n";
+        out << "  DELETE-FILE <name>\n";
+        out << "  LIST-FILES\n";
+        out << "  READ <file> <record-name>\n";
+        out << "  WRITE <file> <record-name> <value...>\n";
         out << "  DUMP-STACK\n";
         out << "  TRACE ON|OFF   trace each instruction before execution (when running)\n";
         out << "  STEP           single-step (requires loaded program)\n";
@@ -487,6 +517,86 @@ namespace PickShell {
             if (entry.path().extension() == ".tbc") {
                 out << "  " << entry.path().filename().string() << "\n";
             }
+        }
+    }
+
+    void Shell::cmdCreateFile(const std::vector<std::string> &tokens, std::ostream &out) {
+        if (tokens.size() < 2) {
+            out << "CREATE-FILE requires a filename\n";
+            return;
+        }
+        try {
+            fileSystem_.createFile(tokens[1]);
+        } catch (const std::exception &e) {
+            out << "Error: " << e.what() << "\n";
+        }
+    }
+
+    void Shell::cmdDeleteFile(const std::vector<std::string> &tokens, std::ostream &out) {
+        if (tokens.size() < 2) {
+            out << "DELETE-FILE requires a filename\n";
+            return;
+        }
+        try {
+            fileSystem_.deleteFile(tokens[1]);
+        } catch (const std::exception &e) {
+            out << "Error: " << e.what() << "\n";
+        }
+    }
+
+    void Shell::cmdListFiles(const std::vector<std::string> &tokens, std::ostream &out) {
+        if (tokens.size() > 1) {
+            out << "LIST-FILES takes no arguments\n";
+            return;
+        }
+        try {
+            const std::vector<std::string> names = fileSystem_.listFiles();
+            if (names.empty()) {
+                out << "No files\n";
+                return;
+            }
+            out << "Files:\n";
+            for (const std::string &name: names) {
+                out << "  " << name << '\n';
+            }
+        } catch (const std::exception &e) {
+            out << "Error: " << e.what() << "\n";
+        }
+    }
+
+    void Shell::cmdRead(const std::vector<std::string> &tokens, std::ostream &out) {
+        if (tokens.size() < 3) {
+            out << "READ requires a file and record name\n";
+            return;
+        }
+        try {
+            const std::optional<PickFS::Record> record = fileSystem_.read(tokens[1], tokens[2]);
+            if (!record) {
+                out << "No such record\n";
+                return;
+            }
+            out << record->value() << '\n';
+        } catch (const std::exception &e) {
+            out << "Error: " << e.what() << "\n";
+        }
+    }
+
+    void Shell::cmdWrite(const std::vector<std::string> &tokens, std::ostream &out) {
+        if (tokens.size() < 4) {
+            out << "WRITE requires a file, record name, and value\n";
+            return;
+        }
+        std::string value;
+        for (std::size_t i = 3; i < tokens.size(); ++i) {
+            if (i > 3) {
+                value += ' ';
+            }
+            value += tokens[i];
+        }
+        try {
+            fileSystem_.write(tokens[1], PickFS::Record(tokens[2], std::move(value)));
+        } catch (const std::exception &e) {
+            out << "Error: " << e.what() << "\n";
         }
     }
 } // namespace PickShell

@@ -300,6 +300,103 @@ TEST_CASE("shell LIST-PROGRAMS missing directory") {
     CHECK(out.str().find("Directory not found:") != std::string::npos);
 }
 
+TEST_CASE("shell CREATE-FILE LIST-FILES DELETE-FILE") {
+    auto dir = uniqueTempDir();
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(dir);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("LIST-FILES", out, quit);
+    CHECK(out.str() == "No files\n");
+
+    out.str("");
+    sh.handleLine("CREATE-FILE BP", out, quit);
+    CHECK(out.str().empty());
+
+    out.str("");
+    sh.handleLine("LIST-FILES", out, quit);
+    CHECK(out.str() == "Files:\n  BP\n");
+
+    out.str("");
+    sh.handleLine("DELETE-FILE BP", out, quit);
+    CHECK(out.str().empty());
+
+    out.str("");
+    sh.handleLine("LIST-FILES", out, quit);
+    CHECK(out.str() == "No files\n");
+}
+
+TEST_CASE("shell WRITE READ and overwrite record value") {
+    auto dir = uniqueTempDir();
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(dir);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("CREATE-FILE BP", out, quit);
+    out.str("");
+    sh.handleLine("WRITE BP HELLO 001*first value", out, quit);
+    CHECK(out.str().empty());
+
+    out.str("");
+    sh.handleLine("READ BP HELLO", out, quit);
+    CHECK(out.str() == "001*first value\n");
+
+    out.str("");
+    sh.handleLine("WRITE BP HELLO 002*second", out, quit);
+    CHECK(out.str().empty());
+
+    out.str("");
+    sh.handleLine("READ BP HELLO", out, quit);
+    CHECK(out.str() == "002*second\n");
+}
+
+TEST_CASE("shell filesystem command arity and missing record") {
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("CREATE-FILE", out, quit);
+    CHECK(out.str() == "CREATE-FILE requires a filename\n");
+
+    out.str("");
+    sh.handleLine("DELETE-FILE", out, quit);
+    CHECK(out.str() == "DELETE-FILE requires a filename\n");
+
+    out.str("");
+    sh.handleLine("LIST-FILES extra", out, quit);
+    CHECK(out.str() == "LIST-FILES takes no arguments\n");
+
+    out.str("");
+    sh.handleLine("READ BP", out, quit);
+    CHECK(out.str() == "READ requires a file and record name\n");
+
+    out.str("");
+    sh.handleLine("WRITE BP HELLO", out, quit);
+    CHECK(out.str() == "WRITE requires a file, record name, and value\n");
+}
+
+TEST_CASE("shell filesystem missing file and missing record") {
+    auto dir = uniqueTempDir();
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(dir);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("READ BP HELLO", out, quit);
+    CHECK(out.str().find("Error: File not found: BP") != std::string::npos);
+
+    out.str("");
+    sh.handleLine("CREATE-FILE BP", out, quit);
+    sh.handleLine("READ BP HELLO", out, quit);
+    CHECK(out.str() == "No such record\n");
+}
+
 TEST_CASE("shell DUMP-STACK routes dump to out") {
     PickVM::Runtime rt;
     std::vector<PickVM::Instruction> prog = {

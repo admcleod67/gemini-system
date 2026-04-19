@@ -11,6 +11,22 @@ The **Pick/TCL Developer Shell** is a small line-oriented REPL that loads **`.tb
 
 **`LIST-PROGRAMS`** lists **`.tbc`** files in that root.
 
+## Filesystem directory
+
+Filesystem commands use a separate root (default directory name **`filesystem`**, relative to the process current working directory unless changed in code via **`Shell::setFileSystemRoot`**).
+
+Each Pick file is stored as JSON:
+
+```json
+{
+  "name": "FILENAME",
+  "records": {
+    "KEY1": "raw record string",
+    "KEY2": "another record"
+  }
+}
+```
+
 ## Commands
 
 | Command | Description |
@@ -26,6 +42,11 @@ The **Pick/TCL Developer Shell** is a small line-oriented REPL that loads **`.tb
 | **`RUN`** *file* | Parse *file*, prune invalid breakpoints (see below), load into the VM, then execute (with trace/breakpoints as configured). |
 | **`RUN`** | **Resume** after a breakpoint: no filename, only when execution is **suspended** at a breakpoint; continues until the next breakpoint, **`HALT`**, or end of program. |
 | **`LIST-PROGRAMS`** | List `.tbc` files under the programs root. |
+| **`CREATE-FILE`** *name* | Create a Pick file in the filesystem root. Creates JSON with matching `name` and empty `records`. |
+| **`DELETE-FILE`** *name* | Delete a Pick file from the filesystem root. |
+| **`LIST-FILES`** | List Pick file names from the filesystem root (sorted). If none: **`No files`**. Takes no arguments. |
+| **`READ`** *file* *record-name* | Print record value if present; if missing record: **`No such record`**. |
+| **`WRITE`** *file* *record-name* *value…* | Upsert record value. Value is remaining tokens joined with single spaces. |
 | **`DUMP-STACK`** | Print the VM stack (uses the command output stream). |
 | **`TRACE ON`** / **`TRACE OFF`** | Enable or disable per-instruction tracing during **`RUN`** / resume loops. Does not require a loaded program. |
 | **`STEP`** | Single-step **one** instruction if a program is loaded; prints the same line format as trace for that step. |
@@ -44,7 +65,7 @@ Variables are **string key/value** pairs held by the shell (not the VM stack). N
 
 **`ECHO`:** each argument token is scanned for **`$$`** (escaped dollar), **`$Name`** substitution, and literal **`$`**. There is **no** expression evaluation. Unset **`$Name`** expands to an empty segment.
 
-Arity errors: **`SET`** / **`GET`** / **`UNSET`** without a name print a **`… requires a variable name`** line. Extra tokens on **`LIST-VARS`** print **`LIST-VARS takes no arguments`**.
+Arity errors: **`SET`** / **`GET`** / **`UNSET`** without a name print a **`… requires a variable name`** line. Extra tokens on **`LIST-VARS`** print **`LIST-VARS takes no arguments`**. Filesystem arity errors follow the same pattern (for example, **`READ requires a file and record name`**, **`WRITE requires a file, record name, and value`**).
 
 ## Loaded program and messages
 
@@ -72,7 +93,7 @@ On each successful **`RUN`** *file*, breakpoint indices **`>= program.size()`** 
 
 ## Errors
 
-Parse/runtime failures during **`RUN`** print **`Error:`** followed by the exception message. The VM’s output stream is cleared back to default after the attempt.
+Parse/runtime failures during **`RUN`** print **`Error:`** followed by the exception message. Filesystem command failures also print **`Error:`** with a specific reason (for example missing file or invalid JSON schema). The VM’s output stream is cleared back to default after **`RUN`** attempts.
 
 ## See also
 
