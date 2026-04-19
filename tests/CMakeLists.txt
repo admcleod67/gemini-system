@@ -20,6 +20,7 @@ add_executable(
         test_Parser.cpp
         test_Runtime.cpp
         test_Shell.cpp
+        test_TclEnvironment.cpp
 )
 target_link_libraries(pick-tests PRIVATE pick-tcl doctest_headers)
 target_compile_definitions(

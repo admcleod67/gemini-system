@@ -26,6 +26,8 @@ TEST_CASE("shell HELP") {
     CHECK_FALSE(quit);
     CHECK(out.str().find("ECHO") != std::string::npos);
     CHECK(out.str().find("RUN") != std::string::npos);
+    CHECK(out.str().find("SET") != std::string::npos);
+    CHECK(out.str().find("LIST-VARS") != std::string::npos);
 }
 
 TEST_CASE("shell VERSION contains project version string") {
@@ -66,6 +68,109 @@ TEST_CASE("shell unknown command") {
     sh.handleLine("XYZZY", out, quit);
     CHECK_FALSE(quit);
     CHECK(out.str() == "Unknown command: XYZZY\n");
+}
+
+TEST_CASE("shell SET GET multi-token value") {
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    std::ostringstream out;
+    bool quit = false;
+    sh.handleLine("SET msg hello world", out, quit);
+    CHECK_FALSE(quit);
+    CHECK(out.str().empty());
+    out.str("");
+    sh.handleLine("GET msg", out, quit);
+    CHECK(out.str() == "hello world\n");
+}
+
+TEST_CASE("shell SET empty value GET") {
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    std::ostringstream out;
+    bool quit = false;
+    sh.handleLine("SET empty", out, quit);
+    out.str("");
+    sh.handleLine("GET empty", out, quit);
+    CHECK(out.str() == "\n");
+}
+
+TEST_CASE("shell SET requires name") {
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    std::ostringstream out;
+    bool quit = false;
+    sh.handleLine("SET", out, quit);
+    CHECK(out.str() == "SET requires a variable name\n");
+}
+
+TEST_CASE("shell GET missing and arity") {
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    std::ostringstream out;
+    bool quit = false;
+    sh.handleLine("GET", out, quit);
+    CHECK(out.str() == "GET requires a variable name\n");
+    out.str("");
+    sh.handleLine("GET nope", out, quit);
+    CHECK(out.str() == "No such variable: nope\n");
+}
+
+TEST_CASE("shell LIST-VARS sorted and empty") {
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    std::ostringstream out;
+    bool quit = false;
+    sh.handleLine("LIST-VARS", out, quit);
+    CHECK(out.str() == "No variables\n");
+    out.str("");
+    sh.handleLine("SET z 1", out, quit);
+    sh.handleLine("SET a 2", out, quit);
+    out.str("");
+    sh.handleLine("LIST-VARS", out, quit);
+    CHECK(out.str() == "Variables:\n  a\n  z\n");
+}
+
+TEST_CASE("shell LIST-VARS takes no arguments") {
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    std::ostringstream out;
+    bool quit = false;
+    sh.handleLine("LIST-VARS extra", out, quit);
+    CHECK(out.str() == "LIST-VARS takes no arguments\n");
+}
+
+TEST_CASE("shell UNSET") {
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    std::ostringstream out;
+    bool quit = false;
+    sh.handleLine("SET x y", out, quit);
+    out.str("");
+    sh.handleLine("UNSET x", out, quit);
+    CHECK(out.str().empty());
+    out.str("");
+    sh.handleLine("GET x", out, quit);
+    CHECK(out.str() == "No such variable: x\n");
+    out.str("");
+    sh.handleLine("UNSET x", out, quit);
+    CHECK(out.str() == "No such variable\n");
+    out.str("");
+    sh.handleLine("UNSET", out, quit);
+    CHECK(out.str() == "UNSET requires a variable name\n");
+}
+
+TEST_CASE("shell QUIT clears variables") {
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    std::ostringstream out;
+    bool quit = false;
+    sh.handleLine("SET k v", out, quit);
+    sh.handleLine("QUIT", out, quit);
+    CHECK(quit);
+    quit = false;
+    out.str("");
+    sh.handleLine("GET k", out, quit);
+    CHECK(out.str() == "No such variable: k\n");
 }
 
 TEST_CASE("shell RUN requires filename") {

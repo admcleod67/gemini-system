@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <iostream>
+#include <optional>
 #include <sstream>
 #include <filesystem>
 #include <vector>
@@ -110,6 +111,7 @@ namespace PickShell {
             lastLoaded_.reset();
             suspended_ = false;
             resumePastBreakpointIp_.reset();
+            env_.clear();
             runtime_.loadProgram({});
             return;
         }
@@ -167,6 +169,22 @@ namespace PickShell {
         }
         if (cmd == "DUMP-LABELS") {
             cmdDumpLabels(out);
+            return;
+        }
+        if (cmd == "SET") {
+            cmdSet(tokens, out);
+            return;
+        }
+        if (cmd == "GET") {
+            cmdGet(tokens, out);
+            return;
+        }
+        if (cmd == "LIST-VARS") {
+            cmdListVars(tokens, out);
+            return;
+        }
+        if (cmd == "UNSET") {
+            cmdUnset(tokens, out);
             return;
         }
 
@@ -326,9 +344,69 @@ namespace PickShell {
         }
     }
 
+    void Shell::cmdSet(const std::vector<std::string> &tokens, std::ostream &out) {
+        if (tokens.size() < 2) {
+            out << "SET requires a variable name\n";
+            return;
+        }
+        std::string value;
+        for (size_t i = 2; i < tokens.size(); ++i) {
+            if (i > 2) {
+                value += ' ';
+            }
+            value += tokens[i];
+        }
+        if (!env_.set(tokens[1], std::move(value))) {
+            out << "Invalid variable name\n";
+        }
+    }
+
+    void Shell::cmdGet(const std::vector<std::string> &tokens, std::ostream &out) {
+        if (tokens.size() < 2) {
+            out << "GET requires a variable name\n";
+            return;
+        }
+        const std::optional<std::string> val = env_.get(tokens[1]);
+        if (!val) {
+            out << "No such variable: " << tokens[1] << '\n';
+            return;
+        }
+        out << *val << '\n';
+    }
+
+    void Shell::cmdListVars(const std::vector<std::string> &tokens, std::ostream &out) {
+        if (tokens.size() > 1) {
+            out << "LIST-VARS takes no arguments\n";
+            return;
+        }
+        const std::vector<std::string> names = env_.names();
+        if (names.empty()) {
+            out << "No variables\n";
+            return;
+        }
+        out << "Variables:\n";
+        for (const std::string &n: names) {
+            out << "  " << n << '\n';
+        }
+    }
+
+    void Shell::cmdUnset(const std::vector<std::string> &tokens, std::ostream &out) {
+        if (tokens.size() < 2) {
+            out << "UNSET requires a variable name\n";
+            return;
+        }
+        if (!env_.unset(tokens[1])) {
+            out << "No such variable\n";
+        }
+    }
+
     void Shell::cmdHelp(std::ostream &out) {
         out << "Commands:\n";
         out << "  ECHO <text>\n";
+        out << "  SET <name> <words...>   set variable (value = remaining tokens, may be empty)\n";
+        out << "  GET <name>\n";
+        out << "  LIST-VARS\n";
+        out << "  UNSET <name>\n";
         out << "  RUN <file>     load and run a .tbc (paths relative to programs root)\n";
         out << "  RUN            resume after a breakpoint (same program in memory)\n";
         out << "  LIST-PROGRAMS\n";

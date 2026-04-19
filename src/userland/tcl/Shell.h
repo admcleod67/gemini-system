@@ -9,6 +9,8 @@
 
 #include <pickvm/core.hpp>
 
+#include "TclEnvironment.h"
+
 #include <filesystem>
 #include <iosfwd>
 #include <optional>
@@ -33,6 +35,7 @@ namespace PickShell {
 
     private:
         PickVM::Runtime &runtime_;
+        TclEnvironment env_;
         std::filesystem::path programsRoot_{"programs"};
 
         static std::vector<std::string> tokenize(const std::string &line);
@@ -66,6 +69,14 @@ namespace PickShell {
         void cmdDumpProgram(std::ostream &out);
 
         void cmdDumpLabels(std::ostream &out);
+
+        void cmdSet(const std::vector<std::string> &tokens, std::ostream &out);
+
+        void cmdGet(const std::vector<std::string> &tokens, std::ostream &out);
+
+        void cmdListVars(const std::vector<std::string> &tokens, std::ostream &out);
+
+        void cmdUnset(const std::vector<std::string> &tokens, std::ostream &out);
 
         void executeVmLoop(std::ostream &out);
 

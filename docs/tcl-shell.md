@@ -17,8 +17,12 @@ The **Pick/TCL Developer Shell** is a small line-oriented REPL that loads **`.tb
 |---------|-------------|
 | **`HELP`** | Short command list (same information as this table, in the binary). |
 | **`VERSION`** | Title, project version string, and build date. |
-| **`QUIT`** | Exit the shell; clears loaded program state in the VM and shell-held bytecode metadata. |
+| **`QUIT`** | Exit the shell; clears loaded program state in the VM, shell-held bytecode metadata, and **shell variables**. |
 | **`ECHO`** … | Echo remaining tokens, space-separated. |
+| **`SET`** *name* *word…* | Set a **shell variable** (case-sensitive *name*). The value is the remaining tokens joined with single spaces; **`SET`** *name* alone sets an empty string. Variable names must be non-empty. |
+| **`GET`** *name* | Print the variable’s value and a newline. If unset: **`No such variable:`** *name*. |
+| **`LIST-VARS`** | List variable names (sorted), each on its own line under a **`Variables:`** header. If none: **`No variables`**. Takes no arguments. |
+| **`UNSET`** *name* | Remove *name*. If it was not set: **`No such variable`**. |
 | **`RUN`** *file* | Parse *file*, prune invalid breakpoints (see below), load into the VM, then execute (with trace/breakpoints as configured). |
 | **`RUN`** | **Resume** after a breakpoint: no filename, only when execution is **suspended** at a breakpoint; continues until the next breakpoint, **`HALT`**, or end of program. |
 | **`LIST-PROGRAMS`** | List `.tbc` files under the programs root. |
@@ -33,6 +37,12 @@ The **Pick/TCL Developer Shell** is a small line-oriented REPL that loads **`.tb
 | **`DUMP-LABELS`** | Print **`label -> index`** for the loaded program, sorted by label name. If no labels: **`No labels`**. |
 
 Unknown first token: **`Unknown command: …`**.
+
+## Shell variables
+
+Variables are **string key/value** pairs held by the shell (not the VM stack). Names are **case-sensitive**. Because input is whitespace-tokenized with no quoting, values **cannot contain spaces** unless you express them as multiple tokens (which are joined with single spaces), same idea as **`ECHO`**.
+
+Arity errors: **`SET`** / **`GET`** / **`UNSET`** without a name print a **`… requires a variable name`** line. Extra tokens on **`LIST-VARS`** print **`LIST-VARS takes no arguments`**.
 
 ## Loaded program and messages
 

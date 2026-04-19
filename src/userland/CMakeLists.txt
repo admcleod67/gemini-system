@@ -1,6 +1,8 @@
 add_library(pick-tcl
         tcl/Shell.cpp
         tcl/Shell.h
+        tcl/TclEnvironment.cpp
+        tcl/TclEnvironment.h
 )
 
 target_include_directories(
