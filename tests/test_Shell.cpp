@@ -354,6 +354,42 @@ TEST_CASE("shell WRITE READ and overwrite record value") {
     CHECK(out.str() == "002*second\n");
 }
 
+TEST_CASE("shell LIST file shows sorted record names") {
+    auto dir = uniqueTempDir();
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(dir);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("CREATE-FILE BP", out, quit);
+    sh.handleLine("WRITE BP ZREC z", out, quit);
+    sh.handleLine("WRITE BP AREC a", out, quit);
+
+    out.str("");
+    sh.handleLine("LIST BP", out, quit);
+    CHECK(out.str() == "Records:\n  AREC\n  ZREC\n");
+}
+
+TEST_CASE("shell LIST file empty and arity") {
+    auto dir = uniqueTempDir();
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(dir);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("CREATE-FILE BP", out, quit);
+
+    out.str("");
+    sh.handleLine("LIST BP", out, quit);
+    CHECK(out.str() == "No records\n");
+
+    out.str("");
+    sh.handleLine("LIST", out, quit);
+    CHECK(out.str() == "LIST requires a filename\n");
+}
+
 TEST_CASE("shell filesystem command arity and missing record") {
     PickVM::Runtime rt;
     PickShell::Shell sh(rt);
@@ -389,6 +425,10 @@ TEST_CASE("shell filesystem missing file and missing record") {
     bool quit = false;
 
     sh.handleLine("READ BP HELLO", out, quit);
+    CHECK(out.str().find("Error: File not found: BP") != std::string::npos);
+
+    out.str("");
+    sh.handleLine("LIST BP", out, quit);
     CHECK(out.str().find("Error: File not found: BP") != std::string::npos);
 
     out.str("");

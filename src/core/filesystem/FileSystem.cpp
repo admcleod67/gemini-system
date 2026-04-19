@@ -344,6 +344,17 @@ namespace PickFS {
         return names;
     }
 
+    std::vector<std::string> FileSystem::listRecordNames(const std::string &fileName) const {
+        const StoredFile stored = loadFile(fileName);
+        std::vector<std::string> names;
+        names.reserve(stored.records.size());
+        for (const auto &entry: stored.records) {
+            names.push_back(entry.first);
+        }
+        std::sort(names.begin(), names.end());
+        return names;
+    }
+
     FileSystem::StoredFile FileSystem::loadFile(const std::string &fileName) const {
         const std::filesystem::path path = catalog_.filePath(fileName);
         std::error_code ec;

@@ -38,6 +38,8 @@ namespace PickFS {
 
         std::vector<std::string> listFiles() const;
 
+        std::vector<std::string> listRecordNames(const std::string &fileName) const;
+
     private:
         struct StoredFile {
             std::string name;

@@ -157,6 +157,10 @@ namespace PickShell {
             cmdListFiles(tokens, out);
             return;
         }
+        if (cmd == "LIST") {
+            cmdList(tokens, out);
+            return;
+        }
         if (cmd == "READ") {
             cmdRead(tokens, out);
             return;
@@ -479,6 +483,7 @@ namespace PickShell {
         out << "  CREATE-FILE <name>\n";
         out << "  DELETE-FILE <name>\n";
         out << "  LIST-FILES\n";
+        out << "  LIST <file>    list record names for a file\n";
         out << "  READ <file> <record-name>\n";
         out << "  WRITE <file> <record-name> <value...>\n";
         out << "  DUMP-STACK\n";
@@ -556,6 +561,26 @@ namespace PickShell {
                 return;
             }
             out << "Files:\n";
+            for (const std::string &name: names) {
+                out << "  " << name << '\n';
+            }
+        } catch (const std::exception &e) {
+            out << "Error: " << e.what() << "\n";
+        }
+    }
+
+    void Shell::cmdList(const std::vector<std::string> &tokens, std::ostream &out) {
+        if (tokens.size() != 2) {
+            out << "LIST requires a filename\n";
+            return;
+        }
+        try {
+            const std::vector<std::string> names = fileSystem_.listRecordNames(tokens[1]);
+            if (names.empty()) {
+                out << "No records\n";
+                return;
+            }
+            out << "Records:\n";
             for (const std::string &name: names) {
                 out << "  " << name << '\n';
             }
