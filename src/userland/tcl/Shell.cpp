@@ -8,7 +8,6 @@
 #include <optional>
 #include <sstream>
 #include <filesystem>
-#include <string_view>
 #include <vector>
 
 namespace PickShell {
@@ -200,23 +199,33 @@ namespace PickShell {
     } // namespace
 
     std::string Shell::expandEchoToken(const std::string &token) const {
-        if (token.size() == 1 && token[0] == '$') {
-            return token;
-        }
-        if (token.size() >= 2 && token[0] == '$') {
-            bool ok = true;
-            for (std::size_t i = 1; i < token.size(); ++i) {
-                if (!echoVarNameChar(token[i])) {
-                    ok = false;
-                    break;
+        std::string out;
+        out.reserve(token.size());
+        for (std::size_t i = 0; i < token.size();) {
+            if (token[i] == '$' && i + 1 < token.size() && token[i + 1] == '$') {
+                out.push_back('$');
+                i += 2;
+                continue;
+            }
+            if (token[i] == '$' && i + 1 < token.size() && echoVarNameChar(token[i + 1])) {
+                std::size_t j = i + 1;
+                while (j < token.size() && echoVarNameChar(token[j])) {
+                    ++j;
                 }
+                const std::string name(token.data() + i + 1, j - i - 1);
+                out += env_.get(name).value_or("");
+                i = j;
+                continue;
             }
-            if (ok) {
-                const std::string_view tail(token.data() + 1, token.size() - 1);
-                return env_.get(std::string(tail)).value_or("");
+            if (token[i] == '$') {
+                out.push_back('$');
+                ++i;
+                continue;
             }
+            out.push_back(token[i]);
+            ++i;
         }
-        return token;
+        return out;
     }
 
     void Shell::cmdEcho(const std::vector<std::string> &tokens, std::ostream &out) {
@@ -434,7 +443,7 @@ namespace PickShell {
 
     void Shell::cmdHelp(std::ostream &out) {
         out << "Commands:\n";
-        out << "  ECHO <text>   tokens space-separated; $Name expands (unset -> empty)\n";
+        out << "  ECHO <text>   $Name expands; $$ -> $; other $ literal; unset -> empty\n";
         out << "  SET <name> <words...>   set variable (names case-insensitive, stored uppercase)\n";
         out << "  GET <name>\n";
         out << "  LIST-VARS\n";

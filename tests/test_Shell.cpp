@@ -86,8 +86,18 @@ TEST_CASE("shell ECHO unset variable empty and literal dollar") {
     sh.handleLine("ECHO $", out, quit);
     CHECK(out.str() == "$\n");
     out.str("");
+    sh.handleLine("ECHO $$A", out, quit);
+    CHECK(out.str() == "$A\n");
+    out.str("");
+    sh.handleLine("ECHO $$", out, quit);
+    CHECK(out.str() == "$\n");
+    out.str("");
     sh.handleLine("ECHO $bad-name", out, quit);
-    CHECK(out.str() == "$bad-name\n");
+    CHECK(out.str() == "-name\n");
+    out.str("");
+    sh.handleLine("SET bad x", out, quit);
+    sh.handleLine("ECHO $bad-name", out, quit);
+    CHECK(out.str() == "x-name\n");
 }
 
 TEST_CASE("shell QUIT sets quit") {

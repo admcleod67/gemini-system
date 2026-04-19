@@ -18,7 +18,7 @@ The **Pick/TCL Developer Shell** is a small line-oriented REPL that loads **`.tb
 | **`HELP`** | Short command list (same information as this table, in the binary). |
 | **`VERSION`** | Title, project version string, and build date. |
 | **`QUIT`** | Exit the shell; clears loaded program state in the VM, shell-held bytecode metadata, and **shell variables**. |
-| **`ECHO`** … | Echo remaining tokens, **space-separated**. A token of the form **`$Name`** ( **`Name`** = letters, digits, underscore; not a lone **`$`**) is replaced by that variable’s value, or nothing if unset. **`$`** alone is echoed literally. |
+| **`ECHO`** … | Echo remaining tokens, **space-separated**. Within each token, scan left to right: **`$$`** becomes a single **`$`**; **`$Name`** ( **`Name`** = letters, digits, underscore, at least one character) is replaced by that variable’s value, or nothing if unset; any other **`$`** is echoed literally. |
 | **`SET`** *name* *word…* | Set a **shell variable**. Names are **case-insensitive**; the canonical name is **ASCII uppercase** (what **`LIST-VARS`** shows). The value is the remaining tokens joined with single spaces; **`SET`** *name* alone sets an empty string. Variable names must be non-empty. |
 | **`GET`** *name* | Print the variable’s value and a newline. If unset: **`No such variable:`** *name* (as you typed it). |
 | **`LIST-VARS`** | List variable names in **ASCII uppercase** (sorted), each on its own line under a **`Variables:`** header. If none: **`No variables`**. Takes no arguments. |
@@ -42,7 +42,7 @@ Unknown first token: **`Unknown command: …`**.
 
 Variables are **string key/value** pairs held by the shell (not the VM stack). Names are **case-insensitive**; the shell stores and lists them in **ASCII uppercase** (see **`LIST-VARS`**). Because input is whitespace-tokenized with no quoting, values **cannot contain spaces** unless you express them as multiple tokens (which are joined with single spaces), same idea as **`ECHO`**.
 
-**`ECHO`:** each argument token is either expanded (**`$Name`**) or printed as-is. There is **no** expression evaluation (only substitution). Unset **`$Name`** expands to an empty segment.
+**`ECHO`:** each argument token is scanned for **`$$`** (escaped dollar), **`$Name`** substitution, and literal **`$`**. There is **no** expression evaluation. Unset **`$Name`** expands to an empty segment.
 
 Arity errors: **`SET`** / **`GET`** / **`UNSET`** without a name print a **`… requires a variable name`** line. Extra tokens on **`LIST-VARS`** print **`LIST-VARS takes no arguments`**.
 
