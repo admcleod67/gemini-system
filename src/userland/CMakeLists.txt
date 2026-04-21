@@ -1,6 +1,14 @@
 add_library(pick-tcl
+        basic/BasicProgram.cpp
+        basic/BasicProgram.h
+        basic/BasicShell.cpp
+        basic/BasicShell.h
+        basic/BasicCompiler.cpp
+        basic/BasicCompiler.h
         tcl/Shell.cpp
         tcl/Shell.h
+        tcl/ShellSession.cpp
+        tcl/ShellSession.h
         tcl/TclEnvironment.cpp
         tcl/TclEnvironment.h
 )
@@ -8,6 +16,7 @@ add_library(pick-tcl
 target_include_directories(
         pick-tcl
         PUBLIC
+        "${CMAKE_CURRENT_SOURCE_DIR}/basic"
         "${CMAKE_CURRENT_SOURCE_DIR}/tcl"
 )
 

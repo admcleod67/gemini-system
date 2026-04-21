@@ -31,7 +31,8 @@ More detail lives under **[`docs/`](docs/README.md)**:
 ## Layout (high level)
 
 - **`src/core/vm/`** — bytecode parser and VM runtime (`pick-core`)
-- **`src/userland/tcl/`** — developer shell (`Shell`, `pick-tcl`)
+- **`src/userland/tcl/`** — Tcl host shell and VM/filesystem command integration
+- **`src/userland/basic/`** — BASIC editor/runtime shell components (compiler scaffold included)
 - **`include/pick_system/`** — shared headers (e.g. version)
 - **`include/pickvm/`** — public VM umbrella header (`core.hpp`)
 - **`tests/`** — **doctest**-based tests

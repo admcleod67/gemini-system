@@ -578,3 +578,219 @@ TEST_CASE("shell breakpoint hit then STEP then RUN completes") {
     REQUIRE(rt.stack().size() == 1);
     CHECK(std::get<int>(rt.stack()[0]) == 30);
 }
+
+TEST_CASE("shell BASIC sample session edit flow") {
+    auto dir = uniqueTempDir();
+    std::filesystem::create_directories(dir);
+
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setProgramsRoot(dir);
+
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("BASIC HELLO", out, quit);
+    CHECK_FALSE(quit);
+    CHECK(out.str().empty());
+
+    sh.handleLine("10 PRINT \"HELLO\"", out, quit);
+    sh.handleLine("20 GOTO 10", out, quit);
+    out.str("");
+
+    sh.handleLine("LIST", out, quit);
+    CHECK(out.str() == "10 PRINT \"HELLO\"\n20 GOTO 10\n");
+
+    out.str("");
+    sh.handleLine("EDIT 10", out, quit);
+    CHECK(out.str().empty());
+
+    out.str("");
+    sh.handleLine("C/HELLO/WORLD/", out, quit);
+    sh.handleLine("FI", out, quit);
+    CHECK(out.str().empty());
+
+    out.str("");
+    sh.handleLine("LIST", out, quit);
+    CHECK(out.str() == "10 PRINT \"WORLD\"\n20 GOTO 10\n");
+
+    out.str("");
+    sh.handleLine("RENUM", out, quit);
+    CHECK(out.str().empty());
+
+    out.str("");
+    sh.handleLine("LIST", out, quit);
+    CHECK(out.str() == "10 PRINT \"WORLD\"\n20 GOTO 10\n");
+
+    out.str("");
+    sh.handleLine("QUIT", out, quit);
+    CHECK_FALSE(quit);
+    CHECK(out.str().empty());
+
+    out.str("");
+    sh.handleLine("LIST", out, quit);
+    CHECK(out.str() == "LIST requires a filename\n");
+}
+
+TEST_CASE("shell BASIC SAVE requires name when unnamed") {
+    auto dir = uniqueTempDir();
+    std::filesystem::create_directories(dir);
+
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setProgramsRoot(dir);
+
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("BASIC", out, quit);
+    sh.handleLine("10 PRINT \"HELLO\"", out, quit);
+    out.str("");
+
+    sh.handleLine("SAVE", out, quit);
+    CHECK(out.str() == "No program name specified\n");
+}
+
+TEST_CASE("shell BASIC SAVE with explicit name persists and autoloads") {
+    auto dir = uniqueTempDir();
+    std::filesystem::create_directories(dir);
+
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setProgramsRoot(dir);
+
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("BASIC", out, quit);
+    sh.handleLine("10 PRINT \"HELLO\"", out, quit);
+    out.str("");
+    sh.handleLine("SAVE HELLO", out, quit);
+    CHECK(out.str().empty());
+    CHECK(std::filesystem::exists(dir / "HELLO"));
+
+    sh.handleLine("QUIT", out, quit);
+    out.str("");
+    sh.handleLine("BASIC HELLO", out, quit);
+    sh.handleLine("LIST", out, quit);
+    CHECK(out.str() == "10 PRINT \"HELLO\"\n");
+}
+
+TEST_CASE("shell BASIC named entry missing file starts empty and creates on SAVE only") {
+    auto dir = uniqueTempDir();
+    std::filesystem::create_directories(dir);
+
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setProgramsRoot(dir);
+
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("BASIC HELLO", out, quit);
+    CHECK_FALSE(std::filesystem::exists(dir / "HELLO"));
+    out.str("");
+
+    sh.handleLine("LIST", out, quit);
+    CHECK(out.str().empty());
+    CHECK_FALSE(std::filesystem::exists(dir / "HELLO"));
+
+    sh.handleLine("10 PRINT \"HELLO\"", out, quit);
+    out.str("");
+    sh.handleLine("SAVE", out, quit);
+    CHECK(out.str().empty());
+    CHECK(std::filesystem::exists(dir / "HELLO"));
+}
+
+TEST_CASE("shell BASIC EDIT requires existing line") {
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("BASIC", out, quit);
+    out.str("");
+    sh.handleLine("EDIT 10", out, quit);
+    CHECK(out.str() == "No such line: 10\n");
+}
+
+TEST_CASE("shell BASIC DELETE supports line and ranges") {
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("BASIC", out, quit);
+    sh.handleLine("10 A", out, quit);
+    sh.handleLine("20 B", out, quit);
+    sh.handleLine("30 C", out, quit);
+    sh.handleLine("40 D", out, quit);
+
+    out.str("");
+    sh.handleLine("DELETE 20-30", out, quit);
+    CHECK(out.str().empty());
+
+    out.str("");
+    sh.handleLine("LIST", out, quit);
+    CHECK(out.str() == "10 A\n40 D\n");
+
+    out.str("");
+    sh.handleLine("DELETE 10", out, quit);
+    sh.handleLine("LIST", out, quit);
+    CHECK(out.str() == "40 D\n");
+}
+
+TEST_CASE("shell BASIC DELETE rejects malformed ranges") {
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("BASIC", out, quit);
+    sh.handleLine("10 A", out, quit);
+    sh.handleLine("20 B", out, quit);
+
+    out.str("");
+    sh.handleLine("DELETE 20-10", out, quit);
+    CHECK(out.str() == "DELETE requires a line number or range\n");
+
+    out.str("");
+    sh.handleLine("LIST", out, quit);
+    CHECK(out.str() == "10 A\n20 B\n");
+}
+
+TEST_CASE("shell BASIC SAVE and BASIC command arity errors") {
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("BASIC A B", out, quit);
+    CHECK(out.str() == "BASIC takes at most one program name\n");
+
+    out.str("");
+    sh.handleLine("BASIC", out, quit);
+    sh.handleLine("SAVE A B", out, quit);
+    CHECK(out.str() == "SAVE takes at most one filename\n");
+}
+
+TEST_CASE("shell ED mode malformed substitute command is rejected") {
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("BASIC", out, quit);
+    sh.handleLine("10 PRINT \"HELLO\"", out, quit);
+    sh.handleLine("EDIT 10", out, quit);
+
+    out.str("");
+    sh.handleLine("C/HELLO/WORLD/ extra", out, quit);
+    CHECK(out.str() == "Invalid edit command\n");
+
+    out.str("");
+    sh.handleLine("C/HELLO/WORLD/", out, quit);
+    sh.handleLine("FI", out, quit);
+    sh.handleLine("LIST", out, quit);
+    CHECK(out.str() == "10 PRINT \"WORLD\"\n");
+}

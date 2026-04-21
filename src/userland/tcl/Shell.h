@@ -7,16 +7,15 @@
 
 #pragma once
 
-#include <pickvm/core.hpp>
-
-#include "FileSystem.h"
-#include "TclEnvironment.h"
+#include "BasicShell.h"
+#include "ShellSession.h"
 
 #include <filesystem>
+#include <functional>
 #include <iosfwd>
 #include <optional>
 #include <string>
-#include <unordered_set>
+#include <unordered_map>
 #include <vector>
 
 namespace PickShell {
@@ -27,12 +26,12 @@ namespace PickShell {
         // Root for LIST-PROGRAMS and relative RUN paths (default "programs").
         void setProgramsRoot(std::filesystem::path root);
 
-        const std::filesystem::path &programsRoot() const { return programsRoot_; }
+        const std::filesystem::path &programsRoot() const { return session_.programsRoot(); }
 
         // Root for CREATE-FILE / DELETE-FILE / LIST-FILES / READ / WRITE (default "filesystem").
         void setFileSystemRoot(std::filesystem::path root);
 
-        const std::filesystem::path &fileSystemRoot() const { return filesystemRoot_; }
+        const std::filesystem::path &fileSystemRoot() const { return session_.fileSystemRoot(); }
 
         // One line of input; all command output goes to out. For interactive use, pass std::cout.
         void handleLine(const std::string &line, std::ostream &out, bool &quit);
@@ -40,15 +39,25 @@ namespace PickShell {
         void run(); // REPL: stdin, prompts on std::cout, command output on std::cout
 
     private:
-        PickVM::Runtime &runtime_;
-        TclEnvironment env_;
-        std::filesystem::path programsRoot_{"programs"};
-        std::filesystem::path filesystemRoot_{"filesystem"};
-        PickFS::FileSystem fileSystem_;
+        using Tokens = std::vector<std::string>;
+        using CommandFn = std::function<void(const Tokens &, std::ostream &, bool &)>;
+        using CommandTable = std::unordered_map<std::string, CommandFn>;
+
+        ShellSession session_;
+        BasicShell basicShell_;
+        CommandTable tclCommands_;
 
         static std::vector<std::string> tokenize(const std::string &line);
 
         void dispatch(const std::vector<std::string> &tokens, bool &quit, std::ostream &out);
+
+        [[nodiscard]] std::string prompt() const;
+
+        void registerCommands();
+
+        void registerTclCommands();
+
+        void handleTclCommand(const Tokens &tokens, bool &quit, std::ostream &out);
 
         void cmdEcho(const std::vector<std::string> &tokens, std::ostream &out);
 
@@ -99,18 +108,6 @@ namespace PickShell {
         void cmdListVars(const std::vector<std::string> &tokens, std::ostream &out);
 
         void cmdUnset(const std::vector<std::string> &tokens, std::ostream &out);
-
-        void executeVmLoop(std::ostream &out);
-
-        void pruneBreakpointsForProgram(std::size_t programSize, std::ostream &out);
-
-        bool programImageLoaded() const;
-
-        std::optional<PickVM::LoadedBytecode> lastLoaded_;
-        bool trace_{false};
-        std::unordered_set<std::size_t> breakpoints_;
-        bool suspended_{false};
-        std::optional<std::size_t> resumePastBreakpointIp_;
     };
 } // namespace PickShell
 

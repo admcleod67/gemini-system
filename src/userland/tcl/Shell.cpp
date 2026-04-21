@@ -1,27 +1,29 @@
 #include "Shell.h"
+
 #include <pick_system/version.hpp>
 
 #include <algorithm>
 #include <cctype>
-#include <cstddef>
+#include <filesystem>
 #include <iostream>
 #include <optional>
 #include <sstream>
-#include <filesystem>
 #include <vector>
 
 namespace PickShell {
     Shell::Shell(PickVM::Runtime &runtime)
-        : runtime_(runtime), fileSystem_(filesystemRoot_) {
+        : session_(runtime) {
+        basicShell_.setProgramsRoot(session_.programsRoot());
+        registerCommands();
     }
 
     void Shell::setProgramsRoot(std::filesystem::path root) {
-        programsRoot_ = std::move(root);
+        session_.setProgramsRoot(std::move(root));
+        basicShell_.setProgramsRoot(session_.programsRoot());
     }
 
     void Shell::setFileSystemRoot(std::filesystem::path root) {
-        filesystemRoot_ = std::move(root);
-        fileSystem_.setRoot(filesystemRoot_);
+        session_.setFileSystemRoot(std::move(root));
     }
 
     std::vector<std::string> Shell::tokenize(const std::string &line) {
@@ -39,186 +41,105 @@ namespace PickShell {
 
         bool quit = false;
         while (!quit) {
-            std::cout << "TCL> " << std::flush;
+            std::cout << prompt() << std::flush;
             std::string line;
             if (!std::getline(std::cin, line))
                 break;
-
             handleLine(line, std::cout, quit);
         }
     }
 
     void Shell::handleLine(const std::string &line, std::ostream &out, bool &quit) {
         auto tokens = tokenize(line);
-        if (!tokens.empty())
+        if (!tokens.empty()) {
             dispatch(tokens, quit, out);
-    }
-
-    bool Shell::programImageLoaded() const {
-        return lastLoaded_.has_value() && runtime_.isLoaded();
-    }
-
-    void Shell::pruneBreakpointsForProgram(const std::size_t programSize, std::ostream &out) {
-        std::vector<std::size_t> removed;
-        for (auto it = breakpoints_.begin(); it != breakpoints_.end();) {
-            if (*it >= programSize) {
-                removed.push_back(*it);
-                it = breakpoints_.erase(it);
-            } else {
-                ++it;
-            }
-        }
-        if (!removed.empty()) {
-            std::sort(removed.begin(), removed.end());
-            out << "Removed invalid breakpoint(s):";
-            for (const std::size_t r: removed) {
-                out << ' ' << r;
-            }
-            out << '\n';
         }
     }
 
-    void Shell::executeVmLoop(std::ostream &out) {
-        if (!lastLoaded_) {
-            return;
+    std::string Shell::prompt() const {
+        if (basicShell_.isActive()) {
+            return basicShell_.prompt();
         }
-        const auto &prog = lastLoaded_->program;
-        while (runtime_.instructionPointer() < prog.size()) {
-            const std::size_t ip = runtime_.instructionPointer();
-            const bool skipBpOnce = resumePastBreakpointIp_ && *resumePastBreakpointIp_ == ip;
-            if (skipBpOnce) {
-                resumePastBreakpointIp_.reset();
-            }
+        return "TCL> ";
+    }
 
-            if (!skipBpOnce && breakpoints_.count(ip) != 0U) {
-                out << "Breakpoint hit at " << ip << '\n';
-                suspended_ = true;
-                break;
-            }
+    void Shell::registerCommands() {
+        registerTclCommands();
+    }
 
-            if (trace_) {
-                const PickVM::Instruction &instr = prog[ip];
-                out << PickVM::formatInstructionLine(ip, instr, &*lastLoaded_) << '\n';
+    void Shell::registerTclCommands() {
+        tclCommands_["QUIT"] = [this](const Tokens &, std::ostream &out, bool &quit) {
+            out << "Exiting shell\n";
+            quit = true;
+            session_.resetForQuit();
+        };
+        tclCommands_["HELP"] = [this](const Tokens &, std::ostream &out, bool &) { cmdHelp(out); };
+        tclCommands_["VERSION"] = [this](const Tokens &, std::ostream &out, bool &) { cmdVersion(out); };
+        tclCommands_["ECHO"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdEcho(tokens, out); };
+        tclCommands_["RUN"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdRun(tokens, out); };
+        tclCommands_["DUMP-STACK"] = [this](const Tokens &, std::ostream &out, bool &) { cmdDumpStack(out); };
+        tclCommands_["LIST-PROGRAMS"] = [this](const Tokens &, std::ostream &out, bool &) { cmdListPrograms(out); };
+        tclCommands_["CREATE-FILE"] = [this](const Tokens &tokens, std::ostream &out, bool &) {
+            cmdCreateFile(tokens, out);
+        };
+        tclCommands_["DELETE-FILE"] = [this](const Tokens &tokens, std::ostream &out, bool &) {
+            cmdDeleteFile(tokens, out);
+        };
+        tclCommands_["LIST-FILES"] = [this](const Tokens &tokens, std::ostream &out, bool &) {
+            cmdListFiles(tokens, out);
+        };
+        tclCommands_["LIST"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdList(tokens, out); };
+        tclCommands_["READ"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdRead(tokens, out); };
+        tclCommands_["WRITE"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdWrite(tokens, out); };
+        tclCommands_["TRACE"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdTrace(tokens, out); };
+        tclCommands_["STEP"] = [this](const Tokens &, std::ostream &out, bool &) { cmdStep(out); };
+        tclCommands_["BREAKPOINT"] = [this](const Tokens &tokens, std::ostream &out, bool &) {
+            cmdBreakpoint(tokens, out);
+        };
+        tclCommands_["BREAKPOINTS"] = [this](const Tokens &, std::ostream &out, bool &) { cmdBreakpoints(out); };
+        tclCommands_["CLEAR-BREAKPOINT"] = [this](const Tokens &tokens, std::ostream &out, bool &) {
+            cmdClearBreakpoint(tokens, out);
+        };
+        tclCommands_["CLEAR-BREAKPOINTS"] = [this](const Tokens &, std::ostream &out, bool &) {
+            cmdClearBreakpoints(out);
+        };
+        tclCommands_["DUMP-PROGRAM"] = [this](const Tokens &, std::ostream &out, bool &) { cmdDumpProgram(out); };
+        tclCommands_["DUMP-LABELS"] = [this](const Tokens &, std::ostream &out, bool &) { cmdDumpLabels(out); };
+        tclCommands_["SET"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdSet(tokens, out); };
+        tclCommands_["GET"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdGet(tokens, out); };
+        tclCommands_["LIST-VARS"] = [this](const Tokens &tokens, std::ostream &out, bool &) {
+            cmdListVars(tokens, out);
+        };
+        tclCommands_["UNSET"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdUnset(tokens, out); };
+        tclCommands_["BASIC"] = [this](const Tokens &tokens, std::ostream &out, bool &) {
+            if (tokens.size() > 2) {
+                out << "BASIC takes at most one program name\n";
+                return;
             }
-
-            if (!runtime_.step()) {
-                suspended_ = false;
-                break;
+            std::optional<std::string> programName;
+            if (tokens.size() == 2) {
+                programName = tokens[1];
             }
-        }
+            basicShell_.enter(programName, out);
+        };
     }
 
     void Shell::dispatch(const std::vector<std::string> &tokens, bool &quit, std::ostream &out) {
-        const std::string &cmd = tokens[0];
+        if (basicShell_.isActive()) {
+            bool leaveBasic = false;
+            basicShell_.handleCommand(tokens, out, leaveBasic);
+            return;
+        }
+        handleTclCommand(tokens, quit, out);
+    }
 
-        if (cmd == "QUIT") {
-            out << "Exiting shell\n";
-            quit = true;
-            lastLoaded_.reset();
-            suspended_ = false;
-            resumePastBreakpointIp_.reset();
-            env_.clear();
-            runtime_.loadProgram({});
+    void Shell::handleTclCommand(const Tokens &tokens, bool &quit, std::ostream &out) {
+        const auto it = tclCommands_.find(tokens[0]);
+        if (it == tclCommands_.end()) {
+            out << "Unknown command: " << tokens[0] << "\n";
             return;
         }
-        if (cmd == "HELP") {
-            cmdHelp(out);
-            return;
-        }
-        if (cmd == "VERSION") {
-            cmdVersion(out);
-            return;
-        }
-        if (cmd == "ECHO") {
-            cmdEcho(tokens, out);
-            return;
-        }
-        if (cmd == "RUN") {
-            cmdRun(tokens, out);
-            return;
-        }
-        if (cmd == "DUMP-STACK") {
-            cmdDumpStack(out);
-            return;
-        }
-        if (cmd == "LIST-PROGRAMS") {
-            cmdListPrograms(out);
-            return;
-        }
-        if (cmd == "CREATE-FILE") {
-            cmdCreateFile(tokens, out);
-            return;
-        }
-        if (cmd == "DELETE-FILE") {
-            cmdDeleteFile(tokens, out);
-            return;
-        }
-        if (cmd == "LIST-FILES") {
-            cmdListFiles(tokens, out);
-            return;
-        }
-        if (cmd == "LIST") {
-            cmdList(tokens, out);
-            return;
-        }
-        if (cmd == "READ") {
-            cmdRead(tokens, out);
-            return;
-        }
-        if (cmd == "WRITE") {
-            cmdWrite(tokens, out);
-            return;
-        }
-        if (cmd == "TRACE") {
-            cmdTrace(tokens, out);
-            return;
-        }
-        if (cmd == "STEP") {
-            cmdStep(out);
-            return;
-        }
-        if (cmd == "BREAKPOINT") {
-            cmdBreakpoint(tokens, out);
-            return;
-        }
-        if (cmd == "BREAKPOINTS") {
-            cmdBreakpoints(out);
-            return;
-        }
-        if (cmd == "CLEAR-BREAKPOINTS") {
-            cmdClearBreakpoints(out);
-            return;
-        }
-        if (cmd == "CLEAR-BREAKPOINT") {
-            cmdClearBreakpoint(tokens, out);
-            return;
-        }
-        if (cmd == "DUMP-PROGRAM") {
-            cmdDumpProgram(out);
-            return;
-        }
-        if (cmd == "DUMP-LABELS") {
-            cmdDumpLabels(out);
-            return;
-        }
-        if (cmd == "SET") {
-            cmdSet(tokens, out);
-            return;
-        }
-        if (cmd == "GET") {
-            cmdGet(tokens, out);
-            return;
-        }
-        if (cmd == "LIST-VARS") {
-            cmdListVars(tokens, out);
-            return;
-        }
-        if (cmd == "UNSET") {
-            cmdUnset(tokens, out);
-            return;
-        }
-
-        out << "Unknown command: " << cmd << "\n";
+        it->second(tokens, out, quit);
     }
 
     namespace {
@@ -242,7 +163,7 @@ namespace PickShell {
                     ++j;
                 }
                 const std::string name(token.data() + i + 1, j - i - 1);
-                out += env_.get(name).value_or("");
+                out += session_.env_.get(name).value_or("");
                 i = j;
                 continue;
             }
@@ -269,39 +190,39 @@ namespace PickShell {
 
     void Shell::cmdRun(const std::vector<std::string> &tokens, std::ostream &out) {
         if (tokens.size() == 1) {
-            if (!suspended_) {
+            if (!session_.suspended_) {
                 out << "RUN requires a filename\n";
                 return;
             }
-            if (!programImageLoaded()) {
-                suspended_ = false;
+            if (!session_.programImageLoaded()) {
+                session_.suspended_ = false;
                 out << "RUN requires a filename\n";
                 return;
             }
-            resumePastBreakpointIp_ = runtime_.instructionPointer();
-            runtime_.setOutputStream(&out);
-            executeVmLoop(out);
-            runtime_.setOutputStream(nullptr);
+            session_.resumePastBreakpointIp_ = session_.runtime_.instructionPointer();
+            session_.runtime_.setOutputStream(&out);
+            session_.executeVmLoop(out);
+            session_.runtime_.setOutputStream(nullptr);
             return;
         }
 
         std::filesystem::path filePath(tokens[1]);
         if (filePath.is_relative() && !std::filesystem::exists(filePath))
-            filePath = programsRoot_ / filePath;
+            filePath = session_.programsRoot_ / filePath;
 
         try {
             PickVM::Parser parser;
             PickVM::LoadedBytecode loaded = parser.parseFile(filePath.string());
-            pruneBreakpointsForProgram(loaded.program.size(), out);
-            lastLoaded_ = std::move(loaded);
-            runtime_.setOutputStream(&out);
-            runtime_.loadProgram(lastLoaded_->program);
-            suspended_ = false;
-            resumePastBreakpointIp_.reset();
-            executeVmLoop(out);
-            runtime_.setOutputStream(nullptr);
+            session_.pruneBreakpointsForProgram(loaded.program.size(), out);
+            session_.lastLoaded_ = std::move(loaded);
+            session_.runtime_.setOutputStream(&out);
+            session_.runtime_.loadProgram(session_.lastLoaded_->program);
+            session_.suspended_ = false;
+            session_.resumePastBreakpointIp_.reset();
+            session_.executeVmLoop(out);
+            session_.runtime_.setOutputStream(nullptr);
         } catch (const std::exception &e) {
-            runtime_.setOutputStream(nullptr);
+            session_.runtime_.setOutputStream(nullptr);
             out << "Error: " << e.what() << "\n";
         }
     }
@@ -312,33 +233,33 @@ namespace PickShell {
             return;
         }
         if (tokens[1] == "ON") {
-            trace_ = true;
+            session_.trace_ = true;
             return;
         }
         if (tokens[1] == "OFF") {
-            trace_ = false;
+            session_.trace_ = false;
             return;
         }
         out << "TRACE requires ON or OFF\n";
     }
 
     void Shell::cmdStep(std::ostream &out) {
-        if (!programImageLoaded()) {
+        if (!session_.programImageLoaded()) {
             out << "No program loaded\n";
             return;
         }
-        if (runtime_.instructionPointer() >= lastLoaded_->program.size()) {
+        if (session_.runtime_.instructionPointer() >= session_.lastLoaded_->program.size()) {
             out << "Program finished\n";
             return;
         }
-        suspended_ = false;
-        resumePastBreakpointIp_.reset();
-        const std::size_t ip = runtime_.instructionPointer();
-        const PickVM::Instruction &instr = lastLoaded_->program[ip];
-        out << PickVM::formatInstructionLine(ip, instr, &*lastLoaded_) << '\n';
-        runtime_.setOutputStream(&out);
-        runtime_.step();
-        runtime_.setOutputStream(nullptr);
+        session_.suspended_ = false;
+        session_.resumePastBreakpointIp_.reset();
+        const std::size_t ip = session_.runtime_.instructionPointer();
+        const PickVM::Instruction &instr = session_.lastLoaded_->program[ip];
+        out << PickVM::formatInstructionLine(ip, instr, &*session_.lastLoaded_) << '\n';
+        session_.runtime_.setOutputStream(&out);
+        session_.runtime_.step();
+        session_.runtime_.setOutputStream(nullptr);
     }
 
     void Shell::cmdBreakpoint(const std::vector<std::string> &tokens, std::ostream &out) {
@@ -348,18 +269,18 @@ namespace PickShell {
         }
         try {
             const std::size_t n = static_cast<std::size_t>(std::stoull(tokens[1]));
-            breakpoints_.insert(n);
+            session_.breakpoints_.insert(n);
         } catch (const std::exception &) {
             out << "BREAKPOINT requires a non-negative integer index\n";
         }
     }
 
     void Shell::cmdBreakpoints(std::ostream &out) {
-        if (breakpoints_.empty()) {
+        if (session_.breakpoints_.empty()) {
             out << "No breakpoints\n";
             return;
         }
-        std::vector<std::size_t> sorted(breakpoints_.begin(), breakpoints_.end());
+        std::vector<std::size_t> sorted(session_.breakpoints_.begin(), session_.breakpoints_.end());
         std::sort(sorted.begin(), sorted.end());
         out << "Breakpoints:";
         for (const std::size_t b: sorted) {
@@ -375,7 +296,7 @@ namespace PickShell {
         }
         try {
             const std::size_t n = static_cast<std::size_t>(std::stoull(tokens[1]));
-            if (breakpoints_.erase(n) == 0U) {
+            if (session_.breakpoints_.erase(n) == 0U) {
                 out << "No such breakpoint\n";
             }
         } catch (const std::exception &) {
@@ -385,29 +306,29 @@ namespace PickShell {
 
     void Shell::cmdClearBreakpoints(std::ostream &out) {
         (void) out;
-        breakpoints_.clear();
+        session_.breakpoints_.clear();
     }
 
     void Shell::cmdDumpProgram(std::ostream &out) {
-        if (!programImageLoaded()) {
+        if (!session_.programImageLoaded()) {
             out << "No program loaded\n";
             return;
         }
-        for (std::size_t i = 0; i < lastLoaded_->program.size(); ++i) {
-            out << PickVM::formatInstructionLine(i, lastLoaded_->program[i], &*lastLoaded_) << '\n';
+        for (std::size_t i = 0; i < session_.lastLoaded_->program.size(); ++i) {
+            out << PickVM::formatInstructionLine(i, session_.lastLoaded_->program[i], &*session_.lastLoaded_) << '\n';
         }
     }
 
     void Shell::cmdDumpLabels(std::ostream &out) {
-        if (!programImageLoaded()) {
+        if (!session_.programImageLoaded()) {
             out << "No program loaded\n";
             return;
         }
-        if (lastLoaded_->labels.empty()) {
+        if (session_.lastLoaded_->labels.empty()) {
             out << "No labels\n";
             return;
         }
-        std::vector<std::pair<std::string, int>> pairs(lastLoaded_->labels.begin(), lastLoaded_->labels.end());
+        std::vector<std::pair<std::string, int>> pairs(session_.lastLoaded_->labels.begin(), session_.lastLoaded_->labels.end());
         std::sort(pairs.begin(), pairs.end(), [](const auto &a, const auto &b) { return a.first < b.first; });
         for (const auto &p: pairs) {
             out << p.first << " -> " << p.second << '\n';
@@ -426,7 +347,7 @@ namespace PickShell {
             }
             value += tokens[i];
         }
-        if (!env_.set(tokens[1], std::move(value))) {
+        if (!session_.env_.set(tokens[1], std::move(value))) {
             out << "Invalid variable name\n";
         }
     }
@@ -436,7 +357,7 @@ namespace PickShell {
             out << "GET requires a variable name\n";
             return;
         }
-        const std::optional<std::string> val = env_.get(tokens[1]);
+        const std::optional<std::string> val = session_.env_.get(tokens[1]);
         if (!val) {
             out << "No such variable: " << tokens[1] << '\n';
             return;
@@ -449,7 +370,7 @@ namespace PickShell {
             out << "LIST-VARS takes no arguments\n";
             return;
         }
-        const std::vector<std::string> names = env_.names();
+        const std::vector<std::string> names = session_.env_.names();
         if (names.empty()) {
             out << "No variables\n";
             return;
@@ -465,7 +386,7 @@ namespace PickShell {
             out << "UNSET requires a variable name\n";
             return;
         }
-        if (!env_.unset(tokens[1])) {
+        if (!session_.env_.unset(tokens[1])) {
             out << "No such variable\n";
         }
     }
@@ -477,6 +398,7 @@ namespace PickShell {
         out << "  GET <name>\n";
         out << "  LIST-VARS\n";
         out << "  UNSET <name>\n";
+        out << "  BASIC [name]   enter BASIC editor mode\n";
         out << "  RUN <file>     load and run a .tbc (paths relative to programs root)\n";
         out << "  RUN            resume after a breakpoint (same program in memory)\n";
         out << "  LIST-PROGRAMS\n";
@@ -505,20 +427,20 @@ namespace PickShell {
     }
 
     void Shell::cmdDumpStack(std::ostream &out) {
-        runtime_.setOutputStream(&out);
-        runtime_.dumpStack();
-        runtime_.setOutputStream(nullptr);
+        session_.runtime_.setOutputStream(&out);
+        session_.runtime_.dumpStack();
+        session_.runtime_.setOutputStream(nullptr);
     }
 
     void Shell::cmdListPrograms(std::ostream &out) {
         std::error_code ec;
-        if (!std::filesystem::exists(programsRoot_, ec)) {
-            out << "Directory not found: " << programsRoot_.string() << "\n";
+        if (!std::filesystem::exists(session_.programsRoot_, ec)) {
+            out << "Directory not found: " << session_.programsRoot_.string() << "\n";
             return;
         }
 
         out << "Programs:\n";
-        for (const auto &entry: std::filesystem::directory_iterator(programsRoot_)) {
+        for (const auto &entry: std::filesystem::directory_iterator(session_.programsRoot_)) {
             if (entry.path().extension() == ".tbc") {
                 out << "  " << entry.path().filename().string() << "\n";
             }
@@ -531,7 +453,7 @@ namespace PickShell {
             return;
         }
         try {
-            fileSystem_.createFile(tokens[1]);
+            session_.fileSystem_.createFile(tokens[1]);
         } catch (const std::exception &e) {
             out << "Error: " << e.what() << "\n";
         }
@@ -543,7 +465,7 @@ namespace PickShell {
             return;
         }
         try {
-            fileSystem_.deleteFile(tokens[1]);
+            session_.fileSystem_.deleteFile(tokens[1]);
         } catch (const std::exception &e) {
             out << "Error: " << e.what() << "\n";
         }
@@ -555,7 +477,7 @@ namespace PickShell {
             return;
         }
         try {
-            const std::vector<std::string> names = fileSystem_.listFiles();
+            const std::vector<std::string> names = session_.fileSystem_.listFiles();
             if (names.empty()) {
                 out << "No files\n";
                 return;
@@ -575,7 +497,7 @@ namespace PickShell {
             return;
         }
         try {
-            const std::vector<std::string> names = fileSystem_.listRecordNames(tokens[1]);
+            const std::vector<std::string> names = session_.fileSystem_.listRecordNames(tokens[1]);
             if (names.empty()) {
                 out << "No records\n";
                 return;
@@ -595,7 +517,7 @@ namespace PickShell {
             return;
         }
         try {
-            const std::optional<PickFS::Record> record = fileSystem_.read(tokens[1], tokens[2]);
+            const std::optional<PickFS::Record> record = session_.fileSystem_.read(tokens[1], tokens[2]);
             if (!record) {
                 out << "No such record\n";
                 return;
@@ -619,7 +541,7 @@ namespace PickShell {
             value += tokens[i];
         }
         try {
-            fileSystem_.write(tokens[1], PickFS::Record(tokens[2], std::move(value)));
+            session_.fileSystem_.write(tokens[1], PickFS::Record(tokens[2], std::move(value)));
         } catch (const std::exception &e) {
             out << "Error: " << e.what() << "\n";
         }
