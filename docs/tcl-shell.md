@@ -1,10 +1,8 @@
-# Developer shell (TCL + BASIC)
+# Developer shell (TCL)
 
-The shell is a line-oriented REPL with multiple prompts/modes:
+The Tcl shell is the host REPL for VM/debug/filesystem commands.
 
-- **`TCL> `** — VM/debug/filesystem commands.
-- **`BASIC> `** — in-memory BASIC program editing commands.
-- **`ED> `** — single-line BASIC editor submode entered from `EDIT <line>`.
+- **Prompt:** `TCL> `
 
 Input is tokenized by whitespace (filenames with spaces are not supported by the tokenizer).
 
@@ -13,6 +11,7 @@ Input is tokenized by whitespace (filenames with spaces are not supported by the
 - Tcl host shell and VM/filesystem command integration: `src/userland/tcl/`
 - BASIC line buffer + BASIC/ED command interpreter: `src/userland/basic/`
 - BASIC compiler files exist as placeholders in `src/userland/basic/BasicCompiler.*` and are not wired yet.
+- BASIC mode command semantics are documented in [BASIC shell](basic-shell.md).
 
 ## Programs directory
 
@@ -48,7 +47,7 @@ Each Pick file is stored as JSON:
 | **`GET`** *name* | Print the variable’s value and a newline. If unset: **`No such variable:`** *name* (as you typed it). |
 | **`LIST-VARS`** | List variable names in **ASCII uppercase** (sorted), each on its own line under a **`Variables:`** header. If none: **`No variables`**. Takes no arguments. |
 | **`UNSET`** *name* | Remove *name*. If it was not set: **`No such variable`**. |
-| **`BASIC`** [*name*] | Enter BASIC mode. If *name* exists under the programs root, load it; otherwise start with an empty in-memory program. Entering BASIC alone starts unnamed. |
+| **`BASIC`** [*name*] | Enter BASIC mode. See [BASIC shell](basic-shell.md) for BASIC/ED commands and persistence rules. |
 | **`RUN`** *file* | Parse *file*, prune invalid breakpoints (see below), load into the VM, then execute (with trace/breakpoints as configured). |
 | **`RUN`** | **Resume** after a breakpoint: no filename, only when execution is **suspended** at a breakpoint; continues until the next breakpoint, **`HALT`**, or end of program. |
 | **`LIST-PROGRAMS`** | List `.tbc` files under the programs root. |
@@ -70,44 +69,12 @@ Each Pick file is stored as JSON:
 
 Unknown first token: **`Unknown command: …`**.
 
-## BASIC commands
+## BASIC mode
 
-| Command | Description |
-|---------|-------------|
-| **`<line> <text...>`** | Insert or replace a BASIC source line in memory. |
-| **`<line>`** | Delete that BASIC source line from memory. |
-| **`LIST`** | Print BASIC source lines in ascending line number order. |
-| **`EDIT`** *line* | Enter editor submode (`ED>`) for an existing line. If missing: **`No such line: <line>`**. |
-| **`DELETE`** *line* \| *start-end* | Delete one line or an inclusive line range. |
-| **`RENUM`** | Renumber all lines to 10,20,30,... preserving sort order. |
-| **`NEW`** | Clear in-memory BASIC lines for the active BASIC program context. |
-| **`SAVE`** [*name*] | Persist the in-memory BASIC program to disk under *name* (or active name if present). |
-| **`QUIT`** | Leave BASIC mode and return to `TCL>`. |
+Tcl host and BASIC editor responsibilities are now separated:
 
-`LIST` is mode-scoped: in `TCL>` it means filesystem record listing (`LIST <file>`), while in `BASIC>` it lists the BASIC source buffer.
-
-### Editor submode (`ED>`)
-
-`EDIT <line>` enters `ED>` for that line. Supported commands:
-
-- `C/old/new/` — replace the first occurrence of `old` in the line.
-- `FI` — finish editing and return to `BASIC>`.
-
-Arity/syntax checks:
-
-- `BASIC` with more than one name: `BASIC takes at most one program name`
-- `SAVE` with more than one name: `SAVE takes at most one filename`
-- malformed `DELETE` range (for example descending `20-10`): `DELETE requires a line number or range`
-- malformed editor substitute command: `Invalid edit command`
-
-## BASIC persistence semantics
-
-- BASIC source lives in-memory until `SAVE`.
-- `BASIC <name>` autoloads `<name>` from programs root if present.
-- If `<name>` does not exist, BASIC starts empty and no file is created.
-- `SAVE` is what creates/overwrites the program file.
-- In unnamed BASIC sessions (`BASIC` with no name), bare `SAVE` errors exactly:
-  - `No program name specified`
+- Tcl shell behavior is described in this page.
+- BASIC/ED command set and persistence behavior are documented in [BASIC shell](basic-shell.md).
 
 ## Shell variables
 

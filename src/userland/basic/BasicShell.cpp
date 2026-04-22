@@ -171,6 +171,25 @@ namespace PickShell {
             }
             program_.clearLines();
         };
+        basicCommands_["LOAD"] = [this](const Tokens &tokens, std::ostream &out, bool &) {
+            if (tokens.size() > 2) {
+                out << "LOAD takes at most one filename\n";
+                return;
+            }
+            std::optional<std::string> loadName;
+            if (tokens.size() == 2) {
+                loadName = tokens[1];
+            } else {
+                loadName = program_.name();
+            }
+            if (!loadName || loadName->empty()) {
+                out << "No program name specified\n";
+                return;
+            }
+            program_.setName(*loadName);
+            program_.clearLines();
+            loadProgramIfPresent(out);
+        };
         basicCommands_["SAVE"] = [this](const Tokens &tokens, std::ostream &out, bool &) {
             if (tokens.size() > 2) {
                 out << "SAVE takes at most one filename\n";
@@ -203,6 +222,7 @@ namespace PickShell {
             out << "  DELETE <n>|<n-m>\n";
             out << "  RENUM\n";
             out << "  NEW\n";
+            out << "  LOAD [name]\n";
             out << "  SAVE [name]\n";
             out << "  QUIT\n";
         };

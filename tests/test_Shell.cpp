@@ -774,6 +774,55 @@ TEST_CASE("shell BASIC SAVE and BASIC command arity errors") {
     CHECK(out.str() == "SAVE takes at most one filename\n");
 }
 
+TEST_CASE("shell BASIC LOAD behavior and arity") {
+    auto dir = uniqueTempDir();
+    std::filesystem::create_directories(dir);
+
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setProgramsRoot(dir);
+
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("BASIC", out, quit);
+    out.str("");
+    sh.handleLine("LOAD", out, quit);
+    CHECK(out.str() == "No program name specified\n");
+
+    out.str("");
+    sh.handleLine("LOAD A B", out, quit);
+    CHECK(out.str() == "LOAD takes at most one filename\n");
+
+    out.str("");
+    sh.handleLine("10 PRINT \"TMP\"", out, quit);
+    sh.handleLine("LOAD MISSING", out, quit);
+    sh.handleLine("LIST", out, quit);
+    CHECK(out.str().empty());
+}
+
+TEST_CASE("shell BASIC LOAD loads saved program") {
+    auto dir = uniqueTempDir();
+    std::filesystem::create_directories(dir);
+
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setProgramsRoot(dir);
+
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("BASIC", out, quit);
+    sh.handleLine("10 PRINT \"HELLO\"", out, quit);
+    sh.handleLine("SAVE HELLO", out, quit);
+    sh.handleLine("NEW", out, quit);
+
+    out.str("");
+    sh.handleLine("LOAD HELLO", out, quit);
+    sh.handleLine("LIST", out, quit);
+    CHECK(out.str() == "10 PRINT \"HELLO\"\n");
+}
+
 TEST_CASE("shell ED mode malformed substitute command is rejected") {
     PickVM::Runtime rt;
     PickShell::Shell sh(rt);
