@@ -31,6 +31,7 @@ namespace PickVM {
         Drop,
         PrintInt,
         PrintStr,
+        InputInt,
         Jump,
         JumpIfZero,
         LoadVar,
@@ -50,6 +51,9 @@ namespace PickVM {
 
         // nullptr selects std::cout (default). Used by tests to capture PRINT / dumpStack.
         void setOutputStream(std::ostream *out) const;
+
+        // nullptr selects std::cin (default). Used by tests to inject INPUT.
+        void setInputStream(std::istream *in) const;
 
         void loadProgram(const std::vector<Instruction> &program);
 
@@ -75,8 +79,10 @@ namespace PickVM {
         std::unordered_map<std::string, Value> variables_;
         std::size_t ip_; // Instruction pointer
         mutable std::ostream *outStream_{nullptr};
+        mutable std::istream *inStream_{nullptr};
 
         std::ostream &out() const;
+        std::istream &in() const;
 
         // Helpers
         void push(const Value &v);

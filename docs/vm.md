@@ -37,6 +37,7 @@ The parser records **1-based physical source line numbers** per instruction (for
 | `DROP` | Pop and discard top. |
 | `PRINT_INT` | Pop int, write decimal and newline to the runtime output stream. |
 | `PRINT_STR` | Pop string, write string and newline. |
+| `INPUT_INT` | Read one input line, parse as int, and push it. Throws `INPUT_INT: end of input` on EOF and `INPUT_INT: invalid integer input` on parse failure. |
 | `JUMP label` | Set IP to the instruction index of `label` (resolved at parse time). |
 | `JZ label` | Pop int; if it is **zero**, jump to `label`; otherwise fall through. |
 | `STORE_VAR name` | Pop value and store it by case-insensitive variable `name` (runtime canonicalizes to uppercase). |
@@ -63,6 +64,7 @@ Jump targets must refer to defined labels and resolve to valid instruction indic
 - **`instructionPointer()`** — current IP (0-based index into the loaded program).
 - **`isLoaded()`** — true if a non-empty program is loaded.
 - **`setOutputStream(ostream*)`** — where **`PRINT_*`** go; **`nullptr`** means **`std::cout`**.
+- **`setInputStream(istream*)`** — where **`INPUT_INT`** reads from; **`nullptr`** means **`std::cin`**.
 - **`stack()`** / **`dumpStack()`** — inspection helpers.
 - Runtime keeps a per-loaded-program variable map for `STORE_VAR`/`LOAD_VAR`; loading a new program resets it.
 

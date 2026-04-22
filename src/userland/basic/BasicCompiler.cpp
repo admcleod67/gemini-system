@@ -454,6 +454,34 @@ namespace PickShell {
                 continue;
             }
 
+            if (op == "INPUT") {
+                std::string rest;
+                std::getline(iss, rest);
+                rest = trim(rest);
+                if (rest.empty()) {
+                    result.errors.push_back({lineNumber, "INPUT requires a variable name"});
+                    continue;
+                }
+                std::istringstream varIss(rest);
+                std::vector<std::string> inputTokens;
+                std::string inputTok;
+                while (varIss >> inputTok) {
+                    inputTokens.push_back(inputTok);
+                }
+                if (inputTokens.size() != 1) {
+                    result.errors.push_back({lineNumber, "INPUT requires a variable name"});
+                    continue;
+                }
+                const std::string varName = inputTokens[0];
+                if (!isValidVariableName(varName)) {
+                    result.errors.push_back({lineNumber, "Invalid variable name '" + varName + "'"});
+                    continue;
+                }
+                result.program.push_back(makeNoOperandInstruction(PickVM::OpCode::InputInt));
+                result.program.push_back(PickVM::Instruction{PickVM::OpCode::StoreVar, uppercase(varName)});
+                continue;
+            }
+
             if (op == "GOTO") {
                 std::string targetRaw;
                 std::getline(iss, targetRaw);

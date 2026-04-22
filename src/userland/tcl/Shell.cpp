@@ -60,6 +60,10 @@ namespace PickShell {
         }
     }
 
+    void Shell::setInputStream(std::istream *in) {
+        inputStream_ = in;
+    }
+
     std::string Shell::prompt() const {
         if (basicShell_.isActive()) {
             return basicShell_.prompt();
@@ -148,9 +152,11 @@ namespace PickShell {
 
     void Shell::executeCompiledBasicProgram(const std::vector<PickVM::Instruction> &program, std::ostream &out) {
         session_.runtime_.setOutputStream(&out);
+        session_.runtime_.setInputStream(inputStream_);
         session_.runtime_.loadProgram(program);
         session_.runtime_.run();
         session_.runtime_.setOutputStream(nullptr);
+        session_.runtime_.setInputStream(nullptr);
     }
 
     namespace {
@@ -212,8 +218,10 @@ namespace PickShell {
             }
             session_.resumePastBreakpointIp_ = session_.runtime_.instructionPointer();
             session_.runtime_.setOutputStream(&out);
+            session_.runtime_.setInputStream(inputStream_);
             session_.executeVmLoop(out);
             session_.runtime_.setOutputStream(nullptr);
+            session_.runtime_.setInputStream(nullptr);
             return;
         }
 
@@ -227,13 +235,16 @@ namespace PickShell {
             session_.pruneBreakpointsForProgram(loaded.program.size(), out);
             session_.lastLoaded_ = std::move(loaded);
             session_.runtime_.setOutputStream(&out);
+            session_.runtime_.setInputStream(inputStream_);
             session_.runtime_.loadProgram(session_.lastLoaded_->program);
             session_.suspended_ = false;
             session_.resumePastBreakpointIp_.reset();
             session_.executeVmLoop(out);
             session_.runtime_.setOutputStream(nullptr);
+            session_.runtime_.setInputStream(nullptr);
         } catch (const std::exception &e) {
             session_.runtime_.setOutputStream(nullptr);
+            session_.runtime_.setInputStream(nullptr);
             out << "Error: " << e.what() << "\n";
         }
     }

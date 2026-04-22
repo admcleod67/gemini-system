@@ -36,6 +36,9 @@ namespace PickShell {
         // One line of input; all command output goes to out. For interactive use, pass std::cout.
         void handleLine(const std::string &line, std::ostream &out, bool &quit);
 
+        // Optional VM input source for instructions like INPUT_INT. nullptr selects std::cin.
+        void setInputStream(std::istream *in);
+
         void run(); // REPL: stdin, prompts on std::cout, command output on std::cout
 
     private:
@@ -46,6 +49,7 @@ namespace PickShell {
         ShellSession session_;
         BasicShell basicShell_;
         CommandTable tclCommands_;
+        std::istream *inputStream_{nullptr};
 
         static std::vector<std::string> tokenize(const std::string &line);
 

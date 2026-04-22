@@ -196,6 +196,23 @@ TEST_CASE("parser comparison opcodes") {
     CHECK(lb.program[7].op == OpCode::Ge);
 }
 
+TEST_CASE("parser INPUT_INT") {
+    Parser parser;
+    std::istringstream in(
+        "INPUT_INT\n"
+        "HALT\n");
+    LoadedBytecode lb = parser.parse(in);
+    REQUIRE(lb.program.size() == 2);
+    CHECK(lb.program[0].op == OpCode::InputInt);
+    CHECK(lb.program[1].op == OpCode::Halt);
+}
+
+TEST_CASE("parser INPUT_INT takes no operand") {
+    Parser parser;
+    std::istringstream in("INPUT_INT 1\nHALT\n");
+    CHECK_THROWS_AS(parser.parse(in), std::runtime_error);
+}
+
 TEST_CASE("parser parseFile missing file") {
     Parser parser;
     CHECK_THROWS_AS(parser.parseFile("/nonexistent/pick_system/no_such_file.tbc"), std::runtime_error);

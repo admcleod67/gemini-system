@@ -53,14 +53,38 @@ namespace PickVM {
             }
             return std::get<std::string>(v);
         }
+
+        bool parseIntLine(const std::string &line, int &value) {
+            std::size_t first = line.find_first_not_of(" \t\r\n");
+            if (first == std::string::npos) {
+                return false;
+            }
+            std::size_t last = line.find_last_not_of(" \t\r\n");
+            const std::string trimmed = line.substr(first, last - first + 1);
+            std::size_t pos = 0;
+            try {
+                value = std::stoi(trimmed, &pos);
+            } catch (const std::exception &) {
+                return false;
+            }
+            return pos == trimmed.size();
+        }
     } // namespace
 
     std::ostream &Runtime::out() const {
         return outStream_ ? *outStream_ : std::cout;
     }
 
+    std::istream &Runtime::in() const {
+        return inStream_ ? *inStream_ : std::cin;
+    }
+
     void Runtime::setOutputStream(std::ostream *out) const {
         outStream_ = out;
+    }
+
+    void Runtime::setInputStream(std::istream *in) const {
+        inStream_ = in;
     }
 
     Runtime::Runtime()
@@ -209,6 +233,19 @@ namespace PickVM {
             case OpCode::PrintStr: {
                 std::string v = stringFromStackValue(pop(), PickVM::opCodeName(instr.op));
                 out() << v << std::endl;
+                break;
+            }
+
+            case OpCode::InputInt: {
+                std::string line;
+                if (!std::getline(in(), line)) {
+                    throw std::runtime_error("INPUT_INT: end of input");
+                }
+                int value = 0;
+                if (!parseIntLine(line, value)) {
+                    throw std::runtime_error("INPUT_INT: invalid integer input");
+                }
+                push(value);
                 break;
             }
 

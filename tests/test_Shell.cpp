@@ -930,6 +930,23 @@ TEST_CASE("shell BASIC RUN executes arithmetic expressions") {
     CHECK(out.str() == "14\n");
 }
 
+TEST_CASE("shell BASIC RUN executes INPUT then PRINT with injected input") {
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    std::istringstream in("123\n");
+    sh.setInputStream(&in);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("BASIC", out, quit);
+    sh.handleLine("10 INPUT A", out, quit);
+    sh.handleLine("20 PRINT A", out, quit);
+    out.str("");
+
+    sh.handleLine("RUN", out, quit);
+    CHECK(out.str() == "123\n");
+}
+
 TEST_CASE("shell BASIC COMPILE reports expression syntax errors") {
     PickVM::Runtime rt;
     PickShell::Shell sh(rt);
@@ -942,6 +959,20 @@ TEST_CASE("shell BASIC COMPILE reports expression syntax errors") {
 
     sh.handleLine("COMPILE", out, quit);
     CHECK(out.str() == "Error on line 10: LET expression error: Missing ')'\nCompilation failed.\n");
+}
+
+TEST_CASE("shell BASIC COMPILE reports malformed INPUT") {
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("BASIC", out, quit);
+    sh.handleLine("10 INPUT", out, quit);
+    out.str("");
+
+    sh.handleLine("COMPILE", out, quit);
+    CHECK(out.str() == "Error on line 10: INPUT requires a variable name\nCompilation failed.\n");
 }
 
 TEST_CASE("shell BASIC RUN executes IF THEN ELSE and GOTO control flow") {

@@ -207,3 +207,47 @@ TEST_CASE("basic compiler reports malformed IF target syntax") {
     CHECK(result.errors[0].message == "IF THEN requires a line number");
     CHECK(result.errors[1].message == "IF ELSE requires a line number");
 }
+
+TEST_CASE("basic compiler compiles INPUT variable") {
+    BasicProgram program;
+    program.setLine(10, "INPUT A");
+    program.setLine(20, "PRINT A");
+
+    BasicCompiler compiler;
+    const auto result = compiler.compile(program);
+
+    CHECK(result.success);
+    CHECK(result.errors.empty());
+    REQUIRE(result.program.size() == 5);
+    CHECK(result.program[0].op == OpCode::InputInt);
+    CHECK(result.program[1].op == OpCode::StoreVar);
+    CHECK(std::get<std::string>(result.program[1].operand) == "A");
+    CHECK(result.program[2].op == OpCode::LoadVar);
+    CHECK(result.program[3].op == OpCode::PrintInt);
+    CHECK(result.program[4].op == OpCode::Halt);
+}
+
+TEST_CASE("basic compiler INPUT requires one valid variable name") {
+    BasicProgram missingVar;
+    missingVar.setLine(10, "INPUT");
+    BasicCompiler compiler;
+    const auto missingVarResult = compiler.compile(missingVar);
+    CHECK_FALSE(missingVarResult.success);
+    REQUIRE(missingVarResult.errors.size() == 1);
+    CHECK(missingVarResult.errors[0].line == 10);
+    CHECK(missingVarResult.errors[0].message == "INPUT requires a variable name");
+
+    BasicProgram extraArgs;
+    extraArgs.setLine(10, "INPUT A B");
+    const auto extraArgsResult = compiler.compile(extraArgs);
+    CHECK_FALSE(extraArgsResult.success);
+    REQUIRE(extraArgsResult.errors.size() == 1);
+    CHECK(extraArgsResult.errors[0].message == "INPUT requires a variable name");
+
+    BasicProgram invalidVar;
+    invalidVar.setLine(10, "INPUT 1A");
+    const auto invalidVarResult = compiler.compile(invalidVar);
+    CHECK_FALSE(invalidVarResult.success);
+    REQUIRE(invalidVarResult.errors.size() == 1);
+    CHECK(invalidVarResult.errors[0].message == "Invalid variable name '1A'");
+}

@@ -138,6 +138,12 @@ namespace PickVM {
                 inst.op = OpCode::PrintInt;
             } else if (pl.opcode == "PRINT_STR") {
                 inst.op = OpCode::PrintStr;
+            } else if (pl.opcode == "INPUT_INT") {
+                inst.op = OpCode::InputInt;
+                if (!pl.operand.empty()) {
+                    throw std::runtime_error(
+                        "INPUT_INT takes no operand at line " + std::to_string(pl.sourceLine));
+                }
             } else if (pl.opcode == "JUMP") {
                 inst.op = OpCode::Jump;
                 try {

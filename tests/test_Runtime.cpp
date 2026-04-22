@@ -437,3 +437,41 @@ TEST_CASE("runtime LOAD_VAR missing throws") {
     rt.loadProgram(prog);
     CHECK_THROWS_AS(rt.run(), std::runtime_error);
 }
+
+TEST_CASE("runtime INPUT_INT reads integer from input stream") {
+    std::istringstream in("42\n");
+    std::vector<Instruction> prog = {
+        {OpCode::InputInt, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    Runtime rt;
+    rt.setInputStream(&in);
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<int>(rt.stack()[0]) == 42);
+}
+
+TEST_CASE("runtime INPUT_INT invalid input throws") {
+    std::istringstream in("xyz\n");
+    std::vector<Instruction> prog = {
+        {OpCode::InputInt, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    Runtime rt;
+    rt.setInputStream(&in);
+    rt.loadProgram(prog);
+    CHECK_THROWS_AS(rt.run(), std::runtime_error);
+}
+
+TEST_CASE("runtime INPUT_INT eof throws") {
+    std::istringstream in;
+    std::vector<Instruction> prog = {
+        {OpCode::InputInt, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    Runtime rt;
+    rt.setInputStream(&in);
+    rt.loadProgram(prog);
+    CHECK_THROWS_AS(rt.run(), std::runtime_error);
+}

@@ -12,6 +12,7 @@ This page documents BASIC compiler subset v1: the currently supported language f
 - `GOTO <line>`
 - `IF <cond> THEN <line> [ELSE <line>]`
 - `STOP`
+- `INPUT <var>`
 - `END` (optional)
 
 If `END` is omitted, the compiler emits an implicit terminating `HALT`.
@@ -63,6 +64,14 @@ PRINT "HELLO"
 ```
 
 String literal `PRINT` uses string VM print path; numeric expressions use integer VM print path.
+
+## `INPUT <var>`
+
+`INPUT` reads one line from runtime input, parses it as an integer, and stores it in the target variable.
+
+- `INPUT` currently supports exactly one variable argument.
+- Input is integer-only in v1.
+- Invalid input and end-of-input are runtime errors.
 
 ## Control flow
 
