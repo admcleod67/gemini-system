@@ -5,4 +5,5 @@ start:
     PUSH_STR ", world"
     CONCAT
     PRINT_STR
+    PRINT_EOL
     HALT

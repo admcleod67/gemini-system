@@ -9,11 +9,13 @@ start:
 is_zero:
     PUSH_STR "zero"
     PRINT_STR
+    PRINT_EOL
     JUMP end
 
 is_nonzero:
     PUSH_STR "nonzero"
     PRINT_STR
+    PRINT_EOL
 
 end:
     HALT

@@ -5,6 +5,7 @@ start:
 loop:
     DUP
     PRINT_INT
+    PRINT_EOL
     PUSH_INT 1
     SUB
     DUP

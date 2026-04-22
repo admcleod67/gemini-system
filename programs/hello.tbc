@@ -1,4 +1,5 @@
 start:
     PUSH_STR "Hello, world"
     PRINT_STR
+    PRINT_EOL
     HALT

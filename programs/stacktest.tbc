@@ -6,7 +6,10 @@ start:
     PUSH_INT 30
     DUP
     PRINT_INT      # prints 30
+    PRINT_EOL
     DROP
     PRINT_INT      # prints 20
+    PRINT_EOL
     PRINT_INT      # prints 10
+    PRINT_EOL
     HALT
