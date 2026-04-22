@@ -1,6 +1,6 @@
-# BASIC language (compiler subset)
+# BASIC language (compiler subset v1)
 
-This page documents the currently supported BASIC language features compiled from `BASIC>` source lines into VM bytecode.
+This page documents BASIC compiler subset v1: the currently supported language features compiled from `BASIC>` source lines into VM bytecode.
 
 - Shell/editor command behavior is documented in [BASIC shell](basic-shell.md).
 - VM opcode/runtime behavior is documented in [Bytecode VM](vm.md).

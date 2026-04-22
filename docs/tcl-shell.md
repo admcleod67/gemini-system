@@ -75,6 +75,7 @@ Tcl host and BASIC editor responsibilities are now separated:
 
 - Tcl shell behavior is described in this page.
 - BASIC/ED command set and persistence behavior are documented in [BASIC shell](basic-shell.md).
+- BASIC compiler/language subset details are documented in [BASIC language](basic-language.md).
 
 ## Shell variables
 

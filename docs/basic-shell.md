@@ -32,12 +32,12 @@ The BASIC shell is a mode inside the interactive shell focused on editing and pe
 | `NEW` | Clear all in-memory lines for the active BASIC program context. |
 | `LOAD [name]` | Reload from disk using explicit name or active program name. Missing files load as empty. |
 | `SAVE [name]` | Save using explicit name or active program name. |
-| `COMPILE` | Compile-only check for the currently supported BASIC language subset; then discard compiled output. |
+| `COMPILE` | Compile-only check for BASIC language subset v1; then discard compiled output. |
 | `RUN` | Always recompile then execute from memory; quiet on compile success. |
 | `RUN (C` | Compile-only alias of `COMPILE` (reports compile status, does not execute). |
 | `QUIT` | Exit BASIC mode and return to `TCL>`. |
 
-## Compile and run behavior
+## Compile and run behavior (v1)
 
 Successful `COMPILE` and `RUN (C)` output:
 
@@ -55,6 +55,8 @@ Compilation failed.
 ```
 
 Compiled programs are in-memory only; no compiled `.tbc` artifact is written.
+
+Language details for subset v1 (statements, expression rules, and diagnostics) are documented in [BASIC language](basic-language.md).
 
 ## Editor submode (`ED>`)
 
