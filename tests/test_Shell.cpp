@@ -997,6 +997,56 @@ TEST_CASE("shell BASIC RENUMBER aliases RENUM") {
     CHECK(out.str() == "10 A\n20 B\n");
 }
 
+TEST_CASE("shell BASIC RENUM rewrites GOTO targets") {
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("BASIC", out, quit);
+    sh.handleLine("100 PRINT 1", out, quit);
+    sh.handleLine("200 GOTO 100", out, quit);
+
+    out.str("");
+    sh.handleLine("RENUM", out, quit);
+    sh.handleLine("LIST", out, quit);
+    CHECK(out.str() == "10 PRINT 1\n20 GOTO 10\n");
+}
+
+TEST_CASE("shell BASIC RENUM rewrites IF THEN ELSE targets") {
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("BASIC", out, quit);
+    sh.handleLine("100 LET A = 1", out, quit);
+    sh.handleLine("200 IF A = 1 THEN 400 ELSE 300", out, quit);
+    sh.handleLine("300 PRINT 0", out, quit);
+    sh.handleLine("400 PRINT 1", out, quit);
+
+    out.str("");
+    sh.handleLine("RENUM", out, quit);
+    sh.handleLine("LIST", out, quit);
+    CHECK(out.str() == "10 LET A = 1\n20 IF A = 1 THEN 40 ELSE 30\n30 PRINT 0\n40 PRINT 1\n");
+}
+
+TEST_CASE("shell BASIC RENUM leaves dangling targets unchanged") {
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("BASIC", out, quit);
+    sh.handleLine("100 GOTO 999", out, quit);
+    sh.handleLine("200 IF 1 = 1 THEN 999 ELSE 100", out, quit);
+
+    out.str("");
+    sh.handleLine("RENUM", out, quit);
+    sh.handleLine("LIST", out, quit);
+    CHECK(out.str() == "10 GOTO 999\n20 IF 1 = 1 THEN 999 ELSE 10\n");
+}
+
 TEST_CASE("shell ED mode malformed substitute command is rejected") {
     PickVM::Runtime rt;
     PickShell::Shell sh(rt);

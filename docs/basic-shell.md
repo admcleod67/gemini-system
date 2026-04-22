@@ -28,7 +28,7 @@ The BASIC shell is a mode inside the interactive shell focused on editing and pe
 | `EDIT <line>` | Enter `ED>` for an existing line. |
 | `DELETE <line>` | Delete one line. |
 | `DELETE <start-end>` | Delete an inclusive range. |
-| `RENUM` / `RENUMBER` | Renumber lines to `10,20,30,...` preserving order. |
+| `RENUM` / `RENUMBER` | Renumber lines to `10,20,30,...` preserving order, and rewrite supported control-flow targets (`GOTO`, `IF ... THEN ... [ELSE ...]`) when target lines exist. |
 | `NEW` | Clear all in-memory lines for the active BASIC program context. |
 | `LOAD [name]` | Reload from disk using explicit name or active program name. Missing files load as empty. |
 | `SAVE [name]` | Save using explicit name or active program name. |
@@ -36,6 +36,8 @@ The BASIC shell is a mode inside the interactive shell focused on editing and pe
 | `RUN` | Always recompile then execute from memory; quiet on compile success. |
 | `RUN (C` | Compile-only alias of `COMPILE` (reports compile status, does not execute). |
 | `QUIT` | Exit BASIC mode and return to `TCL>`. |
+
+When renumbering, targets that do not resolve to an existing pre-renumber line are left unchanged.
 
 ## Compile and run behavior (v1)
 
