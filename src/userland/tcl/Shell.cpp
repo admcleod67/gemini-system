@@ -14,6 +14,10 @@ namespace PickShell {
     Shell::Shell(PickVM::Runtime &runtime)
         : session_(runtime) {
         basicShell_.setProgramsRoot(session_.programsRoot());
+        basicShell_.setExecuteProgramFn(
+            [this](const std::vector<PickVM::Instruction> &program, std::ostream &out) {
+                executeCompiledBasicProgram(program, out);
+            });
         registerCommands();
     }
 
@@ -140,6 +144,13 @@ namespace PickShell {
             return;
         }
         it->second(tokens, out, quit);
+    }
+
+    void Shell::executeCompiledBasicProgram(const std::vector<PickVM::Instruction> &program, std::ostream &out) {
+        session_.runtime_.setOutputStream(&out);
+        session_.runtime_.loadProgram(program);
+        session_.runtime_.run();
+        session_.runtime_.setOutputStream(nullptr);
     }
 
     namespace {

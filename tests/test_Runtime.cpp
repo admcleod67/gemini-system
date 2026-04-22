@@ -337,3 +337,29 @@ TEST_CASE("runtime SUB wrong types") {
     rt.loadProgram(prog);
     CHECK_THROWS_AS(rt.run(), std::runtime_error);
 }
+
+TEST_CASE("runtime STORE_VAR and LOAD_VAR roundtrip int") {
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, 11},
+        {OpCode::StoreVar, std::string{"a"}},
+        {OpCode::LoadVar, std::string{"A"}},
+        {OpCode::PushInt, 1},
+        {OpCode::Add, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    Runtime rt;
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<int>(rt.stack()[0]) == 12);
+}
+
+TEST_CASE("runtime LOAD_VAR missing throws") {
+    std::vector<Instruction> prog = {
+        {OpCode::LoadVar, std::string{"MISSING"}},
+        {OpCode::Halt, Value{}},
+    };
+    Runtime rt;
+    rt.loadProgram(prog);
+    CHECK_THROWS_AS(rt.run(), std::runtime_error);
+}

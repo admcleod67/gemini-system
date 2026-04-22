@@ -5,13 +5,23 @@
 #include "Runtime.h"
 #include "InstructionPrint.h"
 
+#include <cctype>
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <utility>
 
 namespace PickVM {
     namespace {
+        std::string canonicalVariableName(const std::string &raw) {
+            std::string out(raw);
+            for (char &c: out) {
+                c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+            }
+            return out;
+        }
+
         int intOperandAtIp(const Instruction &instr, std::size_t ip) {
             if (!std::holds_alternative<int>(instr.operand)) {
                 std::ostringstream oss;
@@ -61,6 +71,7 @@ namespace PickVM {
         program_ = program;
         ip_ = 0;
         stack_.clear();
+        variables_.clear();
     }
 
     void Runtime::push(const Value &v) {
@@ -155,6 +166,22 @@ namespace PickVM {
                     ip_ = static_cast<std::size_t>(target);
                     return ip_ < program_.size();
                 }
+                break;
+            }
+
+            case OpCode::LoadVar: {
+                const std::string name = canonicalVariableName(stringOperandAtIp(instr, ip_));
+                const auto it = variables_.find(name);
+                if (it == variables_.end()) {
+                    throw std::runtime_error("Undefined variable: " + name);
+                }
+                push(it->second);
+                break;
+            }
+
+            case OpCode::StoreVar: {
+                const std::string name = canonicalVariableName(stringOperandAtIp(instr, ip_));
+                variables_[name] = pop();
                 break;
             }
 

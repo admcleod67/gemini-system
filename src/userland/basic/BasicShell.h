@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include "BasicCompiler.h"
 #include "BasicProgram.h"
 
 #include <filesystem>
@@ -23,10 +24,13 @@ namespace PickShell {
         using Tokens = std::vector<std::string>;
         using CommandFn = std::function<void(const Tokens &, std::ostream &, bool &)>;
         using CommandTable = std::unordered_map<std::string, CommandFn>;
+        using ExecuteProgramFn = std::function<void(const std::vector<PickVM::Instruction> &, std::ostream &)>;
 
         BasicShell();
 
         void setProgramsRoot(std::filesystem::path programsRoot);
+
+        void setExecuteProgramFn(ExecuteProgramFn executeProgramFn);
 
         void enter(std::optional<std::string> programName, std::ostream &out);
 
@@ -50,8 +54,10 @@ namespace PickShell {
 
         std::filesystem::path programsRoot_{"programs"};
         Mode mode_{Mode::Inactive};
+        BasicCompiler compiler_;
         BasicProgram program_;
         std::optional<EditorState> editorState_;
+        ExecuteProgramFn executeProgramFn_;
         CommandTable basicCommands_;
         CommandTable editorCommands_;
 
@@ -78,6 +84,10 @@ namespace PickShell {
         void loadProgramIfPresent(std::ostream &out);
 
         void saveProgram(const std::string &name, std::ostream &out);
+
+        void printCompileSuccess(const BasicCompileResult &compile, std::ostream &out);
+
+        void printCompileFailure(const BasicCompileResult &compile, std::ostream &out);
     };
 } // namespace PickShell
 

@@ -24,6 +24,8 @@ namespace PickVM {
             case OpCode::PrintStr: return "PRINT_STR";
             case OpCode::Jump: return "JUMP";
             case OpCode::JumpIfZero: return "JZ";
+            case OpCode::LoadVar: return "LOAD_VAR";
+            case OpCode::StoreVar: return "STORE_VAR";
         }
         return "UNKNOWN";
     }
@@ -66,6 +68,10 @@ namespace PickVM {
             case OpCode::Jump:
             case OpCode::JumpIfZero:
                 oss << ' ' << intOperandAtIp(instr, ip);
+                break;
+            case OpCode::LoadVar:
+            case OpCode::StoreVar:
+                oss << ' ' << stringOperandAtIp(instr, ip);
                 break;
             case OpCode::Add:
             case OpCode::Sub:

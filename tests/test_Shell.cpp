@@ -823,6 +823,98 @@ TEST_CASE("shell BASIC LOAD loads saved program") {
     CHECK(out.str() == "10 PRINT \"HELLO\"\n");
 }
 
+TEST_CASE("shell BASIC COMPILE reports success summary") {
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("BASIC", out, quit);
+    sh.handleLine("10 LET A = 5", out, quit);
+    sh.handleLine("20 PRINT A", out, quit);
+    sh.handleLine("30 END", out, quit);
+    out.str("");
+
+    sh.handleLine("COMPILE", out, quit);
+    CHECK(out.str() == "Compiled successfully.\nInstructions: 5\nLabels: 0\n");
+}
+
+TEST_CASE("shell BASIC RUN is quiet on compile success and executes output") {
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("BASIC", out, quit);
+    sh.handleLine("10 PRINT \"HELLO\"", out, quit);
+    sh.handleLine("20 END", out, quit);
+    out.str("");
+
+    sh.handleLine("RUN", out, quit);
+    CHECK(out.str() == "HELLO\n");
+}
+
+TEST_CASE("shell BASIC RUN (C mirrors COMPILE and does not execute") {
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("BASIC", out, quit);
+    sh.handleLine("10 PRINT \"HELLO\"", out, quit);
+    out.str("");
+
+    sh.handleLine("RUN (C", out, quit);
+    CHECK(out.str() == "Compiled successfully.\nInstructions: 3\nLabels: 0\n");
+}
+
+TEST_CASE("shell BASIC compile failures print line diagnostics") {
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("BASIC", out, quit);
+    sh.handleLine("30 MAT A = 1", out, quit);
+    out.str("");
+
+    sh.handleLine("COMPILE", out, quit);
+    CHECK(out.str() == "Error on line 30: Unknown keyword 'MAT'\nCompilation failed.\n");
+}
+
+TEST_CASE("shell BASIC RUN compile failure skips execution") {
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("BASIC", out, quit);
+    sh.handleLine("10 MAT A = 1", out, quit);
+    sh.handleLine("20 PRINT \"SHOULD_NOT_RUN\"", out, quit);
+    out.str("");
+
+    sh.handleLine("RUN", out, quit);
+    CHECK(out.str() == "Error on line 10: Unknown keyword 'MAT'\nCompilation failed.\n");
+}
+
+TEST_CASE("shell BASIC RUN recompiles each time and does not depend on COMPILE cache") {
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("BASIC", out, quit);
+    sh.handleLine("10 PRINT \"ONE\"", out, quit);
+    out.str("");
+    sh.handleLine("COMPILE", out, quit);
+    CHECK(out.str() == "Compiled successfully.\nInstructions: 3\nLabels: 0\n");
+
+    sh.handleLine("10 PRINT \"TWO\"", out, quit);
+    out.str("");
+    sh.handleLine("RUN", out, quit);
+    CHECK(out.str() == "TWO\n");
+}
+
 TEST_CASE("shell BASIC RENUMBER aliases RENUM") {
     PickVM::Runtime rt;
     PickShell::Shell sh(rt);

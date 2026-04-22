@@ -59,6 +59,8 @@ namespace PickShell {
 
         void handleTclCommand(const Tokens &tokens, bool &quit, std::ostream &out);
 
+        void executeCompiledBasicProgram(const std::vector<PickVM::Instruction> &program, std::ostream &out);
+
         void cmdEcho(const std::vector<std::string> &tokens, std::ostream &out);
 
         [[nodiscard]] std::string expandEchoToken(const std::string &token) const;

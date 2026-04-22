@@ -163,3 +163,27 @@ TEST_CASE("parser parseFile missing file") {
     Parser parser;
     CHECK_THROWS_AS(parser.parseFile("/nonexistent/pick_system/no_such_file.tbc"), std::runtime_error);
 }
+
+TEST_CASE("parser LOAD_VAR and STORE_VAR") {
+    Parser parser;
+    std::istringstream in(
+        "PUSH_INT 10\n"
+        "STORE_VAR A\n"
+        "LOAD_VAR A\n"
+        "PRINT_INT\n"
+        "HALT\n");
+    LoadedBytecode lb = parser.parse(in);
+    REQUIRE(lb.program.size() == 5);
+    CHECK(lb.program[1].op == OpCode::StoreVar);
+    CHECK(std::get<std::string>(lb.program[1].operand) == "A");
+    CHECK(lb.program[2].op == OpCode::LoadVar);
+    CHECK(std::get<std::string>(lb.program[2].operand) == "A");
+}
+
+TEST_CASE("parser LOAD_VAR and STORE_VAR require names") {
+    Parser parser;
+    std::istringstream in1("LOAD_VAR\nHALT\n");
+    CHECK_THROWS_AS(parser.parse(in1), std::runtime_error);
+    std::istringstream in2("STORE_VAR\nHALT\n");
+    CHECK_THROWS_AS(parser.parse(in2), std::runtime_error);
+}

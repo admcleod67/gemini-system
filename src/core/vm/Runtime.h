@@ -7,6 +7,7 @@
 
 #include <iosfwd>
 #include <string>
+#include <unordered_map>
 #include <variant>
 #include <vector>
 
@@ -23,7 +24,9 @@ namespace PickVM {
         PrintInt,
         PrintStr,
         Jump,
-        JumpIfZero
+        JumpIfZero,
+        LoadVar,
+        StoreVar
     };
 
     using Value = std::variant<int, std::string>;
@@ -61,6 +64,7 @@ namespace PickVM {
     private:
         std::vector<Instruction> program_;
         std::vector<Value> stack_;
+        std::unordered_map<std::string, Value> variables_;
         std::size_t ip_; // Instruction pointer
         mutable std::ostream *outStream_{nullptr};
 

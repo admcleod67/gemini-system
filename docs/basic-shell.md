@@ -31,7 +31,41 @@ The BASIC shell is a mode inside the interactive shell focused on editing and pe
 | `NEW` | Clear all in-memory lines for the active BASIC program context. |
 | `LOAD [name]` | Reload from disk using explicit name or active program name. Missing files load as empty. |
 | `SAVE [name]` | Save using explicit name or active program name. |
+| `COMPILE` | Compile-only check for BASIC subset (`LET`, `PRINT`, `END`), then discard compiled output. |
+| `RUN` | Always recompile then execute from memory; quiet on compile success. |
+| `RUN (C` | Compile-only alias of `COMPILE` (reports compile status, does not execute). |
 | `QUIT` | Exit BASIC mode and return to `TCL>`. |
+
+## BASIC compiler subset (v1)
+
+- Supported statements: `LET`, `PRINT`, `END`.
+- Variable names are case-insensitive and canonicalized to uppercase by the compiler/runtime.
+- `LET` supports integer expressions only:
+  - int literal (for example `LET A = 5`)
+  - int variable reference (for example `LET A = B`)
+- `PRINT` supports:
+  - int literal
+  - int variable reference
+  - string literal (for example `PRINT "HELLO"`)
+- `END` is optional; compiler emits an implicit terminating `HALT` if omitted.
+- Compiled programs are in-memory only; no compiled `.tbc` artifact is written.
+
+### Compile output format
+
+Successful `COMPILE` and `RUN (C)` output:
+
+```text
+Compiled successfully.
+Instructions: <n>
+Labels: <m>
+```
+
+Failure output:
+
+```text
+Error on line <basicLine>: <message>
+Compilation failed.
+```
 
 ## Editor submode (`ED>`)
 

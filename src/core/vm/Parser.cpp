@@ -138,6 +138,20 @@ namespace PickVM {
                     throw std::runtime_error(
                         "Unknown label for JZ at line " + std::to_string(pl.sourceLine) + ": " + pl.operand);
                 }
+            } else if (pl.opcode == "LOAD_VAR") {
+                inst.op = OpCode::LoadVar;
+                if (pl.operand.empty()) {
+                    throw std::runtime_error(
+                        "LOAD_VAR requires a variable name at line " + std::to_string(pl.sourceLine));
+                }
+                inst.operand = pl.operand;
+            } else if (pl.opcode == "STORE_VAR") {
+                inst.op = OpCode::StoreVar;
+                if (pl.operand.empty()) {
+                    throw std::runtime_error(
+                        "STORE_VAR requires a variable name at line " + std::to_string(pl.sourceLine));
+                }
+                inst.operand = pl.operand;
             } else {
                 throw std::runtime_error(
                     "Unknown opcode at line " + std::to_string(pl.sourceLine) + ": " + pl.opcode);

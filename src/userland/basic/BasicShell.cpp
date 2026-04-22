@@ -14,6 +14,10 @@ namespace PickShell {
         programsRoot_ = std::move(programsRoot);
     }
 
+    void BasicShell::setExecuteProgramFn(ExecuteProgramFn executeProgramFn) {
+        executeProgramFn_ = std::move(executeProgramFn);
+    }
+
     void BasicShell::enter(std::optional<std::string> programName, std::ostream &out) {
         mode_ = Mode::Basic;
         editorState_.reset();
@@ -209,6 +213,39 @@ namespace PickShell {
             program_.setName(*saveName);
             saveProgram(*saveName, out);
         };
+        basicCommands_["COMPILE"] = [this](const Tokens &tokens, std::ostream &out, bool &) {
+            if (tokens.size() > 1) {
+                out << "COMPILE takes no arguments\n";
+                return;
+            }
+            const BasicCompileResult compile = compiler_.compile(program_);
+            if (!compile.success) {
+                printCompileFailure(compile, out);
+                return;
+            }
+            printCompileSuccess(compile, out);
+        };
+        basicCommands_["RUN"] = [this](const Tokens &tokens, std::ostream &out, bool &) {
+            const bool compileOnly = tokens.size() == 2 && tokens[1] == "(C";
+            if (!(tokens.size() == 1 || compileOnly)) {
+                out << "RUN takes no arguments or (C\n";
+                return;
+            }
+            const BasicCompileResult compile = compiler_.compile(program_);
+            if (!compile.success) {
+                printCompileFailure(compile, out);
+                return;
+            }
+            if (compileOnly) {
+                printCompileSuccess(compile, out);
+                return;
+            }
+            if (!executeProgramFn_) {
+                out << "Error: BASIC runtime not configured\n";
+                return;
+            }
+            executeProgramFn_(compile.program, out);
+        };
         basicCommands_["QUIT"] = [this](const Tokens &, std::ostream &, bool &leaveBasicMode) {
             mode_ = Mode::Inactive;
             editorState_.reset();
@@ -226,6 +263,9 @@ namespace PickShell {
             out << "  NEW\n";
             out << "  LOAD [name]\n";
             out << "  SAVE [name]\n";
+            out << "  COMPILE\n";
+            out << "  RUN\n";
+            out << "  RUN (C\n";
             out << "  QUIT\n";
         };
     }
@@ -355,5 +395,18 @@ namespace PickShell {
             }
             file << '\n';
         }
+    }
+
+    void BasicShell::printCompileSuccess(const BasicCompileResult &compile, std::ostream &out) {
+        out << "Compiled successfully.\n";
+        out << "Instructions: " << compile.instructionCount << '\n';
+        out << "Labels: " << compile.labelCount << '\n';
+    }
+
+    void BasicShell::printCompileFailure(const BasicCompileResult &compile, std::ostream &out) {
+        for (const auto &err: compile.errors) {
+            out << "Error on line " << err.line << ": " << err.message << '\n';
+        }
+        out << "Compilation failed.\n";
     }
 } // namespace PickShell
