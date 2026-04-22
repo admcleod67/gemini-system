@@ -112,6 +112,10 @@ namespace PickVM {
                 inst.op = OpCode::Add;
             } else if (pl.opcode == "SUB") {
                 inst.op = OpCode::Sub;
+            } else if (pl.opcode == "MUL") {
+                inst.op = OpCode::Mul;
+            } else if (pl.opcode == "DIV") {
+                inst.op = OpCode::Div;
             } else if (pl.opcode == "DUP") {
                 inst.op = OpCode::Dup;
             } else if (pl.opcode == "DROP") {

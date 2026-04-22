@@ -338,6 +338,46 @@ TEST_CASE("runtime SUB wrong types") {
     CHECK_THROWS_AS(rt.run(), std::runtime_error);
 }
 
+TEST_CASE("runtime MUL and DIV") {
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, 8},
+        {OpCode::PushInt, 2},
+        {OpCode::Div, Value{}},
+        {OpCode::PushInt, 3},
+        {OpCode::Mul, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    Runtime rt;
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<int>(rt.stack()[0]) == 12);
+}
+
+TEST_CASE("runtime DIV by zero throws") {
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, 8},
+        {OpCode::PushInt, 0},
+        {OpCode::Div, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    Runtime rt;
+    rt.loadProgram(prog);
+    CHECK_THROWS_AS(rt.run(), std::runtime_error);
+}
+
+TEST_CASE("runtime MUL wrong types") {
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"a"}},
+        {OpCode::PushInt, 2},
+        {OpCode::Mul, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    Runtime rt;
+    rt.loadProgram(prog);
+    CHECK_THROWS_AS(rt.run(), std::runtime_error);
+}
+
 TEST_CASE("runtime STORE_VAR and LOAD_VAR roundtrip int") {
     std::vector<Instruction> prog = {
         {OpCode::PushInt, 11},

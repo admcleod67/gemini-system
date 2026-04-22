@@ -17,6 +17,8 @@ namespace PickVM {
             case OpCode::PushStr: return "PUSH_STR";
             case OpCode::Add: return "ADD";
             case OpCode::Sub: return "SUB";
+            case OpCode::Mul: return "MUL";
+            case OpCode::Div: return "DIV";
             case OpCode::Concat: return "CONCAT";
             case OpCode::Dup: return "DUP";
             case OpCode::Drop: return "DROP";
@@ -75,6 +77,8 @@ namespace PickVM {
                 break;
             case OpCode::Add:
             case OpCode::Sub:
+            case OpCode::Mul:
+            case OpCode::Div:
             case OpCode::Concat:
             case OpCode::Dup:
             case OpCode::Drop:

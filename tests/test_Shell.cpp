@@ -915,6 +915,35 @@ TEST_CASE("shell BASIC RUN recompiles each time and does not depend on COMPILE c
     CHECK(out.str() == "TWO\n");
 }
 
+TEST_CASE("shell BASIC RUN executes arithmetic expressions") {
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("BASIC", out, quit);
+    sh.handleLine("10 LET A = 2+3*4", out, quit);
+    sh.handleLine("20 PRINT A", out, quit);
+    out.str("");
+
+    sh.handleLine("RUN", out, quit);
+    CHECK(out.str() == "14\n");
+}
+
+TEST_CASE("shell BASIC COMPILE reports expression syntax errors") {
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("BASIC", out, quit);
+    sh.handleLine("10 LET A = (2+3", out, quit);
+    out.str("");
+
+    sh.handleLine("COMPILE", out, quit);
+    CHECK(out.str() == "Error on line 10: LET expression error: Missing ')'\nCompilation failed.\n");
+}
+
 TEST_CASE("shell BASIC RENUMBER aliases RENUM") {
     PickVM::Runtime rt;
     PickShell::Shell sh(rt);

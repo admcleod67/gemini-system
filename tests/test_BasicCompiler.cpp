@@ -28,6 +28,40 @@ TEST_CASE("basic compiler compiles LET PRINT END") {
     CHECK(result.program[4].op == OpCode::Halt);
 }
 
+TEST_CASE("basic compiler compiles arithmetic precedence and parentheses") {
+    BasicProgram program;
+    program.setLine(10, "LET A = 2+3*4");
+    program.setLine(20, "LET B = (2+3)*4");
+    program.setLine(30, "PRINT B");
+
+    BasicCompiler compiler;
+    const auto result = compiler.compile(program);
+
+    CHECK(result.success);
+    CHECK(result.errors.empty());
+    REQUIRE(result.program.size() >= 13);
+    CHECK(result.program[0].op == OpCode::PushInt);
+    CHECK(result.program[1].op == OpCode::PushInt);
+    CHECK(result.program[2].op == OpCode::PushInt);
+    CHECK(result.program[3].op == OpCode::Mul);
+    CHECK(result.program[4].op == OpCode::Add);
+}
+
+TEST_CASE("basic compiler supports unary minus in expressions") {
+    BasicProgram program;
+    program.setLine(10, "LET A = -5");
+    program.setLine(20, "PRINT -A");
+
+    BasicCompiler compiler;
+    const auto result = compiler.compile(program);
+
+    CHECK(result.success);
+    CHECK(result.errors.empty());
+    CHECK(result.program[0].op == OpCode::PushInt);
+    CHECK(result.program[1].op == OpCode::PushInt);
+    CHECK(result.program[2].op == OpCode::Sub);
+}
+
 TEST_CASE("basic compiler adds implicit END halt") {
     BasicProgram program;
     program.setLine(10, "LET A = 5");
@@ -94,4 +128,20 @@ TEST_CASE("basic compiler enforces int-only LET and PRINT variables") {
     CHECK_FALSE(result.success);
     REQUIRE(result.errors.size() == 1);
     CHECK(result.errors[0].line == 10);
+}
+
+TEST_CASE("basic compiler reports expression syntax diagnostics") {
+    BasicProgram program;
+    program.setLine(10, "LET A = 2+");
+    program.setLine(20, "PRINT (1+2");
+
+    BasicCompiler compiler;
+    const auto result = compiler.compile(program);
+
+    CHECK_FALSE(result.success);
+    REQUIRE(result.errors.size() == 2);
+    CHECK(result.errors[0].line == 10);
+    CHECK(result.errors[0].message.find("LET expression error:") == 0);
+    CHECK(result.errors[1].line == 20);
+    CHECK(result.errors[1].message.find("PRINT expression error:") == 0);
 }

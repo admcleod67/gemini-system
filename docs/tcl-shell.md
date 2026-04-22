@@ -10,8 +10,8 @@ Input is tokenized by whitespace (filenames with spaces are not supported by the
 
 - Tcl host shell and VM/filesystem command integration: `src/userland/tcl/`
 - BASIC line buffer + BASIC/ED command interpreter: `src/userland/basic/`
-- BASIC compiler files exist as placeholders in `src/userland/basic/BasicCompiler.*` and are not wired yet.
-- BASIC mode command semantics are documented in [BASIC shell](basic-shell.md).
+- BASIC compiler is implemented in `src/userland/basic/BasicCompiler.*`.
+- BASIC mode command semantics are documented in [BASIC shell](basic-shell.md); language/compiler semantics are documented in [BASIC language](basic-language.md).
 
 ## Programs directory
 

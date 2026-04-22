@@ -18,6 +18,8 @@ namespace PickVM {
         PushStr,
         Add,
         Sub,
+        Mul,
+        Div,
         Concat,
         Dup,
         Drop,

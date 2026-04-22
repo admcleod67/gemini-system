@@ -24,6 +24,8 @@ The parser records **1-based physical source line numbers** per instruction (for
 | `PUSH_STR "text"` | Push string (quotes optional in source; see parser). |
 | `ADD` | Pop `b`, pop `a`, push `a + b` (ints). |
 | `SUB` | Pop `b`, pop `a`, push `a - b` (ints). |
+| `MUL` | Pop `b`, pop `a`, push `a * b` (ints). |
+| `DIV` | Pop `b`, pop `a`, push `a / b` (ints, truncates toward zero). Throws `DIV: divide by zero` when `b` is zero. |
 | `CONCAT` | Pop `b`, pop `a`, push string concatenation `a + b`. |
 | `DUP` | Duplicate top of stack. |
 | `DROP` | Pop and discard top. |

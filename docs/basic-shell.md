@@ -1,11 +1,12 @@
 # BASIC shell
 
-The BASIC shell is a mode inside the interactive shell focused on editing and persisting numbered BASIC source lines.
+The BASIC shell is a mode inside the interactive shell focused on editing and persisting numbered BASIC source lines, then invoking compile/run workflows.
 
 - Enter from Tcl mode with `BASIC` or `BASIC <name>`.
 - Prompt is `BASIC> `.
 - `EDIT <line>` enters editor submode with prompt `ED> `.
 - Tcl host shell behavior is documented in [Developer shell (TCL)](tcl-shell.md).
+- BASIC language/compiler semantics are documented in [BASIC language](basic-language.md).
 
 ## Program naming and persistence
 
@@ -31,26 +32,12 @@ The BASIC shell is a mode inside the interactive shell focused on editing and pe
 | `NEW` | Clear all in-memory lines for the active BASIC program context. |
 | `LOAD [name]` | Reload from disk using explicit name or active program name. Missing files load as empty. |
 | `SAVE [name]` | Save using explicit name or active program name. |
-| `COMPILE` | Compile-only check for BASIC subset (`LET`, `PRINT`, `END`), then discard compiled output. |
+| `COMPILE` | Compile-only check for the currently supported BASIC language subset; then discard compiled output. |
 | `RUN` | Always recompile then execute from memory; quiet on compile success. |
 | `RUN (C` | Compile-only alias of `COMPILE` (reports compile status, does not execute). |
 | `QUIT` | Exit BASIC mode and return to `TCL>`. |
 
-## BASIC compiler subset (v1)
-
-- Supported statements: `LET`, `PRINT`, `END`.
-- Variable names are case-insensitive and canonicalized to uppercase by the compiler/runtime.
-- `LET` supports integer expressions only:
-  - int literal (for example `LET A = 5`)
-  - int variable reference (for example `LET A = B`)
-- `PRINT` supports:
-  - int literal
-  - int variable reference
-  - string literal (for example `PRINT "HELLO"`)
-- `END` is optional; compiler emits an implicit terminating `HALT` if omitted.
-- Compiled programs are in-memory only; no compiled `.tbc` artifact is written.
-
-### Compile output format
+## Compile and run behavior
 
 Successful `COMPILE` and `RUN (C)` output:
 
@@ -66,6 +53,8 @@ Failure output:
 Error on line <basicLine>: <message>
 Compilation failed.
 ```
+
+Compiled programs are in-memory only; no compiled `.tbc` artifact is written.
 
 ## Editor submode (`ED>`)
 

@@ -121,6 +121,23 @@ namespace PickVM {
                 break;
             }
 
+            case OpCode::Mul: {
+                int b = intFromStackValue(pop(), PickVM::opCodeName(instr.op));
+                int a = intFromStackValue(pop(), PickVM::opCodeName(instr.op));
+                push(a * b);
+                break;
+            }
+
+            case OpCode::Div: {
+                int b = intFromStackValue(pop(), PickVM::opCodeName(instr.op));
+                int a = intFromStackValue(pop(), PickVM::opCodeName(instr.op));
+                if (b == 0) {
+                    throw std::runtime_error("DIV: divide by zero");
+                }
+                push(a / b);
+                break;
+            }
+
             case OpCode::Concat: {
                 std::string b = stringFromStackValue(pop(), PickVM::opCodeName(instr.op));
                 std::string a = stringFromStackValue(pop(), PickVM::opCodeName(instr.op));

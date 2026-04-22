@@ -28,6 +28,7 @@ More detail lives under **[`docs/`](docs/README.md)**:
 - **[Bytecode VM](docs/vm.md)** — `.tbc` format, opcodes, parser and runtime.
 - **[Developer shell (TCL)](docs/tcl-shell.md)** — REPL commands, trace, breakpoints.
 - **[BASIC shell](docs/basic-shell.md)** — BASIC and ED mode commands, program editing and SAVE rules.
+- **[BASIC language](docs/basic-language.md)** — supported BASIC compiler subset and expression semantics.
 
 ## Layout (high level)
 

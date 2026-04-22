@@ -159,6 +159,21 @@ TEST_CASE("parser DUP DROP SUB") {
     CHECK(lb.program[5].op == OpCode::Halt);
 }
 
+TEST_CASE("parser MUL and DIV") {
+    Parser parser;
+    std::istringstream in(
+        "PUSH_INT 8\n"
+        "PUSH_INT 2\n"
+        "DIV\n"
+        "PUSH_INT 3\n"
+        "MUL\n"
+        "HALT\n");
+    LoadedBytecode lb = parser.parse(in);
+    REQUIRE(lb.program.size() == 6);
+    CHECK(lb.program[2].op == OpCode::Div);
+    CHECK(lb.program[4].op == OpCode::Mul);
+}
+
 TEST_CASE("parser parseFile missing file") {
     Parser parser;
     CHECK_THROWS_AS(parser.parseFile("/nonexistent/pick_system/no_such_file.tbc"), std::runtime_error);
