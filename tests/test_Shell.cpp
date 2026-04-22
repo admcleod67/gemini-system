@@ -823,6 +823,25 @@ TEST_CASE("shell BASIC LOAD loads saved program") {
     CHECK(out.str() == "10 PRINT \"HELLO\"\n");
 }
 
+TEST_CASE("shell BASIC RENUMBER aliases RENUM") {
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("BASIC", out, quit);
+    sh.handleLine("100 A", out, quit);
+    sh.handleLine("350 B", out, quit);
+
+    out.str("");
+    sh.handleLine("RENUMBER", out, quit);
+    CHECK(out.str().empty());
+
+    out.str("");
+    sh.handleLine("LIST", out, quit);
+    CHECK(out.str() == "10 A\n20 B\n");
+}
+
 TEST_CASE("shell ED mode malformed substitute command is rejected") {
     PickVM::Runtime rt;
     PickShell::Shell sh(rt);

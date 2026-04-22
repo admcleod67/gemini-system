@@ -164,6 +164,7 @@ namespace PickShell {
             }
             program_.renumber();
         };
+        basicCommands_["RENUMBER"] = basicCommands_["RENUM"];
         basicCommands_["NEW"] = [this](const Tokens &tokens, std::ostream &out, bool &) {
             if (tokens.size() > 1) {
                 out << "NEW takes no arguments\n";
@@ -221,6 +222,7 @@ namespace PickShell {
             out << "  EDIT <n>\n";
             out << "  DELETE <n>|<n-m>\n";
             out << "  RENUM\n";
+            out << "  RENUMBER\n";
             out << "  NEW\n";
             out << "  LOAD [name]\n";
             out << "  SAVE [name]\n";

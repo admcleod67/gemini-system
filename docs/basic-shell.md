@@ -27,7 +27,7 @@ The BASIC shell is a mode inside the interactive shell focused on editing and pe
 | `EDIT <line>` | Enter `ED>` for an existing line. |
 | `DELETE <line>` | Delete one line. |
 | `DELETE <start-end>` | Delete an inclusive range. |
-| `RENUM` | Renumber lines to `10,20,30,...` preserving order. |
+| `RENUM` / `RENUMBER` | Renumber lines to `10,20,30,...` preserving order. |
 | `NEW` | Clear all in-memory lines for the active BASIC program context. |
 | `LOAD [name]` | Reload from disk using explicit name or active program name. Missing files load as empty. |
 | `SAVE [name]` | Save using explicit name or active program name. |
