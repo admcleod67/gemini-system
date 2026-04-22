@@ -836,7 +836,7 @@ TEST_CASE("shell BASIC COMPILE reports success summary") {
     out.str("");
 
     sh.handleLine("COMPILE", out, quit);
-    CHECK(out.str() == "Compiled successfully.\nInstructions: 5\nLabels: 0\n");
+    CHECK(out.str() == "Compiled successfully.\nInstructions: 6\nLabels: 0\n");
 }
 
 TEST_CASE("shell BASIC RUN is quiet on compile success and executes output") {
@@ -865,7 +865,7 @@ TEST_CASE("shell BASIC RUN (C mirrors COMPILE and does not execute") {
     out.str("");
 
     sh.handleLine("RUN (C", out, quit);
-    CHECK(out.str() == "Compiled successfully.\nInstructions: 3\nLabels: 0\n");
+    CHECK(out.str() == "Compiled successfully.\nInstructions: 4\nLabels: 0\n");
 }
 
 TEST_CASE("shell BASIC compile failures print line diagnostics") {
@@ -907,7 +907,7 @@ TEST_CASE("shell BASIC RUN recompiles each time and does not depend on COMPILE c
     sh.handleLine("10 PRINT \"ONE\"", out, quit);
     out.str("");
     sh.handleLine("COMPILE", out, quit);
-    CHECK(out.str() == "Compiled successfully.\nInstructions: 3\nLabels: 0\n");
+    CHECK(out.str() == "Compiled successfully.\nInstructions: 4\nLabels: 0\n");
 
     sh.handleLine("10 PRINT \"TWO\"", out, quit);
     out.str("");
@@ -945,6 +945,24 @@ TEST_CASE("shell BASIC RUN executes INPUT then PRINT with injected input") {
 
     sh.handleLine("RUN", out, quit);
     CHECK(out.str() == "123\n");
+}
+
+TEST_CASE("shell BASIC RUN supports PRINT semicolon prompt before INPUT") {
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    std::istringstream in("123\n");
+    sh.setInputStream(&in);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("BASIC", out, quit);
+    sh.handleLine("10 PRINT \"Enter value: \";", out, quit);
+    sh.handleLine("20 INPUT A", out, quit);
+    sh.handleLine("30 PRINT A", out, quit);
+    out.str("");
+
+    sh.handleLine("RUN", out, quit);
+    CHECK(out.str() == "Enter value: 123\n");
 }
 
 TEST_CASE("shell BASIC COMPILE reports expression syntax errors") {

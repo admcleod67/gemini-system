@@ -31,6 +31,7 @@ namespace PickVM {
         Drop,
         PrintInt,
         PrintStr,
+        PrintEol,
         InputInt,
         Jump,
         JumpIfZero,

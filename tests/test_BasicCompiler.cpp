@@ -17,15 +17,16 @@ TEST_CASE("basic compiler compiles LET PRINT END") {
 
     CHECK(result.success);
     CHECK(result.errors.empty());
-    CHECK(result.instructionCount == 5);
+    CHECK(result.instructionCount == 6);
     CHECK(result.labelCount == 0);
-    REQUIRE(result.program.size() == 5);
+    REQUIRE(result.program.size() == 6);
     CHECK(result.program[0].op == OpCode::PushInt);
     CHECK(result.program[1].op == OpCode::StoreVar);
     CHECK(std::get<std::string>(result.program[1].operand) == "A");
     CHECK(result.program[2].op == OpCode::LoadVar);
     CHECK(result.program[3].op == OpCode::PrintInt);
-    CHECK(result.program[4].op == OpCode::Halt);
+    CHECK(result.program[4].op == OpCode::PrintEol);
+    CHECK(result.program[5].op == OpCode::Halt);
 }
 
 TEST_CASE("basic compiler compiles arithmetic precedence and parentheses") {
@@ -97,11 +98,32 @@ TEST_CASE("basic compiler supports PRINT string literals") {
     const auto result = compiler.compile(program);
 
     CHECK(result.success);
-    REQUIRE(result.program.size() == 3);
+    REQUIRE(result.program.size() == 4);
     CHECK(result.program[0].op == OpCode::PushStr);
     CHECK(std::get<std::string>(result.program[0].operand) == "HELLO");
     CHECK(result.program[1].op == OpCode::PrintStr);
-    CHECK(result.program[2].op == OpCode::Halt);
+    CHECK(result.program[2].op == OpCode::PrintEol);
+    CHECK(result.program[3].op == OpCode::Halt);
+}
+
+TEST_CASE("basic compiler supports PRINT trailing semicolon to suppress EOL") {
+    BasicProgram program;
+    program.setLine(10, "PRINT \"HELLO\";");
+    program.setLine(20, "PRINT 1+1;");
+
+    BasicCompiler compiler;
+    const auto result = compiler.compile(program);
+
+    CHECK(result.success);
+    CHECK(result.errors.empty());
+    REQUIRE(result.program.size() >= 7);
+    CHECK(result.program[0].op == OpCode::PushStr);
+    CHECK(result.program[1].op == OpCode::PrintStr);
+    CHECK(result.program[2].op == OpCode::PushInt);
+    CHECK(result.program[3].op == OpCode::PushInt);
+    CHECK(result.program[4].op == OpCode::Add);
+    CHECK(result.program[5].op == OpCode::PrintInt);
+    CHECK(result.program[6].op == OpCode::Halt);
 }
 
 TEST_CASE("basic compiler reports unknown keyword with line") {
@@ -218,13 +240,14 @@ TEST_CASE("basic compiler compiles INPUT variable") {
 
     CHECK(result.success);
     CHECK(result.errors.empty());
-    REQUIRE(result.program.size() == 5);
+    REQUIRE(result.program.size() == 6);
     CHECK(result.program[0].op == OpCode::InputInt);
     CHECK(result.program[1].op == OpCode::StoreVar);
     CHECK(std::get<std::string>(result.program[1].operand) == "A");
     CHECK(result.program[2].op == OpCode::LoadVar);
     CHECK(result.program[3].op == OpCode::PrintInt);
-    CHECK(result.program[4].op == OpCode::Halt);
+    CHECK(result.program[4].op == OpCode::PrintEol);
+    CHECK(result.program[5].op == OpCode::Halt);
 }
 
 TEST_CASE("basic compiler INPUT requires one valid variable name") {

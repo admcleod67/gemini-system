@@ -69,6 +69,24 @@ TEST_CASE("runtime print int and str to stream") {
     std::vector<Instruction> prog = {
         {OpCode::PushInt, 42},
         {OpCode::PrintInt, Value{}},
+        {OpCode::PrintEol, Value{}},
+        {OpCode::PushStr, std::string{"ok"}},
+        {OpCode::PrintStr, Value{}},
+        {OpCode::PrintEol, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    Runtime rt;
+    rt.setOutputStream(&out);
+    rt.loadProgram(prog);
+    rt.run();
+    CHECK(out.str() == "42\nok\n");
+}
+
+TEST_CASE("runtime PRINT_INT and PRINT_STR do not append newline") {
+    std::ostringstream out;
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, 42},
+        {OpCode::PrintInt, Value{}},
         {OpCode::PushStr, std::string{"ok"}},
         {OpCode::PrintStr, Value{}},
         {OpCode::Halt, Value{}},
@@ -77,7 +95,7 @@ TEST_CASE("runtime print int and str to stream") {
     rt.setOutputStream(&out);
     rt.loadProgram(prog);
     rt.run();
-    CHECK(out.str() == "42\nok\n");
+    CHECK(out.str() == "42ok");
 }
 
 TEST_CASE("runtime dumpStack uses stream") {

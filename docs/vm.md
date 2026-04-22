@@ -35,8 +35,9 @@ The parser records **1-based physical source line numbers** per instruction (for
 | `CONCAT` | Pop `b`, pop `a`, push string concatenation `a + b`. |
 | `DUP` | Duplicate top of stack. |
 | `DROP` | Pop and discard top. |
-| `PRINT_INT` | Pop int, write decimal and newline to the runtime output stream. |
-| `PRINT_STR` | Pop string, write string and newline. |
+| `PRINT_INT` | Pop int, write decimal to the runtime output stream (no line ending). |
+| `PRINT_STR` | Pop string, write string (no line ending). |
+| `PRINT_EOL` | Write end-of-line to the runtime output stream. |
 | `INPUT_INT` | Read one input line, parse as int, and push it. Throws `INPUT_INT: end of input` on EOF and `INPUT_INT: invalid integer input` on parse failure. |
 | `JUMP label` | Set IP to the instruction index of `label` (resolved at parse time). |
 | `JZ label` | Pop int; if it is **zero**, jump to `label`; otherwise fall through. |

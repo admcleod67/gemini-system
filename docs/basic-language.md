@@ -65,6 +65,13 @@ PRINT "HELLO"
 
 String literal `PRINT` uses string VM print path; numeric expressions use integer VM print path.
 
+`PRINT` newline behavior:
+
+- `PRINT <expr>` prints the value and ends the line.
+- `PRINT <expr>;` prints the value without ending the line.
+
+The semicolon form is useful for prompt-style interaction, for example printing a prompt before `INPUT`.
+
 ## `INPUT <var>`
 
 `INPUT` reads one line from runtime input, parses it as an integer, and stores it in the target variable.

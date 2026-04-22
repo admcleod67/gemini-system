@@ -226,13 +226,18 @@ namespace PickVM {
 
             case OpCode::PrintInt: {
                 int v = intFromStackValue(pop(), PickVM::opCodeName(instr.op));
-                out() << v << std::endl;
+                out() << v;
                 break;
             }
 
             case OpCode::PrintStr: {
                 std::string v = stringFromStackValue(pop(), PickVM::opCodeName(instr.op));
-                out() << v << std::endl;
+                out() << v;
+                break;
+            }
+
+            case OpCode::PrintEol: {
+                out() << std::endl;
                 break;
             }
 

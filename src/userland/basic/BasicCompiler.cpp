@@ -574,6 +574,11 @@ namespace PickShell {
                 std::string expr;
                 std::getline(iss, expr);
                 expr = trim(expr);
+                bool suppressEol = false;
+                if (!expr.empty() && expr.back() == ';') {
+                    suppressEol = true;
+                    expr = trim(expr.substr(0, expr.size() - 1));
+                }
                 if (expr.empty()) {
                     result.errors.push_back({lineNumber, "PRINT requires an expression"});
                     continue;
@@ -583,6 +588,9 @@ namespace PickShell {
                 if (asString) {
                     result.program.push_back(PickVM::Instruction{PickVM::OpCode::PushStr, *asString});
                     result.program.push_back(makeNoOperandInstruction(PickVM::OpCode::PrintStr));
+                    if (!suppressEol) {
+                        result.program.push_back(makeNoOperandInstruction(PickVM::OpCode::PrintEol));
+                    }
                     continue;
                 }
 
@@ -592,6 +600,9 @@ namespace PickShell {
                     continue;
                 }
                 result.program.push_back(makeNoOperandInstruction(PickVM::OpCode::PrintInt));
+                if (!suppressEol) {
+                    result.program.push_back(makeNoOperandInstruction(PickVM::OpCode::PrintEol));
+                }
                 continue;
             }
 

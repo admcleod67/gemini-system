@@ -207,6 +207,23 @@ TEST_CASE("parser INPUT_INT") {
     CHECK(lb.program[1].op == OpCode::Halt);
 }
 
+TEST_CASE("parser PRINT_EOL") {
+    Parser parser;
+    std::istringstream in(
+        "PRINT_EOL\n"
+        "HALT\n");
+    LoadedBytecode lb = parser.parse(in);
+    REQUIRE(lb.program.size() == 2);
+    CHECK(lb.program[0].op == OpCode::PrintEol);
+    CHECK(lb.program[1].op == OpCode::Halt);
+}
+
+TEST_CASE("parser PRINT_EOL takes no operand") {
+    Parser parser;
+    std::istringstream in("PRINT_EOL x\nHALT\n");
+    CHECK_THROWS_AS(parser.parse(in), std::runtime_error);
+}
+
 TEST_CASE("parser INPUT_INT takes no operand") {
     Parser parser;
     std::istringstream in("INPUT_INT 1\nHALT\n");

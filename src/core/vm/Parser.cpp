@@ -136,6 +136,12 @@ namespace PickVM {
                 inst.op = OpCode::Concat;
             } else if (pl.opcode == "PRINT_INT") {
                 inst.op = OpCode::PrintInt;
+            } else if (pl.opcode == "PRINT_EOL") {
+                inst.op = OpCode::PrintEol;
+                if (!pl.operand.empty()) {
+                    throw std::runtime_error(
+                        "PRINT_EOL takes no operand at line " + std::to_string(pl.sourceLine));
+                }
             } else if (pl.opcode == "PRINT_STR") {
                 inst.op = OpCode::PrintStr;
             } else if (pl.opcode == "INPUT_INT") {
