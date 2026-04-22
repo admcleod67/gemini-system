@@ -9,6 +9,9 @@ This page documents BASIC compiler subset v1: the currently supported language f
 
 - `LET <var> = <expr>`
 - `PRINT <expr>`
+- `GOTO <line>`
+- `IF <cond> THEN <line> [ELSE <line>]`
+- `STOP`
 - `END` (optional)
 
 If `END` is omitted, the compiler emits an implicit terminating `HALT`.
@@ -34,12 +37,14 @@ Supported expression features:
 - parentheses
 - unary minus
 - binary operators `+`, `-`, `*`, `/`
+- comparison operators `=`, `<>`, `<`, `<=`, `>`, `>=`
 
 Operator precedence:
 
 1. unary `-`
 2. `*`, `/`
 3. `+`, `-`
+4. comparison operators
 
 Associativity for binary operators is left-to-right.
 
@@ -58,6 +63,16 @@ PRINT "HELLO"
 ```
 
 String literal `PRINT` uses string VM print path; numeric expressions use integer VM print path.
+
+## Control flow
+
+- `GOTO <line>` jumps to the specified BASIC line number.
+- `IF <cond> THEN <line>` jumps to `<line>` when `<cond>` is true; otherwise execution continues to the next sequential line.
+- `IF <cond> THEN <line1> ELSE <line2>` jumps to `<line1>` when true, otherwise to `<line2>`.
+- `STOP` halts execution immediately (same runtime effect as `END`).
+- Unknown target lines are compile-time errors.
+
+Conditions evaluate to integer booleans (`1` true, `0` false).
 
 ## Compile diagnostics
 

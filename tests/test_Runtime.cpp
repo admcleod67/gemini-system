@@ -366,6 +366,40 @@ TEST_CASE("runtime DIV by zero throws") {
     CHECK_THROWS_AS(rt.run(), std::runtime_error);
 }
 
+TEST_CASE("runtime comparison opcodes push integer booleans") {
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, 2},
+        {OpCode::PushInt, 2},
+        {OpCode::Eq, Value{}},
+        {OpCode::PushInt, 2},
+        {OpCode::PushInt, 3},
+        {OpCode::Lt, Value{}},
+        {OpCode::PushInt, 3},
+        {OpCode::PushInt, 2},
+        {OpCode::Ge, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    Runtime rt;
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 3);
+    CHECK(std::get<int>(rt.stack()[0]) == 1);
+    CHECK(std::get<int>(rt.stack()[1]) == 1);
+    CHECK(std::get<int>(rt.stack()[2]) == 1);
+}
+
+TEST_CASE("runtime comparison opcodes enforce int types") {
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"x"}},
+        {OpCode::PushInt, 1},
+        {OpCode::Eq, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    Runtime rt;
+    rt.loadProgram(prog);
+    CHECK_THROWS_AS(rt.run(), std::runtime_error);
+}
+
 TEST_CASE("runtime MUL wrong types") {
     std::vector<Instruction> prog = {
         {OpCode::PushStr, std::string{"a"}},

@@ -944,6 +944,40 @@ TEST_CASE("shell BASIC COMPILE reports expression syntax errors") {
     CHECK(out.str() == "Error on line 10: LET expression error: Missing ')'\nCompilation failed.\n");
 }
 
+TEST_CASE("shell BASIC RUN executes IF THEN ELSE and GOTO control flow") {
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("BASIC", out, quit);
+    sh.handleLine("10 LET A = 1", out, quit);
+    sh.handleLine("20 IF A = 1 THEN 40 ELSE 30", out, quit);
+    sh.handleLine("30 PRINT 0", out, quit);
+    sh.handleLine("40 PRINT 1", out, quit);
+    sh.handleLine("50 GOTO 70", out, quit);
+    sh.handleLine("60 PRINT 2", out, quit);
+    sh.handleLine("70 STOP", out, quit);
+    out.str("");
+
+    sh.handleLine("RUN", out, quit);
+    CHECK(out.str() == "1\n");
+}
+
+TEST_CASE("shell BASIC COMPILE reports unknown GOTO target line") {
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("BASIC", out, quit);
+    sh.handleLine("10 GOTO 99", out, quit);
+    out.str("");
+
+    sh.handleLine("COMPILE", out, quit);
+    CHECK(out.str() == "Error on line 10: Unknown target line 99\nCompilation failed.\n");
+}
+
 TEST_CASE("shell BASIC RENUMBER aliases RENUM") {
     PickVM::Runtime rt;
     PickShell::Shell sh(rt);

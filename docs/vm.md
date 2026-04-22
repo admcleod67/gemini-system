@@ -26,6 +26,12 @@ The parser records **1-based physical source line numbers** per instruction (for
 | `SUB` | Pop `b`, pop `a`, push `a - b` (ints). |
 | `MUL` | Pop `b`, pop `a`, push `a * b` (ints). |
 | `DIV` | Pop `b`, pop `a`, push `a / b` (ints, truncates toward zero). Throws `DIV: divide by zero` when `b` is zero. |
+| `EQ` | Pop `b`, pop `a`, push `1` if `a == b`, else `0` (ints). |
+| `NE` | Pop `b`, pop `a`, push `1` if `a != b`, else `0` (ints). |
+| `LT` | Pop `b`, pop `a`, push `1` if `a < b`, else `0` (ints). |
+| `LE` | Pop `b`, pop `a`, push `1` if `a <= b`, else `0` (ints). |
+| `GT` | Pop `b`, pop `a`, push `1` if `a > b`, else `0` (ints). |
+| `GE` | Pop `b`, pop `a`, push `1` if `a >= b`, else `0` (ints). |
 | `CONCAT` | Pop `b`, pop `a`, push string concatenation `a + b`. |
 | `DUP` | Duplicate top of stack. |
 | `DROP` | Pop and discard top. |

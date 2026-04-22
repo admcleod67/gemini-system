@@ -145,3 +145,65 @@ TEST_CASE("basic compiler reports expression syntax diagnostics") {
     CHECK(result.errors[1].line == 20);
     CHECK(result.errors[1].message.find("PRINT expression error:") == 0);
 }
+
+TEST_CASE("basic compiler supports relational operators in expressions") {
+    BasicProgram program;
+    program.setLine(10, "LET A = 2 < 3");
+    program.setLine(20, "PRINT 4 >= 5");
+
+    BasicCompiler compiler;
+    const auto result = compiler.compile(program);
+
+    CHECK(result.success);
+    REQUIRE(result.program.size() >= 7);
+    CHECK(result.program[2].op == OpCode::Lt);
+    CHECK(result.program[6].op == OpCode::Ge);
+}
+
+TEST_CASE("basic compiler compiles GOTO STOP and IF THEN ELSE line targets") {
+    BasicProgram program;
+    program.setLine(10, "IF 1 = 1 THEN 30 ELSE 40");
+    program.setLine(20, "STOP");
+    program.setLine(30, "GOTO 20");
+    program.setLine(40, "PRINT 99");
+
+    BasicCompiler compiler;
+    const auto result = compiler.compile(program);
+
+    CHECK(result.success);
+    CHECK(result.errors.empty());
+    REQUIRE(result.program.size() >= 10);
+    CHECK(result.program[2].op == OpCode::Eq);
+    CHECK(result.program[3].op == OpCode::JumpIfZero);
+    CHECK(result.program[4].op == OpCode::Jump);
+    CHECK(result.program[5].op == OpCode::Jump);
+    CHECK(result.program[6].op == OpCode::Halt);
+    CHECK(result.program[7].op == OpCode::Jump);
+}
+
+TEST_CASE("basic compiler reports unknown control flow target line") {
+    BasicProgram program;
+    program.setLine(10, "GOTO 99");
+
+    BasicCompiler compiler;
+    const auto result = compiler.compile(program);
+
+    CHECK_FALSE(result.success);
+    REQUIRE(result.errors.size() == 1);
+    CHECK(result.errors[0].line == 10);
+    CHECK(result.errors[0].message == "Unknown target line 99");
+}
+
+TEST_CASE("basic compiler reports malformed IF target syntax") {
+    BasicProgram program;
+    program.setLine(10, "IF 1 THEN");
+    program.setLine(20, "IF 1 THEN 30 ELSE");
+
+    BasicCompiler compiler;
+    const auto result = compiler.compile(program);
+
+    CHECK_FALSE(result.success);
+    REQUIRE(result.errors.size() == 2);
+    CHECK(result.errors[0].message == "IF THEN requires a line number");
+    CHECK(result.errors[1].message == "IF ELSE requires a line number");
+}

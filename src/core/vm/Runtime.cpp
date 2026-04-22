@@ -138,6 +138,48 @@ namespace PickVM {
                 break;
             }
 
+            case OpCode::Eq: {
+                int b = intFromStackValue(pop(), PickVM::opCodeName(instr.op));
+                int a = intFromStackValue(pop(), PickVM::opCodeName(instr.op));
+                push(a == b ? 1 : 0);
+                break;
+            }
+
+            case OpCode::Ne: {
+                int b = intFromStackValue(pop(), PickVM::opCodeName(instr.op));
+                int a = intFromStackValue(pop(), PickVM::opCodeName(instr.op));
+                push(a != b ? 1 : 0);
+                break;
+            }
+
+            case OpCode::Lt: {
+                int b = intFromStackValue(pop(), PickVM::opCodeName(instr.op));
+                int a = intFromStackValue(pop(), PickVM::opCodeName(instr.op));
+                push(a < b ? 1 : 0);
+                break;
+            }
+
+            case OpCode::Le: {
+                int b = intFromStackValue(pop(), PickVM::opCodeName(instr.op));
+                int a = intFromStackValue(pop(), PickVM::opCodeName(instr.op));
+                push(a <= b ? 1 : 0);
+                break;
+            }
+
+            case OpCode::Gt: {
+                int b = intFromStackValue(pop(), PickVM::opCodeName(instr.op));
+                int a = intFromStackValue(pop(), PickVM::opCodeName(instr.op));
+                push(a > b ? 1 : 0);
+                break;
+            }
+
+            case OpCode::Ge: {
+                int b = intFromStackValue(pop(), PickVM::opCodeName(instr.op));
+                int a = intFromStackValue(pop(), PickVM::opCodeName(instr.op));
+                push(a >= b ? 1 : 0);
+                break;
+            }
+
             case OpCode::Concat: {
                 std::string b = stringFromStackValue(pop(), PickVM::opCodeName(instr.op));
                 std::string a = stringFromStackValue(pop(), PickVM::opCodeName(instr.op));

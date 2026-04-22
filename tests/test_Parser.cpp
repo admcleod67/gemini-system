@@ -174,6 +174,28 @@ TEST_CASE("parser MUL and DIV") {
     CHECK(lb.program[4].op == OpCode::Mul);
 }
 
+TEST_CASE("parser comparison opcodes") {
+    Parser parser;
+    std::istringstream in(
+        "PUSH_INT 1\n"
+        "PUSH_INT 2\n"
+        "EQ\n"
+        "NE\n"
+        "LT\n"
+        "LE\n"
+        "GT\n"
+        "GE\n"
+        "HALT\n");
+    LoadedBytecode lb = parser.parse(in);
+    REQUIRE(lb.program.size() == 9);
+    CHECK(lb.program[2].op == OpCode::Eq);
+    CHECK(lb.program[3].op == OpCode::Ne);
+    CHECK(lb.program[4].op == OpCode::Lt);
+    CHECK(lb.program[5].op == OpCode::Le);
+    CHECK(lb.program[6].op == OpCode::Gt);
+    CHECK(lb.program[7].op == OpCode::Ge);
+}
+
 TEST_CASE("parser parseFile missing file") {
     Parser parser;
     CHECK_THROWS_AS(parser.parseFile("/nonexistent/pick_system/no_such_file.tbc"), std::runtime_error);

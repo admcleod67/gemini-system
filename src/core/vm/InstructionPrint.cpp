@@ -19,6 +19,12 @@ namespace PickVM {
             case OpCode::Sub: return "SUB";
             case OpCode::Mul: return "MUL";
             case OpCode::Div: return "DIV";
+            case OpCode::Eq: return "EQ";
+            case OpCode::Ne: return "NE";
+            case OpCode::Lt: return "LT";
+            case OpCode::Le: return "LE";
+            case OpCode::Gt: return "GT";
+            case OpCode::Ge: return "GE";
             case OpCode::Concat: return "CONCAT";
             case OpCode::Dup: return "DUP";
             case OpCode::Drop: return "DROP";
@@ -79,6 +85,12 @@ namespace PickVM {
             case OpCode::Sub:
             case OpCode::Mul:
             case OpCode::Div:
+            case OpCode::Eq:
+            case OpCode::Ne:
+            case OpCode::Lt:
+            case OpCode::Le:
+            case OpCode::Gt:
+            case OpCode::Ge:
             case OpCode::Concat:
             case OpCode::Dup:
             case OpCode::Drop:

@@ -116,6 +116,18 @@ namespace PickVM {
                 inst.op = OpCode::Mul;
             } else if (pl.opcode == "DIV") {
                 inst.op = OpCode::Div;
+            } else if (pl.opcode == "EQ") {
+                inst.op = OpCode::Eq;
+            } else if (pl.opcode == "NE") {
+                inst.op = OpCode::Ne;
+            } else if (pl.opcode == "LT") {
+                inst.op = OpCode::Lt;
+            } else if (pl.opcode == "LE") {
+                inst.op = OpCode::Le;
+            } else if (pl.opcode == "GT") {
+                inst.op = OpCode::Gt;
+            } else if (pl.opcode == "GE") {
+                inst.op = OpCode::Ge;
             } else if (pl.opcode == "DUP") {
                 inst.op = OpCode::Dup;
             } else if (pl.opcode == "DROP") {

@@ -7,6 +7,7 @@
 #include <optional>
 #include <sstream>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace PickShell {
@@ -79,6 +80,12 @@ namespace PickShell {
             Minus,
             Star,
             Slash,
+            Eq,
+            Ne,
+            Lt,
+            Le,
+            Gt,
+            Ge,
             LParen,
             RParen,
             End,
@@ -126,6 +133,21 @@ namespace PickShell {
                 }
 
                 ExprTokenType type = ExprTokenType::End;
+                if (c == '<' && i + 1 < expr.size() && expr[i + 1] == '=') {
+                    tokens.push_back({ExprTokenType::Le, "<=", 0});
+                    i += 2;
+                    continue;
+                }
+                if (c == '>' && i + 1 < expr.size() && expr[i + 1] == '=') {
+                    tokens.push_back({ExprTokenType::Ge, ">=", 0});
+                    i += 2;
+                    continue;
+                }
+                if (c == '<' && i + 1 < expr.size() && expr[i + 1] == '>') {
+                    tokens.push_back({ExprTokenType::Ne, "<>", 0});
+                    i += 2;
+                    continue;
+                }
                 switch (c) {
                     case '+': type = ExprTokenType::Plus;
                         break;
@@ -134,6 +156,12 @@ namespace PickShell {
                     case '*': type = ExprTokenType::Star;
                         break;
                     case '/': type = ExprTokenType::Slash;
+                        break;
+                    case '=': type = ExprTokenType::Eq;
+                        break;
+                    case '<': type = ExprTokenType::Lt;
+                        break;
+                    case '>': type = ExprTokenType::Gt;
                         break;
                     case '(': type = ExprTokenType::LParen;
                         break;
@@ -163,7 +191,7 @@ namespace PickShell {
                     *error_ = "empty expression";
                     return false;
                 }
-                if (!parseAddSub()) {
+                if (!parseComparison()) {
                     return false;
                 }
                 if (current().type != ExprTokenType::End) {
@@ -191,6 +219,44 @@ namespace PickShell {
 
             void emitNoOperand(PickVM::OpCode op) const {
                 out_->push_back(makeNoOperandInstruction(op));
+            }
+
+            bool isComparisonToken(const ExprTokenType type) {
+                return type == ExprTokenType::Eq || type == ExprTokenType::Ne ||
+                       type == ExprTokenType::Lt || type == ExprTokenType::Le ||
+                       type == ExprTokenType::Gt || type == ExprTokenType::Ge;
+            }
+
+            PickVM::OpCode comparisonOpCode(const ExprTokenType type) {
+                switch (type) {
+                    case ExprTokenType::Eq: return PickVM::OpCode::Eq;
+                    case ExprTokenType::Ne: return PickVM::OpCode::Ne;
+                    case ExprTokenType::Lt: return PickVM::OpCode::Lt;
+                    case ExprTokenType::Le: return PickVM::OpCode::Le;
+                    case ExprTokenType::Gt: return PickVM::OpCode::Gt;
+                    case ExprTokenType::Ge: return PickVM::OpCode::Ge;
+                    default: return PickVM::OpCode::Eq;
+                }
+            }
+
+            bool parseComparison() {
+                if (!parseAddSub()) {
+                    return false;
+                }
+                if (!isComparisonToken(current().type)) {
+                    return true;
+                }
+                const ExprTokenType compare = current().type;
+                const std::string compareText = current().lexeme;
+                advance();
+                if (!parseAddSub()) {
+                    if (error_->empty()) {
+                        *error_ = "Invalid operand/operator placement near '" + compareText + "'";
+                    }
+                    return false;
+                }
+                emitNoOperand(comparisonOpCode(compare));
+                return true;
             }
 
             bool parseAddSub() {
@@ -299,17 +365,59 @@ namespace PickShell {
             ExpressionEmitter emitter(*maybeTokens);
             return emitter.emit(out, error);
         }
+
+        bool parsePositiveLineNumber(const std::string &raw, int &lineNumber) {
+            const std::string token = trim(raw);
+            if (token.empty()) {
+                return false;
+            }
+            for (const char c: token) {
+                if (std::isdigit(static_cast<unsigned char>(c)) == 0) {
+                    return false;
+                }
+            }
+            try {
+                lineNumber = std::stoi(token);
+            } catch (const std::exception &) {
+                return false;
+            }
+            return lineNumber > 0;
+        }
+
+        std::size_t findKeywordToken(const std::string &upperText, const std::string &keyword) {
+            std::size_t pos = upperText.find(keyword);
+            while (pos != std::string::npos) {
+                const bool startOk = pos == 0 || std::isspace(static_cast<unsigned char>(upperText[pos - 1])) != 0;
+                const std::size_t endPos = pos + keyword.size();
+                const bool endOk = endPos >= upperText.size() ||
+                                   std::isspace(static_cast<unsigned char>(upperText[endPos])) != 0;
+                if (startOk && endOk) {
+                    return pos;
+                }
+                pos = upperText.find(keyword, pos + 1);
+            }
+            return std::string::npos;
+        }
+
+        struct JumpFixup {
+            int sourceLine{0};
+            std::size_t instructionIndex{0};
+            int targetLine{0};
+        };
     } // namespace
 
     BasicCompileResult BasicCompiler::compile(const BasicProgram &program) const {
         BasicCompileResult result;
         bool explicitEnd = false;
+        std::unordered_map<int, std::size_t> lineToInstructionIndex;
+        std::vector<JumpFixup> jumpFixups;
 
         for (const auto &[lineNumber, sourceText]: program.lines()) {
             const std::string line = trim(sourceText);
             if (line.empty()) {
                 continue;
             }
+            lineToInstructionIndex[lineNumber] = result.program.size();
 
             std::istringstream iss(line);
             std::string keyword;
@@ -346,6 +454,94 @@ namespace PickShell {
                 continue;
             }
 
+            if (op == "GOTO") {
+                std::string targetRaw;
+                std::getline(iss, targetRaw);
+                int targetLine = 0;
+                if (!parsePositiveLineNumber(targetRaw, targetLine)) {
+                    result.errors.push_back({lineNumber, "GOTO requires a line number"});
+                    continue;
+                }
+                const std::size_t jumpIp = result.program.size();
+                result.program.push_back(PickVM::Instruction{PickVM::OpCode::Jump, 0});
+                jumpFixups.push_back({lineNumber, jumpIp, targetLine});
+                continue;
+            }
+
+            if (op == "IF") {
+                std::string rest;
+                std::getline(iss, rest);
+                rest = trim(rest);
+                if (rest.empty()) {
+                    result.errors.push_back({lineNumber, "IF requires THEN <line>"});
+                    continue;
+                }
+                const std::string restUpper = uppercase(rest);
+                const std::size_t thenPos = findKeywordToken(restUpper, "THEN");
+                if (thenPos == std::string::npos) {
+                    result.errors.push_back({lineNumber, "IF requires THEN <line>"});
+                    continue;
+                }
+
+                const std::string conditionExpr = trim(rest.substr(0, thenPos));
+                if (conditionExpr.empty()) {
+                    result.errors.push_back({lineNumber, "IF requires a condition expression"});
+                    continue;
+                }
+
+                std::string branchPart = trim(rest.substr(thenPos + 4));
+                if (branchPart.empty()) {
+                    result.errors.push_back({lineNumber, "IF THEN requires a line number"});
+                    continue;
+                }
+                const std::string branchUpper = uppercase(branchPart);
+                const std::size_t elsePos = findKeywordToken(branchUpper, "ELSE");
+
+                std::string thenRaw = branchPart;
+                std::optional<std::string> elseRaw;
+                if (elsePos != std::string::npos) {
+                    thenRaw = trim(branchPart.substr(0, elsePos));
+                    elseRaw = trim(branchPart.substr(elsePos + 4));
+                } else {
+                    thenRaw = trim(thenRaw);
+                }
+
+                int thenLine = 0;
+                if (!parsePositiveLineNumber(thenRaw, thenLine)) {
+                    result.errors.push_back({lineNumber, "IF THEN requires a line number"});
+                    continue;
+                }
+
+                int elseLine = 0;
+                if (elseRaw && !parsePositiveLineNumber(*elseRaw, elseLine)) {
+                    result.errors.push_back({lineNumber, "IF ELSE requires a line number"});
+                    continue;
+                }
+
+                std::string condError;
+                if (!emitIntegerExpression(conditionExpr, result.program, condError)) {
+                    result.errors.push_back({lineNumber, "IF condition error: " + condError});
+                    continue;
+                }
+
+                const std::size_t jzIp = result.program.size();
+                result.program.push_back(PickVM::Instruction{PickVM::OpCode::JumpIfZero, 0});
+
+                const std::size_t thenJumpIp = result.program.size();
+                result.program.push_back(PickVM::Instruction{PickVM::OpCode::Jump, 0});
+                jumpFixups.push_back({lineNumber, thenJumpIp, thenLine});
+
+                if (elseRaw) {
+                    result.program[jzIp].operand = static_cast<int>(result.program.size());
+                    const std::size_t elseJumpIp = result.program.size();
+                    result.program.push_back(PickVM::Instruction{PickVM::OpCode::Jump, 0});
+                    jumpFixups.push_back({lineNumber, elseJumpIp, elseLine});
+                } else {
+                    result.program[jzIp].operand = static_cast<int>(result.program.size());
+                }
+                continue;
+            }
+
             if (op == "PRINT") {
                 std::string expr;
                 std::getline(iss, expr);
@@ -371,6 +567,17 @@ namespace PickShell {
                 continue;
             }
 
+            if (op == "STOP") {
+                std::string rest;
+                std::getline(iss, rest);
+                if (!trim(rest).empty()) {
+                    result.errors.push_back({lineNumber, "STOP takes no arguments"});
+                    continue;
+                }
+                result.program.push_back(makeNoOperandInstruction(PickVM::OpCode::Halt));
+                continue;
+            }
+
             if (op == "END") {
                 std::string rest;
                 std::getline(iss, rest);
@@ -384,6 +591,15 @@ namespace PickShell {
             }
 
             result.errors.push_back({lineNumber, "Unknown keyword '" + op + "'"});
+        }
+
+        for (const JumpFixup &fixup: jumpFixups) {
+            const auto it = lineToInstructionIndex.find(fixup.targetLine);
+            if (it == lineToInstructionIndex.end()) {
+                result.errors.push_back({fixup.sourceLine, "Unknown target line " + std::to_string(fixup.targetLine)});
+                continue;
+            }
+            result.program[fixup.instructionIndex].operand = static_cast<int>(it->second);
         }
 
         if (!result.errors.empty()) {
