@@ -1,10 +1,13 @@
 add_library(pick-tcl
         basic/BasicProgram.cpp
         basic/BasicProgram.h
+        basic/BasicAst.h
         basic/BasicShell.cpp
         basic/BasicShell.h
         basic/BasicCompiler.cpp
         basic/BasicCompiler.h
+        basic/BasicExpressionParser.cpp
+        basic/BasicExpressionParser.h
         tcl/Shell.cpp
         tcl/Shell.h
         tcl/ShellSession.cpp

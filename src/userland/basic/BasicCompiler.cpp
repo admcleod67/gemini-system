@@ -1,13 +1,13 @@
 #include "BasicCompiler.h"
+#include "BasicExpressionParser.h"
 
-#include <cerrno>
 #include <cctype>
-#include <cstdlib>
-#include <limits>
 #include <optional>
 #include <sstream>
 #include <string>
+#include <type_traits>
 #include <unordered_map>
+#include <variant>
 #include <vector>
 
 namespace PickShell {
@@ -44,24 +44,6 @@ namespace PickShell {
             return true;
         }
 
-        bool parseIntLiteral(const std::string &token, int &value) {
-            if (token.empty()) {
-                return false;
-            }
-            char *end = nullptr;
-            errno = 0;
-            const long v = std::strtol(token.c_str(), &end, 10);
-            if (errno != 0 || end == nullptr || *end != '\0') {
-                return false;
-            }
-            if (v < static_cast<long>(std::numeric_limits<int>::min()) ||
-                v > static_cast<long>(std::numeric_limits<int>::max())) {
-                return false;
-            }
-            value = static_cast<int>(v);
-            return true;
-        }
-
         std::optional<std::string> parseStringLiteral(const std::string &expr) {
             if (expr.size() >= 2 && expr.front() == '"' && expr.back() == '"') {
                 return expr.substr(1, expr.size() - 2);
@@ -73,297 +55,106 @@ namespace PickShell {
             return PickVM::Instruction{op, PickVM::Value{}};
         }
 
-        enum class ExprTokenType {
-            IntLiteral,
-            Identifier,
-            Plus,
-            Minus,
-            Star,
-            Slash,
-            Eq,
-            Ne,
-            Lt,
-            Le,
-            Gt,
-            Ge,
-            LParen,
-            RParen,
-            End,
-        };
-
-        struct ExprToken {
-            ExprTokenType type{ExprTokenType::End};
-            std::string lexeme;
-            int intValue{0};
-        };
-
-        std::optional<std::vector<ExprToken> > tokenizeExpression(const std::string &expr, std::string &error) {
-            std::vector<ExprToken> tokens;
-            std::size_t i = 0;
-            while (i < expr.size()) {
-                const char c = expr[i];
-                if (std::isspace(static_cast<unsigned char>(c)) != 0) {
-                    ++i;
-                    continue;
-                }
-
-                if (std::isdigit(static_cast<unsigned char>(c)) != 0) {
-                    const std::size_t start = i;
-                    while (i < expr.size() && std::isdigit(static_cast<unsigned char>(expr[i])) != 0) {
-                        ++i;
-                    }
-                    const std::string literal = expr.substr(start, i - start);
-                    int parsed = 0;
-                    if (!parseIntLiteral(literal, parsed)) {
-                        error = "Invalid integer literal '" + literal + "'";
-                        return std::nullopt;
-                    }
-                    tokens.push_back({ExprTokenType::IntLiteral, literal, parsed});
-                    continue;
-                }
-
-                if (std::isalpha(static_cast<unsigned char>(c)) != 0) {
-                    const std::size_t start = i;
-                    while (i < expr.size() && std::isalnum(static_cast<unsigned char>(expr[i])) != 0) {
-                        ++i;
-                    }
-                    const std::string ident = expr.substr(start, i - start);
-                    tokens.push_back({ExprTokenType::Identifier, ident, 0});
-                    continue;
-                }
-
-                ExprTokenType type = ExprTokenType::End;
-                if (c == '<' && i + 1 < expr.size() && expr[i + 1] == '=') {
-                    tokens.push_back({ExprTokenType::Le, "<=", 0});
-                    i += 2;
-                    continue;
-                }
-                if (c == '>' && i + 1 < expr.size() && expr[i + 1] == '=') {
-                    tokens.push_back({ExprTokenType::Ge, ">=", 0});
-                    i += 2;
-                    continue;
-                }
-                if (c == '<' && i + 1 < expr.size() && expr[i + 1] == '>') {
-                    tokens.push_back({ExprTokenType::Ne, "<>", 0});
-                    i += 2;
-                    continue;
-                }
-                switch (c) {
-                    case '+': type = ExprTokenType::Plus;
-                        break;
-                    case '-': type = ExprTokenType::Minus;
-                        break;
-                    case '*': type = ExprTokenType::Star;
-                        break;
-                    case '/': type = ExprTokenType::Slash;
-                        break;
-                    case '=': type = ExprTokenType::Eq;
-                        break;
-                    case '<': type = ExprTokenType::Lt;
-                        break;
-                    case '>': type = ExprTokenType::Gt;
-                        break;
-                    case '(': type = ExprTokenType::LParen;
-                        break;
-                    case ')': type = ExprTokenType::RParen;
-                        break;
-                    default:
-                        error = "Unexpected token '" + std::string(1, c) + "'";
-                        return std::nullopt;
-                }
-                tokens.push_back({type, std::string(1, c), 0});
-                ++i;
-            }
-            tokens.push_back({ExprTokenType::End, "", 0});
-            return tokens;
-        }
-
-        class ExpressionEmitter {
+        class ExpressionAstEmitter {
         public:
-            explicit ExpressionEmitter(const std::vector<ExprToken> &tokens)
-                : tokens_(tokens) {
+            ExpressionAstEmitter(std::vector<PickVM::Instruction> &out, std::string &error)
+                : out_(out), error_(error) {
             }
 
-            [[nodiscard]] bool emit(std::vector<PickVM::Instruction> &out, std::string &error) {
-                out_ = &out;
-                error_ = &error;
-                if (tokens_.size() == 1 && tokens_[0].type == ExprTokenType::End) {
-                    *error_ = "empty expression";
-                    return false;
-                }
-                if (!parseComparison()) {
-                    return false;
-                }
-                if (current().type != ExprTokenType::End) {
-                    *error_ = "Unexpected token '" + current().lexeme + "'";
+            [[nodiscard]] bool emit(const BasicAst::Expr &expression) {
+                if (!emitNode(expression)) {
+                    if (error_.empty()) {
+                        error_ = "Failed to emit expression";
+                    }
                     return false;
                 }
                 return true;
             }
 
         private:
-            const std::vector<ExprToken> &tokens_;
-            std::size_t pos_{0};
-            std::vector<PickVM::Instruction> *out_{nullptr};
-            std::string *error_{nullptr};
-
-            [[nodiscard]] const ExprToken &current() const {
-                return tokens_[pos_];
-            }
-
-            void advance() {
-                if (pos_ < tokens_.size()) {
-                    ++pos_;
-                }
-            }
+            std::vector<PickVM::Instruction> &out_;
+            std::string &error_;
 
             void emitNoOperand(PickVM::OpCode op) const {
-                out_->push_back(makeNoOperandInstruction(op));
+                out_.push_back(makeNoOperandInstruction(op));
             }
 
-            bool isComparisonToken(const ExprTokenType type) {
-                return type == ExprTokenType::Eq || type == ExprTokenType::Ne ||
-                       type == ExprTokenType::Lt || type == ExprTokenType::Le ||
-                       type == ExprTokenType::Gt || type == ExprTokenType::Ge;
+            static PickVM::OpCode toOpCode(const BasicAst::BinaryOp op) {
+                switch (op) {
+                    case BasicAst::BinaryOp::Add: return PickVM::OpCode::Add;
+                    case BasicAst::BinaryOp::Subtract: return PickVM::OpCode::Sub;
+                    case BasicAst::BinaryOp::Multiply: return PickVM::OpCode::Mul;
+                    case BasicAst::BinaryOp::Divide: return PickVM::OpCode::Div;
+                    case BasicAst::BinaryOp::Equal: return PickVM::OpCode::Eq;
+                    case BasicAst::BinaryOp::NotEqual: return PickVM::OpCode::Ne;
+                    case BasicAst::BinaryOp::LessThan: return PickVM::OpCode::Lt;
+                    case BasicAst::BinaryOp::LessOrEqual: return PickVM::OpCode::Le;
+                    case BasicAst::BinaryOp::GreaterThan: return PickVM::OpCode::Gt;
+                    case BasicAst::BinaryOp::GreaterOrEqual: return PickVM::OpCode::Ge;
+                }
+                return PickVM::OpCode::Add;
             }
 
-            PickVM::OpCode comparisonOpCode(const ExprTokenType type) {
-                switch (type) {
-                    case ExprTokenType::Eq: return PickVM::OpCode::Eq;
-                    case ExprTokenType::Ne: return PickVM::OpCode::Ne;
-                    case ExprTokenType::Lt: return PickVM::OpCode::Lt;
-                    case ExprTokenType::Le: return PickVM::OpCode::Le;
-                    case ExprTokenType::Gt: return PickVM::OpCode::Gt;
-                    case ExprTokenType::Ge: return PickVM::OpCode::Ge;
-                    default: return PickVM::OpCode::Eq;
-                }
-            }
-
-            bool parseComparison() {
-                if (!parseAddSub()) {
-                    return false;
-                }
-                if (!isComparisonToken(current().type)) {
-                    return true;
-                }
-                const ExprTokenType compare = current().type;
-                const std::string compareText = current().lexeme;
-                advance();
-                if (!parseAddSub()) {
-                    if (error_->empty()) {
-                        *error_ = "Invalid operand/operator placement near '" + compareText + "'";
-                    }
-                    return false;
-                }
-                emitNoOperand(comparisonOpCode(compare));
-                return true;
-            }
-
-            bool parseAddSub() {
-                if (!parseMulDiv()) {
-                    return false;
-                }
-                while (current().type == ExprTokenType::Plus || current().type == ExprTokenType::Minus) {
-                    const ExprTokenType op = current().type;
-                    const std::string opText = current().lexeme;
-                    advance();
-                    if (!parseMulDiv()) {
-                        if (error_->empty()) {
-                            *error_ = "Invalid operand/operator placement near '" + opText + "'";
+            bool emitNode(const BasicAst::Expr &expression) {
+                return std::visit(
+                    [this](const auto &node) -> bool {
+                        using NodeT = std::decay_t<decltype(node)>;
+                        if constexpr (std::is_same_v<NodeT, BasicAst::IntLiteralExpr>) {
+                            out_.push_back(PickVM::Instruction{PickVM::OpCode::PushInt, node.value});
+                            return true;
+                        } else if constexpr (std::is_same_v<NodeT, BasicAst::IdentifierExpr>) {
+                            if (!isValidVariableName(node.name)) {
+                                error_ = "Invalid variable name '" + node.name + "'";
+                                return false;
+                            }
+                            out_.push_back(PickVM::Instruction{PickVM::OpCode::LoadVar, uppercase(node.name)});
+                            return true;
+                        } else if constexpr (std::is_same_v<NodeT, BasicAst::UnaryExpr>) {
+                            if (node.op != BasicAst::UnaryOp::Negate || !node.operand) {
+                                error_ = "Invalid unary expression";
+                                return false;
+                            }
+                            out_.push_back(PickVM::Instruction{PickVM::OpCode::PushInt, 0});
+                            if (!emitNode(*node.operand)) {
+                                return false;
+                            }
+                            emitNoOperand(PickVM::OpCode::Sub);
+                            return true;
+                        } else if constexpr (std::is_same_v<NodeT, BasicAst::BinaryExpr>) {
+                            if (!node.left || !node.right) {
+                                error_ = "Invalid binary expression";
+                                return false;
+                            }
+                            if (!emitNode(*node.left) || !emitNode(*node.right)) {
+                                return false;
+                            }
+                            emitNoOperand(toOpCode(node.op));
+                            return true;
+                        } else if constexpr (std::is_same_v<NodeT, BasicAst::GroupedExpr>) {
+                            if (!node.expression) {
+                                error_ = "Invalid grouped expression";
+                                return false;
+                            }
+                            return emitNode(*node.expression);
                         }
                         return false;
-                    }
-                    emitNoOperand(op == ExprTokenType::Plus ? PickVM::OpCode::Add : PickVM::OpCode::Sub);
-                }
-                return true;
-            }
-
-            bool parseMulDiv() {
-                if (!parseUnary()) {
-                    return false;
-                }
-                while (current().type == ExprTokenType::Star || current().type == ExprTokenType::Slash) {
-                    const ExprTokenType op = current().type;
-                    const std::string opText = current().lexeme;
-                    advance();
-                    if (!parseUnary()) {
-                        if (error_->empty()) {
-                            *error_ = "Invalid operand/operator placement near '" + opText + "'";
-                        }
-                        return false;
-                    }
-                    emitNoOperand(op == ExprTokenType::Star ? PickVM::OpCode::Mul : PickVM::OpCode::Div);
-                }
-                return true;
-            }
-
-            bool parseUnary() {
-                if (current().type == ExprTokenType::Minus) {
-                    advance();
-                    out_->push_back(PickVM::Instruction{PickVM::OpCode::PushInt, 0});
-                    if (!parseUnary()) {
-                        if (error_->empty()) {
-                            *error_ = "Invalid operand/operator placement near '-'";
-                        }
-                        return false;
-                    }
-                    emitNoOperand(PickVM::OpCode::Sub);
-                    return true;
-                }
-                return parsePrimary();
-            }
-
-            bool parsePrimary() {
-                if (current().type == ExprTokenType::IntLiteral) {
-                    out_->push_back(PickVM::Instruction{PickVM::OpCode::PushInt, current().intValue});
-                    advance();
-                    return true;
-                }
-
-                if (current().type == ExprTokenType::Identifier) {
-                    const std::string ident = current().lexeme;
-                    if (!isValidVariableName(ident)) {
-                        *error_ = "Invalid variable name '" + ident + "'";
-                        return false;
-                    }
-                    out_->push_back(PickVM::Instruction{PickVM::OpCode::LoadVar, uppercase(ident)});
-                    advance();
-                    return true;
-                }
-
-                if (current().type == ExprTokenType::LParen) {
-                    advance();
-                    if (current().type == ExprTokenType::RParen) {
-                        *error_ = "empty expression";
-                        return false;
-                    }
-                    if (!parseAddSub()) {
-                        return false;
-                    }
-                    if (current().type != ExprTokenType::RParen) {
-                        *error_ = "Missing ')'";
-                        return false;
-                    }
-                    advance();
-                    return true;
-                }
-
-                if (current().type == ExprTokenType::End) {
-                    *error_ = "empty expression";
-                } else {
-                    *error_ = "Unexpected token '" + current().lexeme + "'";
-                }
-                return false;
+                    },
+                    expression.node);
             }
         };
 
         bool emitIntegerExpression(const std::string &expr, std::vector<PickVM::Instruction> &out, std::string &error) {
-            const std::optional<std::vector<ExprToken> > maybeTokens = tokenizeExpression(expr, error);
-            if (!maybeTokens) {
+            BasicExpressionParseResult parsed = BasicExpressionParser::parse(expr);
+            if (!parsed.success || !parsed.expression) {
+                error = parsed.error;
+                if (error.empty()) {
+                    error = "empty expression";
+                }
                 return false;
             }
-            ExpressionEmitter emitter(*maybeTokens);
-            return emitter.emit(out, error);
+
+            ExpressionAstEmitter emitter(out, error);
+            return emitter.emit(*parsed.expression);
         }
 
         bool parsePositiveLineNumber(const std::string &raw, int &lineNumber) {

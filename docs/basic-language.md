@@ -5,6 +5,10 @@ This page documents BASIC compiler subset v1: the currently supported language f
 - Shell/editor command behavior is documented in [BASIC shell](basic-shell.md).
 - VM opcode/runtime behavior is documented in [Bytecode VM](vm.md).
 
+## Compiler architecture note
+
+Compiler internals are in an incremental refactor phase. Expression parsing is being separated into a dedicated frontend parser module with AST nodes, while statement parsing and bytecode emission continue to use the existing compile flow. This keeps external compiler behavior stable while improving internal structure for future front/middle/back separation.
+
 ## Supported statements (v1)
 
 - `LET <var> = <expr>`
