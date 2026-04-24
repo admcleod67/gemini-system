@@ -2,6 +2,8 @@ add_library(pick-tcl
         basic/BasicProgram.cpp
         basic/BasicProgram.h
         basic/BasicAst.h
+        basic/BasicCompileUtils.cpp
+        basic/BasicCompileUtils.h
         basic/BasicShell.cpp
         basic/BasicShell.h
         basic/BasicCompiler.cpp

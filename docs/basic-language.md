@@ -4,6 +4,7 @@ This page documents BASIC compiler subset v1: the currently supported language f
 
 - Shell/editor command behavior is documented in [BASIC shell](basic-shell.md).
 - VM opcode/runtime behavior is documented in [Bytecode VM](vm.md).
+- Compiler phase architecture is documented in [Compiler architecture](compiler-architecture.md).
 
 ## Compiler architecture note
 

@@ -29,6 +29,7 @@ More detail lives under **[`docs/`](docs/README.md)**:
 - **[Developer shell (TCL)](docs/tcl-shell.md)** — REPL commands, trace, breakpoints.
 - **[BASIC shell](docs/basic-shell.md)** — BASIC and ED mode commands, program editing and SAVE rules.
 - **[BASIC language](docs/basic-language.md)** — supported BASIC compiler subset and expression semantics.
+- **[Compiler architecture](docs/compiler-architecture.md)** — parse/semantic/emit phase boundaries.
 
 ## Layout (high level)
 

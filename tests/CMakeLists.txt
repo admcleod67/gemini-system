@@ -20,6 +20,7 @@ add_executable(
         test_Parser.cpp
         test_Runtime.cpp
         test_BasicCompiler.cpp
+        test_BasicCompilerGolden.cpp
         test_BasicBytecodeEmitter.cpp
         test_BasicExpressionParser.cpp
         test_BasicSemanticAnalyzer.cpp

@@ -82,3 +82,80 @@ TEST_CASE("basic bytecode emitter preserves print string and suppress eol") {
     CHECK(emitted.program[1].op == OpCode::PrintStr);
     CHECK(emitted.program[2].op == OpCode::Halt);
 }
+
+TEST_CASE("basic bytecode emitter rejects LET with null expression") {
+    BasicIr::NormalizedProgram program;
+    program.lines.push_back({10, BasicIr::LetStmt{"A", nullptr}});
+
+    const BasicBytecodeEmissionResult emitted = BasicBytecodeEmitter::emit(program);
+    CHECK_FALSE(emitted.success);
+    REQUIRE(emitted.errors.size() == 1);
+    CHECK(emitted.errors[0].line == 10);
+    CHECK(emitted.errors[0].message == "LET requires an expression");
+    CHECK(emitted.program.empty());
+}
+
+TEST_CASE("basic bytecode emitter rejects IF with null condition") {
+    BasicIr::NormalizedProgram program;
+    program.lines.push_back({10, BasicIr::IfStmt{nullptr, 20, std::nullopt}});
+    program.lines.push_back({20, BasicIr::EndStmt{}});
+
+    const BasicBytecodeEmissionResult emitted = BasicBytecodeEmitter::emit(program);
+    CHECK_FALSE(emitted.success);
+    REQUIRE(emitted.errors.size() == 1);
+    CHECK(emitted.errors[0].message == "IF requires a condition expression");
+    CHECK(emitted.program.empty());
+}
+
+TEST_CASE("basic bytecode emitter rejects PRINT numeric path with null expression") {
+    BasicIr::NormalizedProgram program;
+    program.lines.push_back({10, BasicIr::PrintStmt{std::nullopt, nullptr, false}});
+
+    const BasicBytecodeEmissionResult emitted = BasicBytecodeEmitter::emit(program);
+    CHECK_FALSE(emitted.success);
+    REQUIRE(emitted.errors.size() == 1);
+    CHECK(emitted.errors[0].message == "PRINT requires an expression");
+    CHECK(emitted.program.empty());
+}
+
+TEST_CASE("basic bytecode emitter rejects malformed expression nodes") {
+    BasicIr::NormalizedProgram unaryProgram;
+    auto unaryExpr = std::make_unique<BasicAst::Expr>();
+    unaryExpr->node = BasicAst::UnaryExpr{BasicAst::UnaryOp::Negate, nullptr, {}};
+    unaryProgram.lines.push_back({10, BasicIr::LetStmt{"A", std::move(unaryExpr)}});
+    const auto unaryResult = BasicBytecodeEmitter::emit(unaryProgram);
+    CHECK_FALSE(unaryResult.success);
+    REQUIRE(unaryResult.errors.size() == 1);
+    CHECK(unaryResult.errors[0].message == "LET expression error: Invalid unary expression");
+
+    BasicIr::NormalizedProgram binaryProgram;
+    auto binaryExpr = std::make_unique<BasicAst::Expr>();
+    binaryExpr->node = BasicAst::BinaryExpr{BasicAst::BinaryOp::Add, nullptr, nullptr, {}};
+    binaryProgram.lines.push_back({10, BasicIr::LetStmt{"A", std::move(binaryExpr)}});
+    const auto binaryResult = BasicBytecodeEmitter::emit(binaryProgram);
+    CHECK_FALSE(binaryResult.success);
+    REQUIRE(binaryResult.errors.size() == 1);
+    CHECK(binaryResult.errors[0].message == "LET expression error: Invalid binary expression");
+
+    BasicIr::NormalizedProgram groupedProgram;
+    auto groupedExpr = std::make_unique<BasicAst::Expr>();
+    groupedExpr->node = BasicAst::GroupedExpr{nullptr, {}};
+    groupedProgram.lines.push_back({10, BasicIr::LetStmt{"A", std::move(groupedExpr)}});
+    const auto groupedResult = BasicBytecodeEmitter::emit(groupedProgram);
+    CHECK_FALSE(groupedResult.success);
+    REQUIRE(groupedResult.errors.size() == 1);
+    CHECK(groupedResult.errors[0].message == "LET expression error: Invalid grouped expression");
+}
+
+TEST_CASE("basic bytecode emitter rejects invalid identifier in expression path") {
+    BasicIr::NormalizedProgram program;
+    auto expr = std::make_unique<BasicAst::Expr>();
+    expr->node = BasicAst::IdentifierExpr{"1BAD", {}};
+    program.lines.push_back({10, BasicIr::PrintStmt{std::nullopt, std::move(expr), false}});
+
+    const BasicBytecodeEmissionResult emitted = BasicBytecodeEmitter::emit(program);
+    CHECK_FALSE(emitted.success);
+    REQUIRE(emitted.errors.size() == 1);
+    CHECK(emitted.errors[0].message == "PRINT expression error: Invalid variable name '1BAD'");
+    CHECK(emitted.program.empty());
+}
