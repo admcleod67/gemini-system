@@ -8,6 +8,8 @@ add_library(pick-tcl
         basic/BasicCompiler.h
         basic/BasicExpressionParser.cpp
         basic/BasicExpressionParser.h
+        basic/BasicStatementParser.cpp
+        basic/BasicStatementParser.h
         tcl/Shell.cpp
         tcl/Shell.h
         tcl/ShellSession.cpp

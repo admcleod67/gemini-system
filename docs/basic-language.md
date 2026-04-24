@@ -7,7 +7,7 @@ This page documents BASIC compiler subset v1: the currently supported language f
 
 ## Compiler architecture note
 
-Compiler internals are in an incremental refactor phase. Expression parsing is being separated into a dedicated frontend parser module with AST nodes, while statement parsing and bytecode emission continue to use the existing compile flow. This keeps external compiler behavior stable while improving internal structure for future front/middle/back separation.
+Compiler internals are in an incremental refactor phase. Expression parsing and statement parsing are now separated into dedicated frontend parser modules with AST nodes, while bytecode emission remains in the compiler backend flow. This keeps external compiler behavior stable while improving internal structure for future front/middle/back separation.
 
 ## Supported statements (v1)
 

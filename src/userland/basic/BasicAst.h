@@ -5,7 +5,9 @@
 
 #include <cstddef>
 #include <memory>
+#include <optional>
 #include <string>
+#include <vector>
 #include <variant>
 
 namespace PickShell::BasicAst {
@@ -66,6 +68,53 @@ namespace PickShell::BasicAst {
     struct Expr {
         ExprNode node;
         SourceRange range{};
+    };
+
+    struct LetStmt {
+        std::string variableName;
+        std::unique_ptr<Expr> expression;
+    };
+
+    struct InputStmt {
+        std::string variableName;
+    };
+
+    struct GotoStmt {
+        int targetLine{0};
+    };
+
+    struct IfStmt {
+        std::unique_ptr<Expr> condition;
+        int thenLine{0};
+        std::optional<int> elseLine;
+    };
+
+    struct PrintStmt {
+        std::optional<std::string> stringLiteral;
+        std::unique_ptr<Expr> expression;
+        bool suppressEol{false};
+    };
+
+    struct StopStmt {};
+
+    struct EndStmt {};
+
+    using StatementNode = std::variant<LetStmt, InputStmt, GotoStmt, IfStmt, PrintStmt, StopStmt, EndStmt>;
+
+    struct ParsedBasicLine {
+        int lineNumber{0};
+        StatementNode statement;
+    };
+
+    struct StatementParseError {
+        int line{0};
+        std::string message;
+    };
+
+    struct StatementParseResult {
+        bool success{false};
+        std::vector<ParsedBasicLine> lines;
+        std::vector<StatementParseError> errors;
     };
 } // namespace PickShell::BasicAst
 

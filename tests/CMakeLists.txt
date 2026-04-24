@@ -21,6 +21,7 @@ add_executable(
         test_Runtime.cpp
         test_BasicCompiler.cpp
         test_BasicExpressionParser.cpp
+        test_BasicStatementParser.cpp
         test_Shell.cpp
         test_TclEnvironment.cpp
 )
