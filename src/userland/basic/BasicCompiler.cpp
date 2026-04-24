@@ -1,11 +1,13 @@
 #include "BasicCompiler.h"
 
+#include "BasicSemanticAnalyzer.h"
 #include "BasicStatementParser.h"
 
 #include <cctype>
 #include <string>
 #include <type_traits>
 #include <unordered_map>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -139,7 +141,7 @@ namespace PickShell {
         std::unordered_map<int, std::size_t> lineToInstructionIndex;
         std::vector<JumpFixup> jumpFixups;
 
-        const BasicAst::StatementParseResult parsed = BasicStatementParser::parse(program);
+        BasicAst::StatementParseResult parsed = BasicStatementParser::parse(program);
         if (!parsed.success) {
             result.success = false;
             result.program.clear();
@@ -151,7 +153,19 @@ namespace PickShell {
             return result;
         }
 
-        for (const BasicAst::ParsedBasicLine &parsedLine: parsed.lines) {
+        BasicAst::SemanticResult semantic = BasicSemanticAnalyzer::analyze(std::move(parsed));
+        if (!semantic.success) {
+            result.success = false;
+            result.program.clear();
+            result.instructionCount = 0;
+            result.labelCount = 0;
+            for (const auto &error: semantic.errors) {
+                result.errors.push_back({error.line, error.message});
+            }
+            return result;
+        }
+
+        for (const BasicAst::ValidatedBasicLine &parsedLine: semantic.lines) {
             lineToInstructionIndex[parsedLine.lineNumber] = result.program.size();
 
             const bool emitted = std::visit(
@@ -252,7 +266,6 @@ namespace PickShell {
         for (const JumpFixup &fixup: jumpFixups) {
             const auto it = lineToInstructionIndex.find(fixup.targetLine);
             if (it == lineToInstructionIndex.end()) {
-                result.errors.push_back({fixup.sourceLine, "Unknown target line " + std::to_string(fixup.targetLine)});
                 continue;
             }
             result.program[fixup.instructionIndex].operand = static_cast<int>(it->second);
