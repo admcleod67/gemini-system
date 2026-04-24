@@ -3,10 +3,11 @@
 #include <unordered_set>
 #include <utility>
 #include <variant>
+#include <type_traits>
 
 namespace PickShell {
-    BasicAst::SemanticResult BasicSemanticAnalyzer::analyze(BasicAst::StatementParseResult parsed) {
-        BasicAst::SemanticResult result;
+    BasicSemanticAnalysisResult BasicSemanticAnalyzer::analyze(BasicAst::StatementParseResult parsed) {
+        BasicSemanticAnalysisResult result;
         if (!parsed.success) {
             result.success = false;
             for (const auto &error: parsed.errors) {
@@ -57,9 +58,31 @@ namespace PickShell {
         }
 
         result.success = true;
-        result.lines.reserve(parsed.lines.size());
+        result.program.lines.reserve(parsed.lines.size());
         for (BasicAst::ParsedBasicLine &line: parsed.lines) {
-            result.lines.push_back({line.lineNumber, std::move(line.statement)});
+            BasicIr::NormalizedLine normalized;
+            normalized.lineNumber = line.lineNumber;
+            normalized.statement = std::visit(
+                [](auto &stmt) -> BasicIr::NormalizedStmt {
+                    using StmtT = std::decay_t<decltype(stmt)>;
+                    if constexpr (std::is_same_v<StmtT, BasicAst::LetStmt>) {
+                        return BasicIr::LetStmt{std::move(stmt.variableName), std::move(stmt.expression)};
+                    } else if constexpr (std::is_same_v<StmtT, BasicAst::InputStmt>) {
+                        return BasicIr::InputStmt{std::move(stmt.variableName)};
+                    } else if constexpr (std::is_same_v<StmtT, BasicAst::GotoStmt>) {
+                        return BasicIr::GotoStmt{stmt.targetLine};
+                    } else if constexpr (std::is_same_v<StmtT, BasicAst::IfStmt>) {
+                        return BasicIr::IfStmt{std::move(stmt.condition), stmt.thenLine, stmt.elseLine};
+                    } else if constexpr (std::is_same_v<StmtT, BasicAst::PrintStmt>) {
+                        return BasicIr::PrintStmt{std::move(stmt.stringLiteral), std::move(stmt.expression), stmt.suppressEol};
+                    } else if constexpr (std::is_same_v<StmtT, BasicAst::StopStmt>) {
+                        return BasicIr::StopStmt{};
+                    } else {
+                        return BasicIr::EndStmt{};
+                    }
+                },
+                line.statement);
+            result.program.lines.push_back(std::move(normalized));
         }
         return result;
     }

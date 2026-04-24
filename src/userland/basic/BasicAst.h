@@ -117,19 +117,19 @@ namespace PickShell::BasicAst {
         std::vector<StatementParseError> errors;
     };
 
-    struct ValidatedBasicLine {
-        int lineNumber{0};
-        StatementNode statement;
-    };
-
     struct SemanticError {
         int line{0};
         std::string message;
     };
 
+    struct SemanticLine {
+        int lineNumber{0};
+        StatementNode statement;
+    };
+
     struct SemanticResult {
         bool success{false};
-        std::vector<ValidatedBasicLine> lines;
+        std::vector<SemanticLine> lines;
         std::vector<SemanticError> errors;
     };
 } // namespace PickShell::BasicAst

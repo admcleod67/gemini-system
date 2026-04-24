@@ -4,11 +4,20 @@
 #pragma once
 
 #include "BasicAst.h"
+#include "BasicNormalizedIr.h"
+
+#include <vector>
 
 namespace PickShell {
+    struct BasicSemanticAnalysisResult {
+        bool success{false};
+        BasicIr::NormalizedProgram program;
+        std::vector<BasicAst::SemanticError> errors;
+    };
+
     class BasicSemanticAnalyzer {
     public:
-        [[nodiscard]] static BasicAst::SemanticResult analyze(BasicAst::StatementParseResult parsed);
+        [[nodiscard]] static BasicSemanticAnalysisResult analyze(BasicAst::StatementParseResult parsed);
     };
 } // namespace PickShell
 

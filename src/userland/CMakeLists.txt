@@ -8,8 +8,11 @@ add_library(pick-tcl
         basic/BasicCompiler.h
         basic/BasicExpressionParser.cpp
         basic/BasicExpressionParser.h
+        basic/BasicNormalizedIr.h
         basic/BasicSemanticAnalyzer.cpp
         basic/BasicSemanticAnalyzer.h
+        basic/BasicBytecodeEmitter.cpp
+        basic/BasicBytecodeEmitter.h
         basic/BasicStatementParser.cpp
         basic/BasicStatementParser.h
         tcl/Shell.cpp

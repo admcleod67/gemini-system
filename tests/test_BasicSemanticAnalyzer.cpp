@@ -23,7 +23,7 @@ TEST_CASE("basic semantic analyzer passes when control flow targets exist") {
     const auto semantic = BasicSemanticAnalyzer::analyze(std::move(parsed));
     CHECK(semantic.success);
     CHECK(semantic.errors.empty());
-    CHECK(semantic.lines.size() == 4);
+    CHECK(semantic.program.lines.size() == 4);
 }
 
 TEST_CASE("basic semantic analyzer reports missing GOTO target") {
