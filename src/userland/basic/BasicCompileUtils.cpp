@@ -18,8 +18,8 @@ namespace PickShell {
         if (std::isalpha(static_cast<unsigned char>(first)) == 0) {
             return false;
         }
-        // Allow optional $ suffix for string variables; body chars must be alphanumeric.
-        const std::size_t bodyEnd = (token.size() > 1 && token.back() == '$')
+        // Allow optional $ or % suffix for string/integer variables; body chars must be alphanumeric.
+        const std::size_t bodyEnd = (token.size() > 1 && (token.back() == '$' || token.back() == '%'))
                                         ? token.size() - 1
                                         : token.size();
         for (std::size_t i = 0; i < bodyEnd; ++i) {

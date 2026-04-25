@@ -6,7 +6,9 @@
 #include "InstructionPrint.h"
 
 #include <cctype>
+#include <climits>
 #include <iostream>
+#include <limits>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -52,6 +54,33 @@ namespace PickVM {
                 throw std::runtime_error(std::string(ctx) + ": expected string on stack");
             }
             return std::get<std::string>(v);
+        }
+
+        // Coerce a Value to int following Pick semantics: ints pass through,
+        // strings are parsed as decimal integers; non-numeric strings yield 0.
+        int coerceToInt(const Value &v) {
+            if (std::holds_alternative<int>(v)) {
+                return std::get<int>(v);
+            }
+            const std::string &s = std::get<std::string>(v);
+            if (s.empty()) {
+                return 0;
+            }
+            char *endp = nullptr;
+            errno = 0;
+            const long n = std::strtol(s.c_str(), &endp, 10);
+            // skip trailing whitespace
+            while (*endp == ' ' || *endp == '\t') {
+                ++endp;
+            }
+            if (*endp != '\0' || errno != 0) {
+                return 0;
+            }
+            if (n < static_cast<long>(std::numeric_limits<int>::min()) ||
+                n > static_cast<long>(std::numeric_limits<int>::max())) {
+                return 0;
+            }
+            return static_cast<int>(n);
         }
 
         // Returns -1 / 0 / +1 for a < b / a == b / a > b, for matching types.
@@ -149,29 +178,29 @@ namespace PickVM {
                 break;
 
             case OpCode::Add: {
-                int b = intFromStackValue(pop(), PickVM::opCodeName(instr.op));
-                int a = intFromStackValue(pop(), PickVM::opCodeName(instr.op));
+                int b = coerceToInt(pop());
+                int a = coerceToInt(pop());
                 push(a + b);
                 break;
             }
 
             case OpCode::Sub: {
-                int b = intFromStackValue(pop(), PickVM::opCodeName(instr.op));
-                int a = intFromStackValue(pop(), PickVM::opCodeName(instr.op));
+                int b = coerceToInt(pop());
+                int a = coerceToInt(pop());
                 push(a - b);
                 break;
             }
 
             case OpCode::Mul: {
-                int b = intFromStackValue(pop(), PickVM::opCodeName(instr.op));
-                int a = intFromStackValue(pop(), PickVM::opCodeName(instr.op));
+                int b = coerceToInt(pop());
+                int a = coerceToInt(pop());
                 push(a * b);
                 break;
             }
 
             case OpCode::Div: {
-                int b = intFromStackValue(pop(), PickVM::opCodeName(instr.op));
-                int a = intFromStackValue(pop(), PickVM::opCodeName(instr.op));
+                int b = coerceToInt(pop());
+                int a = coerceToInt(pop());
                 if (b == 0) {
                     throw std::runtime_error("DIV: divide by zero");
                 }
@@ -255,6 +284,21 @@ namespace PickVM {
 
             case OpCode::PrintEol: {
                 out() << std::endl;
+                break;
+            }
+
+            case OpCode::PrintVal: {
+                const Value v = pop();
+                if (std::holds_alternative<int>(v)) {
+                    out() << std::get<int>(v);
+                } else {
+                    out() << std::get<std::string>(v);
+                }
+                break;
+            }
+
+            case OpCode::CoerceInt: {
+                push(coerceToInt(pop()));
                 break;
             }
 

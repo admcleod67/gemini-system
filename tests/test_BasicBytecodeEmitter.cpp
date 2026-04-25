@@ -52,7 +52,7 @@ TEST_CASE("basic bytecode emitter lowers let print and end") {
     CHECK(emitted.program[0].op == OpCode::PushInt);
     CHECK(emitted.program[1].op == OpCode::StoreVar);
     CHECK(emitted.program[2].op == OpCode::LoadVar);
-    CHECK(emitted.program[3].op == OpCode::PrintInt);
+    CHECK(emitted.program[3].op == OpCode::PrintVal);
     CHECK(emitted.program[4].op == OpCode::PrintEol);
     CHECK(emitted.program[5].op == OpCode::Halt);
 }
@@ -85,7 +85,7 @@ TEST_CASE("basic bytecode emitter preserves print string and suppress eol") {
     CHECK(emitted.errors.empty());
     REQUIRE(emitted.program.size() == 3);
     CHECK(emitted.program[0].op == OpCode::PushStr);
-    CHECK(emitted.program[1].op == OpCode::PrintStr);
+    CHECK(emitted.program[1].op == OpCode::PrintVal);
     CHECK(emitted.program[2].op == OpCode::Halt);
 }
 

@@ -110,8 +110,9 @@ namespace PickShell {
                            std::isalnum(static_cast<unsigned char>(expressionText[i])) != 0) {
                         ++i;
                     }
-                    // Allow optional $ suffix for string variables (e.g. A$, NAME$).
-                    if (i < expressionText.size() && expressionText[i] == '$') {
+                    // Allow optional $ or % suffix for string/integer variables (e.g. A$, NAME$, A%).
+                    if (i < expressionText.size() &&
+                        (expressionText[i] == '$' || expressionText[i] == '%')) {
                         ++i;
                     }
                     const std::string ident = std::string(expressionText.substr(start, i - start));

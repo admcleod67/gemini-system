@@ -23,7 +23,7 @@ TEST_CASE("basic compiler golden arithmetic precedence program") {
     CHECK(result.program[4].op == OpCode::Add);
     CHECK(result.program[5].op == OpCode::StoreVar);
     CHECK(result.program[6].op == OpCode::LoadVar);
-    CHECK(result.program[7].op == OpCode::PrintInt);
+    CHECK(result.program[7].op == OpCode::PrintVal);
     CHECK(result.program[8].op == OpCode::PrintEol);
     CHECK(result.program[9].op == OpCode::Halt);
 }
@@ -58,10 +58,10 @@ TEST_CASE("basic compiler golden input print mix program") {
     const auto result = compiler.compile(program);
     CHECK(result.success);
     REQUIRE(result.program.size() == 6);
-    CHECK(result.program[0].op == OpCode::InputInt);
+    CHECK(result.program[0].op == OpCode::InputStr);
     CHECK(result.program[1].op == OpCode::StoreVar);
     CHECK(result.program[2].op == OpCode::LoadVar);
-    CHECK(result.program[3].op == OpCode::PrintInt);
+    CHECK(result.program[3].op == OpCode::PrintVal);
     CHECK(result.program[4].op == OpCode::PrintEol);
     CHECK(result.program[5].op == OpCode::Halt);
 }
@@ -76,10 +76,10 @@ TEST_CASE("basic compiler golden print string semicolon program") {
     CHECK(result.success);
     REQUIRE(result.program.size() == 7);
     CHECK(result.program[0].op == OpCode::PushStr);
-    CHECK(result.program[1].op == OpCode::PrintStr);
+    CHECK(result.program[1].op == OpCode::PrintVal);
     CHECK(result.program[2].op == OpCode::PushInt);
     CHECK(result.program[3].op == OpCode::PushInt);
     CHECK(result.program[4].op == OpCode::Add);
-    CHECK(result.program[5].op == OpCode::PrintInt);
+    CHECK(result.program[5].op == OpCode::PrintVal);
     CHECK(result.program[6].op == OpCode::Halt);
 }

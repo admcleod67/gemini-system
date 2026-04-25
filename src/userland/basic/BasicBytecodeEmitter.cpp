@@ -13,19 +13,22 @@ namespace PickShell {
             return PickVM::Instruction{op, PickVM::Value{}};
         }
 
-        // Returns true when an expression root is definitively string-typed:
-        //   - a StringLiteralExpr node, or
-        //   - an IdentifierExpr whose name ends with '$' (string variable convention).
-        bool isStringExpr(const BasicAst::Expr &expr) {
-            return std::visit([](const auto &node) -> bool {
-                using T = std::decay_t<decltype(node)>;
-                if constexpr (std::is_same_v<T, BasicAst::StringLiteralExpr>) {
-                    return true;
-                } else if constexpr (std::is_same_v<T, BasicAst::IdentifierExpr>) {
-                    return !node.name.empty() && node.name.back() == '$';
-                }
-                return false;
-            }, expr.node);
+        // Variable name suffix helpers (Pick BASIC conventions).
+        // $ → force string; % → force integer; no suffix → dynamic.
+        bool isStringVar(const std::string &name) {
+            return !name.empty() && name.back() == '$';
+        }
+
+        bool isIntVar(const std::string &name) {
+            return !name.empty() && name.back() == '%';
+        }
+
+        // Returns true when a BinaryOp is an arithmetic operator (not a comparison).
+        bool isArithmeticOp(const BasicAst::BinaryOp op) {
+            return op == BasicAst::BinaryOp::Add ||
+                   op == BasicAst::BinaryOp::Subtract ||
+                   op == BasicAst::BinaryOp::Multiply ||
+                   op == BasicAst::BinaryOp::Divide;
         }
 
         class ExpressionAstEmitter {
@@ -35,7 +38,7 @@ namespace PickShell {
             }
 
             [[nodiscard]] bool emit(const BasicAst::Expr &expression) {
-                if (!emitNode(expression)) {
+                if (!emitNode(expression, false)) {
                     if (error_.empty()) {
                         error_ = "Failed to emit expression";
                     }
@@ -68,9 +71,11 @@ namespace PickShell {
                 return PickVM::OpCode::Add;
             }
 
-            bool emitNode(const BasicAst::Expr &expression) {
+            // inArithmetic is true when this node is an operand of an arithmetic operator
+            // or unary negate — used to reject $ variables in numeric contexts.
+            bool emitNode(const BasicAst::Expr &expression, bool inArithmetic) {
                 return std::visit(
-                    [this](const auto &node) -> bool {
+                    [this, inArithmetic](const auto &node) -> bool {
                         using NodeT = std::decay_t<decltype(node)>;
                         if constexpr (std::is_same_v<NodeT, BasicAst::IntLiteralExpr>) {
                             out_.push_back(PickVM::Instruction{PickVM::OpCode::PushInt, node.value});
@@ -83,6 +88,12 @@ namespace PickShell {
                                 error_ = "Invalid variable name '" + node.name + "'";
                                 return false;
                             }
+                            // $ variables may never be used in arithmetic contexts.
+                            if (inArithmetic && isStringVar(node.name)) {
+                                error_ = "String variable '" + node.name +
+                                         "' cannot be used in an arithmetic expression";
+                                return false;
+                            }
                             out_.push_back(PickVM::Instruction{PickVM::OpCode::LoadVar, uppercase(node.name)});
                             return true;
                         } else if constexpr (std::is_same_v<NodeT, BasicAst::UnaryExpr>) {
@@ -91,7 +102,7 @@ namespace PickShell {
                                 return false;
                             }
                             out_.push_back(PickVM::Instruction{PickVM::OpCode::PushInt, 0});
-                            if (!emitNode(*node.operand)) {
+                            if (!emitNode(*node.operand, true)) {
                                 return false;
                             }
                             emitNoOperand(PickVM::OpCode::Sub);
@@ -101,7 +112,9 @@ namespace PickShell {
                                 error_ = "Invalid binary expression";
                                 return false;
                             }
-                            if (!emitNode(*node.left) || !emitNode(*node.right)) {
+                            const bool childInArithmetic = isArithmeticOp(node.op);
+                            if (!emitNode(*node.left, childInArithmetic) ||
+                                !emitNode(*node.right, childInArithmetic)) {
                                 return false;
                             }
                             emitNoOperand(toOpCode(node.op));
@@ -111,7 +124,7 @@ namespace PickShell {
                                 error_ = "Invalid grouped expression";
                                 return false;
                             }
-                            return emitNode(*node.expression);
+                            return emitNode(*node.expression, inArithmetic);
                         }
                         return false;
                     },
@@ -142,29 +155,24 @@ namespace PickShell {
                             result.errors.push_back({line.lineNumber, "LET requires an expression"});
                             return false;
                         }
-                        // Type check: $ variables must hold strings; non-$ variables must hold ints.
-                        const bool isStrVar = !stmt.variableName.empty() && stmt.variableName.back() == '$';
-                        const bool isStrExpr = isStringExpr(*stmt.expression);
-                        if (isStrVar != isStrExpr) {
-                            result.errors.push_back({line.lineNumber,
-                                "LET type mismatch: cannot assign " +
-                                std::string(isStrExpr ? "string" : "integer") + " expression to " +
-                                std::string(isStrVar ? "string" : "integer") + " variable '" +
-                                stmt.variableName + "'"});
-                            return false;
-                        }
                         std::string error;
                         ExpressionAstEmitter emitter(result.program, error);
                         if (!emitter.emit(*stmt.expression)) {
                             result.errors.push_back({line.lineNumber, "LET expression error: " + error});
                             return false;
                         }
+                        // % variables are always integers: coerce on assignment.
+                        if (isIntVar(stmt.variableName)) {
+                            result.program.push_back(makeNoOperandInstruction(PickVM::OpCode::CoerceInt));
+                        }
                         result.program.push_back(PickVM::Instruction{PickVM::OpCode::StoreVar, uppercase(stmt.variableName)});
                         return true;
                     } else if constexpr (std::is_same_v<StmtT, BasicIr::InputStmt>) {
-                        const bool isStrVar = !stmt.variableName.empty() && stmt.variableName.back() == '$';
-                        const auto inputOp = isStrVar ? PickVM::OpCode::InputStr : PickVM::OpCode::InputInt;
-                        result.program.push_back(makeNoOperandInstruction(inputOp));
+                        // All INPUT reads a raw string line; % variables additionally coerce to int.
+                        result.program.push_back(makeNoOperandInstruction(PickVM::OpCode::InputStr));
+                        if (isIntVar(stmt.variableName)) {
+                            result.program.push_back(makeNoOperandInstruction(PickVM::OpCode::CoerceInt));
+                        }
                         result.program.push_back(PickVM::Instruction{PickVM::OpCode::StoreVar, uppercase(stmt.variableName)});
                         return true;
                     } else if constexpr (std::is_same_v<StmtT, BasicIr::GotoStmt>) {
@@ -208,10 +216,7 @@ namespace PickShell {
                             result.errors.push_back({line.lineNumber, "PRINT expression error: " + error});
                             return false;
                         }
-                        const auto printOp = isStringExpr(*stmt.expression)
-                                                 ? PickVM::OpCode::PrintStr
-                                                 : PickVM::OpCode::PrintInt;
-                        result.program.push_back(makeNoOperandInstruction(printOp));
+                        result.program.push_back(makeNoOperandInstruction(PickVM::OpCode::PrintVal));
                         if (!stmt.suppressEol) {
                             result.program.push_back(makeNoOperandInstruction(PickVM::OpCode::PrintEol));
                         }

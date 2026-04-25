@@ -168,7 +168,7 @@ TEST_CASE("runtime ADD stack underflow") {
     CHECK_THROWS_AS(rt.run(), std::runtime_error);
 }
 
-TEST_CASE("runtime ADD wrong stack types") {
+TEST_CASE("runtime ADD non-numeric strings coerce to zero") {
     std::vector<Instruction> prog = {
         {OpCode::PushStr, std::string{"a"}},
         {OpCode::PushStr, std::string{"b"}},
@@ -177,7 +177,9 @@ TEST_CASE("runtime ADD wrong stack types") {
     };
     Runtime rt;
     rt.loadProgram(prog);
-    CHECK_THROWS_AS(rt.run(), std::runtime_error);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<int>(rt.stack()[0]) == 0);
 }
 
 TEST_CASE("runtime CONCAT stack underflow") {
@@ -344,7 +346,7 @@ TEST_CASE("runtime SUB one value") {
     CHECK_THROWS_AS(rt.run(), std::runtime_error);
 }
 
-TEST_CASE("runtime SUB wrong types") {
+TEST_CASE("runtime SUB non-numeric strings coerce to zero") {
     std::vector<Instruction> prog = {
         {OpCode::PushStr, std::string{"a"}},
         {OpCode::PushStr, std::string{"b"}},
@@ -353,7 +355,9 @@ TEST_CASE("runtime SUB wrong types") {
     };
     Runtime rt;
     rt.loadProgram(prog);
-    CHECK_THROWS_AS(rt.run(), std::runtime_error);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<int>(rt.stack()[0]) == 0);
 }
 
 TEST_CASE("runtime MUL and DIV") {
@@ -418,7 +422,7 @@ TEST_CASE("runtime comparison opcodes enforce int types") {
     CHECK_THROWS_AS(rt.run(), std::runtime_error);
 }
 
-TEST_CASE("runtime MUL wrong types") {
+TEST_CASE("runtime MUL non-numeric string coerces to zero") {
     std::vector<Instruction> prog = {
         {OpCode::PushStr, std::string{"a"}},
         {OpCode::PushInt, 2},
@@ -427,7 +431,9 @@ TEST_CASE("runtime MUL wrong types") {
     };
     Runtime rt;
     rt.loadProgram(prog);
-    CHECK_THROWS_AS(rt.run(), std::runtime_error);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<int>(rt.stack()[0]) == 0);
 }
 
 TEST_CASE("runtime STORE_VAR and LOAD_VAR roundtrip int") {
@@ -559,4 +565,100 @@ TEST_CASE("runtime comparison throws on type mismatch") {
     Runtime rt;
     rt.loadProgram(prog);
     CHECK_THROWS_AS(rt.run(), std::runtime_error);
+}
+
+TEST_CASE("runtime PrintVal prints an integer") {
+    std::ostringstream oss;
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, 42},
+        {OpCode::PrintVal, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    Runtime rt;
+    rt.setOutputStream(&oss);
+    rt.loadProgram(prog);
+    rt.run();
+    CHECK(oss.str() == "42");
+}
+
+TEST_CASE("runtime PrintVal prints a string") {
+    std::ostringstream oss;
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"hello"}},
+        {OpCode::PrintVal, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    Runtime rt;
+    rt.setOutputStream(&oss);
+    rt.loadProgram(prog);
+    rt.run();
+    CHECK(oss.str() == "hello");
+}
+
+TEST_CASE("runtime CoerceInt converts numeric string to int") {
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"99"}},
+        {OpCode::CoerceInt, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    Runtime rt;
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<int>(rt.stack()[0]) == 99);
+}
+
+TEST_CASE("runtime CoerceInt yields zero for non-numeric string") {
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"hello"}},
+        {OpCode::CoerceInt, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    Runtime rt;
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<int>(rt.stack()[0]) == 0);
+}
+
+TEST_CASE("runtime CoerceInt passes through an existing int") {
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, 7},
+        {OpCode::CoerceInt, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    Runtime rt;
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<int>(rt.stack()[0]) == 7);
+}
+
+TEST_CASE("runtime ADD string plus int coerces string to zero") {
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"hello"}},
+        {OpCode::PushInt, 5},
+        {OpCode::Add, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    Runtime rt;
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    // "hello" coerces to 0; 0 + 5 = 5
+    CHECK(std::get<int>(rt.stack()[0]) == 5);
+}
+
+TEST_CASE("runtime ADD numeric strings coerces both operands") {
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"10"}},
+        {OpCode::PushStr, std::string{"20"}},
+        {OpCode::Add, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    Runtime rt;
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<int>(rt.stack()[0]) == 30);
 }

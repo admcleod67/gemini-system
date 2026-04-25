@@ -24,7 +24,7 @@ TEST_CASE("basic compiler compiles LET PRINT END") {
     CHECK(result.program[1].op == OpCode::StoreVar);
     CHECK(std::get<std::string>(result.program[1].operand) == "A");
     CHECK(result.program[2].op == OpCode::LoadVar);
-    CHECK(result.program[3].op == OpCode::PrintInt);
+    CHECK(result.program[3].op == OpCode::PrintVal);
     CHECK(result.program[4].op == OpCode::PrintEol);
     CHECK(result.program[5].op == OpCode::Halt);
 }
@@ -101,7 +101,7 @@ TEST_CASE("basic compiler supports PRINT string literals") {
     REQUIRE(result.program.size() == 4);
     CHECK(result.program[0].op == OpCode::PushStr);
     CHECK(std::get<std::string>(result.program[0].operand) == "HELLO");
-    CHECK(result.program[1].op == OpCode::PrintStr);
+    CHECK(result.program[1].op == OpCode::PrintVal);
     CHECK(result.program[2].op == OpCode::PrintEol);
     CHECK(result.program[3].op == OpCode::Halt);
 }
@@ -118,11 +118,11 @@ TEST_CASE("basic compiler supports PRINT trailing semicolon to suppress EOL") {
     CHECK(result.errors.empty());
     REQUIRE(result.program.size() >= 7);
     CHECK(result.program[0].op == OpCode::PushStr);
-    CHECK(result.program[1].op == OpCode::PrintStr);
+    CHECK(result.program[1].op == OpCode::PrintVal);
     CHECK(result.program[2].op == OpCode::PushInt);
     CHECK(result.program[3].op == OpCode::PushInt);
     CHECK(result.program[4].op == OpCode::Add);
-    CHECK(result.program[5].op == OpCode::PrintInt);
+    CHECK(result.program[5].op == OpCode::PrintVal);
     CHECK(result.program[6].op == OpCode::Halt);
 }
 
@@ -139,17 +139,17 @@ TEST_CASE("basic compiler reports unknown keyword with line") {
     CHECK(result.errors[0].message == "Unknown keyword 'MAT'");
 }
 
-TEST_CASE("basic compiler enforces type consistency in LET assignments") {
+TEST_CASE("basic compiler accepts any expression in LET for dynamic variables") {
     BasicProgram program;
-    program.setLine(10, "LET A = \"X\"");
+    program.setLine(10, "LET A = \"hello\"");
     program.setLine(20, "PRINT \"OK\"");
 
     BasicCompiler compiler;
     const auto result = compiler.compile(program);
 
-    CHECK_FALSE(result.success);
-    REQUIRE(result.errors.size() == 1);
-    CHECK(result.errors[0].line == 10);
+    // Pick BASIC allows assigning strings to non-$ variables; numeric coercion happens at use-time.
+    CHECK(result.success);
+    CHECK(result.errors.empty());
 }
 
 TEST_CASE("basic compiler reports expression syntax diagnostics") {
@@ -241,11 +241,11 @@ TEST_CASE("basic compiler compiles INPUT variable") {
     CHECK(result.success);
     CHECK(result.errors.empty());
     REQUIRE(result.program.size() == 6);
-    CHECK(result.program[0].op == OpCode::InputInt);
+    CHECK(result.program[0].op == OpCode::InputStr);
     CHECK(result.program[1].op == OpCode::StoreVar);
     CHECK(std::get<std::string>(result.program[1].operand) == "A");
     CHECK(result.program[2].op == OpCode::LoadVar);
-    CHECK(result.program[3].op == OpCode::PrintInt);
+    CHECK(result.program[3].op == OpCode::PrintVal);
     CHECK(result.program[4].op == OpCode::PrintEol);
     CHECK(result.program[5].op == OpCode::Halt);
 }
@@ -263,12 +263,12 @@ TEST_CASE("basic compiler REM produces no instructions") {
 
     CHECK(result.success);
     CHECK(result.errors.empty());
-    // REM lines emit no instructions: PushInt + StoreVar + LoadVar + PrintInt + PrintEol + Halt
+    // REM lines emit no instructions: PushInt + StoreVar + LoadVar + PrintVal + PrintEol + Halt
     REQUIRE(result.program.size() == 6);
     CHECK(result.program[0].op == OpCode::PushInt);
     CHECK(result.program[1].op == OpCode::StoreVar);
     CHECK(result.program[2].op == OpCode::LoadVar);
-    CHECK(result.program[3].op == OpCode::PrintInt);
+    CHECK(result.program[3].op == OpCode::PrintVal);
     CHECK(result.program[4].op == OpCode::PrintEol);
     CHECK(result.program[5].op == OpCode::Halt);
 }
@@ -335,7 +335,7 @@ TEST_CASE("basic compiler compiles string variable assignment and print") {
     CHECK(std::get<std::string>(result.program[1].operand) == "A$");
     CHECK(result.program[2].op == OpCode::LoadVar);
     CHECK(std::get<std::string>(result.program[2].operand) == "A$");
-    CHECK(result.program[3].op == OpCode::PrintStr);
+    CHECK(result.program[3].op == OpCode::PrintVal);
     CHECK(result.program[4].op == OpCode::PrintEol);
     CHECK(result.program[5].op == OpCode::Halt);
 }
@@ -356,7 +356,7 @@ TEST_CASE("basic compiler compiles INPUT for string variable") {
     CHECK(result.program[1].op == OpCode::StoreVar);
     CHECK(std::get<std::string>(result.program[1].operand) == "A$");
     CHECK(result.program[2].op == OpCode::LoadVar);
-    CHECK(result.program[3].op == OpCode::PrintStr);
+    CHECK(result.program[3].op == OpCode::PrintVal);
     CHECK(result.program[4].op == OpCode::PrintEol);
     CHECK(result.program[5].op == OpCode::Halt);
 }
@@ -382,26 +382,87 @@ TEST_CASE("basic compiler compiles string comparison in IF condition") {
     CHECK(result.program[4].op == OpCode::Eq);
 }
 
-TEST_CASE("basic compiler rejects string expression assigned to integer variable") {
+TEST_CASE("basic compiler accepts string literal assigned to dynamic variable") {
     BasicProgram program;
     program.setLine(10, "LET A = \"hello\"");
 
     BasicCompiler compiler;
     const auto result = compiler.compile(program);
 
-    CHECK_FALSE(result.success);
-    REQUIRE(result.errors.size() == 1);
-    CHECK(result.errors[0].line == 10);
+    // Pick BASIC: any value may be stored in a dynamic variable; coercion happens at use-time.
+    CHECK(result.success);
+    CHECK(result.errors.empty());
 }
 
-TEST_CASE("basic compiler rejects integer expression assigned to string variable") {
+TEST_CASE("basic compiler accepts integer assigned to string variable") {
     BasicProgram program;
     program.setLine(10, "LET A$ = 42");
 
     BasicCompiler compiler;
     const auto result = compiler.compile(program);
 
+    // Pick BASIC: $ is a naming convention; the value 42 is stored as int under A$.
+    CHECK(result.success);
+    CHECK(result.errors.empty());
+}
+
+TEST_CASE("basic compiler compiles LET for percent variable with CoerceInt") {
+    BasicProgram program;
+    program.setLine(10, "LET A% = 42");
+    program.setLine(20, "END");
+
+    BasicCompiler compiler;
+    const auto result = compiler.compile(program);
+
+    REQUIRE(result.success);
+    // PushInt, CoerceInt, StoreVar, Halt
+    REQUIRE(result.program.size() == 4);
+    CHECK(result.program[0].op == OpCode::PushInt);
+    CHECK(result.program[1].op == OpCode::CoerceInt);
+    CHECK(result.program[2].op == OpCode::StoreVar);
+    CHECK(std::get<std::string>(result.program[2].operand) == "A%");
+    CHECK(result.program[3].op == OpCode::Halt);
+}
+
+TEST_CASE("basic compiler compiles INPUT for percent variable with CoerceInt") {
+    BasicProgram program;
+    program.setLine(10, "INPUT A%");
+    program.setLine(20, "END");
+
+    BasicCompiler compiler;
+    const auto result = compiler.compile(program);
+
+    REQUIRE(result.success);
+    // InputStr, CoerceInt, StoreVar, Halt
+    REQUIRE(result.program.size() == 4);
+    CHECK(result.program[0].op == OpCode::InputStr);
+    CHECK(result.program[1].op == OpCode::CoerceInt);
+    CHECK(result.program[2].op == OpCode::StoreVar);
+    CHECK(std::get<std::string>(result.program[2].operand) == "A%");
+    CHECK(result.program[3].op == OpCode::Halt);
+}
+
+TEST_CASE("basic compiler rejects dollar variable in arithmetic expression") {
+    BasicProgram program;
+    program.setLine(10, "LET A$ = \"hello\"");
+    program.setLine(20, "PRINT A$ + 1");
+
+    BasicCompiler compiler;
+    const auto result = compiler.compile(program);
+
     CHECK_FALSE(result.success);
-    REQUIRE(result.errors.size() == 1);
-    CHECK(result.errors[0].line == 10);
+    REQUIRE_FALSE(result.errors.empty());
+    CHECK(result.errors[0].line == 20);
+}
+
+TEST_CASE("basic compiler accepts percent variable in expression parser") {
+    BasicProgram program;
+    program.setLine(10, "LET COUNT% = 0");
+    program.setLine(20, "END");
+
+    BasicCompiler compiler;
+    const auto result = compiler.compile(program);
+
+    CHECK(result.success);
+    CHECK(result.errors.empty());
 }

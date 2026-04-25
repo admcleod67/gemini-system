@@ -103,3 +103,21 @@ TEST_CASE("basic expression parser parses string equality comparison") {
     REQUIRE(std::holds_alternative<BasicAst::StringLiteralExpr>(bin.right->node));
     CHECK(std::get<BasicAst::StringLiteralExpr>(bin.right->node).value == "hello");
 }
+
+TEST_CASE("basic expression parser parses percent variable identifier") {
+    const auto result = BasicExpressionParser::parse("COUNT%");
+    REQUIRE(result.success);
+    REQUIRE(result.expression);
+    REQUIRE(std::holds_alternative<BasicAst::IdentifierExpr>(result.expression->node));
+    CHECK(std::get<BasicAst::IdentifierExpr>(result.expression->node).name == "COUNT%");
+}
+
+TEST_CASE("basic expression parser parses percent variable in arithmetic") {
+    const auto result = BasicExpressionParser::parse("A% + 1");
+    REQUIRE(result.success);
+    REQUIRE(result.expression);
+    const auto &bin = std::get<BasicAst::BinaryExpr>(result.expression->node);
+    CHECK(bin.op == BasicAst::BinaryOp::Add);
+    REQUIRE(std::holds_alternative<BasicAst::IdentifierExpr>(bin.left->node));
+    CHECK(std::get<BasicAst::IdentifierExpr>(bin.left->node).name == "A%");
+}
