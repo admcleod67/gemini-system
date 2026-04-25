@@ -314,8 +314,9 @@ TEST_CASE("basic statement parser parses OPEN with ELSE line") {
     REQUIRE(std::holds_alternative<BasicAst::OpenStmt>(result.lines[0].statement));
     const auto &stmt = std::get<BasicAst::OpenStmt>(result.lines[0].statement);
     CHECK(stmt.fileVar == "FVAR");
-    REQUIRE(stmt.elseLine.has_value());
-    CHECK(*stmt.elseLine == 90);
+    REQUIRE(stmt.elseArm.has_value());
+    REQUIRE(stmt.elseArm->line.has_value());
+    CHECK(*stmt.elseArm->line == 90);
 }
 
 TEST_CASE("basic statement parser parses READ WRITE and CLOSE") {

@@ -59,7 +59,11 @@ TEST_CASE("basic bytecode emitter lowers let print and end") {
 
 TEST_CASE("basic bytecode emitter lowers if and goto control flow") {
     BasicIr::NormalizedProgram program;
-    program.lines.push_back({10, BasicIr::IfStmt{makeEq(makeInt(1), makeInt(1)), 30, 40}});
+    BasicIr::IfStmt ifStmt{};
+    ifStmt.condition = makeEq(makeInt(1), makeInt(1));
+    ifStmt.thenArm = BasicIr::BranchArm{30, ""};
+    ifStmt.elseArm = BasicIr::BranchArm{40, ""};
+    program.lines.push_back({10, std::move(ifStmt)});
     program.lines.push_back({20, BasicIr::StopStmt{}});
     program.lines.push_back({30, BasicIr::GotoStmt{20}});
     program.lines.push_back({40, BasicIr::PrintStmt{makeInt(99), false}});
@@ -103,7 +107,11 @@ TEST_CASE("basic bytecode emitter rejects LET with null expression") {
 
 TEST_CASE("basic bytecode emitter rejects IF with null condition") {
     BasicIr::NormalizedProgram program;
-    program.lines.push_back({10, BasicIr::IfStmt{nullptr, 20, std::nullopt}});
+    BasicIr::IfStmt ifStmt{};
+    ifStmt.condition = nullptr;
+    ifStmt.thenArm = BasicIr::BranchArm{20, ""};
+    ifStmt.elseArm = std::nullopt;
+    program.lines.push_back({10, std::move(ifStmt)});
     program.lines.push_back({20, BasicIr::EndStmt{}});
 
     const BasicBytecodeEmissionResult emitted = BasicBytecodeEmitter::emit(program);
@@ -467,7 +475,7 @@ TEST_CASE("basic bytecode emitter emits *_Try opcodes for file ELSE flow") {
     BasicIr::OpenStmt open{};
     open.fileExpr = makeStr("CUST");
     open.fileVar = "FVAR";
-    open.elseLine = 40;
+    open.elseArm = BasicIr::BranchArm{40, ""};
     program.lines.push_back({10, std::move(open)});
     program.lines.push_back({40, BasicIr::EndStmt{}});
 

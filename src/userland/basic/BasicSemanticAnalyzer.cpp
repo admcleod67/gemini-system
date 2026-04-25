@@ -6,6 +6,22 @@
 #include <type_traits>
 
 namespace PickShell {
+    namespace {
+        BasicIr::BranchArm toIrBranchArm(BasicAst::BranchArm arm) {
+            BasicIr::BranchArm out{};
+            out.line = arm.line;
+            out.statementText = std::move(arm.statementText);
+            return out;
+        }
+
+        std::optional<BasicIr::BranchArm> toIrBranchArmOpt(std::optional<BasicAst::BranchArm> arm) {
+            if (!arm.has_value()) {
+                return std::nullopt;
+            }
+            return toIrBranchArm(std::move(*arm));
+        }
+    } // namespace
+
     BasicSemanticAnalysisResult BasicSemanticAnalyzer::analyze(BasicAst::StatementParseResult parsed) {
         BasicSemanticAnalysisResult result;
         if (!parsed.success) {
@@ -41,41 +57,47 @@ namespace PickShell {
                             });
                         }
                     } else if constexpr (std::is_same_v<StmtT, BasicAst::IfStmt>) {
-                        if (knownLines.find(stmt.thenLine) == knownLines.end()) {
+                        if (!stmt.thenArm.line.has_value() ||
+                            knownLines.find(*stmt.thenArm.line) == knownLines.end()) {
                             result.errors.push_back({
                                 line.lineNumber,
-                                "Unknown target line " + std::to_string(stmt.thenLine)
+                                "Unknown target line " +
+                                        std::to_string(stmt.thenArm.line.value_or(0))
                             });
                         }
-                        if (stmt.elseLine.has_value() &&
-                            knownLines.find(*stmt.elseLine) == knownLines.end()) {
+                        if (stmt.elseArm.has_value() &&
+                            stmt.elseArm->line.has_value() &&
+                            knownLines.find(*stmt.elseArm->line) == knownLines.end()) {
                             result.errors.push_back({
                                 line.lineNumber,
-                                "Unknown target line " + std::to_string(*stmt.elseLine)
+                                "Unknown target line " + std::to_string(*stmt.elseArm->line)
                             });
                         }
                     } else if constexpr (std::is_same_v<StmtT, BasicAst::OpenStmt>) {
-                        if (stmt.elseLine.has_value() &&
-                            knownLines.find(*stmt.elseLine) == knownLines.end()) {
+                        if (stmt.elseArm.has_value() &&
+                            stmt.elseArm->line.has_value() &&
+                            knownLines.find(*stmt.elseArm->line) == knownLines.end()) {
                             result.errors.push_back({
                                 line.lineNumber,
-                                "Unknown target line " + std::to_string(*stmt.elseLine)
+                                "Unknown target line " + std::to_string(*stmt.elseArm->line)
                             });
                         }
                     } else if constexpr (std::is_same_v<StmtT, BasicAst::ReadStmt>) {
-                        if (stmt.elseLine.has_value() &&
-                            knownLines.find(*stmt.elseLine) == knownLines.end()) {
+                        if (stmt.elseArm.has_value() &&
+                            stmt.elseArm->line.has_value() &&
+                            knownLines.find(*stmt.elseArm->line) == knownLines.end()) {
                             result.errors.push_back({
                                 line.lineNumber,
-                                "Unknown target line " + std::to_string(*stmt.elseLine)
+                                "Unknown target line " + std::to_string(*stmt.elseArm->line)
                             });
                         }
                     } else if constexpr (std::is_same_v<StmtT, BasicAst::WriteStmt>) {
-                        if (stmt.elseLine.has_value() &&
-                            knownLines.find(*stmt.elseLine) == knownLines.end()) {
+                        if (stmt.elseArm.has_value() &&
+                            stmt.elseArm->line.has_value() &&
+                            knownLines.find(*stmt.elseArm->line) == knownLines.end()) {
                             result.errors.push_back({
                                 line.lineNumber,
-                                "Unknown target line " + std::to_string(*stmt.elseLine)
+                                "Unknown target line " + std::to_string(*stmt.elseArm->line)
                             });
                         }
                     }
@@ -129,25 +151,33 @@ namespace PickShell {
                     } else if constexpr (std::is_same_v<StmtT, BasicAst::ClearStmt>) {
                         return BasicIr::ClearStmt{};
                     } else if constexpr (std::is_same_v<StmtT, BasicAst::OpenStmt>) {
-                        return BasicIr::OpenStmt{std::move(stmt.fileExpr), std::move(stmt.fileVar), stmt.elseLine};
+                        return BasicIr::OpenStmt{
+                            std::move(stmt.fileExpr),
+                            std::move(stmt.fileVar),
+                            toIrBranchArmOpt(std::move(stmt.elseArm))
+                        };
                     } else if constexpr (std::is_same_v<StmtT, BasicAst::ReadStmt>) {
                         return BasicIr::ReadStmt{
                             std::move(stmt.targetVar),
                             std::move(stmt.fileVar),
                             std::move(stmt.idExpr),
-                            stmt.elseLine
+                            toIrBranchArmOpt(std::move(stmt.elseArm))
                         };
                     } else if constexpr (std::is_same_v<StmtT, BasicAst::WriteStmt>) {
                         return BasicIr::WriteStmt{
                             std::move(stmt.valueExpr),
                             std::move(stmt.fileVar),
                             std::move(stmt.idExpr),
-                            stmt.elseLine
+                            toIrBranchArmOpt(std::move(stmt.elseArm))
                         };
                     } else if constexpr (std::is_same_v<StmtT, BasicAst::CloseStmt>) {
                         return BasicIr::CloseStmt{std::move(stmt.fileVar)};
                     } else if constexpr (std::is_same_v<StmtT, BasicAst::IfStmt>) {
-                        return BasicIr::IfStmt{std::move(stmt.condition), stmt.thenLine, stmt.elseLine};
+                        return BasicIr::IfStmt{
+                            std::move(stmt.condition),
+                            toIrBranchArm(std::move(stmt.thenArm)),
+                            toIrBranchArmOpt(std::move(stmt.elseArm))
+                        };
                     } else if constexpr (std::is_same_v<StmtT, BasicAst::PrintStmt>) {
                         return BasicIr::PrintStmt{std::move(stmt.expression), stmt.suppressEol};
                     } else if constexpr (std::is_same_v<StmtT, BasicAst::RemStmt>) {

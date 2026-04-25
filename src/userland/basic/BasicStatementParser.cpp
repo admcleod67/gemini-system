@@ -263,7 +263,7 @@ namespace PickShell {
                     continue;
                 }
 
-                std::optional<int> elseLine;
+                std::optional<BasicAst::BranchArm> elseArm;
                 std::string mainPart = rest;
                 const std::string restUpper = uppercase(rest);
                 const std::size_t elsePos = findKeywordToken(restUpper, "ELSE");
@@ -275,7 +275,7 @@ namespace PickShell {
                         result.errors.push_back({lineNumber, "OPEN ELSE requires a line number"});
                         continue;
                     }
-                    elseLine = parsedElseLine;
+                    elseArm = BasicAst::BranchArm{parsedElseLine, ""};
                 }
 
                 const std::string mainUpper = uppercase(mainPart);
@@ -305,7 +305,7 @@ namespace PickShell {
                 BasicAst::OpenStmt stmt{};
                 stmt.fileExpr = std::move(fileExpr.expression);
                 stmt.fileVar = fileVar;
-                stmt.elseLine = elseLine;
+                stmt.elseArm = elseArm;
                 result.lines.push_back({lineNumber, std::move(stmt)});
                 continue;
             }
@@ -319,7 +319,7 @@ namespace PickShell {
                     continue;
                 }
 
-                std::optional<int> elseLine;
+                std::optional<BasicAst::BranchArm> elseArm;
                 std::string mainPart = rest;
                 const std::string restUpper = uppercase(rest);
                 const std::size_t elsePos = findKeywordToken(restUpper, "ELSE");
@@ -331,7 +331,7 @@ namespace PickShell {
                         result.errors.push_back({lineNumber, "READ ELSE requires a line number"});
                         continue;
                     }
-                    elseLine = parsedElseLine;
+                    elseArm = BasicAst::BranchArm{parsedElseLine, ""};
                 }
 
                 const std::string mainUpper = uppercase(mainPart);
@@ -373,7 +373,7 @@ namespace PickShell {
                 stmt.targetVar = targetVar;
                 stmt.fileVar = fileVar;
                 stmt.idExpr = std::move(idExpr.expression);
-                stmt.elseLine = elseLine;
+                stmt.elseArm = elseArm;
                 result.lines.push_back({lineNumber, std::move(stmt)});
                 continue;
             }
@@ -387,7 +387,7 @@ namespace PickShell {
                     continue;
                 }
 
-                std::optional<int> elseLine;
+                std::optional<BasicAst::BranchArm> elseArm;
                 std::string mainPart = rest;
                 const std::string restUpper = uppercase(rest);
                 const std::size_t elsePos = findKeywordToken(restUpper, "ELSE");
@@ -399,7 +399,7 @@ namespace PickShell {
                         result.errors.push_back({lineNumber, "WRITE ELSE requires a line number"});
                         continue;
                     }
-                    elseLine = parsedElseLine;
+                    elseArm = BasicAst::BranchArm{parsedElseLine, ""};
                 }
 
                 const std::string mainUpper = uppercase(mainPart);
@@ -446,7 +446,7 @@ namespace PickShell {
                 stmt.valueExpr = std::move(valueExpr.expression);
                 stmt.fileVar = fileVar;
                 stmt.idExpr = std::move(idExpr.expression);
-                stmt.elseLine = elseLine;
+                stmt.elseArm = elseArm;
                 result.lines.push_back({lineNumber, std::move(stmt)});
                 continue;
             }
@@ -611,9 +611,9 @@ namespace PickShell {
 
                 BasicAst::IfStmt stmt{};
                 stmt.condition = std::move(condition.expression);
-                stmt.thenLine = thenLine;
+                stmt.thenArm = BasicAst::BranchArm{thenLine, ""};
                 if (elseRaw) {
-                    stmt.elseLine = elseLine;
+                    stmt.elseArm = BasicAst::BranchArm{elseLine, ""};
                 }
                 result.lines.push_back({lineNumber, std::move(stmt)});
                 continue;

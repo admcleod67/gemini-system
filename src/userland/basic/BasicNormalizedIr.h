@@ -39,12 +39,18 @@ namespace PickShell::BasicIr {
 
     struct ReturnStmt {};
 
+    struct BranchArm {
+        // Stage 1 model: line target remains active; statement text is reserved for stage 2 parsing.
+        std::optional<int> line;
+        std::string statementText;
+    };
+
     struct IfStmt {
         // Required: non-null condition.
-        // Guaranteed by semantic pass: thenLine/elseLine (if present) refer to existing lines.
+        // Guaranteed by semantic pass: thenArm.line / elseArm.line (when present) refer to existing lines.
         std::unique_ptr<BasicAst::Expr> condition;
-        int thenLine{0};
-        std::optional<int> elseLine;
+        BranchArm thenArm;
+        std::optional<BranchArm> elseArm;
     };
 
     struct PrintStmt {
@@ -84,21 +90,21 @@ namespace PickShell::BasicIr {
     struct OpenStmt {
         std::unique_ptr<BasicAst::Expr> fileExpr;
         std::string fileVar;
-        std::optional<int> elseLine;
+        std::optional<BranchArm> elseArm;
     };
 
     struct ReadStmt {
         std::string targetVar;
         std::string fileVar;
         std::unique_ptr<BasicAst::Expr> idExpr;
-        std::optional<int> elseLine;
+        std::optional<BranchArm> elseArm;
     };
 
     struct WriteStmt {
         std::unique_ptr<BasicAst::Expr> valueExpr;
         std::string fileVar;
         std::unique_ptr<BasicAst::Expr> idExpr;
-        std::optional<int> elseLine;
+        std::optional<BranchArm> elseArm;
     };
 
     struct CloseStmt {

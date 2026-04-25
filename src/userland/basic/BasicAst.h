@@ -117,10 +117,16 @@ namespace PickShell::BasicAst {
         std::string variableName;
     };
 
+    struct BranchArm {
+        // Stage 1 model: line target remains active; statement text is reserved for stage 2 parsing.
+        std::optional<int> line;
+        std::string statementText;
+    };
+
     struct IfStmt {
         std::unique_ptr<Expr> condition;
-        int thenLine{0};
-        std::optional<int> elseLine;
+        BranchArm thenArm;
+        std::optional<BranchArm> elseArm;
     };
 
     struct PrintStmt {
@@ -150,21 +156,21 @@ namespace PickShell::BasicAst {
     struct OpenStmt {
         std::unique_ptr<Expr> fileExpr;
         std::string fileVar;
-        std::optional<int> elseLine;
+        std::optional<BranchArm> elseArm;
     };
 
     struct ReadStmt {
         std::string targetVar;
         std::string fileVar;
         std::unique_ptr<Expr> idExpr;
-        std::optional<int> elseLine;
+        std::optional<BranchArm> elseArm;
     };
 
     struct WriteStmt {
         std::unique_ptr<Expr> valueExpr;
         std::string fileVar;
         std::unique_ptr<Expr> idExpr;
-        std::optional<int> elseLine;
+        std::optional<BranchArm> elseArm;
     };
 
     struct CloseStmt {

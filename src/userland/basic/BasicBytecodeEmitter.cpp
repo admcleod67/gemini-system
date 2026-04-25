@@ -280,6 +280,10 @@ namespace PickShell {
                             result.errors.push_back({line.lineNumber, "IF requires a condition expression"});
                             return false;
                         }
+                        if (!stmt.thenArm.line.has_value()) {
+                            result.errors.push_back({line.lineNumber, "IF THEN requires a line target"});
+                            return false;
+                        }
                         std::string error;
                         ExpressionAstEmitter emitter(result.program, error);
                         if (!emitter.emit(*stmt.condition)) {
@@ -290,12 +294,12 @@ namespace PickShell {
                         result.program.push_back(PickVM::Instruction{PickVM::OpCode::JumpIfZero, 0});
                         const std::size_t thenJumpIp = result.program.size();
                         result.program.push_back(PickVM::Instruction{PickVM::OpCode::Jump, 0});
-                        jumpFixups.push_back({line.lineNumber, thenJumpIp, stmt.thenLine});
-                        if (stmt.elseLine.has_value()) {
+                        jumpFixups.push_back({line.lineNumber, thenJumpIp, *stmt.thenArm.line});
+                        if (stmt.elseArm.has_value() && stmt.elseArm->line.has_value()) {
                             result.program[jzIp].operand = static_cast<int>(result.program.size());
                             const std::size_t elseJumpIp = result.program.size();
                             result.program.push_back(PickVM::Instruction{PickVM::OpCode::Jump, 0});
-                            jumpFixups.push_back({line.lineNumber, elseJumpIp, *stmt.elseLine});
+                            jumpFixups.push_back({line.lineNumber, elseJumpIp, *stmt.elseArm->line});
                         } else {
                             result.program[jzIp].operand = static_cast<int>(result.program.size());
                         }
@@ -380,7 +384,7 @@ namespace PickShell {
                         }
 
                         const std::string fileVar = uppercase(stmt.fileVar);
-                        if (stmt.elseLine.has_value()) {
+                        if (stmt.elseArm.has_value() && stmt.elseArm->line.has_value()) {
                             result.program.push_back(PickVM::Instruction{PickVM::OpCode::OpenFileTry, fileVar});
                             const std::size_t jzIp = result.program.size();
                             result.program.push_back(PickVM::Instruction{PickVM::OpCode::JumpIfZero, 0});
@@ -390,7 +394,7 @@ namespace PickShell {
                             result.program.push_back(PickVM::Instruction{PickVM::OpCode::Jump, 0});
                             result.program[jzIp].operand = static_cast<int>(elseJumpIp);
                             result.program[skipElseJumpIp].operand = static_cast<int>(result.program.size());
-                            jumpFixups.push_back({line.lineNumber, elseJumpIp, *stmt.elseLine});
+                            jumpFixups.push_back({line.lineNumber, elseJumpIp, *stmt.elseArm->line});
                         } else {
                             result.program.push_back(PickVM::Instruction{PickVM::OpCode::OpenFile, fileVar});
                         }
@@ -409,7 +413,7 @@ namespace PickShell {
 
                         const std::string fileVar = uppercase(stmt.fileVar);
                         const std::string targetVar = uppercase(stmt.targetVar);
-                        if (stmt.elseLine.has_value()) {
+                        if (stmt.elseArm.has_value() && stmt.elseArm->line.has_value()) {
                             result.program.push_back(PickVM::Instruction{PickVM::OpCode::ReadRecTry, fileVar});
                             const std::size_t jzIp = result.program.size();
                             result.program.push_back(PickVM::Instruction{PickVM::OpCode::JumpIfZero, 0}); // pops success flag
@@ -423,7 +427,7 @@ namespace PickShell {
                             result.program.push_back(PickVM::Instruction{PickVM::OpCode::Jump, 0});
                             result.program[jzIp].operand = static_cast<int>(failPathIp);
                             result.program[skipElseJumpIp].operand = static_cast<int>(result.program.size());
-                            jumpFixups.push_back({line.lineNumber, elseJumpIp, *stmt.elseLine});
+                            jumpFixups.push_back({line.lineNumber, elseJumpIp, *stmt.elseArm->line});
                         } else {
                             result.program.push_back(PickVM::Instruction{PickVM::OpCode::ReadRec, fileVar});
                             result.program.push_back(PickVM::Instruction{PickVM::OpCode::StoreVar, targetVar});
@@ -452,7 +456,7 @@ namespace PickShell {
                         }
 
                         const std::string fileVar = uppercase(stmt.fileVar);
-                        if (stmt.elseLine.has_value()) {
+                        if (stmt.elseArm.has_value() && stmt.elseArm->line.has_value()) {
                             result.program.push_back(PickVM::Instruction{PickVM::OpCode::WriteRecTry, fileVar});
                             const std::size_t jzIp = result.program.size();
                             result.program.push_back(PickVM::Instruction{PickVM::OpCode::JumpIfZero, 0});
@@ -462,7 +466,7 @@ namespace PickShell {
                             result.program.push_back(PickVM::Instruction{PickVM::OpCode::Jump, 0});
                             result.program[jzIp].operand = static_cast<int>(elseJumpIp);
                             result.program[skipElseJumpIp].operand = static_cast<int>(result.program.size());
-                            jumpFixups.push_back({line.lineNumber, elseJumpIp, *stmt.elseLine});
+                            jumpFixups.push_back({line.lineNumber, elseJumpIp, *stmt.elseArm->line});
                         } else {
                             result.program.push_back(PickVM::Instruction{PickVM::OpCode::WriteRec, fileVar});
                         }
