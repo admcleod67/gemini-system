@@ -905,8 +905,7 @@ TEST_CASE("runtime loadProgram clears forStack") {
     CHECK_THROWS_WITH(rt.run(), "NEXT without FOR");
 }
 
-TEST_CASE("runtime nested FOR/NEXT loops") {
-    std::ostringstream out;
+TEST_CASE("runtime nested FOR/NEXT loops") {    std::ostringstream out;
     Runtime rt;
     rt.setOutputStream(&out);
 
@@ -956,4 +955,27 @@ TEST_CASE("runtime nested FOR/NEXT loops") {
     rt.loadProgram(prog);
     rt.run();
     CHECK(out.str() == "11\n12\n21\n22\n");
+}
+
+TEST_CASE("runtime bare NEXT (no variable) matches innermost frame") {
+    std::ostringstream out;
+    Runtime rt;
+    rt.setOutputStream(&out);
+
+    // FOR I = 1 TO 3 : PRINT I : NEXT  (no variable name)
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt,   1},
+        {OpCode::StoreVar,  std::string{"I"}},
+        {OpCode::PushInt,   3},
+        {OpCode::PushInt,   1},
+        {OpCode::ForSetup,  std::string{"I"}},           // bodyIP = 5
+        {OpCode::LoadVar,   std::string{"I"}},
+        {OpCode::PrintVal,  Value{}},
+        {OpCode::PrintEol,  Value{}},
+        {OpCode::ForNext,   std::string{""}},            // bare NEXT
+        {OpCode::Halt,      Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    CHECK(out.str() == "1\n2\n3\n");
 }

@@ -228,9 +228,9 @@ TEST_CASE("basic statement parser rejects NEXT without variable") {
     program.setLine(20, "NEXT");
 
     const BasicAst::StatementParseResult result = BasicStatementParser::parse(program);
-    CHECK_FALSE(result.success);
-    REQUIRE(result.errors.size() == 1);
-    CHECK(result.errors[0].line == 20);
-    CHECK(result.errors[0].message == "NEXT requires a variable name");
+    REQUIRE(result.success);
+    REQUIRE(result.lines.size() == 1);
+    REQUIRE(std::holds_alternative<BasicAst::NextStmt>(result.lines[0].statement));
+    CHECK(std::get<BasicAst::NextStmt>(result.lines[0].statement).variableName.empty());
 }
 

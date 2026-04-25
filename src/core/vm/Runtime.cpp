@@ -381,7 +381,8 @@ namespace PickVM {
                     throw std::runtime_error("NEXT without FOR");
                 }
                 ForFrame &frame = forStack_.back();
-                if (frame.varName != varName) {
+                // Only validate the name when one was provided; bare NEXT matches the innermost frame.
+                if (!varName.empty() && frame.varName != varName) {
                     throw std::runtime_error("FOR/NEXT variable mismatch");
                 }
                 const auto it = variables_.find(frame.varName);

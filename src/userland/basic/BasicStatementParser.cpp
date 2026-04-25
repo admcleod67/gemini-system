@@ -249,11 +249,8 @@ namespace PickShell {
                 std::string rest;
                 std::getline(iss, rest);
                 const std::string varName = trim(rest);
-                if (varName.empty()) {
-                    result.errors.push_back({lineNumber, "NEXT requires a variable name"});
-                    continue;
-                }
-                if (!isValidVariableName(varName)) {
+                // Variable name is optional in Pick BASIC; omitting it matches the innermost frame.
+                if (!varName.empty() && !isValidVariableName(varName)) {
                     result.errors.push_back({lineNumber, "NEXT requires a valid variable name"});
                     continue;
                 }
