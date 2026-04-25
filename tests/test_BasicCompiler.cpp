@@ -226,8 +226,8 @@ TEST_CASE("basic compiler reports malformed IF target syntax") {
 
     CHECK_FALSE(result.success);
     REQUIRE(result.errors.size() == 2);
-    CHECK(result.errors[0].message == "IF THEN requires a line number");
-    CHECK(result.errors[1].message == "IF ELSE requires a line number");
+    CHECK(result.errors[0].message == "IF THEN requires a line number or statement");
+    CHECK(result.errors[1].message == "IF ELSE requires a line number or statement");
 }
 
 TEST_CASE("basic compiler compiles INPUT variable") {

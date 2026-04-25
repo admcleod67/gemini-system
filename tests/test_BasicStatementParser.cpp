@@ -57,9 +57,14 @@ TEST_CASE("basic statement parser preserves IF THEN ELSE token boundary behavior
 
     const BasicAst::StatementParseResult result = BasicStatementParser::parse(program);
     CHECK_FALSE(result.success);
-    REQUIRE(result.errors.size() == 2);
+    REQUIRE(result.errors.size() == 1);
     CHECK(result.errors[0].message == "IF requires THEN <line>");
-    CHECK(result.errors[1].message == "IF THEN requires a line number");
+    REQUIRE(result.lines.size() == 1);
+    REQUIRE(std::holds_alternative<BasicAst::IfStmt>(result.lines[0].statement));
+    const auto &stmt = std::get<BasicAst::IfStmt>(result.lines[0].statement);
+    CHECK_FALSE(stmt.thenArm.line.has_value());
+    CHECK(stmt.thenArm.statementText == "30 ELSEX 40");
+    CHECK_FALSE(stmt.elseArm.has_value());
 }
 
 TEST_CASE("basic statement parser preserves PRINT string and semicolon behavior") {
@@ -101,7 +106,7 @@ TEST_CASE("basic statement parser preserves diagnostic messages") {
     CHECK(result.errors[0].message == "LET requires assignment with '='");
     CHECK(result.errors[1].message == "INPUT requires a variable name");
     CHECK(result.errors[2].message == "GOTO requires a line number");
-    CHECK(result.errors[3].message == "IF THEN requires a line number");
+    CHECK(result.errors[3].message == "IF THEN requires a line number or statement");
     CHECK(result.errors[4].message == "PRINT requires an expression");
     CHECK(result.errors[5].message == "STOP takes no arguments");
     CHECK(result.errors[6].message == "END takes no arguments");
@@ -333,13 +338,40 @@ TEST_CASE("basic statement parser parses READ WRITE and CLOSE") {
     CHECK(std::holds_alternative<BasicAst::CloseStmt>(result.lines[2].statement));
 }
 
-TEST_CASE("basic statement parser rejects OPEN ELSE without line number") {
+TEST_CASE("basic statement parser accepts OPEN ELSE with single statement") {
     BasicProgram program;
     program.setLine(10, "OPEN \"CUSTOMERS\" TO FVAR ELSE STOP");
 
     const BasicAst::StatementParseResult result = BasicStatementParser::parse(program);
+    REQUIRE(result.success);
+    REQUIRE(result.errors.empty());
+    REQUIRE(result.lines.size() == 1);
+    REQUIRE(std::holds_alternative<BasicAst::OpenStmt>(result.lines[0].statement));
+    const auto &stmt = std::get<BasicAst::OpenStmt>(result.lines[0].statement);
+    REQUIRE(stmt.elseArm.has_value());
+    CHECK_FALSE(stmt.elseArm->line.has_value());
+    CHECK(stmt.elseArm->statementText == "STOP");
+}
+
+TEST_CASE("basic statement parser rejects IF branch with multiple statements") {
+    BasicProgram program;
+    program.setLine(10, "IF A=1 THEN STOP: PRINT 1");
+
+    const BasicAst::StatementParseResult result = BasicStatementParser::parse(program);
     CHECK_FALSE(result.success);
     REQUIRE(result.errors.size() == 1);
-    CHECK(result.errors[0].message == "OPEN ELSE requires a line number");
+    CHECK(result.errors[0].message == "IF THEN supports exactly one statement");
+}
+
+TEST_CASE("basic statement parser rejects FOR and NEXT in branch arms") {
+    BasicProgram program;
+    program.setLine(10, "IF A=1 THEN FOR I=1 TO 10");
+    program.setLine(20, "OPEN \"CUSTOMERS\" TO FVAR ELSE NEXT I");
+
+    const BasicAst::StatementParseResult result = BasicStatementParser::parse(program);
+    CHECK_FALSE(result.success);
+    REQUIRE(result.errors.size() == 2);
+    CHECK(result.errors[0].message == "IF THEN does not allow FOR/NEXT");
+    CHECK(result.errors[1].message == "OPEN ELSE does not allow FOR/NEXT");
 }
 

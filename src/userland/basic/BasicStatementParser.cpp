@@ -51,6 +51,40 @@ namespace PickShell {
             }
             return std::string::npos;
         }
+
+        bool parseBranchArmSpec(const std::string &raw,
+                                const std::string &context,
+                                BasicAst::BranchArm &outArm,
+                                std::string &error) {
+            const std::string token = trim(raw);
+            if (token.empty()) {
+                error = context + " requires a line number or statement";
+                return false;
+            }
+
+            int lineNumber = 0;
+            if (parsePositiveLineNumber(token, lineNumber)) {
+                outArm = BasicAst::BranchArm{lineNumber, ""};
+                return true;
+            }
+
+            if (token.find(':') != std::string::npos) {
+                error = context + " supports exactly one statement";
+                return false;
+            }
+
+            std::istringstream branchIss(token);
+            std::string branchKeyword;
+            branchIss >> branchKeyword;
+            const std::string branchOp = uppercase(branchKeyword);
+            if (branchOp == "FOR" || branchOp == "NEXT") {
+                error = context + " does not allow FOR/NEXT";
+                return false;
+            }
+
+            outArm = BasicAst::BranchArm{std::nullopt, token};
+            return true;
+        }
     } // namespace
 
     BasicAst::StatementParseResult BasicStatementParser::parse(const BasicProgram &program) {
@@ -270,12 +304,13 @@ namespace PickShell {
                 if (elsePos != std::string::npos) {
                     mainPart = trim(rest.substr(0, elsePos));
                     const std::string elseRaw = trim(rest.substr(elsePos + 4));
-                    int parsedElseLine = 0;
-                    if (!parsePositiveLineNumber(elseRaw, parsedElseLine)) {
-                        result.errors.push_back({lineNumber, "OPEN ELSE requires a line number"});
+                    BasicAst::BranchArm parsedElseArm{};
+                    std::string armError;
+                    if (!parseBranchArmSpec(elseRaw, "OPEN ELSE", parsedElseArm, armError)) {
+                        result.errors.push_back({lineNumber, armError});
                         continue;
                     }
-                    elseArm = BasicAst::BranchArm{parsedElseLine, ""};
+                    elseArm = std::move(parsedElseArm);
                 }
 
                 const std::string mainUpper = uppercase(mainPart);
@@ -326,12 +361,13 @@ namespace PickShell {
                 if (elsePos != std::string::npos) {
                     mainPart = trim(rest.substr(0, elsePos));
                     const std::string elseRaw = trim(rest.substr(elsePos + 4));
-                    int parsedElseLine = 0;
-                    if (!parsePositiveLineNumber(elseRaw, parsedElseLine)) {
-                        result.errors.push_back({lineNumber, "READ ELSE requires a line number"});
+                    BasicAst::BranchArm parsedElseArm{};
+                    std::string armError;
+                    if (!parseBranchArmSpec(elseRaw, "READ ELSE", parsedElseArm, armError)) {
+                        result.errors.push_back({lineNumber, armError});
                         continue;
                     }
-                    elseArm = BasicAst::BranchArm{parsedElseLine, ""};
+                    elseArm = std::move(parsedElseArm);
                 }
 
                 const std::string mainUpper = uppercase(mainPart);
@@ -394,12 +430,13 @@ namespace PickShell {
                 if (elsePos != std::string::npos) {
                     mainPart = trim(rest.substr(0, elsePos));
                     const std::string elseRaw = trim(rest.substr(elsePos + 4));
-                    int parsedElseLine = 0;
-                    if (!parsePositiveLineNumber(elseRaw, parsedElseLine)) {
-                        result.errors.push_back({lineNumber, "WRITE ELSE requires a line number"});
+                    BasicAst::BranchArm parsedElseArm{};
+                    std::string armError;
+                    if (!parseBranchArmSpec(elseRaw, "WRITE ELSE", parsedElseArm, armError)) {
+                        result.errors.push_back({lineNumber, armError});
                         continue;
                     }
-                    elseArm = BasicAst::BranchArm{parsedElseLine, ""};
+                    elseArm = std::move(parsedElseArm);
                 }
 
                 const std::string mainUpper = uppercase(mainPart);
@@ -576,7 +613,7 @@ namespace PickShell {
 
                 std::string branchPart = trim(rest.substr(thenPos + 4));
                 if (branchPart.empty()) {
-                    result.errors.push_back({lineNumber, "IF THEN requires a line number"});
+                    result.errors.push_back({lineNumber, "IF THEN requires a line number or statement"});
                     continue;
                 }
                 const std::string branchUpper = uppercase(branchPart);
@@ -591,16 +628,21 @@ namespace PickShell {
                     thenRaw = trim(thenRaw);
                 }
 
-                int thenLine = 0;
-                if (!parsePositiveLineNumber(thenRaw, thenLine)) {
-                    result.errors.push_back({lineNumber, "IF THEN requires a line number"});
+                BasicAst::BranchArm thenArm{};
+                std::string armError;
+                if (!parseBranchArmSpec(thenRaw, "IF THEN", thenArm, armError)) {
+                    result.errors.push_back({lineNumber, armError});
                     continue;
                 }
 
-                int elseLine = 0;
-                if (elseRaw && !parsePositiveLineNumber(*elseRaw, elseLine)) {
-                    result.errors.push_back({lineNumber, "IF ELSE requires a line number"});
-                    continue;
+                std::optional<BasicAst::BranchArm> elseArm;
+                if (elseRaw) {
+                    BasicAst::BranchArm parsedElseArm{};
+                    if (!parseBranchArmSpec(*elseRaw, "IF ELSE", parsedElseArm, armError)) {
+                        result.errors.push_back({lineNumber, armError});
+                        continue;
+                    }
+                    elseArm = std::move(parsedElseArm);
                 }
 
                 BasicExpressionParseResult condition = BasicExpressionParser::parse(conditionExpr);
@@ -611,10 +653,8 @@ namespace PickShell {
 
                 BasicAst::IfStmt stmt{};
                 stmt.condition = std::move(condition.expression);
-                stmt.thenArm = BasicAst::BranchArm{thenLine, ""};
-                if (elseRaw) {
-                    stmt.elseArm = BasicAst::BranchArm{elseLine, ""};
-                }
+                stmt.thenArm = std::move(thenArm);
+                stmt.elseArm = std::move(elseArm);
                 result.lines.push_back({lineNumber, std::move(stmt)});
                 continue;
             }
