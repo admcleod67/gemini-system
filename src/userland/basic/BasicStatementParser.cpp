@@ -74,6 +74,11 @@ namespace PickShell {
             iss >> keyword;
             const std::string op = uppercase(keyword);
 
+            if (op == "REM") {
+                result.lines.push_back({lineNumber, BasicAst::RemStmt{}});
+                continue;
+            }
+
             if (op == "LET") {
                 std::string rest;
                 std::getline(iss, rest);

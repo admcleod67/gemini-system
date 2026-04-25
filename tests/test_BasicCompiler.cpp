@@ -250,6 +250,48 @@ TEST_CASE("basic compiler compiles INPUT variable") {
     CHECK(result.program[5].op == OpCode::Halt);
 }
 
+TEST_CASE("basic compiler REM produces no instructions") {
+    BasicProgram program;
+    program.setLine(10, "REM initialise counter");
+    program.setLine(20, "LET A = 1");
+    program.setLine(30, "REM print result");
+    program.setLine(40, "PRINT A");
+    program.setLine(50, "END");
+
+    BasicCompiler compiler;
+    const auto result = compiler.compile(program);
+
+    CHECK(result.success);
+    CHECK(result.errors.empty());
+    // REM lines emit no instructions: PushInt + StoreVar + LoadVar + PrintInt + PrintEol + Halt
+    REQUIRE(result.program.size() == 6);
+    CHECK(result.program[0].op == OpCode::PushInt);
+    CHECK(result.program[1].op == OpCode::StoreVar);
+    CHECK(result.program[2].op == OpCode::LoadVar);
+    CHECK(result.program[3].op == OpCode::PrintInt);
+    CHECK(result.program[4].op == OpCode::PrintEol);
+    CHECK(result.program[5].op == OpCode::Halt);
+}
+
+TEST_CASE("basic compiler GOTO can target a REM line") {
+    BasicProgram program;
+    program.setLine(10, "GOTO 20");
+    program.setLine(20, "REM skipped over");
+    program.setLine(30, "END");
+
+    BasicCompiler compiler;
+    const auto result = compiler.compile(program);
+
+    CHECK(result.success);
+    CHECK(result.errors.empty());
+    // Line 20 (REM) emits nothing, so lineToInstructionIndex[20] == 1
+    // which is the same slot as line 30 (END/Halt).
+    REQUIRE(result.program.size() == 2);
+    CHECK(result.program[0].op == OpCode::Jump);
+    CHECK(std::get<int>(result.program[0].operand) == 1);
+    CHECK(result.program[1].op == OpCode::Halt);
+}
+
 TEST_CASE("basic compiler INPUT requires one valid variable name") {
     BasicProgram missingVar;
     missingVar.setLine(10, "INPUT");

@@ -187,6 +187,8 @@ namespace PickShell {
                             result.program.push_back(makeNoOperandInstruction(PickVM::OpCode::PrintEol));
                         }
                         return true;
+                    } else if constexpr (std::is_same_v<StmtT, BasicIr::RemStmt>) {
+                        return true;
                     } else if constexpr (std::is_same_v<StmtT, BasicIr::StopStmt>) {
                         result.program.push_back(makeNoOperandInstruction(PickVM::OpCode::Halt));
                         return true;

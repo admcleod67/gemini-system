@@ -95,11 +95,13 @@ namespace PickShell::BasicAst {
         bool suppressEol{false};
     };
 
+    struct RemStmt {};
+
     struct StopStmt {};
 
     struct EndStmt {};
 
-    using StatementNode = std::variant<LetStmt, InputStmt, GotoStmt, IfStmt, PrintStmt, StopStmt, EndStmt>;
+    using StatementNode = std::variant<LetStmt, InputStmt, GotoStmt, IfStmt, PrintStmt, RemStmt, StopStmt, EndStmt>;
 
     struct ParsedBasicLine {
         int lineNumber{0};

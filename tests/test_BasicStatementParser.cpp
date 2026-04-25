@@ -17,20 +17,37 @@ TEST_CASE("basic statement parser parses each supported statement kind") {
     program.setLine(30, "GOTO 50");
     program.setLine(40, "IF A = 1 THEN 10 ELSE 20");
     program.setLine(50, "PRINT \"OK\";");
+    program.setLine(55, "REM this is a comment");
     program.setLine(60, "STOP");
     program.setLine(70, "END");
 
     const BasicAst::StatementParseResult result = BasicStatementParser::parse(program);
     CHECK(result.success);
     CHECK(result.errors.empty());
-    REQUIRE(result.lines.size() == 7);
+    REQUIRE(result.lines.size() == 8);
     CHECK(std::holds_alternative<BasicAst::LetStmt>(result.lines[0].statement));
     CHECK(std::holds_alternative<BasicAst::InputStmt>(result.lines[1].statement));
     CHECK(std::holds_alternative<BasicAst::GotoStmt>(result.lines[2].statement));
     CHECK(std::holds_alternative<BasicAst::IfStmt>(result.lines[3].statement));
     CHECK(std::holds_alternative<BasicAst::PrintStmt>(result.lines[4].statement));
-    CHECK(std::holds_alternative<BasicAst::StopStmt>(result.lines[5].statement));
-    CHECK(std::holds_alternative<BasicAst::EndStmt>(result.lines[6].statement));
+    CHECK(std::holds_alternative<BasicAst::RemStmt>(result.lines[5].statement));
+    CHECK(std::holds_alternative<BasicAst::StopStmt>(result.lines[6].statement));
+    CHECK(std::holds_alternative<BasicAst::EndStmt>(result.lines[7].statement));
+}
+
+TEST_CASE("basic statement parser handles REM with and without comment text") {
+    BasicProgram program;
+    program.setLine(10, "REM");
+    program.setLine(20, "REM this is a comment");
+    program.setLine(30, "REM    leading spaces are fine too");
+
+    const BasicAst::StatementParseResult result = BasicStatementParser::parse(program);
+    CHECK(result.success);
+    CHECK(result.errors.empty());
+    REQUIRE(result.lines.size() == 3);
+    CHECK(std::holds_alternative<BasicAst::RemStmt>(result.lines[0].statement));
+    CHECK(std::holds_alternative<BasicAst::RemStmt>(result.lines[1].statement));
+    CHECK(std::holds_alternative<BasicAst::RemStmt>(result.lines[2].statement));
 }
 
 TEST_CASE("basic statement parser preserves IF THEN ELSE token boundary behavior") {

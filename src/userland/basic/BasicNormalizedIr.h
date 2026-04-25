@@ -49,10 +49,11 @@ namespace PickShell::BasicIr {
         bool suppressEol{false};
     };
 
+    struct RemStmt {};
     struct StopStmt {};
     struct EndStmt {};
 
-    using NormalizedStmt = std::variant<LetStmt, InputStmt, GotoStmt, IfStmt, PrintStmt, StopStmt, EndStmt>;
+    using NormalizedStmt = std::variant<LetStmt, InputStmt, GotoStmt, IfStmt, PrintStmt, RemStmt, StopStmt, EndStmt>;
 
     struct NormalizedLine {
         // Original BASIC line number used for diagnostics and jump mapping.
