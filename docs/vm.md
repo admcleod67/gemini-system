@@ -46,6 +46,9 @@ The parser records **1-based physical source line numbers** per instruction (for
 | `RETURN` | Pop the top address from the call stack and set IP to it. Throws `"RETURN without GOSUB"` if the call stack is empty. |
 | `FOR_SETUP name` | Pop `step` (top of stack), then pop `limit`; validate that `step ≠ 0` (throws `"FOR: STEP cannot be zero"`); push a loop frame `{varName=name, limit, step, bodyIP=ip+1}` onto the for-stack; fall through to the body. Used to implement `FOR`. |
 | `FOR_NEXT name` | Increment variable `name` by the step stored in the top for-frame; if the termination condition is met (`step > 0 && var > limit` or `step < 0 && var < limit`) pop the frame and fall through; otherwise jump back to `bodyIP`. Throws `"NEXT without FOR"` if the for-stack is empty; throws `"FOR/NEXT variable mismatch"` if the frame's variable name does not match `name`. Used to implement `NEXT`. |
+| `DIM_ARRAY name` | Pop int `n`; allocate (or re-allocate) a 1-based array of `n` elements under key `name`, each initialised to `""`. Throws `"DIM: size must be >= 1"` if `n < 1`. |
+| `LOAD_ARR name` | Pop int index `i` (1-based); push `arrays[name][i-1]`. Throws `"Array not dimensioned: <name>"` if the array does not exist; throws `"Array index out of bounds: <name>"` if `i` is out of range. |
+| `STORE_ARR name` | Pop int index `i` (top), then pop value; store value at `arrays[name][i-1]`. Same error conditions as `LOAD_ARR`. |
 | `JUMP label` | Set IP to the instruction index of `label` (resolved at parse time). |
 | `JZ label` | Pop int; if it is **zero**, jump to `label`; otherwise fall through. |
 | `STORE_VAR name` | Pop value and store it by case-insensitive variable `name` (runtime canonicalizes to uppercase). |
@@ -74,7 +77,7 @@ Jump targets must refer to defined labels and resolve to valid instruction indic
 - **`setOutputStream(ostream*)`** — where **`PRINT_*`** go; **`nullptr`** means **`std::cout`**.
 - **`setInputStream(istream*)`** — where **`INPUT_STR`** and **`INPUT_INT`** read from; **`nullptr`** means **`std::cin`**.
 - **`stack()`** / **`dumpStack()`** — inspection helpers.
-- Runtime keeps a per-loaded-program variable map for `STORE_VAR`/`LOAD_VAR`, a **call stack** for `CALL`/`RETURN`, and a **for-stack** for `FOR_SETUP`/`FOR_NEXT`; loading a new program resets all three.
+- Runtime keeps a per-loaded-program variable map for `STORE_VAR`/`LOAD_VAR`, a **call stack** for `CALL`/`RETURN`, a **for-stack** for `FOR_SETUP`/`FOR_NEXT`, and an **arrays map** for `DIM_ARRAY`/`LOAD_ARR`/`STORE_ARR`; loading a new program resets all four.
 
 ## Instruction listing
 

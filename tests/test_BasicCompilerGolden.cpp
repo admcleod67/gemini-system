@@ -164,3 +164,44 @@ TEST_CASE("basic compiler golden: simple FOR/NEXT counted loop") {
     CHECK(std::get<std::string>(result.program[8].operand) == "I");
     CHECK(result.program[9].op == OpCode::Halt);
 }
+
+TEST_CASE("basic compiler golden: DIM / LET array / PRINT array subscript") {
+    // ip0: PUSH_INT 5        DIM A(5) size
+    // ip1: DIM_ARRAY A
+    // ip2: PUSH_INT 42       LET A(3) = 42 value
+    // ip3: PUSH_INT 3        index
+    // ip4: STORE_ARR A
+    // ip5: PUSH_INT 3        PRINT A(3) index
+    // ip6: LOAD_ARR A
+    // ip7: PRINT_VAL
+    // ip8: PRINT_EOL
+    // ip9: HALT
+    BasicProgram program;
+    program.setLine(10, "DIM A(5)");
+    program.setLine(20, "LET A(3) = 42");
+    program.setLine(30, "PRINT A(3)");
+    program.setLine(40, "END");
+
+    BasicCompiler compiler;
+    const auto result = compiler.compile(program);
+
+    REQUIRE(result.success);
+    REQUIRE(result.program.size() == 10);
+    CHECK(result.program[0].op == OpCode::PushInt);
+    CHECK(std::get<int>(result.program[0].operand) == 5);
+    CHECK(result.program[1].op == OpCode::DimArray);
+    CHECK(std::get<std::string>(result.program[1].operand) == "A");
+    CHECK(result.program[2].op == OpCode::PushInt);
+    CHECK(std::get<int>(result.program[2].operand) == 42);
+    CHECK(result.program[3].op == OpCode::PushInt);
+    CHECK(std::get<int>(result.program[3].operand) == 3);
+    CHECK(result.program[4].op == OpCode::StoreArr);
+    CHECK(std::get<std::string>(result.program[4].operand) == "A");
+    CHECK(result.program[5].op == OpCode::PushInt);
+    CHECK(std::get<int>(result.program[5].operand) == 3);
+    CHECK(result.program[6].op == OpCode::LoadArr);
+    CHECK(std::get<std::string>(result.program[6].operand) == "A");
+    CHECK(result.program[7].op == OpCode::PrintVal);
+    CHECK(result.program[8].op == OpCode::PrintEol);
+    CHECK(result.program[9].op == OpCode::Halt);
+}

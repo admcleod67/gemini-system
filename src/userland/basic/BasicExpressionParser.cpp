@@ -361,6 +361,22 @@ namespace PickShell {
 
                 if (current().type == ExprTokenType::Identifier) {
                     const ExprToken tok = advance();
+                    // Array subscript: Identifier followed by '('
+                    if (current().type == ExprTokenType::LParen) {
+                        advance(); // consume '('
+                        auto idx = parseAddSub();
+                        if (!idx) {
+                            return nullptr;
+                        }
+                        if (current().type != ExprTokenType::RParen) {
+                            error_ = "Missing ')' in array subscript";
+                            return nullptr;
+                        }
+                        const ExprToken close = advance();
+                        const BasicAst::SourceRange range{tok.range.begin, close.range.end};
+                        BasicAst::SubscriptExpr node{tok.lexeme, std::move(idx), range};
+                        return makeExpr(std::move(node), range);
+                    }
                     BasicAst::IdentifierExpr node{tok.lexeme, tok.range};
                     return makeExpr(std::move(node), tok.range);
                 }

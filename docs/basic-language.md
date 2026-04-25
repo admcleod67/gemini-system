@@ -19,6 +19,7 @@ Compiler internals are in an incremental refactor phase. Expression parsing and 
 - `RETURN`
 - `FOR <var> = <init> TO <limit> [STEP <step>]`
 - `NEXT <var>`
+- `DIM <var>(<size>)`
 - `IF <cond> THEN <line> [ELSE <line>]`
 - `STOP`
 - `INPUT <var>`
@@ -184,3 +185,26 @@ Expression-related messages include categories such as:
 - empty expression
 - invalid operand/operator placement
 - `String variable '<name>' cannot be used in an arithmetic expression` (compile-time rejection of `$` variables in arithmetic)
+
+## Arrays
+
+`DIM <var>(<size>)` declares a one-dimensional array with `<size>` elements. Arrays are 1-based: `<var>(1)` through `<var>(<size>)`.
+
+```
+10 DIM A(10)
+20 LET A(1) = 100
+30 PRINT A(1)
+40 END
+```
+
+**Rules:**
+
+- `<size>` is evaluated at runtime and must be ≥ 1, otherwise a runtime error is raised.
+- Re-executing `DIM` on the same variable silently re-allocates and zero-initialises the array.
+- `LET <var>(<index>) = <expr>` writes to an element; `<var>(<index>)` anywhere in an expression reads an element.
+- Accessing an element before `DIM` has been executed, or with an out-of-range index, raises a runtime error.
+- Array variables obey the same suffix rules as scalars:
+  - `A$(n)` — string array; using in arithmetic is a compile-time error.
+  - `A%(n)` — integer array; values are coerced to int on write.
+  - `A(n)` — dynamic array; values are stored as-is and coerced to int in arithmetic contexts.
+- Arrays and scalar variables with the same base name are independent: `A` and `A(1)` are different storage locations.

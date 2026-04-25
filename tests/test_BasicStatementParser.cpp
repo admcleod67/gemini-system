@@ -234,3 +234,52 @@ TEST_CASE("basic statement parser rejects NEXT without variable") {
     CHECK(std::get<BasicAst::NextStmt>(result.lines[0].statement).variableName.empty());
 }
 
+TEST_CASE("basic statement parser parses DIM") {
+    BasicProgram program;
+    program.setLine(10, "DIM A(10)");
+
+    const BasicAst::StatementParseResult result = BasicStatementParser::parse(program);
+    REQUIRE(result.success);
+    REQUIRE(result.lines.size() == 1);
+    REQUIRE(std::holds_alternative<BasicAst::DimStmt>(result.lines[0].statement));
+    const auto &stmt = std::get<BasicAst::DimStmt>(result.lines[0].statement);
+    CHECK(stmt.variableName == "A");
+    CHECK(stmt.sizeExpr != nullptr);
+}
+
+TEST_CASE("basic statement parser parses LET with array subscript") {
+    BasicProgram program;
+    program.setLine(10, "LET A(I) = 5");
+
+    const BasicAst::StatementParseResult result = BasicStatementParser::parse(program);
+    REQUIRE(result.success);
+    REQUIRE(result.lines.size() == 1);
+    REQUIRE(std::holds_alternative<BasicAst::LetArrayStmt>(result.lines[0].statement));
+    const auto &stmt = std::get<BasicAst::LetArrayStmt>(result.lines[0].statement);
+    CHECK(stmt.variableName == "A");
+    CHECK(stmt.indexExpr != nullptr);
+    CHECK(stmt.valueExpr != nullptr);
+}
+
+TEST_CASE("basic statement parser rejects DIM without opening paren") {
+    BasicProgram program;
+    program.setLine(10, "DIM A 10");
+
+    const BasicAst::StatementParseResult result = BasicStatementParser::parse(program);
+    CHECK_FALSE(result.success);
+    REQUIRE(result.errors.size() == 1);
+    CHECK(result.errors[0].line == 10);
+    CHECK(result.errors[0].message == "DIM requires '(' after variable name");
+}
+
+TEST_CASE("basic statement parser rejects DIM with empty size") {
+    BasicProgram program;
+    program.setLine(10, "DIM A()");
+
+    const BasicAst::StatementParseResult result = BasicStatementParser::parse(program);
+    CHECK_FALSE(result.success);
+    REQUIRE(result.errors.size() == 1);
+    CHECK(result.errors[0].line == 10);
+    CHECK(result.errors[0].message == "DIM size expression cannot be empty");
+}
+

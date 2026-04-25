@@ -57,8 +57,7 @@ namespace PickShell::BasicIr {
     struct StopStmt {};
     struct EndStmt {};
 
-    struct ForStmt {
-        // $ variable is rejected at emit time; % variable gets CoerceInt applied to init.
+    struct ForStmt {        // $ variable is rejected at emit time; % variable gets CoerceInt applied to init.
         std::string variableName;
         std::unique_ptr<BasicAst::Expr> initExpr;
         std::unique_ptr<BasicAst::Expr> limitExpr;
@@ -69,7 +68,18 @@ namespace PickShell::BasicIr {
         std::string variableName;
     };
 
-    using NormalizedStmt = std::variant<LetStmt, InputStmt, GotoStmt, GosubStmt, ReturnStmt, ForStmt, NextStmt, IfStmt, PrintStmt, RemStmt, StopStmt, EndStmt>;
+    struct DimStmt {
+        std::string variableName;
+        std::unique_ptr<BasicAst::Expr> sizeExpr;
+    };
+
+    struct LetArrayStmt {
+        std::string variableName;
+        std::unique_ptr<BasicAst::Expr> indexExpr;
+        std::unique_ptr<BasicAst::Expr> valueExpr;
+    };
+
+    using NormalizedStmt = std::variant<LetStmt, InputStmt, GotoStmt, GosubStmt, ReturnStmt, ForStmt, NextStmt, IfStmt, PrintStmt, RemStmt, StopStmt, EndStmt, DimStmt, LetArrayStmt>;
 
     struct NormalizedLine {
         // Original BASIC line number used for diagnostics and jump mapping.

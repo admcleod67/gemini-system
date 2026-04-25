@@ -43,6 +43,9 @@ namespace PickVM {
         Return,
         ForSetup,
         ForNext,
+        DimArray,
+        LoadArr,
+        StoreArr,
         LoadVar,
         StoreVar
     };
@@ -103,6 +106,7 @@ namespace PickVM {
         std::vector<std::size_t> callStack_; // Return-address stack for GOSUB/RETURN
         std::vector<ForFrame> forStack_;     // Loop-frame stack for FOR/NEXT
         std::unordered_map<std::string, Value> variables_;
+        std::unordered_map<std::string, std::vector<Value>> arrays_; // DIM arrays
         std::size_t ip_; // Instruction pointer
         std::atomic<bool> interrupted_{false};
         mutable std::ostream *outStream_{nullptr};

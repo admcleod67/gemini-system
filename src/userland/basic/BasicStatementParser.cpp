@@ -83,12 +83,50 @@ namespace PickShell {
                 }
                 const std::string lhsRaw = trim(rest.substr(0, eqPos));
                 const std::string rhsRaw = trim(rest.substr(eqPos + 1));
-                if (!isValidVariableName(lhsRaw)) {
-                    result.errors.push_back({lineNumber, "Invalid variable name '" + lhsRaw + "'"});
-                    continue;
-                }
                 if (rhsRaw.empty()) {
                     result.errors.push_back({lineNumber, "LET requires an expression"});
+                    continue;
+                }
+
+                // Detect array subscript: base(index) = value
+                const std::size_t lparenPos = lhsRaw.find('(');
+                if (lparenPos != std::string::npos) {
+                    const std::string baseName = trim(lhsRaw.substr(0, lparenPos));
+                    if (!isValidVariableName(baseName)) {
+                        result.errors.push_back({lineNumber, "Invalid array variable name '" + baseName + "'"});
+                        continue;
+                    }
+                    const std::size_t rparenPos = lhsRaw.rfind(')');
+                    if (rparenPos == std::string::npos || rparenPos <= lparenPos) {
+                        result.errors.push_back({lineNumber, "Missing ')' in array subscript"});
+                        continue;
+                    }
+                    const std::string idxRaw = trim(lhsRaw.substr(lparenPos + 1, rparenPos - lparenPos - 1));
+                    if (idxRaw.empty()) {
+                        result.errors.push_back({lineNumber, "Array subscript cannot be empty"});
+                        continue;
+                    }
+                    BasicExpressionParseResult idxExpr = BasicExpressionParser::parse(idxRaw);
+                    if (!idxExpr.success || !idxExpr.expression) {
+                        result.errors.push_back({lineNumber, "Array index error: " + idxExpr.error});
+                        continue;
+                    }
+                    BasicExpressionParseResult valExpr = BasicExpressionParser::parse(rhsRaw);
+                    if (!valExpr.success || !valExpr.expression) {
+                        result.errors.push_back({lineNumber, "LET expression error: " + valExpr.error});
+                        continue;
+                    }
+                    BasicAst::LetArrayStmt stmt{};
+                    stmt.variableName = baseName;
+                    stmt.indexExpr = std::move(idxExpr.expression);
+                    stmt.valueExpr = std::move(valExpr.expression);
+                    result.lines.push_back({lineNumber, std::move(stmt)});
+                    continue;
+                }
+
+                // Scalar assignment
+                if (!isValidVariableName(lhsRaw)) {
+                    result.errors.push_back({lineNumber, "Invalid variable name '" + lhsRaw + "'"});
                     continue;
                 }
 
@@ -101,6 +139,43 @@ namespace PickShell {
                 BasicAst::LetStmt stmt{};
                 stmt.variableName = lhsRaw;
                 stmt.expression = std::move(expression.expression);
+                result.lines.push_back({lineNumber, std::move(stmt)});
+                continue;
+            }
+
+            if (op == "DIM") {
+                std::string rest;
+                std::getline(iss, rest);
+                rest = trim(rest);
+                // Expect: varName(sizeExpr)
+                const std::size_t lparenPos = rest.find('(');
+                if (lparenPos == std::string::npos) {
+                    result.errors.push_back({lineNumber, "DIM requires '(' after variable name"});
+                    continue;
+                }
+                const std::string baseName = trim(rest.substr(0, lparenPos));
+                if (!isValidVariableName(baseName)) {
+                    result.errors.push_back({lineNumber, "Invalid array variable name '" + baseName + "'"});
+                    continue;
+                }
+                const std::size_t rparenPos = rest.rfind(')');
+                if (rparenPos == std::string::npos || rparenPos <= lparenPos) {
+                    result.errors.push_back({lineNumber, "DIM missing closing ')'"});
+                    continue;
+                }
+                const std::string sizeRaw = trim(rest.substr(lparenPos + 1, rparenPos - lparenPos - 1));
+                if (sizeRaw.empty()) {
+                    result.errors.push_back({lineNumber, "DIM size expression cannot be empty"});
+                    continue;
+                }
+                BasicExpressionParseResult sizeExpr = BasicExpressionParser::parse(sizeRaw);
+                if (!sizeExpr.success || !sizeExpr.expression) {
+                    result.errors.push_back({lineNumber, "DIM size error: " + sizeExpr.error});
+                    continue;
+                }
+                BasicAst::DimStmt stmt{};
+                stmt.variableName = baseName;
+                stmt.sizeExpr = std::move(sizeExpr.expression);
                 result.lines.push_back({lineNumber, std::move(stmt)});
                 continue;
             }

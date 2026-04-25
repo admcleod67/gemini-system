@@ -68,7 +68,13 @@ namespace PickShell::BasicAst {
         SourceRange range{};
     };
 
-    using ExprNode = std::variant<IntLiteralExpr, StringLiteralExpr, IdentifierExpr, UnaryExpr, BinaryExpr, GroupedExpr>;
+    struct SubscriptExpr {
+        std::string varName;
+        std::unique_ptr<Expr> indexExpr;
+        SourceRange range{};
+    };
+
+    using ExprNode = std::variant<IntLiteralExpr, StringLiteralExpr, IdentifierExpr, UnaryExpr, BinaryExpr, GroupedExpr, SubscriptExpr>;
 
     struct Expr {
         ExprNode node;
@@ -122,7 +128,18 @@ namespace PickShell::BasicAst {
 
     struct EndStmt {};
 
-    using StatementNode = std::variant<LetStmt, InputStmt, GotoStmt, GosubStmt, ReturnStmt, ForStmt, NextStmt, IfStmt, PrintStmt, RemStmt, StopStmt, EndStmt>;
+    struct DimStmt {
+        std::string variableName;
+        std::unique_ptr<Expr> sizeExpr;
+    };
+
+    struct LetArrayStmt {
+        std::string variableName;
+        std::unique_ptr<Expr> indexExpr;
+        std::unique_ptr<Expr> valueExpr;
+    };
+
+    using StatementNode = std::variant<LetStmt, InputStmt, GotoStmt, GosubStmt, ReturnStmt, ForStmt, NextStmt, IfStmt, PrintStmt, RemStmt, StopStmt, EndStmt, DimStmt, LetArrayStmt>;
 
     struct ParsedBasicLine {
         int lineNumber{0};

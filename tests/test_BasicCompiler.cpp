@@ -606,3 +606,52 @@ TEST_CASE("basic compiler rejects $ variable as FOR loop variable") {
     REQUIRE(result.errors.size() >= 1);
     CHECK(result.errors[0].line == 10);
 }
+
+TEST_CASE("basic compiler compiles DIM, LET array, and PRINT array subscript") {
+    BasicProgram program;
+    program.setLine(10, "DIM A(5)");
+    program.setLine(20, "LET A(3) = 42");
+    program.setLine(30, "PRINT A(3)");
+    program.setLine(40, "END");
+
+    BasicCompiler compiler;
+    const auto result = compiler.compile(program);
+    REQUIRE(result.success);
+
+    // DIM: PUSH_INT 5, DIM_ARRAY A
+    CHECK(result.program[0].op == OpCode::PushInt);
+    CHECK(std::get<int>(result.program[0].operand) == 5);
+    CHECK(result.program[1].op == OpCode::DimArray);
+    CHECK(std::get<std::string>(result.program[1].operand) == "A");
+    // LET A(3)=42: PUSH_INT 42, PUSH_INT 3, STORE_ARR A
+    CHECK(result.program[2].op == OpCode::PushInt);
+    CHECK(std::get<int>(result.program[2].operand) == 42);
+    CHECK(result.program[3].op == OpCode::PushInt);
+    CHECK(std::get<int>(result.program[3].operand) == 3);
+    CHECK(result.program[4].op == OpCode::StoreArr);
+    CHECK(std::get<std::string>(result.program[4].operand) == "A");
+    // PRINT A(3): PUSH_INT 3, LOAD_ARR A, PRINT_VAL, PRINT_EOL
+    CHECK(result.program[5].op == OpCode::PushInt);
+    CHECK(std::get<int>(result.program[5].operand) == 3);
+    CHECK(result.program[6].op == OpCode::LoadArr);
+    CHECK(std::get<std::string>(result.program[6].operand) == "A");
+    CHECK(result.program[7].op == OpCode::PrintVal);
+    CHECK(result.program[8].op == OpCode::PrintEol);
+    CHECK(result.program[9].op == OpCode::Halt);
+}
+
+TEST_CASE("basic compiler applies CoerceInt when writing to % array") {
+    BasicProgram program;
+    program.setLine(10, "DIM A%(3)");
+    program.setLine(20, "LET A%(1) = 7");
+    program.setLine(30, "END");
+
+    BasicCompiler compiler;
+    const auto result = compiler.compile(program);
+    REQUIRE(result.success);
+    // LET A%(1) = 7: PUSH_INT 7, COERCE_INT, PUSH_INT 1, STORE_ARR A%
+    CHECK(result.program[2].op == OpCode::PushInt);
+    CHECK(result.program[3].op == OpCode::CoerceInt);
+    CHECK(result.program[4].op == OpCode::PushInt);
+    CHECK(result.program[5].op == OpCode::StoreArr);
+}

@@ -143,6 +143,7 @@ namespace PickVM {
         stack_.clear();
         callStack_.clear();
         forStack_.clear();
+        arrays_.clear();
         interrupted_.store(false, std::memory_order_relaxed);
         variables_.clear();
     }
@@ -398,6 +399,45 @@ namespace PickVM {
                 }
                 ip_ = frame.bodyIP;
                 return ip_ < program_.size();
+            }
+
+            case OpCode::DimArray: {
+                const std::string name = canonicalVariableName(stringOperandAtIp(instr, ip_));
+                const int size = coerceToInt(pop());
+                if (size < 1) {
+                    throw std::runtime_error("DIM: size must be >= 1");
+                }
+                arrays_[name].assign(static_cast<std::size_t>(size), Value{std::string{""}});
+                break;
+            }
+
+            case OpCode::LoadArr: {
+                const std::string name = canonicalVariableName(stringOperandAtIp(instr, ip_));
+                const int idx = coerceToInt(pop());
+                const auto it = arrays_.find(name);
+                if (it == arrays_.end()) {
+                    throw std::runtime_error("Array not dimensioned: " + name);
+                }
+                if (idx < 1 || static_cast<std::size_t>(idx) > it->second.size()) {
+                    throw std::runtime_error("Array index out of bounds: " + name);
+                }
+                push(it->second[static_cast<std::size_t>(idx) - 1]);
+                break;
+            }
+
+            case OpCode::StoreArr: {
+                const std::string name = canonicalVariableName(stringOperandAtIp(instr, ip_));
+                const int idx = coerceToInt(pop()); // index on top
+                Value val = pop();                  // value underneath
+                const auto it = arrays_.find(name);
+                if (it == arrays_.end()) {
+                    throw std::runtime_error("Array not dimensioned: " + name);
+                }
+                if (idx < 1 || static_cast<std::size_t>(idx) > it->second.size()) {
+                    throw std::runtime_error("Array index out of bounds: " + name);
+                }
+                it->second[static_cast<std::size_t>(idx) - 1] = std::move(val);
+                break;
             }
 
             case OpCode::LoadVar: {

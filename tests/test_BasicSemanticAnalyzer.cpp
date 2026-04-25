@@ -135,3 +135,25 @@ TEST_CASE("basic semantic analyzer lowers FOR/NEXT to IR") {
     CHECK(forStmt.stepExpr == nullptr);
     CHECK(std::get<BasicIr::NextStmt>(semantic.program.lines[1].statement).variableName == "I");
 }
+
+TEST_CASE("basic semantic analyzer lowers DimStmt and LetArrayStmt to IR") {
+    BasicProgram program;
+    program.setLine(10, "DIM A(10)");
+    program.setLine(20, "LET A(1) = 99");
+
+    auto parsed = BasicStatementParser::parse(program);
+    REQUIRE(parsed.success);
+
+    const auto semantic = BasicSemanticAnalyzer::analyze(std::move(parsed));
+    REQUIRE(semantic.success);
+    REQUIRE(semantic.program.lines.size() == 2);
+    REQUIRE(std::holds_alternative<BasicIr::DimStmt>(semantic.program.lines[0].statement));
+    REQUIRE(std::holds_alternative<BasicIr::LetArrayStmt>(semantic.program.lines[1].statement));
+    const auto &dim = std::get<BasicIr::DimStmt>(semantic.program.lines[0].statement);
+    CHECK(dim.variableName == "A");
+    CHECK(dim.sizeExpr != nullptr);
+    const auto &letArr = std::get<BasicIr::LetArrayStmt>(semantic.program.lines[1].statement);
+    CHECK(letArr.variableName == "A");
+    CHECK(letArr.indexExpr != nullptr);
+    CHECK(letArr.valueExpr != nullptr);
+}

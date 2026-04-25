@@ -125,6 +125,26 @@ namespace PickShell {
                                 return false;
                             }
                             return emitNode(*node.expression, inArithmetic);
+                        } else if constexpr (std::is_same_v<NodeT, BasicAst::SubscriptExpr>) {
+                            if (!node.indexExpr) {
+                                error_ = "Array subscript requires an index expression";
+                                return false;
+                            }
+                            if (!isValidVariableName(node.varName)) {
+                                error_ = "Invalid array variable name '" + node.varName + "'";
+                                return false;
+                            }
+                            if (inArithmetic && isStringVar(node.varName)) {
+                                error_ = "String array '" + node.varName +
+                                         "' cannot be used in an arithmetic expression";
+                                return false;
+                            }
+                            // Emit index, then LOAD_ARR
+                            if (!emitNode(*node.indexExpr, false)) {
+                                return false;
+                            }
+                            out_.push_back(PickVM::Instruction{PickVM::OpCode::LoadArr, uppercase(node.varName)});
+                            return true;
                         }
                         return false;
                     },
@@ -287,6 +307,48 @@ namespace PickShell {
                     } else if constexpr (std::is_same_v<StmtT, BasicIr::EndStmt>) {
                         result.program.push_back(makeNoOperandInstruction(PickVM::OpCode::Halt));
                         explicitEnd = true;
+                        return true;
+                    } else if constexpr (std::is_same_v<StmtT, BasicIr::DimStmt>) {
+                        if (!stmt.sizeExpr) {
+                            result.errors.push_back({line.lineNumber, "DIM requires a size expression"});
+                            return false;
+                        }
+                        std::string error;
+                        ExpressionAstEmitter emitter(result.program, error);
+                        if (!emitter.emit(*stmt.sizeExpr)) {
+                            result.errors.push_back({line.lineNumber, "DIM size error: " + error});
+                            return false;
+                        }
+                        result.program.push_back(PickVM::Instruction{PickVM::OpCode::DimArray, uppercase(stmt.variableName)});
+                        return true;
+                    } else if constexpr (std::is_same_v<StmtT, BasicIr::LetArrayStmt>) {
+                        if (!stmt.indexExpr || !stmt.valueExpr) {
+                            result.errors.push_back({line.lineNumber, "LET array requires index and value expressions"});
+                            return false;
+                        }
+                        // Emit value expression
+                        {
+                            std::string error;
+                            ExpressionAstEmitter emitter(result.program, error);
+                            if (!emitter.emit(*stmt.valueExpr)) {
+                                result.errors.push_back({line.lineNumber, "LET array value error: " + error});
+                                return false;
+                            }
+                        }
+                        // % suffix → coerce value to int
+                        if (isIntVar(stmt.variableName)) {
+                            result.program.push_back(makeNoOperandInstruction(PickVM::OpCode::CoerceInt));
+                        }
+                        // Emit index expression
+                        {
+                            std::string error;
+                            ExpressionAstEmitter emitter(result.program, error);
+                            if (!emitter.emit(*stmt.indexExpr)) {
+                                result.errors.push_back({line.lineNumber, "LET array index error: " + error});
+                                return false;
+                            }
+                        }
+                        result.program.push_back(PickVM::Instruction{PickVM::OpCode::StoreArr, uppercase(stmt.variableName)});
                         return true;
                     }
                     return false;

@@ -266,3 +266,68 @@ TEST_CASE("basic bytecode emitter rejects $ variable as FOR loop variable") {
     REQUIRE(emitted.errors.size() == 1);
     CHECK(emitted.errors[0].line == 10);
 }
+
+TEST_CASE("basic bytecode emitter lowers DimStmt to size + DimArray") {
+    BasicIr::NormalizedProgram program;
+    BasicIr::DimStmt stmt{};
+    stmt.variableName = "A";
+    stmt.sizeExpr = makeInt(10);
+    program.lines.push_back({10, std::move(stmt)});
+
+    const BasicBytecodeEmissionResult emitted = BasicBytecodeEmitter::emit(program);
+    REQUIRE(emitted.success);
+    // PUSH_INT 10, DIM_ARRAY A, HALT
+    REQUIRE(emitted.program.size() == 3);
+    CHECK(emitted.program[0].op == OpCode::PushInt);
+    CHECK(std::get<int>(emitted.program[0].operand) == 10);
+    CHECK(emitted.program[1].op == OpCode::DimArray);
+    CHECK(std::get<std::string>(emitted.program[1].operand) == "A");
+    CHECK(emitted.program[2].op == OpCode::Halt);
+}
+
+TEST_CASE("basic bytecode emitter lowers LetArrayStmt to value + index + StoreArr") {
+    BasicIr::NormalizedProgram program;
+    BasicIr::LetArrayStmt stmt{};
+    stmt.variableName = "A";
+    stmt.valueExpr = makeInt(99);
+    stmt.indexExpr = makeInt(3);
+    program.lines.push_back({10, std::move(stmt)});
+
+    const BasicBytecodeEmissionResult emitted = BasicBytecodeEmitter::emit(program);
+    REQUIRE(emitted.success);
+    // PUSH_INT 99, PUSH_INT 3, STORE_ARR A, HALT
+    REQUIRE(emitted.program.size() == 4);
+    CHECK(emitted.program[0].op == OpCode::PushInt);
+    CHECK(std::get<int>(emitted.program[0].operand) == 99);
+    CHECK(emitted.program[1].op == OpCode::PushInt);
+    CHECK(std::get<int>(emitted.program[1].operand) == 3);
+    CHECK(emitted.program[2].op == OpCode::StoreArr);
+    CHECK(std::get<std::string>(emitted.program[2].operand) == "A");
+    CHECK(emitted.program[3].op == OpCode::Halt);
+}
+
+TEST_CASE("basic bytecode emitter emits LoadArr for SubscriptExpr in PRINT") {
+    BasicIr::NormalizedProgram program;
+    // Build PRINT A(2) via a SubscriptExpr
+    auto subscript = std::make_unique<BasicAst::Expr>();
+    BasicAst::SubscriptExpr subNode{};
+    subNode.varName = "A";
+    subNode.indexExpr = makeInt(2);
+    subscript->node = std::move(subNode);
+
+    BasicIr::PrintStmt printStmt{};
+    printStmt.expression = std::move(subscript);
+    program.lines.push_back({10, std::move(printStmt)});
+
+    const BasicBytecodeEmissionResult emitted = BasicBytecodeEmitter::emit(program);
+    REQUIRE(emitted.success);
+    // PUSH_INT 2, LOAD_ARR A, PRINT_VAL, PRINT_EOL, HALT
+    REQUIRE(emitted.program.size() == 5);
+    CHECK(emitted.program[0].op == OpCode::PushInt);
+    CHECK(std::get<int>(emitted.program[0].operand) == 2);
+    CHECK(emitted.program[1].op == OpCode::LoadArr);
+    CHECK(std::get<std::string>(emitted.program[1].operand) == "A");
+    CHECK(emitted.program[2].op == OpCode::PrintVal);
+    CHECK(emitted.program[3].op == OpCode::PrintEol);
+    CHECK(emitted.program[4].op == OpCode::Halt);
+}

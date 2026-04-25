@@ -979,6 +979,140 @@ TEST_CASE("runtime bare NEXT (no variable) matches innermost frame") {    std::o
     CHECK(out.str() == "1\n2\n3\n");
 }
 
+// ─────────────────────── Arrays ─────────────────────────
+
+TEST_CASE("runtime DimArray / StoreArr / LoadArr basic read-write") {
+    std::ostringstream out;
+    Runtime rt;
+    rt.setOutputStream(&out);
+
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt,  5},
+        {OpCode::DimArray, std::string{"A"}},   // DIM A(5)
+        {OpCode::PushInt,  99},                 // value
+        {OpCode::PushInt,  3},                  // index
+        {OpCode::StoreArr, std::string{"A"}},   // A(3) = 99
+        {OpCode::PushInt,  3},                  // index to read
+        {OpCode::LoadArr,  std::string{"A"}},   // push A(3)
+        {OpCode::PrintVal, Value{}},
+        {OpCode::PrintEol, Value{}},
+        {OpCode::Halt,     Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    CHECK(out.str() == "99\n");
+}
+
+TEST_CASE("runtime DimArray initialises elements to empty string") {
+    std::ostringstream out;
+    Runtime rt;
+    rt.setOutputStream(&out);
+
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt,  3},
+        {OpCode::DimArray, std::string{"A"}},
+        {OpCode::PushInt,  1},
+        {OpCode::LoadArr,  std::string{"A"}},
+        {OpCode::PrintVal, Value{}},
+        {OpCode::PrintEol, Value{}},
+        {OpCode::Halt,     Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    CHECK(out.str() == "\n");
+}
+
+TEST_CASE("runtime DimArray reDIM resets elements") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt,  3},
+        {OpCode::DimArray, std::string{"A"}},
+        {OpCode::PushInt,  7},
+        {OpCode::PushInt,  1},
+        {OpCode::StoreArr, std::string{"A"}},
+        // Re-DIM: should reset
+        {OpCode::PushInt,  3},
+        {OpCode::DimArray, std::string{"A"}},
+        {OpCode::PushInt,  1},
+        {OpCode::LoadArr,  std::string{"A"}},
+        {OpCode::Halt,     Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    // After re-DIM A(3) = "" so coerce to int → 0
+    CHECK(rt.stack().size() == 1);
+    const auto &top = rt.stack()[0];
+    const bool isEmptyStr = std::holds_alternative<std::string>(top) && std::get<std::string>(top).empty();
+    CHECK(isEmptyStr);
+}
+
+TEST_CASE("runtime LoadArr on undimensioned array throws") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, 1},
+        {OpCode::LoadArr, std::string{"X"}},
+        {OpCode::Halt,    Value{}},
+    };
+    rt.loadProgram(prog);
+    CHECK_THROWS_WITH(rt.run(), "Array not dimensioned: X");
+}
+
+TEST_CASE("runtime StoreArr on undimensioned array throws") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt,  42},
+        {OpCode::PushInt,  1},
+        {OpCode::StoreArr, std::string{"X"}},
+        {OpCode::Halt,     Value{}},
+    };
+    rt.loadProgram(prog);
+    CHECK_THROWS_WITH(rt.run(), "Array not dimensioned: X");
+}
+
+TEST_CASE("runtime LoadArr out-of-bounds throws") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt,  3},
+        {OpCode::DimArray, std::string{"A"}},
+        {OpCode::PushInt,  5},                  // index 5 > size 3
+        {OpCode::LoadArr,  std::string{"A"}},
+        {OpCode::Halt,     Value{}},
+    };
+    rt.loadProgram(prog);
+    CHECK_THROWS_WITH(rt.run(), "Array index out of bounds: A");
+}
+
+TEST_CASE("runtime DimArray size less than 1 throws") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt,  0},
+        {OpCode::DimArray, std::string{"A"}},
+        {OpCode::Halt,     Value{}},
+    };
+    rt.loadProgram(prog);
+    CHECK_THROWS_WITH(rt.run(), "DIM: size must be >= 1");
+}
+
+TEST_CASE("runtime loadProgram clears arrays") {
+    Runtime rt;
+    std::vector<Instruction> prog1 = {
+        {OpCode::PushInt,  3},
+        {OpCode::DimArray, std::string{"A"}},
+        {OpCode::Halt,     Value{}},
+    };
+    rt.loadProgram(prog1);
+    rt.run();
+
+    // Second run: array should have been cleared
+    std::vector<Instruction> prog2 = {
+        {OpCode::PushInt, 1},
+        {OpCode::LoadArr, std::string{"A"}},
+        {OpCode::Halt,    Value{}},
+    };
+    rt.loadProgram(prog2);
+    CHECK_THROWS_WITH(rt.run(), "Array not dimensioned: A");
+}
+
 TEST_CASE("runtime throws UserInterrupt when interrupt flag is set before run") {
     Runtime rt;
     // An infinite jump loop — would never halt on its own.

@@ -41,6 +41,9 @@ namespace PickVM {
             case OpCode::Return: return "RETURN";
             case OpCode::ForSetup: return "FOR_SETUP";
             case OpCode::ForNext: return "FOR_NEXT";
+            case OpCode::DimArray: return "DIM_ARRAY";
+            case OpCode::LoadArr: return "LOAD_ARR";
+            case OpCode::StoreArr: return "STORE_ARR";
             case OpCode::LoadVar: return "LOAD_VAR";
             case OpCode::StoreVar: return "STORE_VAR";
         }
@@ -91,6 +94,9 @@ namespace PickVM {
             case OpCode::StoreVar:
             case OpCode::ForSetup:
             case OpCode::ForNext:
+            case OpCode::DimArray:
+            case OpCode::LoadArr:
+            case OpCode::StoreArr:
                 oss << ' ' << stringOperandAtIp(instr, ip);
                 break;
             case OpCode::Add:
