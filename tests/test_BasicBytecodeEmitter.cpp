@@ -490,3 +490,49 @@ TEST_CASE("basic bytecode emitter emits *_Try opcodes for file ELSE flow") {
     }
     CHECK(hasTry);
 }
+
+TEST_CASE("basic bytecode emitter supports IF THEN ELSE inline statements") {
+    BasicIr::NormalizedProgram program;
+    BasicIr::IfStmt ifStmt{};
+    ifStmt.condition = makeEq(makeInt(1), makeInt(1));
+    ifStmt.thenArm = BasicIr::BranchArm{std::nullopt, "PRINT 7"};
+    ifStmt.elseArm = BasicIr::BranchArm{std::nullopt, "PRINT 8"};
+    program.lines.push_back({10, std::move(ifStmt)});
+    program.lines.push_back({20, BasicIr::EndStmt{}});
+
+    const BasicBytecodeEmissionResult emitted = BasicBytecodeEmitter::emit(program);
+    REQUIRE(emitted.success);
+
+    bool hasJumpIfZero = false;
+    int printValCount = 0;
+    for (const auto &ins : emitted.program) {
+        hasJumpIfZero = hasJumpIfZero || ins.op == OpCode::JumpIfZero;
+        if (ins.op == OpCode::PrintVal) {
+            ++printValCount;
+        }
+    }
+    CHECK(hasJumpIfZero);
+    CHECK(printValCount == 2);
+}
+
+TEST_CASE("basic bytecode emitter supports OPEN ELSE inline statement") {
+    BasicIr::NormalizedProgram program;
+    BasicIr::OpenStmt open{};
+    open.fileExpr = makeStr("CUST");
+    open.fileVar = "FVAR";
+    open.elseArm = BasicIr::BranchArm{std::nullopt, "PRINT \"MISS\""};
+    program.lines.push_back({10, std::move(open)});
+    program.lines.push_back({20, BasicIr::EndStmt{}});
+
+    const BasicBytecodeEmissionResult emitted = BasicBytecodeEmitter::emit(program);
+    REQUIRE(emitted.success);
+
+    bool hasTry = false;
+    bool hasPrint = false;
+    for (const auto &ins : emitted.program) {
+        hasTry = hasTry || ins.op == OpCode::OpenFileTry;
+        hasPrint = hasPrint || ins.op == OpCode::PrintVal;
+    }
+    CHECK(hasTry);
+    CHECK(hasPrint);
+}

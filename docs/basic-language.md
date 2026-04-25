@@ -20,12 +20,12 @@ Compiler internals are in an incremental refactor phase. Expression parsing and 
 - `FOR <var> = <init> TO <limit> [STEP <step>]`
 - `NEXT <var>`
 - `DIM <var>(<size>)`
-- `OPEN <file-expr> TO <filevar> [ELSE <line>]`
-- `READ <var> FROM <filevar>, <id-expr> [ELSE <line>]`
-- `WRITE <expr> ON <filevar>, <id-expr> [ELSE <line>]`
+- `OPEN <file-expr> TO <filevar> [ELSE <line-or-statement>]`
+- `READ <var> FROM <filevar>, <id-expr> [ELSE <line-or-statement>]`
+- `WRITE <expr> ON <filevar>, <id-expr> [ELSE <line-or-statement>]`
 - `CLOSE <filevar>`
 - `CLEAR`
-- `IF <cond> THEN <line> [ELSE <line>]`
+- `IF <cond> THEN <line-or-statement> [ELSE <line-or-statement>]`
 - `STOP`
 - `INPUT <var>`
 - `END` (optional)
@@ -129,7 +129,7 @@ The semicolon form is useful for prompt-style interaction, for example printing 
 - `GOTO <line>` jumps to the specified BASIC line number.
 - `GOSUB <line>` calls the subroutine beginning at the specified BASIC line number. Execution resumes at the statement following `GOSUB` when a matching `RETURN` is reached.
 - `RETURN` returns from the most recently called `GOSUB`. Raises a runtime error if there is no active `GOSUB` call.
-- `IF <cond> THEN <line>` jumps to `<line>` when `<cond>` is true; otherwise execution continues to the next sequential line.
+- `IF <cond> THEN <line-or-statement>` executes the branch when `<cond>` is true; otherwise execution continues to the next sequential line.
 
 A running program can be interrupted at any time by pressing **Ctrl-C**. The VM stops cleanly and prints `Break`, then returns to the BASIC shell prompt. Ctrl-C has no effect at the command prompt.
 
@@ -168,9 +168,16 @@ Counting down requires an explicit negative step:
 ```
 
 `NEXT` without a matching `FOR` raises `"NEXT without FOR"` at runtime. If the variable name in `NEXT` does not match the top of the loop stack, a `"FOR/NEXT variable mismatch"` runtime error is raised.
-- `IF <cond> THEN <line1> ELSE <line2>` jumps to `<line1>` when true, otherwise to `<line2>`.
+- `IF <cond> THEN <line-or-statement> ELSE <line-or-statement>` supports line targets and inline single statements in both branches.
 - `STOP` halts execution immediately (same runtime effect as `END`).
 - Unknown target lines are compile-time errors.
+
+Branch arm rules for `THEN` and `ELSE`:
+
+- Each arm accepts either a positive target line (for example `THEN 200`) or one inline statement (for example `ELSE PRINT "ERR"`).
+- Only one statement is allowed per arm. Multi-statement forms (for example using `:`) are rejected.
+- `FOR` and `NEXT` are not allowed as inline branch statements; loops must remain standalone line statements.
+- `ELSE` binds to the nearest unmatched `IF` (classic dangling-`ELSE` behavior).
 
 Conditions evaluate to integer booleans (`1` true, `0` false).
 
@@ -218,9 +225,9 @@ Expression-related messages include categories such as:
 
 File handling uses the PickFS backend and file-variable handles:
 
-- `OPEN <file-expr> TO <filevar> [ELSE <line>]`
-- `READ <var> FROM <filevar>, <id-expr> [ELSE <line>]`
-- `WRITE <expr> ON <filevar>, <id-expr> [ELSE <line>]`
+- `OPEN <file-expr> TO <filevar> [ELSE <line-or-statement>]`
+- `READ <var> FROM <filevar>, <id-expr> [ELSE <line-or-statement>]`
+- `WRITE <expr> ON <filevar>, <id-expr> [ELSE <line-or-statement>]`
 - `CLOSE <filevar>`
 
 Examples:
@@ -235,12 +242,21 @@ Examples:
 90 END
 ```
 
+Inline `ELSE` statement examples:
+
+```
+10 OPEN "CUSTOMERS" TO FVAR ELSE PRINT "OPEN FAIL"
+20 READ REC FROM FVAR, ID ELSE LET REC = ""
+30 WRITE REC ON FVAR, ID ELSE STOP
+40 END
+```
+
 Rules:
 
 - `OPEN` succeeds only if the file already exists. There is no automatic file creation from BASIC.
-- `OPEN`, `READ`, and `WRITE` route failures to `ELSE <line>` when provided.
+- `OPEN`, `READ`, and `WRITE` route failures to `ELSE` when provided.
 - Without `ELSE`, failures raise runtime errors and stop execution.
-- In this MVP, `ELSE` for file statements accepts only a line target (`ELSE <line>`), not an inline statement.
+- File `ELSE` accepts either a line target or one inline statement.
 - `CLOSE` on an unopened file variable is a no-op.
 - Open file handles are automatically released when the program ends.
 

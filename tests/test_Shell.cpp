@@ -1013,6 +1013,23 @@ TEST_CASE("shell BASIC RUN executes IF THEN ELSE and GOTO control flow") {
     CHECK(out.str() == "1\n");
 }
 
+TEST_CASE("shell BASIC RUN executes IF THEN ELSE inline statements") {
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("BASIC", out, quit);
+    sh.handleLine("10 LET A = 1", out, quit);
+    sh.handleLine("20 IF A = 1 THEN PRINT 111 ELSE PRINT 222", out, quit);
+    sh.handleLine("30 IF A = 0 THEN PRINT 333 ELSE PRINT 444", out, quit);
+    sh.handleLine("40 END", out, quit);
+    out.str("");
+
+    sh.handleLine("RUN", out, quit);
+    CHECK(out.str() == "111\n444\n");
+}
+
 TEST_CASE("shell BASIC COMPILE reports unknown GOTO target line") {
     PickVM::Runtime rt;
     PickShell::Shell sh(rt);
@@ -1181,4 +1198,28 @@ TEST_CASE("shell BASIC RUN executes OPEN WRITE READ CLOSE flow") {
 
     sh.handleLine("RUN", out, quit);
     CHECK(out.str() == "HELLO\n");
+}
+
+TEST_CASE("shell BASIC RUN executes OPEN ELSE inline statement on missing file") {
+    auto progDir = uniqueTempDir();
+    auto fsDir = uniqueTempDir();
+    std::filesystem::create_directories(progDir);
+    std::filesystem::create_directories(fsDir);
+
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setProgramsRoot(progDir);
+    sh.setFileSystemRoot(fsDir);
+
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("BASIC TEST", out, quit);
+    sh.handleLine("10 OPEN \"MISSING\" TO F ELSE PRINT \"MISS\"", out, quit);
+    sh.handleLine("20 PRINT \"AFTER\"", out, quit);
+    sh.handleLine("30 END", out, quit);
+    out.str("");
+
+    sh.handleLine("RUN", out, quit);
+    CHECK(out.str() == "MISS\nAFTER\n");
 }

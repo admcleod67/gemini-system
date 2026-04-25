@@ -770,3 +770,43 @@ TEST_CASE("basic compiler uses try opcode for OPEN ELSE line") {
     }
     CHECK(hasTry);
 }
+
+TEST_CASE("basic compiler compiles IF THEN ELSE inline statements") {
+    BasicProgram program;
+    program.setLine(10, "IF 1 = 1 THEN PRINT 7 ELSE PRINT 8");
+    program.setLine(20, "END");
+
+    BasicCompiler compiler;
+    const auto result = compiler.compile(program);
+    REQUIRE(result.success);
+
+    int printValCount = 0;
+    bool hasJumpIfZero = false;
+    for (const auto &ins : result.program) {
+        hasJumpIfZero = hasJumpIfZero || ins.op == OpCode::JumpIfZero;
+        if (ins.op == OpCode::PrintVal) {
+            ++printValCount;
+        }
+    }
+    CHECK(hasJumpIfZero);
+    CHECK(printValCount == 2);
+}
+
+TEST_CASE("basic compiler compiles OPEN ELSE inline statement") {
+    BasicProgram program;
+    program.setLine(10, "OPEN \"CUSTOMERS\" TO FVAR ELSE PRINT \"ERR\"");
+    program.setLine(20, "END");
+
+    BasicCompiler compiler;
+    const auto result = compiler.compile(program);
+    REQUIRE(result.success);
+
+    bool hasTry = false;
+    bool hasPrint = false;
+    for (const auto &ins : result.program) {
+        hasTry = hasTry || ins.op == OpCode::OpenFileTry;
+        hasPrint = hasPrint || ins.op == OpCode::PrintVal;
+    }
+    CHECK(hasTry);
+    CHECK(hasPrint);
+}
