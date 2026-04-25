@@ -154,7 +154,11 @@ namespace PickShell {
         session_.runtime_.setOutputStream(&out);
         session_.runtime_.setInputStream(inputStream_);
         session_.runtime_.loadProgram(program);
-        session_.runtime_.run();
+        try {
+            session_.runtime_.run();
+        } catch (const std::runtime_error &e) {
+            out << "\nRuntime error: " << e.what() << '\n';
+        }
         session_.runtime_.setOutputStream(nullptr);
         session_.runtime_.setInputStream(nullptr);
     }

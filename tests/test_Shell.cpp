@@ -1116,3 +1116,36 @@ TEST_CASE("shell ED mode malformed substitute command is rejected") {
     sh.handleLine("LIST", out, quit);
     CHECK(out.str() == "10 PRINT \"WORLD\"\n");
 }
+
+TEST_CASE("shell BASIC RUN reports runtime error for RETURN without GOSUB") {
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("BASIC", out, quit);
+    sh.handleLine("10 PRINT \"before\";", out, quit);
+    sh.handleLine("20 RETURN", out, quit);
+    out.str("");
+
+    sh.handleLine("RUN", out, quit);
+    CHECK(out.str().find("Runtime error") != std::string::npos);
+    CHECK(out.str().find("RETURN without GOSUB") != std::string::npos);
+    // Shell must remain usable after a runtime error — BASIC prompt should still work
+    CHECK_FALSE(quit);
+}
+
+TEST_CASE("shell BASIC RUN reports runtime error for divide by zero") {
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("BASIC", out, quit);
+    sh.handleLine("10 PRINT 1/0", out, quit);
+    out.str("");
+
+    sh.handleLine("RUN", out, quit);
+    CHECK(out.str().find("Runtime error") != std::string::npos);
+    CHECK(out.str().find("divide by zero") != std::string::npos);
+}
