@@ -125,6 +125,8 @@ The semicolon form is useful for prompt-style interaction, for example printing 
 - `RETURN` returns from the most recently called `GOSUB`. Raises a runtime error if there is no active `GOSUB` call.
 - `IF <cond> THEN <line>` jumps to `<line>` when `<cond>` is true; otherwise execution continues to the next sequential line.
 
+A running program can be interrupted at any time by pressing **Ctrl-C**. The VM stops cleanly and prints `Break`, then returns to the BASIC shell prompt. Ctrl-C has no effect at the command prompt.
+
 ## Loops
 
 `FOR <var> = <init> TO <limit> [STEP <step>]` … `NEXT <var>` implements a counted loop.

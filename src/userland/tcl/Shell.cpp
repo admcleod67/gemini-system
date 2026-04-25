@@ -3,7 +3,9 @@
 #include <pick_system/version.hpp>
 
 #include <algorithm>
+#include <atomic>
 #include <cctype>
+#include <csignal>
 #include <filesystem>
 #include <iostream>
 #include <optional>
@@ -11,6 +13,12 @@
 #include <vector>
 
 namespace PickShell {
+    namespace {
+        // Set by executeCompiledBasicProgram while a program is running.
+        // Accessed from the SIGINT handler, so must be an atomic pointer.
+        std::atomic<PickVM::Runtime *> g_interruptRuntime{nullptr};
+    } // namespace
+
     Shell::Shell(PickVM::Runtime &runtime)
         : session_(runtime) {
         basicShell_.setProgramsRoot(session_.programsRoot());
@@ -40,6 +48,7 @@ namespace PickShell {
     }
 
     void Shell::run() {
+        std::signal(SIGINT, SIG_IGN); // Ctrl-C does nothing outside a running program
         std::cout << "Pick/TCL Developer Shell\n";
         std::cout << "Type HELP for commands\n";
 
@@ -153,12 +162,25 @@ namespace PickShell {
     void Shell::executeCompiledBasicProgram(const std::vector<PickVM::Instruction> &program, std::ostream &out) {
         session_.runtime_.setOutputStream(&out);
         session_.runtime_.setInputStream(inputStream_);
-        session_.runtime_.loadProgram(program);
+        session_.runtime_.loadProgram(program); // also clears interrupted_ flag
+
+        g_interruptRuntime.store(&session_.runtime_);
+        const auto previousHandler = std::signal(SIGINT, [](int) {
+            if (auto *rt = g_interruptRuntime.load()) {
+                rt->interrupt();
+            }
+        });
+
         try {
             session_.runtime_.run();
+        } catch (const PickVM::UserInterrupt &) {
+            out << "\nBreak\n";
         } catch (const std::runtime_error &e) {
             out << "\nRuntime error: " << e.what() << '\n';
         }
+
+        std::signal(SIGINT, previousHandler); // restores SIG_IGN
+        g_interruptRuntime.store(nullptr);
         session_.runtime_.setOutputStream(nullptr);
         session_.runtime_.setInputStream(nullptr);
     }

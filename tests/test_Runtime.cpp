@@ -957,8 +957,7 @@ TEST_CASE("runtime nested FOR/NEXT loops") {    std::ostringstream out;
     CHECK(out.str() == "11\n12\n21\n22\n");
 }
 
-TEST_CASE("runtime bare NEXT (no variable) matches innermost frame") {
-    std::ostringstream out;
+TEST_CASE("runtime bare NEXT (no variable) matches innermost frame") {    std::ostringstream out;
     Runtime rt;
     rt.setOutputStream(&out);
 
@@ -978,4 +977,27 @@ TEST_CASE("runtime bare NEXT (no variable) matches innermost frame") {
     rt.loadProgram(prog);
     rt.run();
     CHECK(out.str() == "1\n2\n3\n");
+}
+
+TEST_CASE("runtime throws UserInterrupt when interrupt flag is set before run") {
+    Runtime rt;
+    // An infinite jump loop — would never halt on its own.
+    std::vector<Instruction> prog = {
+        {OpCode::Jump, 0},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.interrupt(); // set flag before run()
+    CHECK_THROWS_AS(rt.run(), PickVM::UserInterrupt);
+}
+
+TEST_CASE("runtime loadProgram clears interrupt flag") {
+    Runtime rt;
+    rt.interrupt();
+    std::vector<Instruction> prog = {
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog); // should clear the flag
+    // run() should complete normally (no UserInterrupt thrown)
+    CHECK_NOTHROW(rt.run());
 }

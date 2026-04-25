@@ -143,6 +143,7 @@ namespace PickVM {
         stack_.clear();
         callStack_.clear();
         forStack_.clear();
+        interrupted_.store(false, std::memory_order_relaxed);
         variables_.clear();
     }
 
@@ -428,7 +429,18 @@ namespace PickVM {
 
     void Runtime::run() {
         while (step()) {
+            if (interrupted_.load(std::memory_order_relaxed)) {
+                throw UserInterrupt{};
+            }
         }
+    }
+
+    void Runtime::interrupt() noexcept {
+        interrupted_.store(true, std::memory_order_relaxed);
+    }
+
+    void Runtime::clearInterrupt() noexcept {
+        interrupted_.store(false, std::memory_order_relaxed);
     }
 
     void Runtime::dumpStack() const {
