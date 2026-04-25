@@ -204,3 +204,46 @@ TEST_CASE("basic semantic analyzer validates ELSE line targets in file statement
     REQUIRE(semantic.errors.size() == 1);
     CHECK(semantic.errors[0].message == "Unknown target line 99");
 }
+
+TEST_CASE("basic semantic analyzer allows IF with inline statement branch arms") {
+    BasicProgram program;
+    program.setLine(10, "IF 1 THEN STOP ELSE PRINT 1");
+    program.setLine(20, "END");
+
+    auto parsed = BasicStatementParser::parse(program);
+    REQUIRE(parsed.success);
+
+    const auto semantic = BasicSemanticAnalyzer::analyze(std::move(parsed));
+    CHECK(semantic.success);
+    CHECK(semantic.errors.empty());
+}
+
+TEST_CASE("basic semantic analyzer validates nested targets in IF inline branch statements") {
+    BasicProgram program;
+    program.setLine(10, "IF 1 THEN GOTO 99 ELSE IF 1 THEN 20");
+    program.setLine(20, "END");
+
+    auto parsed = BasicStatementParser::parse(program);
+    REQUIRE(parsed.success);
+
+    const auto semantic = BasicSemanticAnalyzer::analyze(std::move(parsed));
+    CHECK_FALSE(semantic.success);
+    REQUIRE(semantic.errors.size() == 1);
+    CHECK(semantic.errors[0].line == 10);
+    CHECK(semantic.errors[0].message == "Unknown target line 99");
+}
+
+TEST_CASE("basic semantic analyzer validates nested targets in file ELSE inline statements") {
+    BasicProgram program;
+    program.setLine(10, "OPEN \"CUSTOMERS\" TO FVAR ELSE GOSUB 90");
+    program.setLine(20, "END");
+
+    auto parsed = BasicStatementParser::parse(program);
+    REQUIRE(parsed.success);
+
+    const auto semantic = BasicSemanticAnalyzer::analyze(std::move(parsed));
+    CHECK_FALSE(semantic.success);
+    REQUIRE(semantic.errors.size() == 1);
+    CHECK(semantic.errors[0].line == 10);
+    CHECK(semantic.errors[0].message == "Unknown target line 90");
+}

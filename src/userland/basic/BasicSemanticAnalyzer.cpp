@@ -1,5 +1,8 @@
 #include "BasicSemanticAnalyzer.h"
 
+#include "BasicProgram.h"
+#include "BasicStatementParser.h"
+
 #include <unordered_set>
 #include <utility>
 #include <variant>
@@ -20,6 +23,104 @@ namespace PickShell {
             }
             return toIrBranchArm(std::move(*arm));
         }
+
+        void addUnknownTargetError(std::vector<BasicAst::SemanticError> &errors, int ownerLine, int targetLine) {
+            errors.push_back({
+                ownerLine,
+                "Unknown target line " + std::to_string(targetLine)
+            });
+        }
+
+        bool validateLineTarget(const std::unordered_set<int> &knownLines,
+                                int ownerLine,
+                                int targetLine,
+                                std::vector<BasicAst::SemanticError> &errors) {
+            if (knownLines.find(targetLine) != knownLines.end()) {
+                return true;
+            }
+            addUnknownTargetError(errors, ownerLine, targetLine);
+            return false;
+        }
+
+        bool parseInlineBranchStatement(const std::string &statementText,
+                                        int ownerLine,
+                                        BasicAst::StatementNode &outStatement,
+                                        std::vector<BasicAst::SemanticError> &errors) {
+            BasicProgram synthetic;
+            synthetic.setLine(ownerLine, statementText);
+            BasicAst::StatementParseResult parsed = BasicStatementParser::parse(synthetic);
+            if (!parsed.success) {
+                for (const auto &err: parsed.errors) {
+                    errors.push_back({ownerLine, err.message});
+                }
+                return false;
+            }
+            if (parsed.lines.size() != 1) {
+                errors.push_back({ownerLine, "Branch statement must parse as exactly one statement"});
+                return false;
+            }
+            outStatement = std::move(parsed.lines[0].statement);
+            return true;
+        }
+
+        void validateStatement(const BasicAst::StatementNode &statement,
+                               int ownerLine,
+                               const std::unordered_set<int> &knownLines,
+                               std::vector<BasicAst::SemanticError> &errors);
+
+        void validateBranchArm(const BasicAst::BranchArm &arm,
+                               int ownerLine,
+                               const std::unordered_set<int> &knownLines,
+                               std::vector<BasicAst::SemanticError> &errors) {
+            if (arm.line.has_value()) {
+                (void) validateLineTarget(knownLines, ownerLine, *arm.line, errors);
+                return;
+            }
+
+            if (arm.statementText.empty()) {
+                errors.push_back({ownerLine, "Branch arm requires a line target or statement"});
+                return;
+            }
+
+            BasicAst::StatementNode branchStatement;
+            if (!parseInlineBranchStatement(arm.statementText, ownerLine, branchStatement, errors)) {
+                return;
+            }
+            validateStatement(branchStatement, ownerLine, knownLines, errors);
+        }
+
+        void validateStatement(const BasicAst::StatementNode &statement,
+                               int ownerLine,
+                               const std::unordered_set<int> &knownLines,
+                               std::vector<BasicAst::SemanticError> &errors) {
+            std::visit(
+                [&](const auto &stmt) {
+                    using StmtT = std::decay_t<decltype(stmt)>;
+                    if constexpr (std::is_same_v<StmtT, BasicAst::GotoStmt>) {
+                        (void) validateLineTarget(knownLines, ownerLine, stmt.targetLine, errors);
+                    } else if constexpr (std::is_same_v<StmtT, BasicAst::GosubStmt>) {
+                        (void) validateLineTarget(knownLines, ownerLine, stmt.targetLine, errors);
+                    } else if constexpr (std::is_same_v<StmtT, BasicAst::IfStmt>) {
+                        validateBranchArm(stmt.thenArm, ownerLine, knownLines, errors);
+                        if (stmt.elseArm.has_value()) {
+                            validateBranchArm(*stmt.elseArm, ownerLine, knownLines, errors);
+                        }
+                    } else if constexpr (std::is_same_v<StmtT, BasicAst::OpenStmt>) {
+                        if (stmt.elseArm.has_value()) {
+                            validateBranchArm(*stmt.elseArm, ownerLine, knownLines, errors);
+                        }
+                    } else if constexpr (std::is_same_v<StmtT, BasicAst::ReadStmt>) {
+                        if (stmt.elseArm.has_value()) {
+                            validateBranchArm(*stmt.elseArm, ownerLine, knownLines, errors);
+                        }
+                    } else if constexpr (std::is_same_v<StmtT, BasicAst::WriteStmt>) {
+                        if (stmt.elseArm.has_value()) {
+                            validateBranchArm(*stmt.elseArm, ownerLine, knownLines, errors);
+                        }
+                    }
+                },
+                statement);
+        }
     } // namespace
 
     BasicSemanticAnalysisResult BasicSemanticAnalyzer::analyze(BasicAst::StatementParseResult parsed) {
@@ -39,70 +140,7 @@ namespace PickShell {
         }
 
         for (const BasicAst::ParsedBasicLine &line: parsed.lines) {
-            std::visit(
-                [&](const auto &stmt) {
-                    using StmtT = std::decay_t<decltype(stmt)>;
-                    if constexpr (std::is_same_v<StmtT, BasicAst::GotoStmt>) {
-                        if (knownLines.find(stmt.targetLine) == knownLines.end()) {
-                            result.errors.push_back({
-                                line.lineNumber,
-                                "Unknown target line " + std::to_string(stmt.targetLine)
-                            });
-                        }
-                    } else if constexpr (std::is_same_v<StmtT, BasicAst::GosubStmt>) {
-                        if (knownLines.find(stmt.targetLine) == knownLines.end()) {
-                            result.errors.push_back({
-                                line.lineNumber,
-                                "Unknown target line " + std::to_string(stmt.targetLine)
-                            });
-                        }
-                    } else if constexpr (std::is_same_v<StmtT, BasicAst::IfStmt>) {
-                        if (!stmt.thenArm.line.has_value() ||
-                            knownLines.find(*stmt.thenArm.line) == knownLines.end()) {
-                            result.errors.push_back({
-                                line.lineNumber,
-                                "Unknown target line " +
-                                        std::to_string(stmt.thenArm.line.value_or(0))
-                            });
-                        }
-                        if (stmt.elseArm.has_value() &&
-                            stmt.elseArm->line.has_value() &&
-                            knownLines.find(*stmt.elseArm->line) == knownLines.end()) {
-                            result.errors.push_back({
-                                line.lineNumber,
-                                "Unknown target line " + std::to_string(*stmt.elseArm->line)
-                            });
-                        }
-                    } else if constexpr (std::is_same_v<StmtT, BasicAst::OpenStmt>) {
-                        if (stmt.elseArm.has_value() &&
-                            stmt.elseArm->line.has_value() &&
-                            knownLines.find(*stmt.elseArm->line) == knownLines.end()) {
-                            result.errors.push_back({
-                                line.lineNumber,
-                                "Unknown target line " + std::to_string(*stmt.elseArm->line)
-                            });
-                        }
-                    } else if constexpr (std::is_same_v<StmtT, BasicAst::ReadStmt>) {
-                        if (stmt.elseArm.has_value() &&
-                            stmt.elseArm->line.has_value() &&
-                            knownLines.find(*stmt.elseArm->line) == knownLines.end()) {
-                            result.errors.push_back({
-                                line.lineNumber,
-                                "Unknown target line " + std::to_string(*stmt.elseArm->line)
-                            });
-                        }
-                    } else if constexpr (std::is_same_v<StmtT, BasicAst::WriteStmt>) {
-                        if (stmt.elseArm.has_value() &&
-                            stmt.elseArm->line.has_value() &&
-                            knownLines.find(*stmt.elseArm->line) == knownLines.end()) {
-                            result.errors.push_back({
-                                line.lineNumber,
-                                "Unknown target line " + std::to_string(*stmt.elseArm->line)
-                            });
-                        }
-                    }
-                },
-                line.statement);
+            validateStatement(line.statement, line.lineNumber, knownLines, result.errors);
         }
 
         if (!result.errors.empty()) {
