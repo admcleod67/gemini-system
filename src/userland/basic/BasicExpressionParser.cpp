@@ -361,8 +361,27 @@ namespace PickShell {
 
                 if (current().type == ExprTokenType::Identifier) {
                     const ExprToken tok = advance();
-                    // Array subscript: Identifier followed by '('
+
                     if (current().type == ExprTokenType::LParen) {
+                        // Uppercase the identifier to check for builtin functions.
+                        std::string upper = tok.lexeme;
+                        for (char &c : upper) { c = static_cast<char>(std::toupper(static_cast<unsigned char>(c))); }
+
+                        if (upper == "ABS" || upper == "SGN" || upper == "SEQ") {
+                            advance(); // consume '('
+                            auto arg = parseComparison();
+                            if (!arg) { return nullptr; }
+                            if (current().type != ExprTokenType::RParen) {
+                                error_ = "Missing ')' after " + upper + " argument";
+                                return nullptr;
+                            }
+                            const ExprToken close = advance();
+                            const BasicAst::SourceRange range{tok.range.begin, close.range.end};
+                            BasicAst::FunctionCallExpr node{upper, std::move(arg), range};
+                            return makeExpr(std::move(node), range);
+                        }
+
+                        // Array subscript: Identifier followed by '('
                         advance(); // consume '('
                         auto idx = parseAddSub();
                         if (!idx) {

@@ -145,6 +145,23 @@ namespace PickShell {
                             }
                             out_.push_back(PickVM::Instruction{PickVM::OpCode::LoadArr, uppercase(node.varName)});
                             return true;
+                        } else if constexpr (std::is_same_v<NodeT, BasicAst::FunctionCallExpr>) {
+                            if (!node.argument) {
+                                error_ = node.name + ": missing argument";
+                                return false;
+                            }
+                            const bool argInArithmetic = (node.name == "ABS" || node.name == "SGN");
+                            if (!emitNode(*node.argument, argInArithmetic)) {
+                                return false;
+                            }
+                            if (node.name == "ABS") {
+                                emitNoOperand(PickVM::OpCode::AbsInt);
+                            } else if (node.name == "SGN") {
+                                emitNoOperand(PickVM::OpCode::SgnInt);
+                            } else {
+                                emitNoOperand(PickVM::OpCode::SeqStr);
+                            }
+                            return true;
                         }
                         return false;
                     },

@@ -47,6 +47,9 @@ namespace PickVM {
         LoadArr,
         StoreArr,
         ClearVars,
+        AbsInt,
+        SgnInt,
+        SeqStr,
         LoadVar,
         StoreVar
     };

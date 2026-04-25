@@ -45,6 +45,9 @@ namespace PickVM {
             case OpCode::LoadArr: return "LOAD_ARR";
             case OpCode::StoreArr: return "STORE_ARR";
             case OpCode::ClearVars: return "CLEAR_VARS";
+            case OpCode::AbsInt: return "ABS_INT";
+            case OpCode::SgnInt: return "SGN_INT";
+            case OpCode::SeqStr: return "SEQ_STR";
             case OpCode::LoadVar: return "LOAD_VAR";
             case OpCode::StoreVar: return "STORE_VAR";
         }
@@ -122,6 +125,9 @@ namespace PickVM {
             case OpCode::CoerceInt:
             case OpCode::Return:
             case OpCode::ClearVars:
+            case OpCode::AbsInt:
+            case OpCode::SgnInt:
+            case OpCode::SeqStr:
                 break;
         }
 

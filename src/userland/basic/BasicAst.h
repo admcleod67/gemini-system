@@ -74,7 +74,13 @@ namespace PickShell::BasicAst {
         SourceRange range{};
     };
 
-    using ExprNode = std::variant<IntLiteralExpr, StringLiteralExpr, IdentifierExpr, UnaryExpr, BinaryExpr, GroupedExpr, SubscriptExpr>;
+    struct FunctionCallExpr {
+        std::string name;  // uppercased: "ABS", "SGN", "SEQ"
+        std::unique_ptr<Expr> argument;
+        SourceRange range{};
+    };
+
+    using ExprNode = std::variant<IntLiteralExpr, StringLiteralExpr, IdentifierExpr, UnaryExpr, BinaryExpr, GroupedExpr, SubscriptExpr, FunctionCallExpr>;
 
     struct Expr {
         ExprNode node;

@@ -668,3 +668,60 @@ TEST_CASE("basic compiler compiles CLEAR to a single ClearVars instruction") {
     CHECK(result.program[0].op == OpCode::ClearVars);
     CHECK(result.program[1].op == OpCode::Halt);
 }
+
+TEST_CASE("basic compiler compiles ABS function") {
+    BasicProgram program;
+    program.setLine(10, "PRINT ABS(-5)");
+    program.setLine(20, "END");
+
+    BasicCompiler compiler;
+    const auto result = compiler.compile(program);
+    REQUIRE(result.success);
+    // Argument -5 is: PushInt 0, PushInt 5, Sub
+    // Then: ABS_INT, PRINT_VAL, PRINT_EOL, HALT
+    bool found = false;
+    for (const auto &instr : result.program) {
+        if (instr.op == OpCode::AbsInt) { found = true; break; }
+    }
+    CHECK(found);
+}
+
+TEST_CASE("basic compiler compiles SGN function") {
+    BasicProgram program;
+    program.setLine(10, "PRINT SGN(5)");
+    program.setLine(20, "END");
+
+    BasicCompiler compiler;
+    const auto result = compiler.compile(program);
+    REQUIRE(result.success);
+    bool found = false;
+    for (const auto &instr : result.program) {
+        if (instr.op == OpCode::SgnInt) { found = true; break; }
+    }
+    CHECK(found);
+}
+
+TEST_CASE("basic compiler compiles SEQ function") {
+    BasicProgram program;
+    program.setLine(10, "PRINT SEQ(\"A\")");
+    program.setLine(20, "END");
+
+    BasicCompiler compiler;
+    const auto result = compiler.compile(program);
+    REQUIRE(result.success);
+    bool found = false;
+    for (const auto &instr : result.program) {
+        if (instr.op == OpCode::SeqStr) { found = true; break; }
+    }
+    CHECK(found);
+}
+
+TEST_CASE("basic compiler rejects dollar variable in ABS") {
+    BasicProgram program;
+    program.setLine(10, "PRINT ABS(X$)");
+    program.setLine(20, "END");
+
+    BasicCompiler compiler;
+    const auto result = compiler.compile(program);
+    CHECK_FALSE(result.success);
+}

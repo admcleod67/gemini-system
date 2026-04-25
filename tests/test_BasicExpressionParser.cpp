@@ -121,3 +121,52 @@ TEST_CASE("basic expression parser parses percent variable in arithmetic") {
     REQUIRE(std::holds_alternative<BasicAst::IdentifierExpr>(bin.left->node));
     CHECK(std::get<BasicAst::IdentifierExpr>(bin.left->node).name == "A%");
 }
+
+TEST_CASE("basic expression parser parses ABS function call") {
+    const auto result = BasicExpressionParser::parse("ABS(5)");
+    REQUIRE(result.success);
+    REQUIRE(result.expression != nullptr);
+    REQUIRE(std::holds_alternative<BasicAst::FunctionCallExpr>(result.expression->node));
+    const auto &call = std::get<BasicAst::FunctionCallExpr>(result.expression->node);
+    CHECK(call.name == "ABS");
+    REQUIRE(call.argument != nullptr);
+    REQUIRE(std::holds_alternative<BasicAst::IntLiteralExpr>(call.argument->node));
+    CHECK(std::get<BasicAst::IntLiteralExpr>(call.argument->node).value == 5);
+}
+
+TEST_CASE("basic expression parser parses SGN function call with negative argument") {
+    const auto result = BasicExpressionParser::parse("SGN(-3)");
+    REQUIRE(result.success);
+    REQUIRE(result.expression != nullptr);
+    REQUIRE(std::holds_alternative<BasicAst::FunctionCallExpr>(result.expression->node));
+    const auto &call = std::get<BasicAst::FunctionCallExpr>(result.expression->node);
+    CHECK(call.name == "SGN");
+    REQUIRE(call.argument != nullptr);
+}
+
+TEST_CASE("basic expression parser parses SEQ function call with string argument") {
+    const auto result = BasicExpressionParser::parse("SEQ(\"A\")");
+    REQUIRE(result.success);
+    REQUIRE(result.expression != nullptr);
+    REQUIRE(std::holds_alternative<BasicAst::FunctionCallExpr>(result.expression->node));
+    const auto &call = std::get<BasicAst::FunctionCallExpr>(result.expression->node);
+    CHECK(call.name == "SEQ");
+    REQUIRE(call.argument != nullptr);
+    REQUIRE(std::holds_alternative<BasicAst::StringLiteralExpr>(call.argument->node));
+    CHECK(std::get<BasicAst::StringLiteralExpr>(call.argument->node).value == "A");
+}
+
+TEST_CASE("basic expression parser is case-insensitive for function names") {
+    const auto result = BasicExpressionParser::parse("abs(5)");
+    REQUIRE(result.success);
+    REQUIRE(result.expression != nullptr);
+    REQUIRE(std::holds_alternative<BasicAst::FunctionCallExpr>(result.expression->node));
+    CHECK(std::get<BasicAst::FunctionCallExpr>(result.expression->node).name == "ABS");
+}
+
+TEST_CASE("basic expression parser treats unknown name followed by paren as array subscript") {
+    const auto result = BasicExpressionParser::parse("FOO(1)");
+    REQUIRE(result.success);
+    REQUIRE(result.expression != nullptr);
+    CHECK(std::holds_alternative<BasicAst::SubscriptExpr>(result.expression->node));
+}

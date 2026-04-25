@@ -7,6 +7,7 @@
 
 #include <cctype>
 #include <climits>
+#include <cstdlib>
 #include <iostream>
 #include <limits>
 #include <sstream>
@@ -443,6 +444,26 @@ namespace PickVM {
             case OpCode::ClearVars: {
                 variables_.clear();
                 arrays_.clear();
+                break;
+            }
+
+            case OpCode::AbsInt: {
+                push(std::abs(coerceToInt(pop())));
+                break;
+            }
+
+            case OpCode::SgnInt: {
+                const int v = coerceToInt(pop());
+                push(v > 0 ? 1 : v < 0 ? -1 : 0);
+                break;
+            }
+
+            case OpCode::SeqStr: {
+                const Value v = pop();
+                const std::string s = std::holds_alternative<std::string>(v)
+                    ? std::get<std::string>(v)
+                    : std::to_string(std::get<int>(v));
+                push(s.empty() ? 0 : static_cast<int>(static_cast<unsigned char>(s[0])));
                 break;
             }
 

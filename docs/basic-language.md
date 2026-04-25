@@ -222,3 +222,48 @@ CLEAR
 - Any attempt to access an array element will raise a runtime "Array not dimensioned" error until the array is re-dimensioned with `DIM`.
 
 `CLEAR` takes no arguments. It does not affect the program itself, the VM stack, the instruction pointer, the call stack, or the for-stack.
+
+## Built-in Functions
+
+Built-in functions are called with a single argument enclosed in parentheses. Function names are case-insensitive.
+
+### ABS
+
+```
+ABS(<numeric-expr>)
+```
+
+Returns the absolute value of the numeric expression. The argument is coerced to integer (Pick semantics: non-numeric string → 0). Using a `$`-suffix variable as the argument is a compile-time error.
+
+```
+10 LET X = ABS(-42)   ;* X = 42
+20 PRINT ABS(0)       ;* prints 0
+```
+
+### SGN
+
+```
+SGN(<numeric-expr>)
+```
+
+Returns the sign of the numeric expression: `-1` for negative, `0` for zero, `1` for positive. The argument is coerced to integer. Using a `$`-suffix variable as the argument is a compile-time error.
+
+```
+10 PRINT SGN(100)   ;* prints 1
+20 PRINT SGN(-5)    ;* prints -1
+30 PRINT SGN(0)     ;* prints 0
+```
+
+### SEQ
+
+```
+SEQ(<expr>)
+```
+
+Returns the ASCII (numeric) value of the first character of the string representation of `<expr>`. If the argument evaluates to an empty string, `SEQ` returns `0`. All variable types (including `$`-suffix) are accepted.
+
+```
+10 PRINT SEQ("A")       ;* prints 65
+20 PRINT SEQ("Hello")   ;* prints 72  (ASCII of 'H')
+30 PRINT SEQ("")        ;* prints 0
+```

@@ -53,6 +53,10 @@ The parser records **1-based physical source line numbers** per instruction (for
 | `JZ label` | Pop int; if it is **zero**, jump to `label`; otherwise fall through. |
 | `STORE_VAR name` | Pop value and store it by case-insensitive variable `name` (runtime canonicalizes to uppercase). |
 | `LOAD_VAR name` | Push value stored for case-insensitive variable `name`; throws `Undefined variable: <NAME>` if missing. |
+| `CLEAR_VARS` | Remove all scalar variables and all array allocations. Stack, IP, call stack, and for-stack are untouched. |
+| `ABS_INT` | Pop a `Value`, coerce to int, push `abs(value)`. |
+| `SGN_INT` | Pop a `Value`, coerce to int, push `-1`, `0`, or `1` according to sign. |
+| `SEQ_STR` | Pop a `Value`; if it is an int, stringify it first (`std::to_string`). Push the ASCII value of the first character of the resulting string, or `0` if the string is empty. |
 
 Jump targets must refer to defined labels and resolve to valid instruction indices; the parser validates range.
 

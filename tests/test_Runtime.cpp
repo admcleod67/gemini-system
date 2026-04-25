@@ -1164,3 +1164,134 @@ TEST_CASE("runtime ClearVars removes array allocations") {
     rt.loadProgram(prog);
     CHECK_THROWS_AS(rt.run(), std::runtime_error);
 }
+
+TEST_CASE("runtime AbsInt returns absolute value of positive int") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, 5},
+        {OpCode::AbsInt, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<int>(rt.stack()[0]) == 5);
+}
+
+TEST_CASE("runtime AbsInt returns absolute value of negative int") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, -7},
+        {OpCode::AbsInt, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<int>(rt.stack()[0]) == 7);
+}
+
+TEST_CASE("runtime AbsInt returns 0 for zero") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, 0},
+        {OpCode::AbsInt, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<int>(rt.stack()[0]) == 0);
+}
+
+TEST_CASE("runtime SgnInt returns 1 for positive") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, 42},
+        {OpCode::SgnInt, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<int>(rt.stack()[0]) == 1);
+}
+
+TEST_CASE("runtime SgnInt returns -1 for negative") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, -3},
+        {OpCode::SgnInt, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<int>(rt.stack()[0]) == -1);
+}
+
+TEST_CASE("runtime SgnInt returns 0 for zero") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, 0},
+        {OpCode::SgnInt, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<int>(rt.stack()[0]) == 0);
+}
+
+TEST_CASE("runtime SeqStr returns ASCII value of first char") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"A"}},
+        {OpCode::SeqStr, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<int>(rt.stack()[0]) == 65);
+}
+
+TEST_CASE("runtime SeqStr returns 0 for empty string") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{""}},
+        {OpCode::SeqStr, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<int>(rt.stack()[0]) == 0);
+}
+
+TEST_CASE("runtime SeqStr uses only first character") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"Hello"}},
+        {OpCode::SeqStr, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<int>(rt.stack()[0]) == 72); // 'H'
+}
+
+TEST_CASE("runtime SeqStr stringifies integer operand") {
+    Runtime rt;
+    // SEQ(65) → stringify to "65" → ASCII of '6' = 54
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, 65},
+        {OpCode::SeqStr, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<int>(rt.stack()[0]) == 54); // '6'
+}
