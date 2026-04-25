@@ -51,13 +51,6 @@ namespace PickShell {
             }
             return std::string::npos;
         }
-
-        std::optional<std::string> parseStringLiteral(const std::string &expr) {
-            if (expr.size() >= 2 && expr.front() == '"' && expr.back() == '"') {
-                return expr.substr(1, expr.size() - 2);
-            }
-            return std::nullopt;
-        }
     } // namespace
 
     BasicAst::StatementParseResult BasicStatementParser::parse(const BasicProgram &program) {
@@ -232,20 +225,14 @@ namespace PickShell {
                     continue;
                 }
 
-                BasicAst::PrintStmt stmt{};
-                stmt.suppressEol = suppressEol;
-                const std::optional<std::string> asString = parseStringLiteral(exprText);
-                if (asString) {
-                    stmt.stringLiteral = *asString;
-                    result.lines.push_back({lineNumber, std::move(stmt)});
-                    continue;
-                }
-
                 BasicExpressionParseResult expression = BasicExpressionParser::parse(exprText);
                 if (!expression.success || !expression.expression) {
                     result.errors.push_back({lineNumber, "PRINT expression error: " + expression.error});
                     continue;
                 }
+
+                BasicAst::PrintStmt stmt{};
+                stmt.suppressEol = suppressEol;
                 stmt.expression = std::move(expression.expression);
                 result.lines.push_back({lineNumber, std::move(stmt)});
                 continue;

@@ -68,3 +68,38 @@ TEST_CASE("basic expression parser reports malformed expression diagnostics") {
     CHECK_FALSE(emptyExpr.success);
     CHECK(emptyExpr.error == "empty expression");
 }
+
+TEST_CASE("basic expression parser parses string literal") {
+    const auto result = BasicExpressionParser::parse("\"hello world\"");
+    REQUIRE(result.success);
+    REQUIRE(result.expression != nullptr);
+    REQUIRE(std::holds_alternative<BasicAst::StringLiteralExpr>(result.expression->node));
+    CHECK(std::get<BasicAst::StringLiteralExpr>(result.expression->node).value == "hello world");
+}
+
+TEST_CASE("basic expression parser parses string variable identifier") {
+    const auto result = BasicExpressionParser::parse("A$");
+    REQUIRE(result.success);
+    REQUIRE(result.expression != nullptr);
+    REQUIRE(std::holds_alternative<BasicAst::IdentifierExpr>(result.expression->node));
+    CHECK(std::get<BasicAst::IdentifierExpr>(result.expression->node).name == "A$");
+}
+
+TEST_CASE("basic expression parser reports unterminated string literal") {
+    const auto result = BasicExpressionParser::parse("\"hello");
+    CHECK_FALSE(result.success);
+    CHECK(result.error == "Unterminated string literal");
+}
+
+TEST_CASE("basic expression parser parses string equality comparison") {
+    const auto result = BasicExpressionParser::parse("A$ = \"hello\"");
+    REQUIRE(result.success);
+    REQUIRE(result.expression != nullptr);
+    REQUIRE(std::holds_alternative<BasicAst::BinaryExpr>(result.expression->node));
+    const auto &bin = std::get<BasicAst::BinaryExpr>(result.expression->node);
+    CHECK(bin.op == BasicAst::BinaryOp::Equal);
+    REQUIRE(std::holds_alternative<BasicAst::IdentifierExpr>(bin.left->node));
+    CHECK(std::get<BasicAst::IdentifierExpr>(bin.left->node).name == "A$");
+    REQUIRE(std::holds_alternative<BasicAst::StringLiteralExpr>(bin.right->node));
+    CHECK(std::get<BasicAst::StringLiteralExpr>(bin.right->node).value == "hello");
+}

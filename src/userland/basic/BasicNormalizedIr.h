@@ -41,10 +41,7 @@ namespace PickShell::BasicIr {
     };
 
     struct PrintStmt {
-        // Exactly one payload path is expected:
-        // - stringLiteral has value (string print path), OR
-        // - expression is non-null (numeric print path).
-        std::optional<std::string> stringLiteral;
+        // expression is always non-null; type (string/int) inferred from expression AST at emit time.
         std::unique_ptr<BasicAst::Expr> expression;
         bool suppressEol{false};
     };

@@ -20,6 +20,12 @@ namespace {
         return expr;
     }
 
+    std::unique_ptr<BasicAst::Expr> makeStr(const std::string &value) {
+        auto expr = std::make_unique<BasicAst::Expr>();
+        expr->node = BasicAst::StringLiteralExpr{value, {}};
+        return expr;
+    }
+
     std::unique_ptr<BasicAst::Expr> makeVar(const std::string &name) {
         auto expr = std::make_unique<BasicAst::Expr>();
         expr->node = BasicAst::IdentifierExpr{name, {}};
@@ -36,7 +42,7 @@ namespace {
 TEST_CASE("basic bytecode emitter lowers let print and end") {
     BasicIr::NormalizedProgram program;
     program.lines.push_back({10, BasicIr::LetStmt{"A", makeInt(5)}});
-    program.lines.push_back({20, BasicIr::PrintStmt{std::nullopt, makeVar("A"), false}});
+    program.lines.push_back({20, BasicIr::PrintStmt{makeVar("A"), false}});
     program.lines.push_back({30, BasicIr::EndStmt{}});
 
     const BasicBytecodeEmissionResult emitted = BasicBytecodeEmitter::emit(program);
@@ -56,7 +62,7 @@ TEST_CASE("basic bytecode emitter lowers if and goto control flow") {
     program.lines.push_back({10, BasicIr::IfStmt{makeEq(makeInt(1), makeInt(1)), 30, 40}});
     program.lines.push_back({20, BasicIr::StopStmt{}});
     program.lines.push_back({30, BasicIr::GotoStmt{20}});
-    program.lines.push_back({40, BasicIr::PrintStmt{std::nullopt, makeInt(99), false}});
+    program.lines.push_back({40, BasicIr::PrintStmt{makeInt(99), false}});
 
     const BasicBytecodeEmissionResult emitted = BasicBytecodeEmitter::emit(program);
     CHECK(emitted.success);
@@ -72,7 +78,7 @@ TEST_CASE("basic bytecode emitter lowers if and goto control flow") {
 
 TEST_CASE("basic bytecode emitter preserves print string and suppress eol") {
     BasicIr::NormalizedProgram program;
-    program.lines.push_back({10, BasicIr::PrintStmt{std::string("HELLO"), nullptr, true}});
+    program.lines.push_back({10, BasicIr::PrintStmt{makeStr("HELLO"), true}});
 
     const BasicBytecodeEmissionResult emitted = BasicBytecodeEmitter::emit(program);
     CHECK(emitted.success);
@@ -109,7 +115,7 @@ TEST_CASE("basic bytecode emitter rejects IF with null condition") {
 
 TEST_CASE("basic bytecode emitter rejects PRINT numeric path with null expression") {
     BasicIr::NormalizedProgram program;
-    program.lines.push_back({10, BasicIr::PrintStmt{std::nullopt, nullptr, false}});
+    program.lines.push_back({10, BasicIr::PrintStmt{nullptr, false}});
 
     const BasicBytecodeEmissionResult emitted = BasicBytecodeEmitter::emit(program);
     CHECK_FALSE(emitted.success);
@@ -151,7 +157,7 @@ TEST_CASE("basic bytecode emitter rejects invalid identifier in expression path"
     BasicIr::NormalizedProgram program;
     auto expr = std::make_unique<BasicAst::Expr>();
     expr->node = BasicAst::IdentifierExpr{"1BAD", {}};
-    program.lines.push_back({10, BasicIr::PrintStmt{std::nullopt, std::move(expr), false}});
+    program.lines.push_back({10, BasicIr::PrintStmt{std::move(expr), false}});
 
     const BasicBytecodeEmissionResult emitted = BasicBytecodeEmitter::emit(program);
     CHECK_FALSE(emitted.success);

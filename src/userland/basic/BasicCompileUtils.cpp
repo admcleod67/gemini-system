@@ -18,8 +18,12 @@ namespace PickShell {
         if (std::isalpha(static_cast<unsigned char>(first)) == 0) {
             return false;
         }
-        for (const char c: token) {
-            if (std::isalnum(static_cast<unsigned char>(c)) == 0) {
+        // Allow optional $ suffix for string variables; body chars must be alphanumeric.
+        const std::size_t bodyEnd = (token.size() > 1 && token.back() == '$')
+                                        ? token.size() - 1
+                                        : token.size();
+        for (std::size_t i = 0; i < bodyEnd; ++i) {
+            if (std::isalnum(static_cast<unsigned char>(token[i])) == 0) {
                 return false;
             }
         }

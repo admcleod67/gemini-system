@@ -139,7 +139,7 @@ TEST_CASE("basic compiler reports unknown keyword with line") {
     CHECK(result.errors[0].message == "Unknown keyword 'MAT'");
 }
 
-TEST_CASE("basic compiler enforces int-only LET and PRINT variables") {
+TEST_CASE("basic compiler enforces type consistency in LET assignments") {
     BasicProgram program;
     program.setLine(10, "LET A = \"X\"");
     program.setLine(20, "PRINT \"OK\"");
@@ -315,4 +315,93 @@ TEST_CASE("basic compiler INPUT requires one valid variable name") {
     CHECK_FALSE(invalidVarResult.success);
     REQUIRE(invalidVarResult.errors.size() == 1);
     CHECK(invalidVarResult.errors[0].message == "Invalid variable name '1A'");
+}
+
+TEST_CASE("basic compiler compiles string variable assignment and print") {
+    BasicProgram program;
+    program.setLine(10, "LET A$ = \"hello\"");
+    program.setLine(20, "PRINT A$");
+    program.setLine(30, "END");
+
+    BasicCompiler compiler;
+    const auto result = compiler.compile(program);
+
+    CHECK(result.success);
+    CHECK(result.errors.empty());
+    REQUIRE(result.program.size() == 6);
+    CHECK(result.program[0].op == OpCode::PushStr);
+    CHECK(std::get<std::string>(result.program[0].operand) == "hello");
+    CHECK(result.program[1].op == OpCode::StoreVar);
+    CHECK(std::get<std::string>(result.program[1].operand) == "A$");
+    CHECK(result.program[2].op == OpCode::LoadVar);
+    CHECK(std::get<std::string>(result.program[2].operand) == "A$");
+    CHECK(result.program[3].op == OpCode::PrintStr);
+    CHECK(result.program[4].op == OpCode::PrintEol);
+    CHECK(result.program[5].op == OpCode::Halt);
+}
+
+TEST_CASE("basic compiler compiles INPUT for string variable") {
+    BasicProgram program;
+    program.setLine(10, "INPUT A$");
+    program.setLine(20, "PRINT A$");
+    program.setLine(30, "END");
+
+    BasicCompiler compiler;
+    const auto result = compiler.compile(program);
+
+    CHECK(result.success);
+    CHECK(result.errors.empty());
+    REQUIRE(result.program.size() == 6);
+    CHECK(result.program[0].op == OpCode::InputStr);
+    CHECK(result.program[1].op == OpCode::StoreVar);
+    CHECK(std::get<std::string>(result.program[1].operand) == "A$");
+    CHECK(result.program[2].op == OpCode::LoadVar);
+    CHECK(result.program[3].op == OpCode::PrintStr);
+    CHECK(result.program[4].op == OpCode::PrintEol);
+    CHECK(result.program[5].op == OpCode::Halt);
+}
+
+TEST_CASE("basic compiler compiles string comparison in IF condition") {
+    BasicProgram program;
+    program.setLine(10, "LET A$ = \"yes\"");
+    program.setLine(20, "IF A$ = \"yes\" THEN 40 ELSE 50");
+    program.setLine(30, "END");
+    program.setLine(40, "PRINT \"match\"");
+    program.setLine(50, "END");
+
+    BasicCompiler compiler;
+    const auto result = compiler.compile(program);
+
+    CHECK(result.success);
+    CHECK(result.errors.empty());
+    // After LET A$ (PushStr + StoreVar), IF emits LoadVar A$, PushStr "yes", Eq, JZ, Jump, [JumpElse]
+    CHECK(result.program[2].op == OpCode::LoadVar);
+    CHECK(std::get<std::string>(result.program[2].operand) == "A$");
+    CHECK(result.program[3].op == OpCode::PushStr);
+    CHECK(std::get<std::string>(result.program[3].operand) == "yes");
+    CHECK(result.program[4].op == OpCode::Eq);
+}
+
+TEST_CASE("basic compiler rejects string expression assigned to integer variable") {
+    BasicProgram program;
+    program.setLine(10, "LET A = \"hello\"");
+
+    BasicCompiler compiler;
+    const auto result = compiler.compile(program);
+
+    CHECK_FALSE(result.success);
+    REQUIRE(result.errors.size() == 1);
+    CHECK(result.errors[0].line == 10);
+}
+
+TEST_CASE("basic compiler rejects integer expression assigned to string variable") {
+    BasicProgram program;
+    program.setLine(10, "LET A$ = 42");
+
+    BasicCompiler compiler;
+    const auto result = compiler.compile(program);
+
+    CHECK_FALSE(result.success);
+    REQUIRE(result.errors.size() == 1);
+    CHECK(result.errors[0].line == 10);
 }

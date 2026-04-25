@@ -493,3 +493,70 @@ TEST_CASE("runtime INPUT_INT eof throws") {
     rt.loadProgram(prog);
     CHECK_THROWS_AS(rt.run(), std::runtime_error);
 }
+
+TEST_CASE("runtime INPUT_STR reads a trimmed line as string") {
+    std::istringstream in("  hello world  \n");
+    std::vector<Instruction> prog = {
+        {OpCode::InputStr, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    Runtime rt;
+    rt.setInputStream(&in);
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    REQUIRE(std::holds_alternative<std::string>(rt.stack()[0]));
+    CHECK(std::get<std::string>(rt.stack()[0]) == "hello world");
+}
+
+TEST_CASE("runtime INPUT_STR throws on end of input") {
+    std::istringstream in("");
+    std::vector<Instruction> prog = {
+        {OpCode::InputStr, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    Runtime rt;
+    rt.setInputStream(&in);
+    rt.loadProgram(prog);
+    CHECK_THROWS_AS(rt.run(), std::runtime_error);
+}
+
+TEST_CASE("runtime string equality comparison") {
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"hello"}},
+        {OpCode::PushStr, std::string{"hello"}},
+        {OpCode::Eq, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    Runtime rt;
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<int>(rt.stack()[0]) == 1);
+}
+
+TEST_CASE("runtime string inequality comparison") {
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"abc"}},
+        {OpCode::PushStr, std::string{"xyz"}},
+        {OpCode::Lt, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    Runtime rt;
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<int>(rt.stack()[0]) == 1);
+}
+
+TEST_CASE("runtime comparison throws on type mismatch") {
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, 1},
+        {OpCode::PushStr, std::string{"hello"}},
+        {OpCode::Eq, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    Runtime rt;
+    rt.loadProgram(prog);
+    CHECK_THROWS_AS(rt.run(), std::runtime_error);
+}

@@ -54,6 +54,23 @@ namespace PickVM {
             return std::get<std::string>(v);
         }
 
+        // Returns -1 / 0 / +1 for a < b / a == b / a > b, for matching types.
+        int compareValues(const Value &a, const Value &b, const char *ctx) {
+            if (std::holds_alternative<int>(a) && std::holds_alternative<int>(b)) {
+                const int ia = std::get<int>(a), ib = std::get<int>(b);
+                if (ia < ib) return -1;
+                if (ia > ib) return 1;
+                return 0;
+            }
+            if (std::holds_alternative<std::string>(a) && std::holds_alternative<std::string>(b)) {
+                const auto &sa = std::get<std::string>(a), &sb = std::get<std::string>(b);
+                if (sa < sb) return -1;
+                if (sa > sb) return 1;
+                return 0;
+            }
+            throw std::runtime_error(std::string(ctx) + ": type mismatch");
+        }
+
         bool parseIntLine(const std::string &line, int &value) {
             std::size_t first = line.find_first_not_of(" \t\r\n");
             if (first == std::string::npos) {
@@ -163,44 +180,44 @@ namespace PickVM {
             }
 
             case OpCode::Eq: {
-                int b = intFromStackValue(pop(), PickVM::opCodeName(instr.op));
-                int a = intFromStackValue(pop(), PickVM::opCodeName(instr.op));
-                push(a == b ? 1 : 0);
+                Value b = pop();
+                Value a = pop();
+                push(compareValues(a, b, "EQ") == 0 ? 1 : 0);
                 break;
             }
 
             case OpCode::Ne: {
-                int b = intFromStackValue(pop(), PickVM::opCodeName(instr.op));
-                int a = intFromStackValue(pop(), PickVM::opCodeName(instr.op));
-                push(a != b ? 1 : 0);
+                Value b = pop();
+                Value a = pop();
+                push(compareValues(a, b, "NE") != 0 ? 1 : 0);
                 break;
             }
 
             case OpCode::Lt: {
-                int b = intFromStackValue(pop(), PickVM::opCodeName(instr.op));
-                int a = intFromStackValue(pop(), PickVM::opCodeName(instr.op));
-                push(a < b ? 1 : 0);
+                Value b = pop();
+                Value a = pop();
+                push(compareValues(a, b, "LT") < 0 ? 1 : 0);
                 break;
             }
 
             case OpCode::Le: {
-                int b = intFromStackValue(pop(), PickVM::opCodeName(instr.op));
-                int a = intFromStackValue(pop(), PickVM::opCodeName(instr.op));
-                push(a <= b ? 1 : 0);
+                Value b = pop();
+                Value a = pop();
+                push(compareValues(a, b, "LE") <= 0 ? 1 : 0);
                 break;
             }
 
             case OpCode::Gt: {
-                int b = intFromStackValue(pop(), PickVM::opCodeName(instr.op));
-                int a = intFromStackValue(pop(), PickVM::opCodeName(instr.op));
-                push(a > b ? 1 : 0);
+                Value b = pop();
+                Value a = pop();
+                push(compareValues(a, b, "GT") > 0 ? 1 : 0);
                 break;
             }
 
             case OpCode::Ge: {
-                int b = intFromStackValue(pop(), PickVM::opCodeName(instr.op));
-                int a = intFromStackValue(pop(), PickVM::opCodeName(instr.op));
-                push(a >= b ? 1 : 0);
+                Value b = pop();
+                Value a = pop();
+                push(compareValues(a, b, "GE") >= 0 ? 1 : 0);
                 break;
             }
 
@@ -251,6 +268,21 @@ namespace PickVM {
                     throw std::runtime_error("INPUT_INT: invalid integer input");
                 }
                 push(value);
+                break;
+            }
+
+            case OpCode::InputStr: {
+                std::string line;
+                if (!std::getline(in(), line)) {
+                    throw std::runtime_error("INPUT_STR: end of input");
+                }
+                const std::size_t first = line.find_first_not_of(" \t\r\n");
+                if (first == std::string::npos) {
+                    push(std::string{});
+                } else {
+                    const std::size_t last = line.find_last_not_of(" \t\r\n");
+                    push(line.substr(first, last - first + 1));
+                }
                 break;
             }
 

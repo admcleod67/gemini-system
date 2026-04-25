@@ -32,6 +32,7 @@ namespace PickVM {
             case OpCode::PrintStr: return "PRINT_STR";
             case OpCode::PrintEol: return "PRINT_EOL";
             case OpCode::InputInt: return "INPUT_INT";
+            case OpCode::InputStr: return "INPUT_STR";
             case OpCode::Jump: return "JUMP";
             case OpCode::JumpIfZero: return "JZ";
             case OpCode::LoadVar: return "LOAD_VAR";
@@ -100,6 +101,7 @@ namespace PickVM {
             case OpCode::PrintStr:
             case OpCode::PrintEol:
             case OpCode::InputInt:
+            case OpCode::InputStr:
                 break;
         }
 

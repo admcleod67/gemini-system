@@ -13,6 +13,21 @@ namespace PickShell {
             return PickVM::Instruction{op, PickVM::Value{}};
         }
 
+        // Returns true when an expression root is definitively string-typed:
+        //   - a StringLiteralExpr node, or
+        //   - an IdentifierExpr whose name ends with '$' (string variable convention).
+        bool isStringExpr(const BasicAst::Expr &expr) {
+            return std::visit([](const auto &node) -> bool {
+                using T = std::decay_t<decltype(node)>;
+                if constexpr (std::is_same_v<T, BasicAst::StringLiteralExpr>) {
+                    return true;
+                } else if constexpr (std::is_same_v<T, BasicAst::IdentifierExpr>) {
+                    return !node.name.empty() && node.name.back() == '$';
+                }
+                return false;
+            }, expr.node);
+        }
+
         class ExpressionAstEmitter {
         public:
             ExpressionAstEmitter(std::vector<PickVM::Instruction> &out, std::string &error)
@@ -59,6 +74,9 @@ namespace PickShell {
                         using NodeT = std::decay_t<decltype(node)>;
                         if constexpr (std::is_same_v<NodeT, BasicAst::IntLiteralExpr>) {
                             out_.push_back(PickVM::Instruction{PickVM::OpCode::PushInt, node.value});
+                            return true;
+                        } else if constexpr (std::is_same_v<NodeT, BasicAst::StringLiteralExpr>) {
+                            out_.push_back(PickVM::Instruction{PickVM::OpCode::PushStr, node.value});
                             return true;
                         } else if constexpr (std::is_same_v<NodeT, BasicAst::IdentifierExpr>) {
                             if (!isValidVariableName(node.name)) {
@@ -124,6 +142,17 @@ namespace PickShell {
                             result.errors.push_back({line.lineNumber, "LET requires an expression"});
                             return false;
                         }
+                        // Type check: $ variables must hold strings; non-$ variables must hold ints.
+                        const bool isStrVar = !stmt.variableName.empty() && stmt.variableName.back() == '$';
+                        const bool isStrExpr = isStringExpr(*stmt.expression);
+                        if (isStrVar != isStrExpr) {
+                            result.errors.push_back({line.lineNumber,
+                                "LET type mismatch: cannot assign " +
+                                std::string(isStrExpr ? "string" : "integer") + " expression to " +
+                                std::string(isStrVar ? "string" : "integer") + " variable '" +
+                                stmt.variableName + "'"});
+                            return false;
+                        }
                         std::string error;
                         ExpressionAstEmitter emitter(result.program, error);
                         if (!emitter.emit(*stmt.expression)) {
@@ -133,7 +162,9 @@ namespace PickShell {
                         result.program.push_back(PickVM::Instruction{PickVM::OpCode::StoreVar, uppercase(stmt.variableName)});
                         return true;
                     } else if constexpr (std::is_same_v<StmtT, BasicIr::InputStmt>) {
-                        result.program.push_back(makeNoOperandInstruction(PickVM::OpCode::InputInt));
+                        const bool isStrVar = !stmt.variableName.empty() && stmt.variableName.back() == '$';
+                        const auto inputOp = isStrVar ? PickVM::OpCode::InputStr : PickVM::OpCode::InputInt;
+                        result.program.push_back(makeNoOperandInstruction(inputOp));
                         result.program.push_back(PickVM::Instruction{PickVM::OpCode::StoreVar, uppercase(stmt.variableName)});
                         return true;
                     } else if constexpr (std::is_same_v<StmtT, BasicIr::GotoStmt>) {
@@ -167,22 +198,20 @@ namespace PickShell {
                         }
                         return true;
                     } else if constexpr (std::is_same_v<StmtT, BasicIr::PrintStmt>) {
-                        if (stmt.stringLiteral.has_value()) {
-                            result.program.push_back(PickVM::Instruction{PickVM::OpCode::PushStr, *stmt.stringLiteral});
-                            result.program.push_back(makeNoOperandInstruction(PickVM::OpCode::PrintStr));
-                        } else {
-                            if (!stmt.expression) {
-                                result.errors.push_back({line.lineNumber, "PRINT requires an expression"});
-                                return false;
-                            }
-                            std::string error;
-                            ExpressionAstEmitter emitter(result.program, error);
-                            if (!emitter.emit(*stmt.expression)) {
-                                result.errors.push_back({line.lineNumber, "PRINT expression error: " + error});
-                                return false;
-                            }
-                            result.program.push_back(makeNoOperandInstruction(PickVM::OpCode::PrintInt));
+                        if (!stmt.expression) {
+                            result.errors.push_back({line.lineNumber, "PRINT requires an expression"});
+                            return false;
                         }
+                        std::string error;
+                        ExpressionAstEmitter emitter(result.program, error);
+                        if (!emitter.emit(*stmt.expression)) {
+                            result.errors.push_back({line.lineNumber, "PRINT expression error: " + error});
+                            return false;
+                        }
+                        const auto printOp = isStringExpr(*stmt.expression)
+                                                 ? PickVM::OpCode::PrintStr
+                                                 : PickVM::OpCode::PrintInt;
+                        result.program.push_back(makeNoOperandInstruction(printOp));
                         if (!stmt.suppressEol) {
                             result.program.push_back(makeNoOperandInstruction(PickVM::OpCode::PrintEol));
                         }

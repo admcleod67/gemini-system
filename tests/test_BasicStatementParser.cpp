@@ -72,13 +72,15 @@ TEST_CASE("basic statement parser preserves PRINT string and semicolon behavior"
     REQUIRE(result.lines.size() == 2);
 
     const auto &printString = std::get<BasicAst::PrintStmt>(result.lines[0].statement);
-    REQUIRE(printString.stringLiteral.has_value());
-    CHECK(*printString.stringLiteral == "HELLO");
+    REQUIRE(printString.expression != nullptr);
+    const auto *strLit = std::get_if<BasicAst::StringLiteralExpr>(&printString.expression->node);
+    REQUIRE(strLit != nullptr);
+    CHECK(strLit->value == "HELLO");
     CHECK(printString.suppressEol);
 
     const auto &printExpr = std::get<BasicAst::PrintStmt>(result.lines[1].statement);
-    CHECK_FALSE(printExpr.stringLiteral.has_value());
     REQUIRE(printExpr.expression != nullptr);
+    CHECK(std::holds_alternative<BasicAst::BinaryExpr>(printExpr.expression->node));
     CHECK_FALSE(printExpr.suppressEol);
 }
 

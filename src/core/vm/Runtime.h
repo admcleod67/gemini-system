@@ -33,6 +33,7 @@ namespace PickVM {
         PrintStr,
         PrintEol,
         InputInt,
+        InputStr,
         Jump,
         JumpIfZero,
         LoadVar,

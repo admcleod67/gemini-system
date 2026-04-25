@@ -12,6 +12,7 @@ namespace PickShell {
     namespace {
         enum class ExprTokenType {
             IntLiteral,
+            StringLiteral,
             Identifier,
             Plus,
             Minus,
@@ -33,6 +34,7 @@ namespace PickShell {
             std::string lexeme;
             int intValue{0};
             BasicAst::SourceRange range{};
+            std::string strValue{}; // populated for StringLiteral tokens
         };
 
         bool parseIntLiteral(const std::string &token, int &value) {
@@ -65,8 +67,29 @@ namespace PickShell {
                     continue;
                 }
 
-                if (std::isdigit(static_cast<unsigned char>(c)) != 0) {
+                if (c == '"') {
                     const std::size_t start = i;
+                    ++i; // skip opening quote
+                    std::string value;
+                    while (i < expressionText.size() && expressionText[i] != '"') {
+                        value += expressionText[i];
+                        ++i;
+                    }
+                    if (i >= expressionText.size()) {
+                        error = "Unterminated string literal";
+                        return std::nullopt;
+                    }
+                    ++i; // skip closing quote
+                    ExprToken tok;
+                    tok.type = ExprTokenType::StringLiteral;
+                    tok.lexeme = std::string(expressionText.substr(start, i - start));
+                    tok.strValue = value;
+                    tok.range = {start, i};
+                    tokens.push_back(std::move(tok));
+                    continue;
+                }
+
+                if (std::isdigit(static_cast<unsigned char>(c)) != 0) {                    const std::size_t start = i;
                     while (i < expressionText.size() &&
                            std::isdigit(static_cast<unsigned char>(expressionText[i])) != 0) {
                         ++i;
@@ -77,7 +100,7 @@ namespace PickShell {
                         error = "Invalid integer literal '" + literal + "'";
                         return std::nullopt;
                     }
-                    tokens.push_back({ExprTokenType::IntLiteral, literal, parsed, {start, i}});
+                    tokens.push_back({ExprTokenType::IntLiteral, literal, parsed, {start, i}, {}});
                     continue;
                 }
 
@@ -87,23 +110,27 @@ namespace PickShell {
                            std::isalnum(static_cast<unsigned char>(expressionText[i])) != 0) {
                         ++i;
                     }
+                    // Allow optional $ suffix for string variables (e.g. A$, NAME$).
+                    if (i < expressionText.size() && expressionText[i] == '$') {
+                        ++i;
+                    }
                     const std::string ident = std::string(expressionText.substr(start, i - start));
-                    tokens.push_back({ExprTokenType::Identifier, ident, 0, {start, i}});
+                    tokens.push_back({ExprTokenType::Identifier, ident, 0, {start, i}, {}});
                     continue;
                 }
 
                 if (c == '<' && i + 1 < expressionText.size() && expressionText[i + 1] == '=') {
-                    tokens.push_back({ExprTokenType::Le, "<=", 0, {i, i + 2}});
+                    tokens.push_back({ExprTokenType::Le, "<=", 0, {i, i + 2}, {}});
                     i += 2;
                     continue;
                 }
                 if (c == '>' && i + 1 < expressionText.size() && expressionText[i + 1] == '=') {
-                    tokens.push_back({ExprTokenType::Ge, ">=", 0, {i, i + 2}});
+                    tokens.push_back({ExprTokenType::Ge, ">=", 0, {i, i + 2}, {}});
                     i += 2;
                     continue;
                 }
                 if (c == '<' && i + 1 < expressionText.size() && expressionText[i + 1] == '>') {
-                    tokens.push_back({ExprTokenType::Ne, "<>", 0, {i, i + 2}});
+                    tokens.push_back({ExprTokenType::Ne, "<>", 0, {i, i + 2}, {}});
                     i += 2;
                     continue;
                 }
@@ -132,11 +159,11 @@ namespace PickShell {
                         error = "Unexpected token '" + std::string(1, c) + "'";
                         return std::nullopt;
                 }
-                tokens.push_back({type, std::string(1, c), 0, {i, i + 1}});
+                tokens.push_back({type, std::string(1, c), 0, {i, i + 1}, {}});
                 ++i;
             }
 
-            tokens.push_back({ExprTokenType::End, "", 0, {expressionText.size(), expressionText.size()}});
+            tokens.push_back({ExprTokenType::End, "", 0, {expressionText.size(), expressionText.size()}, {}});
             return tokens;
         }
 
@@ -322,6 +349,12 @@ namespace PickShell {
                 if (current().type == ExprTokenType::IntLiteral) {
                     const ExprToken tok = advance();
                     BasicAst::IntLiteralExpr node{tok.intValue, tok.range};
+                    return makeExpr(std::move(node), tok.range);
+                }
+
+                if (current().type == ExprTokenType::StringLiteral) {
+                    const ExprToken tok = advance();
+                    BasicAst::StringLiteralExpr node{tok.strValue, tok.range};
                     return makeExpr(std::move(node), tok.range);
                 }
 

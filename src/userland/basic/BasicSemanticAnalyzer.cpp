@@ -74,7 +74,7 @@ namespace PickShell {
                     } else if constexpr (std::is_same_v<StmtT, BasicAst::IfStmt>) {
                         return BasicIr::IfStmt{std::move(stmt.condition), stmt.thenLine, stmt.elseLine};
                     } else if constexpr (std::is_same_v<StmtT, BasicAst::PrintStmt>) {
-                        return BasicIr::PrintStmt{std::move(stmt.stringLiteral), std::move(stmt.expression), stmt.suppressEol};
+                        return BasicIr::PrintStmt{std::move(stmt.expression), stmt.suppressEol};
                     } else if constexpr (std::is_same_v<StmtT, BasicAst::RemStmt>) {
                         return BasicIr::RemStmt{};
                     } else if constexpr (std::is_same_v<StmtT, BasicAst::StopStmt>) {
