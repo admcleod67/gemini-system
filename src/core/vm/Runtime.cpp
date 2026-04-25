@@ -142,6 +142,7 @@ namespace PickVM {
         ip_ = 0;
         stack_.clear();
         callStack_.clear();
+        forStack_.clear();
         variables_.clear();
     }
 
@@ -360,6 +361,40 @@ namespace PickVM {
                 }
                 ip_ = callStack_.back();
                 callStack_.pop_back();
+                return ip_ < program_.size();
+            }
+
+            case OpCode::ForSetup: {
+                const std::string varName = canonicalVariableName(stringOperandAtIp(instr, ip_));
+                const int step  = coerceToInt(pop());
+                const int limit = coerceToInt(pop());
+                if (step == 0) {
+                    throw std::runtime_error("FOR: STEP cannot be zero");
+                }
+                forStack_.push_back({varName, limit, step, ip_ + 1});
+                break; // falls through to ++ip_ → body
+            }
+
+            case OpCode::ForNext: {
+                const std::string varName = canonicalVariableName(stringOperandAtIp(instr, ip_));
+                if (forStack_.empty()) {
+                    throw std::runtime_error("NEXT without FOR");
+                }
+                ForFrame &frame = forStack_.back();
+                if (frame.varName != varName) {
+                    throw std::runtime_error("FOR/NEXT variable mismatch");
+                }
+                const auto it = variables_.find(frame.varName);
+                const int cur = (it != variables_.end()) ? coerceToInt(it->second) : 0;
+                const int newVal = cur + frame.step;
+                variables_[frame.varName] = newVal;
+                const bool done = (frame.step > 0) ? (newVal > frame.limit)
+                                                   : (newVal < frame.limit);
+                if (done) {
+                    forStack_.pop_back();
+                    break; // falls through to ++ip_ → code after loop
+                }
+                ip_ = frame.bodyIP;
                 return ip_ < program_.size();
             }
 

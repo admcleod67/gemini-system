@@ -510,3 +510,99 @@ TEST_CASE("basic compiler rejects GOSUB to unknown line") {
     CHECK(result.errors[0].line == 10);
     CHECK(result.errors[0].message == "Unknown target line 99");
 }
+
+TEST_CASE("basic compiler compiles simple FOR/NEXT loop") {
+    BasicProgram program;
+    program.setLine(10, "FOR I = 1 TO 3");
+    program.setLine(20, "PRINT I");
+    program.setLine(30, "NEXT I");
+    program.setLine(40, "END");
+
+    BasicCompiler compiler;
+    const auto result = compiler.compile(program);
+
+    REQUIRE(result.success);
+    // FOR I=1 TO 3:
+    //   ip0: PUSH_INT 1
+    //   ip1: STORE_VAR I
+    //   ip2: PUSH_INT 3
+    //   ip3: PUSH_INT 1  (default step)
+    //   ip4: FOR_SETUP I
+    // PRINT I:
+    //   ip5: LOAD_VAR I
+    //   ip6: PRINT_VAL
+    //   ip7: PRINT_EOL
+    // NEXT I:
+    //   ip8: FOR_NEXT I
+    // END:
+    //   ip9: HALT
+    REQUIRE(result.program.size() == 10);
+    CHECK(result.program[0].op == OpCode::PushInt);
+    CHECK(result.program[1].op == OpCode::StoreVar);
+    CHECK(result.program[2].op == OpCode::PushInt);
+    CHECK(result.program[3].op == OpCode::PushInt);  // step=1
+    CHECK(result.program[4].op == OpCode::ForSetup);
+    CHECK(std::get<std::string>(result.program[4].operand) == "I");
+    CHECK(result.program[5].op == OpCode::LoadVar);
+    CHECK(result.program[6].op == OpCode::PrintVal);
+    CHECK(result.program[7].op == OpCode::PrintEol);
+    CHECK(result.program[8].op == OpCode::ForNext);
+    CHECK(std::get<std::string>(result.program[8].operand) == "I");
+    CHECK(result.program[9].op == OpCode::Halt);
+}
+
+TEST_CASE("basic compiler compiles FOR/NEXT with STEP 2") {
+    BasicProgram program;
+    program.setLine(10, "FOR I = 0 TO 8 STEP 2");
+    program.setLine(20, "NEXT I");
+    program.setLine(30, "END");
+
+    BasicCompiler compiler;
+    const auto result = compiler.compile(program);
+    REQUIRE(result.success);
+    // step comes from PUSH_INT 2 at index 3
+    CHECK(result.program[3].op == OpCode::PushInt);
+    CHECK(std::get<int>(result.program[3].operand) == 2);
+    CHECK(result.program[4].op == OpCode::ForSetup);
+}
+
+TEST_CASE("basic compiler compiles FOR/NEXT with negative STEP") {
+    BasicProgram program;
+    program.setLine(10, "FOR I = 5 TO 1 STEP -1");
+    program.setLine(20, "NEXT I");
+    program.setLine(30, "END");
+
+    BasicCompiler compiler;
+    const auto result = compiler.compile(program);
+    REQUIRE(result.success);
+    // Just verify a ForSetup with varName "I" appears in the output
+    bool foundForSetup = false;
+    for (const auto &instr : result.program) {
+        if (instr.op == OpCode::ForSetup && std::get<std::string>(instr.operand) == "I") {
+            foundForSetup = true;
+            break;
+        }
+    }
+    CHECK(foundForSetup);
+    bool foundForNext = false;
+    for (const auto &instr : result.program) {
+        if (instr.op == OpCode::ForNext && std::get<std::string>(instr.operand) == "I") {
+            foundForNext = true;
+            break;
+        }
+    }
+    CHECK(foundForNext);
+}
+
+TEST_CASE("basic compiler rejects $ variable as FOR loop variable") {
+    BasicProgram program;
+    program.setLine(10, "FOR A$ = 1 TO 5");
+    program.setLine(20, "NEXT A$");
+    program.setLine(30, "END");
+
+    BasicCompiler compiler;
+    const auto result = compiler.compile(program);
+    CHECK_FALSE(result.success);
+    REQUIRE(result.errors.size() >= 1);
+    CHECK(result.errors[0].line == 10);
+}

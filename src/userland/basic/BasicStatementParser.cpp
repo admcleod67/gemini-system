@@ -168,6 +168,99 @@ namespace PickShell {
                 continue;
             }
 
+            if (op == "FOR") {
+                std::string rest;
+                std::getline(iss, rest);
+                rest = trim(rest);
+
+                // Find '='
+                const std::size_t eqPos = rest.find('=');
+                if (eqPos == std::string::npos) {
+                    result.errors.push_back({lineNumber, "FOR requires '='"});
+                    continue;
+                }
+                const std::string varRaw = trim(rest.substr(0, eqPos));
+                if (!isValidVariableName(varRaw)) {
+                    result.errors.push_back({lineNumber, "FOR requires a valid variable name"});
+                    continue;
+                }
+
+                // Split remainder on TO keyword
+                const std::string afterEq = trim(rest.substr(eqPos + 1));
+                const std::string afterEqUpper = uppercase(afterEq);
+                const std::size_t toPos = findKeywordToken(afterEqUpper, "TO");
+                if (toPos == std::string::npos) {
+                    result.errors.push_back({lineNumber, "FOR requires TO"});
+                    continue;
+                }
+                const std::string initRaw = trim(afterEq.substr(0, toPos));
+                if (initRaw.empty()) {
+                    result.errors.push_back({lineNumber, "FOR requires an initial value"});
+                    continue;
+                }
+
+                // Split the part after TO on optional STEP keyword
+                const std::string afterTo = trim(afterEq.substr(toPos + 2));
+                const std::string afterToUpper = uppercase(afterTo);
+                const std::size_t stepPos = findKeywordToken(afterToUpper, "STEP");
+
+                std::string limitRaw;
+                std::string stepRaw;
+                if (stepPos != std::string::npos) {
+                    limitRaw = trim(afterTo.substr(0, stepPos));
+                    stepRaw = trim(afterTo.substr(stepPos + 4));
+                } else {
+                    limitRaw = afterTo;
+                }
+
+                if (limitRaw.empty()) {
+                    result.errors.push_back({lineNumber, "FOR requires a limit value"});
+                    continue;
+                }
+
+                BasicExpressionParseResult initExpr = BasicExpressionParser::parse(initRaw);
+                if (!initExpr.success || !initExpr.expression) {
+                    result.errors.push_back({lineNumber, "FOR init error: " + initExpr.error});
+                    continue;
+                }
+                BasicExpressionParseResult limitExpr = BasicExpressionParser::parse(limitRaw);
+                if (!limitExpr.success || !limitExpr.expression) {
+                    result.errors.push_back({lineNumber, "FOR limit error: " + limitExpr.error});
+                    continue;
+                }
+
+                BasicAst::ForStmt stmt{};
+                stmt.variableName = varRaw;
+                stmt.initExpr = std::move(initExpr.expression);
+                stmt.limitExpr = std::move(limitExpr.expression);
+                if (!stepRaw.empty()) {
+                    BasicExpressionParseResult stepExpr = BasicExpressionParser::parse(stepRaw);
+                    if (!stepExpr.success || !stepExpr.expression) {
+                        result.errors.push_back({lineNumber, "FOR STEP error: " + stepExpr.error});
+                        continue;
+                    }
+                    stmt.stepExpr = std::move(stepExpr.expression);
+                }
+                result.lines.push_back({lineNumber, std::move(stmt)});
+                continue;
+            }
+
+            if (op == "NEXT") {
+                std::string rest;
+                std::getline(iss, rest);
+                const std::string varName = trim(rest);
+                if (varName.empty()) {
+                    result.errors.push_back({lineNumber, "NEXT requires a variable name"});
+                    continue;
+                }
+                if (!isValidVariableName(varName)) {
+                    result.errors.push_back({lineNumber, "NEXT requires a valid variable name"});
+                    continue;
+                }
+                result.lines.push_back({lineNumber, BasicAst::NextStmt{varName}});
+                continue;
+            }
+
             if (op == "IF") {
                 std::string rest;
                 std::getline(iss, rest);

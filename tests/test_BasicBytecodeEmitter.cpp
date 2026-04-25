@@ -197,3 +197,72 @@ TEST_CASE("basic bytecode emitter lowers ReturnStmt to Return opcode") {
     CHECK(emitted.program[0].op == OpCode::Return);
     CHECK(emitted.program[1].op == OpCode::Halt);
 }
+
+TEST_CASE("basic bytecode emitter lowers ForStmt to init + ForSetup with default step") {
+    BasicIr::NormalizedProgram program;
+    BasicIr::ForStmt stmt{};
+    stmt.variableName = "I";
+    stmt.initExpr = makeInt(1);
+    stmt.limitExpr = makeInt(10);
+    // stepExpr deliberately left null → emitter should push PUSH_INT 1
+    program.lines.push_back({10, std::move(stmt)});
+
+    const BasicBytecodeEmissionResult emitted = BasicBytecodeEmitter::emit(program);
+    REQUIRE(emitted.success);
+    // Expected: PUSH_INT 1, STORE_VAR I, PUSH_INT 10, PUSH_INT 1 (default step), FOR_SETUP I, HALT
+    REQUIRE(emitted.program.size() == 6);
+    CHECK(emitted.program[0].op == OpCode::PushInt);
+    CHECK(std::get<int>(emitted.program[0].operand) == 1);
+    CHECK(emitted.program[1].op == OpCode::StoreVar);
+    CHECK(std::get<std::string>(emitted.program[1].operand) == "I");
+    CHECK(emitted.program[2].op == OpCode::PushInt);
+    CHECK(std::get<int>(emitted.program[2].operand) == 10);
+    CHECK(emitted.program[3].op == OpCode::PushInt);  // default step = 1
+    CHECK(std::get<int>(emitted.program[3].operand) == 1);
+    CHECK(emitted.program[4].op == OpCode::ForSetup);
+    CHECK(std::get<std::string>(emitted.program[4].operand) == "I");
+    CHECK(emitted.program[5].op == OpCode::Halt);
+}
+
+TEST_CASE("basic bytecode emitter lowers ForStmt with explicit STEP") {
+    BasicIr::NormalizedProgram program;
+    BasicIr::ForStmt stmt{};
+    stmt.variableName = "I";
+    stmt.initExpr = makeInt(0);
+    stmt.limitExpr = makeInt(10);
+    stmt.stepExpr = makeInt(2);
+    program.lines.push_back({10, std::move(stmt)});
+
+    const BasicBytecodeEmissionResult emitted = BasicBytecodeEmitter::emit(program);
+    REQUIRE(emitted.success);
+    REQUIRE(emitted.program.size() == 6);
+    CHECK(emitted.program[3].op == OpCode::PushInt);
+    CHECK(std::get<int>(emitted.program[3].operand) == 2);  // explicit step
+    CHECK(emitted.program[4].op == OpCode::ForSetup);
+}
+
+TEST_CASE("basic bytecode emitter lowers NextStmt to ForNext opcode") {
+    BasicIr::NormalizedProgram program;
+    program.lines.push_back({20, BasicIr::NextStmt{"I"}});
+
+    const BasicBytecodeEmissionResult emitted = BasicBytecodeEmitter::emit(program);
+    REQUIRE(emitted.success);
+    REQUIRE(emitted.program.size() == 2);
+    CHECK(emitted.program[0].op == OpCode::ForNext);
+    CHECK(std::get<std::string>(emitted.program[0].operand) == "I");
+    CHECK(emitted.program[1].op == OpCode::Halt);
+}
+
+TEST_CASE("basic bytecode emitter rejects $ variable as FOR loop variable") {
+    BasicIr::NormalizedProgram program;
+    BasicIr::ForStmt stmt{};
+    stmt.variableName = "I$";
+    stmt.initExpr = makeInt(1);
+    stmt.limitExpr = makeInt(5);
+    program.lines.push_back({10, std::move(stmt)});
+
+    const BasicBytecodeEmissionResult emitted = BasicBytecodeEmitter::emit(program);
+    CHECK_FALSE(emitted.success);
+    REQUIRE(emitted.errors.size() == 1);
+    CHECK(emitted.errors[0].line == 10);
+}

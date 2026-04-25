@@ -188,6 +188,56 @@ namespace PickShell {
                     } else if constexpr (std::is_same_v<StmtT, BasicIr::ReturnStmt>) {
                         result.program.push_back(makeNoOperandInstruction(PickVM::OpCode::Return));
                         return true;
+                    } else if constexpr (std::is_same_v<StmtT, BasicIr::ForStmt>) {
+                        if (isStringVar(stmt.variableName)) {
+                            result.errors.push_back({line.lineNumber,
+                                "String variable '" + stmt.variableName +
+                                "' cannot be used as a FOR loop variable"});
+                            return false;
+                        }
+                        if (!stmt.initExpr || !stmt.limitExpr) {
+                            result.errors.push_back({line.lineNumber, "FOR requires init and limit expressions"});
+                            return false;
+                        }
+                        // Emit: init → [CoerceInt if %] → StoreVar
+                        {
+                            std::string error;
+                            ExpressionAstEmitter emitter(result.program, error);
+                            if (!emitter.emit(*stmt.initExpr)) {
+                                result.errors.push_back({line.lineNumber, "FOR init error: " + error});
+                                return false;
+                            }
+                        }
+                        if (isIntVar(stmt.variableName)) {
+                            result.program.push_back(makeNoOperandInstruction(PickVM::OpCode::CoerceInt));
+                        }
+                        result.program.push_back(PickVM::Instruction{PickVM::OpCode::StoreVar, uppercase(stmt.variableName)});
+                        // Emit: limit expression
+                        {
+                            std::string error;
+                            ExpressionAstEmitter emitter(result.program, error);
+                            if (!emitter.emit(*stmt.limitExpr)) {
+                                result.errors.push_back({line.lineNumber, "FOR limit error: " + error});
+                                return false;
+                            }
+                        }
+                        // Emit: step expression (or PUSH_INT 1 as default)
+                        if (stmt.stepExpr) {
+                            std::string error;
+                            ExpressionAstEmitter emitter(result.program, error);
+                            if (!emitter.emit(*stmt.stepExpr)) {
+                                result.errors.push_back({line.lineNumber, "FOR STEP error: " + error});
+                                return false;
+                            }
+                        } else {
+                            result.program.push_back(PickVM::Instruction{PickVM::OpCode::PushInt, 1});
+                        }
+                        // Emit: FOR_SETUP varName
+                        result.program.push_back(PickVM::Instruction{PickVM::OpCode::ForSetup, uppercase(stmt.variableName)});
+                        return true;
+                    } else if constexpr (std::is_same_v<StmtT, BasicIr::NextStmt>) {
+                        result.program.push_back(PickVM::Instruction{PickVM::OpCode::ForNext, uppercase(stmt.variableName)});
+                        return true;
                     } else if constexpr (std::is_same_v<StmtT, BasicIr::IfStmt>) {
                         if (!stmt.condition) {
                             result.errors.push_back({line.lineNumber, "IF requires a condition expression"});

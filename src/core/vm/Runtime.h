@@ -40,11 +40,20 @@ namespace PickVM {
         JumpIfZero,
         Call,
         Return,
+        ForSetup,
+        ForNext,
         LoadVar,
         StoreVar
     };
 
     using Value = std::variant<int, std::string>;
+
+    struct ForFrame {
+        std::string varName;
+        int limit{0};
+        int step{0};
+        std::size_t bodyIP{0};
+    };
 
     struct Instruction {
         OpCode op;
@@ -83,6 +92,7 @@ namespace PickVM {
         std::vector<Instruction> program_;
         std::vector<Value> stack_;
         std::vector<std::size_t> callStack_; // Return-address stack for GOSUB/RETURN
+        std::vector<ForFrame> forStack_;     // Loop-frame stack for FOR/NEXT
         std::unordered_map<std::string, Value> variables_;
         std::size_t ip_; // Instruction pointer
         mutable std::ostream *outStream_{nullptr};

@@ -39,6 +39,8 @@ namespace PickVM {
             case OpCode::JumpIfZero: return "JZ";
             case OpCode::Call: return "CALL";
             case OpCode::Return: return "RETURN";
+            case OpCode::ForSetup: return "FOR_SETUP";
+            case OpCode::ForNext: return "FOR_NEXT";
             case OpCode::LoadVar: return "LOAD_VAR";
             case OpCode::StoreVar: return "STORE_VAR";
         }
@@ -87,6 +89,8 @@ namespace PickVM {
                 break;
             case OpCode::LoadVar:
             case OpCode::StoreVar:
+            case OpCode::ForSetup:
+            case OpCode::ForNext:
                 oss << ' ' << stringOperandAtIp(instr, ip);
                 break;
             case OpCode::Add:

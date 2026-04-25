@@ -17,6 +17,8 @@ Compiler internals are in an incremental refactor phase. Expression parsing and 
 - `GOTO <line>`
 - `GOSUB <line>`
 - `RETURN`
+- `FOR <var> = <init> TO <limit> [STEP <step>]`
+- `NEXT <var>`
 - `IF <cond> THEN <line> [ELSE <line>]`
 - `STOP`
 - `INPUT <var>`
@@ -122,6 +124,42 @@ The semicolon form is useful for prompt-style interaction, for example printing 
 - `GOSUB <line>` calls the subroutine beginning at the specified BASIC line number. Execution resumes at the statement following `GOSUB` when a matching `RETURN` is reached.
 - `RETURN` returns from the most recently called `GOSUB`. Raises a runtime error if there is no active `GOSUB` call.
 - `IF <cond> THEN <line>` jumps to `<line>` when `<cond>` is true; otherwise execution continues to the next sequential line.
+
+## Loops
+
+`FOR <var> = <init> TO <limit> [STEP <step>]` … `NEXT <var>` implements a counted loop.
+
+Authentic Pick BASIC semantics are preserved:
+
+- **Body executes at least once.** The termination test occurs *after* `NEXT`, not before the body.
+- **`NEXT` increments** the loop variable by `step` (default 1), then checks whether the loop is done:
+  - Positive step: loop ends when `var > limit`.
+  - Negative step: loop ends when `var < limit`.
+  - Zero step: runtime error `"FOR: STEP cannot be zero"`.
+- `limit` and `step` are captured once at loop entry (`FOR_SETUP`), so any later assignment to variables used in those expressions does not affect the loop.
+- The loop control variable obeys the usual suffix rules: `$` suffix is a **compile-time error**; `%` suffix applies `COERCE_INT` to the initial value; unsuffixed variables are stored as-is.
+
+Example:
+
+```
+10 FOR I = 1 TO 5
+20   PRINT I
+30 NEXT I
+40 END
+```
+
+This prints `1`, `2`, `3`, `4`, `5` (one per line).
+
+Counting down requires an explicit negative step:
+
+```
+10 FOR I = 5 TO 1 STEP -1
+20   PRINT I
+30 NEXT I
+40 END
+```
+
+`NEXT` without a matching `FOR` raises `"NEXT without FOR"` at runtime. If the variable name in `NEXT` does not match the top of the loop stack, a `"FOR/NEXT variable mismatch"` runtime error is raised.
 - `IF <cond> THEN <line1> ELSE <line2>` jumps to `<line1>` when true, otherwise to `<line2>`.
 - `STOP` halts execution immediately (same runtime effect as `END`).
 - Unknown target lines are compile-time errors.

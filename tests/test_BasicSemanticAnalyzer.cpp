@@ -1,6 +1,7 @@
 #include <doctest/doctest.h>
 
 #include "BasicProgram.h"
+#include "BasicNormalizedIr.h"
 #include "BasicSemanticAnalyzer.h"
 #include "BasicStatementParser.h"
 
@@ -9,6 +10,7 @@
 using PickShell::BasicProgram;
 using PickShell::BasicSemanticAnalyzer;
 using PickShell::BasicStatementParser;
+namespace BasicIr = PickShell::BasicIr;
 
 TEST_CASE("basic semantic analyzer passes when control flow targets exist") {
     BasicProgram program;
@@ -111,4 +113,25 @@ TEST_CASE("basic semantic analyzer reports missing GOSUB target") {
     REQUIRE(semantic.errors.size() == 1);
     CHECK(semantic.errors[0].line == 10);
     CHECK(semantic.errors[0].message == "Unknown target line 99");
+}
+
+TEST_CASE("basic semantic analyzer lowers FOR/NEXT to IR") {
+    BasicProgram program;
+    program.setLine(10, "FOR I = 1 TO 10");
+    program.setLine(20, "NEXT I");
+
+    auto parsed = BasicStatementParser::parse(program);
+    REQUIRE(parsed.success);
+
+    const auto semantic = BasicSemanticAnalyzer::analyze(std::move(parsed));
+    REQUIRE(semantic.success);
+    REQUIRE(semantic.program.lines.size() == 2);
+    CHECK(std::holds_alternative<BasicIr::ForStmt>(semantic.program.lines[0].statement));
+    CHECK(std::holds_alternative<BasicIr::NextStmt>(semantic.program.lines[1].statement));
+    const auto &forStmt = std::get<BasicIr::ForStmt>(semantic.program.lines[0].statement);
+    CHECK(forStmt.variableName == "I");
+    CHECK(forStmt.initExpr != nullptr);
+    CHECK(forStmt.limitExpr != nullptr);
+    CHECK(forStmt.stepExpr == nullptr);
+    CHECK(std::get<BasicIr::NextStmt>(semantic.program.lines[1].statement).variableName == "I");
 }

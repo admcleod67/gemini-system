@@ -94,6 +94,17 @@ namespace PickShell::BasicAst {
 
     struct ReturnStmt {};
 
+    struct ForStmt {
+        std::string variableName;
+        std::unique_ptr<Expr> initExpr;
+        std::unique_ptr<Expr> limitExpr;
+        std::unique_ptr<Expr> stepExpr; // nullptr → step defaults to 1 at emit time
+    };
+
+    struct NextStmt {
+        std::string variableName;
+    };
+
     struct IfStmt {
         std::unique_ptr<Expr> condition;
         int thenLine{0};
@@ -111,7 +122,7 @@ namespace PickShell::BasicAst {
 
     struct EndStmt {};
 
-    using StatementNode = std::variant<LetStmt, InputStmt, GotoStmt, GosubStmt, ReturnStmt, IfStmt, PrintStmt, RemStmt, StopStmt, EndStmt>;
+    using StatementNode = std::variant<LetStmt, InputStmt, GotoStmt, GosubStmt, ReturnStmt, ForStmt, NextStmt, IfStmt, PrintStmt, RemStmt, StopStmt, EndStmt>;
 
     struct ParsedBasicLine {
         int lineNumber{0};

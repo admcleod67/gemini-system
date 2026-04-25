@@ -160,3 +160,77 @@ TEST_CASE("basic statement parser rejects RETURN with arguments") {
     CHECK(result.errors[0].line == 10);
     CHECK(result.errors[0].message == "RETURN takes no arguments");
 }
+
+TEST_CASE("basic statement parser parses FOR...TO") {
+    BasicProgram program;
+    program.setLine(10, "FOR I = 1 TO 10");
+
+    const BasicAst::StatementParseResult result = BasicStatementParser::parse(program);
+    REQUIRE(result.success);
+    REQUIRE(result.lines.size() == 1);
+    REQUIRE(std::holds_alternative<BasicAst::ForStmt>(result.lines[0].statement));
+    const auto &stmt = std::get<BasicAst::ForStmt>(result.lines[0].statement);
+    CHECK(stmt.variableName == "I");
+    CHECK(stmt.initExpr != nullptr);
+    CHECK(stmt.limitExpr != nullptr);
+    CHECK(stmt.stepExpr == nullptr);
+}
+
+TEST_CASE("basic statement parser parses FOR...TO STEP") {
+    BasicProgram program;
+    program.setLine(10, "FOR I = 1 TO 10 STEP 2");
+
+    const BasicAst::StatementParseResult result = BasicStatementParser::parse(program);
+    REQUIRE(result.success);
+    REQUIRE(result.lines.size() == 1);
+    REQUIRE(std::holds_alternative<BasicAst::ForStmt>(result.lines[0].statement));
+    const auto &stmt = std::get<BasicAst::ForStmt>(result.lines[0].statement);
+    CHECK(stmt.variableName == "I");
+    CHECK(stmt.initExpr != nullptr);
+    CHECK(stmt.limitExpr != nullptr);
+    CHECK(stmt.stepExpr != nullptr);
+}
+
+TEST_CASE("basic statement parser parses NEXT") {
+    BasicProgram program;
+    program.setLine(20, "NEXT I");
+
+    const BasicAst::StatementParseResult result = BasicStatementParser::parse(program);
+    REQUIRE(result.success);
+    REQUIRE(result.lines.size() == 1);
+    REQUIRE(std::holds_alternative<BasicAst::NextStmt>(result.lines[0].statement));
+    CHECK(std::get<BasicAst::NextStmt>(result.lines[0].statement).variableName == "I");
+}
+
+TEST_CASE("basic statement parser rejects FOR without TO") {
+    BasicProgram program;
+    program.setLine(10, "FOR I = 1 5");
+
+    const BasicAst::StatementParseResult result = BasicStatementParser::parse(program);
+    CHECK_FALSE(result.success);
+    REQUIRE(result.errors.size() == 1);
+    CHECK(result.errors[0].line == 10);
+    CHECK(result.errors[0].message == "FOR requires TO");
+}
+
+TEST_CASE("basic statement parser rejects FOR without variable") {
+    BasicProgram program;
+    program.setLine(10, "FOR = 1 TO 10");
+
+    const BasicAst::StatementParseResult result = BasicStatementParser::parse(program);
+    CHECK_FALSE(result.success);
+    REQUIRE(result.errors.size() == 1);
+    CHECK(result.errors[0].line == 10);
+}
+
+TEST_CASE("basic statement parser rejects NEXT without variable") {
+    BasicProgram program;
+    program.setLine(20, "NEXT");
+
+    const BasicAst::StatementParseResult result = BasicStatementParser::parse(program);
+    CHECK_FALSE(result.success);
+    REQUIRE(result.errors.size() == 1);
+    CHECK(result.errors[0].line == 20);
+    CHECK(result.errors[0].message == "NEXT requires a variable name");
+}
+

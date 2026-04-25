@@ -744,3 +744,216 @@ TEST_CASE("runtime loadProgram clears call stack between runs") {
     rt.loadProgram(prog2);
     CHECK_THROWS_AS(rt.run(), std::runtime_error);
 }
+
+// ─────────────────────── FOR / NEXT ─────────────────────────
+
+TEST_CASE("runtime FOR/NEXT loop body executes at least once (Pick semantics)") {
+    // FOR I = 5 TO 1 (no STEP), body should still run once before NEXT increments
+    // PUSH_INT 5 → STORE_VAR I → PUSH_INT 1 (limit) → PUSH_INT 1 (step) → FOR_SETUP I
+    // body: LOAD_VAR I → PRINT_VAL → PRINT_EOL
+    // FOR_NEXT I → HALT
+    std::ostringstream out;
+    Runtime rt;
+    rt.setOutputStream(&out);
+
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt,   5},                          // 0 init
+        {OpCode::StoreVar,  std::string{"I"}},           // 1
+        {OpCode::PushInt,   1},                          // 2 limit
+        {OpCode::PushInt,   1},                          // 3 step
+        {OpCode::ForSetup,  std::string{"I"}},           // 4 bodyIP = 5
+        {OpCode::LoadVar,   std::string{"I"}},           // 5
+        {OpCode::PrintVal,  Value{}},                    // 6
+        {OpCode::PrintEol,  Value{}},                    // 7
+        {OpCode::ForNext,   std::string{"I"}},           // 8
+        {OpCode::Halt,      Value{}},                    // 9
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    // I starts at 5; NEXT increments to 6; 6 > 1 (limit), so loop exits after one iteration
+    const std::string output = out.str();
+    CHECK(output == "5\n");
+}
+
+TEST_CASE("runtime FOR/NEXT loop executes correct number of times") {
+    // FOR I = 1 TO 3 : body : NEXT I
+    std::ostringstream out;
+    Runtime rt;
+    rt.setOutputStream(&out);
+
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt,   1},                          // 0 init
+        {OpCode::StoreVar,  std::string{"I"}},           // 1
+        {OpCode::PushInt,   3},                          // 2 limit
+        {OpCode::PushInt,   1},                          // 3 step
+        {OpCode::ForSetup,  std::string{"I"}},           // 4 bodyIP = 5
+        {OpCode::LoadVar,   std::string{"I"}},           // 5
+        {OpCode::PrintVal,  Value{}},                    // 6
+        {OpCode::PrintEol,  Value{}},                    // 7
+        {OpCode::ForNext,   std::string{"I"}},           // 8
+        {OpCode::Halt,      Value{}},                    // 9
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    // I=1 body → NEXT → I=2 (2>3? no) → body → NEXT → I=3 (3>3? no) → body → NEXT → I=4 (4>3? yes) → exit
+    CHECK(out.str() == "1\n2\n3\n");
+}
+
+TEST_CASE("runtime FOR/NEXT loop with STEP 2") {
+    std::ostringstream out;
+    Runtime rt;
+    rt.setOutputStream(&out);
+
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt,   1},
+        {OpCode::StoreVar,  std::string{"I"}},
+        {OpCode::PushInt,   5},
+        {OpCode::PushInt,   2},                          // step = 2
+        {OpCode::ForSetup,  std::string{"I"}},           // bodyIP = 5
+        {OpCode::LoadVar,   std::string{"I"}},
+        {OpCode::PrintVal,  Value{}},
+        {OpCode::PrintEol,  Value{}},
+        {OpCode::ForNext,   std::string{"I"}},
+        {OpCode::Halt,      Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    CHECK(out.str() == "1\n3\n5\n");
+}
+
+TEST_CASE("runtime FOR/NEXT loop with negative STEP counts down") {
+    std::ostringstream out;
+    Runtime rt;
+    rt.setOutputStream(&out);
+
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt,   3},
+        {OpCode::StoreVar,  std::string{"I"}},
+        {OpCode::PushInt,   1},                          // limit
+        {OpCode::PushInt,   -1},                         // step = -1
+        {OpCode::ForSetup,  std::string{"I"}},
+        {OpCode::LoadVar,   std::string{"I"}},
+        {OpCode::PrintVal,  Value{}},
+        {OpCode::PrintEol,  Value{}},
+        {OpCode::ForNext,   std::string{"I"}},
+        {OpCode::Halt,      Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    CHECK(out.str() == "3\n2\n1\n");
+}
+
+TEST_CASE("runtime NEXT without FOR throws") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::ForNext, std::string{"I"}},
+        {OpCode::Halt,    Value{}},
+    };
+    rt.loadProgram(prog);
+    CHECK_THROWS_WITH(rt.run(), "NEXT without FOR");
+}
+
+TEST_CASE("runtime FOR/NEXT variable mismatch throws") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt,  1},
+        {OpCode::StoreVar, std::string{"I"}},
+        {OpCode::PushInt,  5},
+        {OpCode::PushInt,  1},
+        {OpCode::ForSetup, std::string{"I"}},
+        {OpCode::ForNext,  std::string{"J"}},  // mismatch!
+        {OpCode::Halt,     Value{}},
+    };
+    rt.loadProgram(prog);
+    CHECK_THROWS_WITH(rt.run(), "FOR/NEXT variable mismatch");
+}
+
+TEST_CASE("runtime STEP 0 throws") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt,  1},
+        {OpCode::StoreVar, std::string{"I"}},
+        {OpCode::PushInt,  5},
+        {OpCode::PushInt,  0},                           // STEP 0
+        {OpCode::ForSetup, std::string{"I"}},
+        {OpCode::Halt,     Value{}},
+    };
+    rt.loadProgram(prog);
+    CHECK_THROWS_WITH(rt.run(), "FOR: STEP cannot be zero");
+}
+
+TEST_CASE("runtime loadProgram clears forStack") {
+    Runtime rt;
+    // First run: push a frame but don't NEXT it
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt,  1},
+        {OpCode::StoreVar, std::string{"I"}},
+        {OpCode::PushInt,  10},
+        {OpCode::PushInt,  1},
+        {OpCode::ForSetup, std::string{"I"}},
+        {OpCode::Halt,     Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+
+    // Second run: the for stack should have been cleared; bare NEXT should throw
+    std::vector<Instruction> prog2 = {
+        {OpCode::ForNext, std::string{"I"}},
+        {OpCode::Halt,    Value{}},
+    };
+    rt.loadProgram(prog2);
+    CHECK_THROWS_WITH(rt.run(), "NEXT without FOR");
+}
+
+TEST_CASE("runtime nested FOR/NEXT loops") {
+    std::ostringstream out;
+    Runtime rt;
+    rt.setOutputStream(&out);
+
+    // Outer: I = 1 TO 2; Inner: J = 1 TO 2; PRINT I*10+J
+    // ip0:  PUSH_INT 1        outer init
+    // ip1:  STORE_VAR I
+    // ip2:  PUSH_INT 2        outer limit
+    // ip3:  PUSH_INT 1        outer step
+    // ip4:  FOR_SETUP I       outer bodyIP = 5
+    // ip5:  PUSH_INT 1        inner init
+    // ip6:  STORE_VAR J
+    // ip7:  PUSH_INT 2        inner limit
+    // ip8:  PUSH_INT 1        inner step
+    // ip9:  FOR_SETUP J       inner bodyIP = 10
+    // ip10: LOAD_VAR I
+    // ip11: PUSH_INT 10
+    // ip12: MUL
+    // ip13: LOAD_VAR J
+    // ip14: ADD
+    // ip15: PRINT_VAL
+    // ip16: PRINT_EOL
+    // ip17: FOR_NEXT J
+    // ip18: FOR_NEXT I
+    // ip19: HALT
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt,  1},
+        {OpCode::StoreVar, std::string{"I"}},
+        {OpCode::PushInt,  2},
+        {OpCode::PushInt,  1},
+        {OpCode::ForSetup, std::string{"I"}},           // ip4, bodyIP=5
+        {OpCode::PushInt,  1},
+        {OpCode::StoreVar, std::string{"J"}},
+        {OpCode::PushInt,  2},
+        {OpCode::PushInt,  1},
+        {OpCode::ForSetup, std::string{"J"}},           // ip9, bodyIP=10
+        {OpCode::LoadVar,  std::string{"I"}},
+        {OpCode::PushInt,  10},
+        {OpCode::Mul,      Value{}},
+        {OpCode::LoadVar,  std::string{"J"}},
+        {OpCode::Add,      Value{}},
+        {OpCode::PrintVal, Value{}},
+        {OpCode::PrintEol, Value{}},
+        {OpCode::ForNext,  std::string{"J"}},           // ip17
+        {OpCode::ForNext,  std::string{"I"}},           // ip18
+        {OpCode::Halt,     Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    CHECK(out.str() == "11\n12\n21\n22\n");
+}
