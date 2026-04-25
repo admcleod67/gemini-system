@@ -1149,3 +1149,36 @@ TEST_CASE("shell BASIC RUN reports runtime error for divide by zero") {
     CHECK(out.str().find("Runtime error") != std::string::npos);
     CHECK(out.str().find("divide by zero") != std::string::npos);
 }
+
+TEST_CASE("shell BASIC RUN executes OPEN WRITE READ CLOSE flow") {
+    auto progDir = uniqueTempDir();
+    auto fsDir = uniqueTempDir();
+    std::filesystem::create_directories(progDir);
+    std::filesystem::create_directories(fsDir);
+
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setProgramsRoot(progDir);
+    sh.setFileSystemRoot(fsDir);
+
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("CREATE-FILE BP", out, quit);
+    CHECK(out.str().empty());
+    out.str("");
+
+    sh.handleLine("BASIC TEST", out, quit);
+    sh.handleLine("10 OPEN \"BP\" TO F ELSE 90", out, quit);
+    sh.handleLine("20 WRITE \"HELLO\" ON F, \"ID1\" ELSE 90", out, quit);
+    sh.handleLine("30 READ R FROM F, \"ID1\" ELSE 90", out, quit);
+    sh.handleLine("40 PRINT R", out, quit);
+    sh.handleLine("50 CLOSE F", out, quit);
+    sh.handleLine("60 END", out, quit);
+    sh.handleLine("90 PRINT \"ERR\"", out, quit);
+    sh.handleLine("100 END", out, quit);
+    out.str("");
+
+    sh.handleLine("RUN", out, quit);
+    CHECK(out.str() == "HELLO\n");
+}

@@ -367,6 +367,109 @@ namespace PickShell {
                         }
                         result.program.push_back(PickVM::Instruction{PickVM::OpCode::StoreArr, uppercase(stmt.variableName)});
                         return true;
+                    } else if constexpr (std::is_same_v<StmtT, BasicIr::OpenStmt>) {
+                        if (!stmt.fileExpr) {
+                            result.errors.push_back({line.lineNumber, "OPEN requires a file expression"});
+                            return false;
+                        }
+                        std::string error;
+                        ExpressionAstEmitter emitter(result.program, error);
+                        if (!emitter.emit(*stmt.fileExpr)) {
+                            result.errors.push_back({line.lineNumber, "OPEN file expression error: " + error});
+                            return false;
+                        }
+
+                        const std::string fileVar = uppercase(stmt.fileVar);
+                        if (stmt.elseLine.has_value()) {
+                            result.program.push_back(PickVM::Instruction{PickVM::OpCode::OpenFileTry, fileVar});
+                            const std::size_t jzIp = result.program.size();
+                            result.program.push_back(PickVM::Instruction{PickVM::OpCode::JumpIfZero, 0});
+                            const std::size_t skipElseJumpIp = result.program.size();
+                            result.program.push_back(PickVM::Instruction{PickVM::OpCode::Jump, 0});
+                            const std::size_t elseJumpIp = result.program.size();
+                            result.program.push_back(PickVM::Instruction{PickVM::OpCode::Jump, 0});
+                            result.program[jzIp].operand = static_cast<int>(elseJumpIp);
+                            result.program[skipElseJumpIp].operand = static_cast<int>(result.program.size());
+                            jumpFixups.push_back({line.lineNumber, elseJumpIp, *stmt.elseLine});
+                        } else {
+                            result.program.push_back(PickVM::Instruction{PickVM::OpCode::OpenFile, fileVar});
+                        }
+                        return true;
+                    } else if constexpr (std::is_same_v<StmtT, BasicIr::ReadStmt>) {
+                        if (!stmt.idExpr) {
+                            result.errors.push_back({line.lineNumber, "READ requires an ID expression"});
+                            return false;
+                        }
+                        std::string error;
+                        ExpressionAstEmitter emitter(result.program, error);
+                        if (!emitter.emit(*stmt.idExpr)) {
+                            result.errors.push_back({line.lineNumber, "READ ID expression error: " + error});
+                            return false;
+                        }
+
+                        const std::string fileVar = uppercase(stmt.fileVar);
+                        const std::string targetVar = uppercase(stmt.targetVar);
+                        if (stmt.elseLine.has_value()) {
+                            result.program.push_back(PickVM::Instruction{PickVM::OpCode::ReadRecTry, fileVar});
+                            const std::size_t jzIp = result.program.size();
+                            result.program.push_back(PickVM::Instruction{PickVM::OpCode::JumpIfZero, 0}); // pops success flag
+                            result.program.push_back(makeNoOperandInstruction(PickVM::OpCode::StoreVar));
+                            result.program.back().operand = targetVar;
+                            const std::size_t skipElseJumpIp = result.program.size();
+                            result.program.push_back(PickVM::Instruction{PickVM::OpCode::Jump, 0});
+                            const std::size_t failPathIp = result.program.size();
+                            result.program.push_back(makeNoOperandInstruction(PickVM::OpCode::Drop)); // drop placeholder value
+                            const std::size_t elseJumpIp = result.program.size();
+                            result.program.push_back(PickVM::Instruction{PickVM::OpCode::Jump, 0});
+                            result.program[jzIp].operand = static_cast<int>(failPathIp);
+                            result.program[skipElseJumpIp].operand = static_cast<int>(result.program.size());
+                            jumpFixups.push_back({line.lineNumber, elseJumpIp, *stmt.elseLine});
+                        } else {
+                            result.program.push_back(PickVM::Instruction{PickVM::OpCode::ReadRec, fileVar});
+                            result.program.push_back(PickVM::Instruction{PickVM::OpCode::StoreVar, targetVar});
+                        }
+                        return true;
+                    } else if constexpr (std::is_same_v<StmtT, BasicIr::WriteStmt>) {
+                        if (!stmt.valueExpr || !stmt.idExpr) {
+                            result.errors.push_back({line.lineNumber, "WRITE requires value and ID expressions"});
+                            return false;
+                        }
+                        {
+                            std::string error;
+                            ExpressionAstEmitter emitter(result.program, error);
+                            if (!emitter.emit(*stmt.valueExpr)) {
+                                result.errors.push_back({line.lineNumber, "WRITE value expression error: " + error});
+                                return false;
+                            }
+                        }
+                        {
+                            std::string error;
+                            ExpressionAstEmitter emitter(result.program, error);
+                            if (!emitter.emit(*stmt.idExpr)) {
+                                result.errors.push_back({line.lineNumber, "WRITE ID expression error: " + error});
+                                return false;
+                            }
+                        }
+
+                        const std::string fileVar = uppercase(stmt.fileVar);
+                        if (stmt.elseLine.has_value()) {
+                            result.program.push_back(PickVM::Instruction{PickVM::OpCode::WriteRecTry, fileVar});
+                            const std::size_t jzIp = result.program.size();
+                            result.program.push_back(PickVM::Instruction{PickVM::OpCode::JumpIfZero, 0});
+                            const std::size_t skipElseJumpIp = result.program.size();
+                            result.program.push_back(PickVM::Instruction{PickVM::OpCode::Jump, 0});
+                            const std::size_t elseJumpIp = result.program.size();
+                            result.program.push_back(PickVM::Instruction{PickVM::OpCode::Jump, 0});
+                            result.program[jzIp].operand = static_cast<int>(elseJumpIp);
+                            result.program[skipElseJumpIp].operand = static_cast<int>(result.program.size());
+                            jumpFixups.push_back({line.lineNumber, elseJumpIp, *stmt.elseLine});
+                        } else {
+                            result.program.push_back(PickVM::Instruction{PickVM::OpCode::WriteRec, fileVar});
+                        }
+                        return true;
+                    } else if constexpr (std::is_same_v<StmtT, BasicIr::CloseStmt>) {
+                        result.program.push_back(PickVM::Instruction{PickVM::OpCode::CloseFile, uppercase(stmt.fileVar)});
+                        return true;
                     } else if constexpr (std::is_same_v<StmtT, BasicIr::ClearStmt>) {
                         result.program.push_back(makeNoOperandInstruction(PickVM::OpCode::ClearVars));
                         return true;

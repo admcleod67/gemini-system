@@ -20,6 +20,10 @@ Compiler internals are in an incremental refactor phase. Expression parsing and 
 - `FOR <var> = <init> TO <limit> [STEP <step>]`
 - `NEXT <var>`
 - `DIM <var>(<size>)`
+- `OPEN <file-expr> TO <filevar> [ELSE <line>]`
+- `READ <var> FROM <filevar>, <id-expr> [ELSE <line>]`
+- `WRITE <expr> ON <filevar>, <id-expr> [ELSE <line>]`
+- `CLOSE <filevar>`
 - `CLEAR`
 - `IF <cond> THEN <line> [ELSE <line>]`
 - `STOP`
@@ -209,6 +213,36 @@ Expression-related messages include categories such as:
   - `A%(n)` — integer array; values are coerced to int on write.
   - `A(n)` — dynamic array; values are stored as-is and coerced to int in arithmetic contexts.
 - Arrays and scalar variables with the same base name are independent: `A` and `A(1)` are different storage locations.
+
+## File handling (MVP)
+
+File handling uses the PickFS backend and file-variable handles:
+
+- `OPEN <file-expr> TO <filevar> [ELSE <line>]`
+- `READ <var> FROM <filevar>, <id-expr> [ELSE <line>]`
+- `WRITE <expr> ON <filevar>, <id-expr> [ELSE <line>]`
+- `CLOSE <filevar>`
+
+Examples:
+
+```
+10 OPEN "CUSTOMERS" TO FVAR ELSE 90
+20 READ REC FROM FVAR, ID ELSE 80
+30 WRITE REC ON FVAR, ID ELSE 90
+40 CLOSE FVAR
+50 END
+80 LET REC = ""
+90 END
+```
+
+Rules:
+
+- `OPEN` succeeds only if the file already exists. There is no automatic file creation from BASIC.
+- `OPEN`, `READ`, and `WRITE` route failures to `ELSE <line>` when provided.
+- Without `ELSE`, failures raise runtime errors and stop execution.
+- In this MVP, `ELSE` for file statements accepts only a line target (`ELSE <line>`), not an inline statement.
+- `CLOSE` on an unopened file variable is a no-op.
+- Open file handles are automatically released when the program ends.
 
 ## CLEAR
 

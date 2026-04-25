@@ -147,7 +147,31 @@ namespace PickShell::BasicAst {
 
     struct ClearStmt {};
 
-    using StatementNode = std::variant<LetStmt, InputStmt, GotoStmt, GosubStmt, ReturnStmt, ForStmt, NextStmt, IfStmt, PrintStmt, RemStmt, StopStmt, EndStmt, DimStmt, LetArrayStmt, ClearStmt>;
+    struct OpenStmt {
+        std::unique_ptr<Expr> fileExpr;
+        std::string fileVar;
+        std::optional<int> elseLine;
+    };
+
+    struct ReadStmt {
+        std::string targetVar;
+        std::string fileVar;
+        std::unique_ptr<Expr> idExpr;
+        std::optional<int> elseLine;
+    };
+
+    struct WriteStmt {
+        std::unique_ptr<Expr> valueExpr;
+        std::string fileVar;
+        std::unique_ptr<Expr> idExpr;
+        std::optional<int> elseLine;
+    };
+
+    struct CloseStmt {
+        std::string fileVar;
+    };
+
+    using StatementNode = std::variant<LetStmt, InputStmt, GotoStmt, GosubStmt, ReturnStmt, ForStmt, NextStmt, IfStmt, PrintStmt, RemStmt, StopStmt, EndStmt, DimStmt, LetArrayStmt, ClearStmt, OpenStmt, ReadStmt, WriteStmt, CloseStmt>;
 
     struct ParsedBasicLine {
         int lineNumber{0};

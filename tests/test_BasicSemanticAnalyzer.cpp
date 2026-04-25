@@ -170,3 +170,37 @@ TEST_CASE("basic semantic analyzer lowers ClearStmt to IR") {
     REQUIRE(semantic.program.lines.size() == 1);
     CHECK(std::holds_alternative<BasicIr::ClearStmt>(semantic.program.lines[0].statement));
 }
+
+TEST_CASE("basic semantic analyzer lowers file statements to IR") {
+    BasicProgram program;
+    program.setLine(10, "OPEN \"CUSTOMERS\" TO FVAR ELSE 50");
+    program.setLine(20, "READ REC FROM FVAR, ID ELSE 50");
+    program.setLine(30, "WRITE REC ON FVAR, ID ELSE 50");
+    program.setLine(40, "CLOSE FVAR");
+    program.setLine(50, "END");
+
+    auto parsed = BasicStatementParser::parse(program);
+    REQUIRE(parsed.success);
+
+    const auto semantic = BasicSemanticAnalyzer::analyze(std::move(parsed));
+    REQUIRE(semantic.success);
+    REQUIRE(semantic.program.lines.size() == 5);
+    CHECK(std::holds_alternative<BasicIr::OpenStmt>(semantic.program.lines[0].statement));
+    CHECK(std::holds_alternative<BasicIr::ReadStmt>(semantic.program.lines[1].statement));
+    CHECK(std::holds_alternative<BasicIr::WriteStmt>(semantic.program.lines[2].statement));
+    CHECK(std::holds_alternative<BasicIr::CloseStmt>(semantic.program.lines[3].statement));
+}
+
+TEST_CASE("basic semantic analyzer validates ELSE line targets in file statements") {
+    BasicProgram program;
+    program.setLine(10, "OPEN \"CUSTOMERS\" TO FVAR ELSE 99");
+    program.setLine(20, "END");
+
+    auto parsed = BasicStatementParser::parse(program);
+    REQUIRE(parsed.success);
+
+    const auto semantic = BasicSemanticAnalyzer::analyze(std::move(parsed));
+    CHECK_FALSE(semantic.success);
+    REQUIRE(semantic.errors.size() == 1);
+    CHECK(semantic.errors[0].message == "Unknown target line 99");
+}

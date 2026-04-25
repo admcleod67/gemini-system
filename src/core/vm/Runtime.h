@@ -6,7 +6,9 @@
 #define PICK_SYSTEM_VM_RUNTIME_H
 
 #include <atomic>
+#include <functional>
 #include <iosfwd>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <variant>
@@ -50,6 +52,13 @@ namespace PickVM {
         AbsInt,
         SgnInt,
         SeqStr,
+        OpenFile,
+        OpenFileTry,
+        ReadRec,
+        ReadRecTry,
+        WriteRec,
+        WriteRecTry,
+        CloseFile,
         LoadVar,
         StoreVar
     };
@@ -98,6 +107,15 @@ namespace PickVM {
         void interrupt() noexcept;
         void clearInterrupt() noexcept;
 
+        // File backend callbacks used by BASIC file statements.
+        using FileExistsFn = std::function<bool(const std::string &)>;
+        using ReadRecordFn = std::function<std::optional<std::string>(const std::string &, const std::string &)>;
+        using WriteRecordFn = std::function<void(const std::string &, const std::string &, const std::string &)>;
+
+        void setFileExistsCallback(FileExistsFn fn);
+        void setReadRecordCallback(ReadRecordFn fn);
+        void setWriteRecordCallback(WriteRecordFn fn);
+
         // Debug helper (optional)
         void dumpStack() const;
 
@@ -111,10 +129,14 @@ namespace PickVM {
         std::vector<ForFrame> forStack_;     // Loop-frame stack for FOR/NEXT
         std::unordered_map<std::string, Value> variables_;
         std::unordered_map<std::string, std::vector<Value>> arrays_; // DIM arrays
+        std::unordered_map<std::string, std::string> openFiles_; // file var -> opened file name
         std::size_t ip_; // Instruction pointer
         std::atomic<bool> interrupted_{false};
         mutable std::ostream *outStream_{nullptr};
         mutable std::istream *inStream_{nullptr};
+        FileExistsFn fileExists_;
+        ReadRecordFn readRecord_;
+        WriteRecordFn writeRecord_;
 
         std::ostream &out() const;
         std::istream &in() const;

@@ -431,3 +431,54 @@ TEST_CASE("basic bytecode emitter allows dollar variable in SEQ") {
     CHECK(emitted.program[0].op == OpCode::LoadVar);
     CHECK(emitted.program[1].op == OpCode::SeqStr);
 }
+
+TEST_CASE("basic bytecode emitter emits OpenFile without ELSE") {
+    BasicIr::NormalizedProgram program;
+    BasicIr::OpenStmt stmt{};
+    stmt.fileExpr = makeStr("CUSTOMERS");
+    stmt.fileVar = "FVAR";
+    program.lines.push_back({10, std::move(stmt)});
+
+    const BasicBytecodeEmissionResult emitted = BasicBytecodeEmitter::emit(program);
+    REQUIRE(emitted.success);
+    REQUIRE(emitted.program.size() == 3);
+    CHECK(emitted.program[0].op == OpCode::PushStr);
+    CHECK(emitted.program[1].op == OpCode::OpenFile);
+    CHECK(std::get<std::string>(emitted.program[1].operand) == "FVAR");
+}
+
+TEST_CASE("basic bytecode emitter emits ReadRec + StoreVar without ELSE") {
+    BasicIr::NormalizedProgram program;
+    BasicIr::ReadStmt stmt{};
+    stmt.targetVar = "REC";
+    stmt.fileVar = "FVAR";
+    stmt.idExpr = makeVar("ID");
+    program.lines.push_back({10, std::move(stmt)});
+
+    const BasicBytecodeEmissionResult emitted = BasicBytecodeEmitter::emit(program);
+    REQUIRE(emitted.success);
+    CHECK(emitted.program[0].op == OpCode::LoadVar);
+    CHECK(emitted.program[1].op == OpCode::ReadRec);
+    CHECK(emitted.program[2].op == OpCode::StoreVar);
+}
+
+TEST_CASE("basic bytecode emitter emits *_Try opcodes for file ELSE flow") {
+    BasicIr::NormalizedProgram program;
+    BasicIr::OpenStmt open{};
+    open.fileExpr = makeStr("CUST");
+    open.fileVar = "FVAR";
+    open.elseLine = 40;
+    program.lines.push_back({10, std::move(open)});
+    program.lines.push_back({40, BasicIr::EndStmt{}});
+
+    const BasicBytecodeEmissionResult emitted = BasicBytecodeEmitter::emit(program);
+    REQUIRE(emitted.success);
+    bool hasTry = false;
+    for (const auto &ins : emitted.program) {
+        if (ins.op == OpCode::OpenFileTry) {
+            hasTry = true;
+            break;
+        }
+    }
+    CHECK(hasTry);
+}

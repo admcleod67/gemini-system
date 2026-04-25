@@ -54,6 +54,30 @@ namespace PickShell {
                                 "Unknown target line " + std::to_string(*stmt.elseLine)
                             });
                         }
+                    } else if constexpr (std::is_same_v<StmtT, BasicAst::OpenStmt>) {
+                        if (stmt.elseLine.has_value() &&
+                            knownLines.find(*stmt.elseLine) == knownLines.end()) {
+                            result.errors.push_back({
+                                line.lineNumber,
+                                "Unknown target line " + std::to_string(*stmt.elseLine)
+                            });
+                        }
+                    } else if constexpr (std::is_same_v<StmtT, BasicAst::ReadStmt>) {
+                        if (stmt.elseLine.has_value() &&
+                            knownLines.find(*stmt.elseLine) == knownLines.end()) {
+                            result.errors.push_back({
+                                line.lineNumber,
+                                "Unknown target line " + std::to_string(*stmt.elseLine)
+                            });
+                        }
+                    } else if constexpr (std::is_same_v<StmtT, BasicAst::WriteStmt>) {
+                        if (stmt.elseLine.has_value() &&
+                            knownLines.find(*stmt.elseLine) == knownLines.end()) {
+                            result.errors.push_back({
+                                line.lineNumber,
+                                "Unknown target line " + std::to_string(*stmt.elseLine)
+                            });
+                        }
                     }
                 },
                 line.statement);
@@ -104,6 +128,24 @@ namespace PickShell {
                         };
                     } else if constexpr (std::is_same_v<StmtT, BasicAst::ClearStmt>) {
                         return BasicIr::ClearStmt{};
+                    } else if constexpr (std::is_same_v<StmtT, BasicAst::OpenStmt>) {
+                        return BasicIr::OpenStmt{std::move(stmt.fileExpr), std::move(stmt.fileVar), stmt.elseLine};
+                    } else if constexpr (std::is_same_v<StmtT, BasicAst::ReadStmt>) {
+                        return BasicIr::ReadStmt{
+                            std::move(stmt.targetVar),
+                            std::move(stmt.fileVar),
+                            std::move(stmt.idExpr),
+                            stmt.elseLine
+                        };
+                    } else if constexpr (std::is_same_v<StmtT, BasicAst::WriteStmt>) {
+                        return BasicIr::WriteStmt{
+                            std::move(stmt.valueExpr),
+                            std::move(stmt.fileVar),
+                            std::move(stmt.idExpr),
+                            stmt.elseLine
+                        };
+                    } else if constexpr (std::is_same_v<StmtT, BasicAst::CloseStmt>) {
+                        return BasicIr::CloseStmt{std::move(stmt.fileVar)};
                     } else if constexpr (std::is_same_v<StmtT, BasicAst::IfStmt>) {
                         return BasicIr::IfStmt{std::move(stmt.condition), stmt.thenLine, stmt.elseLine};
                     } else if constexpr (std::is_same_v<StmtT, BasicAst::PrintStmt>) {

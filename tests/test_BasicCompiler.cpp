@@ -725,3 +725,48 @@ TEST_CASE("basic compiler rejects dollar variable in ABS") {
     const auto result = compiler.compile(program);
     CHECK_FALSE(result.success);
 }
+
+TEST_CASE("basic compiler compiles OPEN READ WRITE CLOSE") {
+    BasicProgram program;
+    program.setLine(10, "OPEN \"CUSTOMERS\" TO FVAR");
+    program.setLine(20, "READ REC FROM FVAR, ID");
+    program.setLine(30, "WRITE REC ON FVAR, ID");
+    program.setLine(40, "CLOSE FVAR");
+    program.setLine(50, "END");
+
+    BasicCompiler compiler;
+    const auto result = compiler.compile(program);
+    REQUIRE(result.success);
+
+    bool hasOpen = false, hasRead = false, hasWrite = false, hasClose = false;
+    for (const auto &ins : result.program) {
+        hasOpen = hasOpen || ins.op == OpCode::OpenFile;
+        hasRead = hasRead || ins.op == OpCode::ReadRec;
+        hasWrite = hasWrite || ins.op == OpCode::WriteRec;
+        hasClose = hasClose || ins.op == OpCode::CloseFile;
+    }
+    CHECK(hasOpen);
+    CHECK(hasRead);
+    CHECK(hasWrite);
+    CHECK(hasClose);
+}
+
+TEST_CASE("basic compiler uses try opcode for OPEN ELSE line") {
+    BasicProgram program;
+    program.setLine(10, "OPEN \"CUSTOMERS\" TO FVAR ELSE 40");
+    program.setLine(20, "END");
+    program.setLine(40, "END");
+
+    BasicCompiler compiler;
+    const auto result = compiler.compile(program);
+    REQUIRE(result.success);
+
+    bool hasTry = false;
+    for (const auto &ins : result.program) {
+        if (ins.op == OpCode::OpenFileTry) {
+            hasTry = true;
+            break;
+        }
+    }
+    CHECK(hasTry);
+}

@@ -58,7 +58,7 @@ Compilation failed.
 
 Compiled programs are in-memory only; no compiled `.tbc` artifact is written.
 
-Language details for subset v1 (statements, expression rules, and diagnostics) are documented in [BASIC language](basic-language.md).
+Language details for subset v1 (statements, expression rules, diagnostics, and file handling statements `OPEN`/`READ`/`WRITE`/`CLOSE`) are documented in [BASIC language](basic-language.md).
 
 ## Editor submode (`ED>`)
 

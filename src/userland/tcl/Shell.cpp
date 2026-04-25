@@ -21,6 +21,27 @@ namespace PickShell {
 
     Shell::Shell(PickVM::Runtime &runtime)
         : session_(runtime) {
+        session_.runtime_.setFileExistsCallback([this](const std::string &fileName) {
+            try {
+                (void) session_.fileSystem_.listRecordNames(fileName);
+                return true;
+            } catch (const PickFS::FileSystemError &e) {
+                if (std::string(e.what()).find("File not found: ") == 0) {
+                    return false;
+                }
+                throw;
+            }
+        });
+        session_.runtime_.setReadRecordCallback([this](const std::string &fileName, const std::string &recordName) {
+            const std::optional<PickFS::Record> rec = session_.fileSystem_.read(fileName, recordName);
+            if (!rec.has_value()) {
+                return std::optional<std::string>{};
+            }
+            return std::optional<std::string>{rec->value()};
+        });
+        session_.runtime_.setWriteRecordCallback([this](const std::string &fileName, const std::string &recordName, const std::string &value) {
+            session_.fileSystem_.write(fileName, PickFS::Record(recordName, value));
+        });
         basicShell_.setProgramsRoot(session_.programsRoot());
         basicShell_.setExecuteProgramFn(
             [this](const std::vector<PickVM::Instruction> &program, std::ostream &out) {

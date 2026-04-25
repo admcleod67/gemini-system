@@ -304,3 +304,41 @@ TEST_CASE("basic statement parser rejects CLEAR with arguments") {
     CHECK(result.errors[0].message == "CLEAR takes no arguments");
 }
 
+TEST_CASE("basic statement parser parses OPEN with ELSE line") {
+    BasicProgram program;
+    program.setLine(10, "OPEN \"CUSTOMERS\" TO FVAR ELSE 90");
+
+    const BasicAst::StatementParseResult result = BasicStatementParser::parse(program);
+    REQUIRE(result.success);
+    REQUIRE(result.lines.size() == 1);
+    REQUIRE(std::holds_alternative<BasicAst::OpenStmt>(result.lines[0].statement));
+    const auto &stmt = std::get<BasicAst::OpenStmt>(result.lines[0].statement);
+    CHECK(stmt.fileVar == "FVAR");
+    REQUIRE(stmt.elseLine.has_value());
+    CHECK(*stmt.elseLine == 90);
+}
+
+TEST_CASE("basic statement parser parses READ WRITE and CLOSE") {
+    BasicProgram program;
+    program.setLine(10, "READ REC FROM FVAR, ID ELSE 40");
+    program.setLine(20, "WRITE REC ON FVAR, ID");
+    program.setLine(30, "CLOSE FVAR");
+
+    const BasicAst::StatementParseResult result = BasicStatementParser::parse(program);
+    REQUIRE(result.success);
+    REQUIRE(result.lines.size() == 3);
+    CHECK(std::holds_alternative<BasicAst::ReadStmt>(result.lines[0].statement));
+    CHECK(std::holds_alternative<BasicAst::WriteStmt>(result.lines[1].statement));
+    CHECK(std::holds_alternative<BasicAst::CloseStmt>(result.lines[2].statement));
+}
+
+TEST_CASE("basic statement parser rejects OPEN ELSE without line number") {
+    BasicProgram program;
+    program.setLine(10, "OPEN \"CUSTOMERS\" TO FVAR ELSE STOP");
+
+    const BasicAst::StatementParseResult result = BasicStatementParser::parse(program);
+    CHECK_FALSE(result.success);
+    REQUIRE(result.errors.size() == 1);
+    CHECK(result.errors[0].message == "OPEN ELSE requires a line number");
+}
+

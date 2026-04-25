@@ -48,6 +48,13 @@ namespace PickVM {
             case OpCode::AbsInt: return "ABS_INT";
             case OpCode::SgnInt: return "SGN_INT";
             case OpCode::SeqStr: return "SEQ_STR";
+            case OpCode::OpenFile: return "OPEN_FILE";
+            case OpCode::OpenFileTry: return "OPEN_FILE_TRY";
+            case OpCode::ReadRec: return "READ_REC";
+            case OpCode::ReadRecTry: return "READ_REC_TRY";
+            case OpCode::WriteRec: return "WRITE_REC";
+            case OpCode::WriteRecTry: return "WRITE_REC_TRY";
+            case OpCode::CloseFile: return "CLOSE_FILE";
             case OpCode::LoadVar: return "LOAD_VAR";
             case OpCode::StoreVar: return "STORE_VAR";
         }
@@ -101,6 +108,13 @@ namespace PickVM {
             case OpCode::DimArray:
             case OpCode::LoadArr:
             case OpCode::StoreArr:
+            case OpCode::OpenFile:
+            case OpCode::OpenFileTry:
+            case OpCode::ReadRec:
+            case OpCode::ReadRecTry:
+            case OpCode::WriteRec:
+            case OpCode::WriteRecTry:
+            case OpCode::CloseFile:
                 oss << ' ' << stringOperandAtIp(instr, ip);
                 break;
             case OpCode::Add:

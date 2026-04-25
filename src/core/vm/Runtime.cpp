@@ -57,6 +57,13 @@ namespace PickVM {
             return std::get<std::string>(v);
         }
 
+        std::string valueToString(const Value &v) {
+            if (std::holds_alternative<std::string>(v)) {
+                return std::get<std::string>(v);
+            }
+            return std::to_string(std::get<int>(v));
+        }
+
         // Coerce a Value to int following Pick semantics: ints pass through,
         // strings are parsed as decimal integers; non-numeric strings yield 0.
         int coerceToInt(const Value &v) {
@@ -135,7 +142,17 @@ namespace PickVM {
     }
 
     Runtime::Runtime()
-        : ip_(0) {
+        : ip_(0),
+          fileExists_([](const std::string &) {
+              throw std::runtime_error("File backend not configured");
+              return false;
+          }),
+          readRecord_([](const std::string &, const std::string &) -> std::optional<std::string> {
+              throw std::runtime_error("File backend not configured");
+          }),
+          writeRecord_([](const std::string &, const std::string &, const std::string &) {
+              throw std::runtime_error("File backend not configured");
+          }) {
     }
 
     void Runtime::loadProgram(const std::vector<Instruction> &program) {
@@ -144,9 +161,38 @@ namespace PickVM {
         stack_.clear();
         callStack_.clear();
         forStack_.clear();
+        openFiles_.clear();
         arrays_.clear();
         interrupted_.store(false, std::memory_order_relaxed);
         variables_.clear();
+    }
+
+    void Runtime::setFileExistsCallback(FileExistsFn fn) {
+        fileExists_ = fn ? std::move(fn) : FileExistsFn{};
+        if (!fileExists_) {
+            fileExists_ = [](const std::string &) {
+                throw std::runtime_error("File backend not configured");
+                return false;
+            };
+        }
+    }
+
+    void Runtime::setReadRecordCallback(ReadRecordFn fn) {
+        readRecord_ = fn ? std::move(fn) : ReadRecordFn{};
+        if (!readRecord_) {
+            readRecord_ = [](const std::string &, const std::string &) -> std::optional<std::string> {
+                throw std::runtime_error("File backend not configured");
+            };
+        }
+    }
+
+    void Runtime::setWriteRecordCallback(WriteRecordFn fn) {
+        writeRecord_ = fn ? std::move(fn) : WriteRecordFn{};
+        if (!writeRecord_) {
+            writeRecord_ = [](const std::string &, const std::string &, const std::string &) {
+                throw std::runtime_error("File backend not configured");
+            };
+        }
     }
 
     void Runtime::push(const Value &v) {
@@ -464,6 +510,99 @@ namespace PickVM {
                     ? std::get<std::string>(v)
                     : std::to_string(std::get<int>(v));
                 push(s.empty() ? 0 : static_cast<int>(static_cast<unsigned char>(s[0])));
+                break;
+            }
+
+            case OpCode::OpenFile: {
+                const std::string fileVar = canonicalVariableName(stringOperandAtIp(instr, ip_));
+                const std::string fileName = valueToString(pop());
+                if (!fileExists_(fileName)) {
+                    throw std::runtime_error("OPEN failed: file not found: " + fileName);
+                }
+                openFiles_[fileVar] = fileName;
+                break;
+            }
+
+            case OpCode::OpenFileTry: {
+                const std::string fileVar = canonicalVariableName(stringOperandAtIp(instr, ip_));
+                const std::string fileName = valueToString(pop());
+                if (!fileExists_(fileName)) {
+                    push(0);
+                    break;
+                }
+                openFiles_[fileVar] = fileName;
+                push(1);
+                break;
+            }
+
+            case OpCode::ReadRec: {
+                const std::string fileVar = canonicalVariableName(stringOperandAtIp(instr, ip_));
+                const std::string id = valueToString(pop());
+                const auto fit = openFiles_.find(fileVar);
+                if (fit == openFiles_.end()) {
+                    throw std::runtime_error("READ failed: file variable not open: " + fileVar);
+                }
+                const std::optional<std::string> value = readRecord_(fit->second, id);
+                if (!value.has_value()) {
+                    throw std::runtime_error("READ failed: record not found: " + id);
+                }
+                push(*value);
+                break;
+            }
+
+            case OpCode::ReadRecTry: {
+                const std::string fileVar = canonicalVariableName(stringOperandAtIp(instr, ip_));
+                const std::string id = valueToString(pop());
+                const auto fit = openFiles_.find(fileVar);
+                if (fit == openFiles_.end()) {
+                    push(std::string{});
+                    push(0);
+                    break;
+                }
+                const std::optional<std::string> value = readRecord_(fit->second, id);
+                if (!value.has_value()) {
+                    push(std::string{});
+                    push(0);
+                    break;
+                }
+                push(*value);
+                push(1);
+                break;
+            }
+
+            case OpCode::WriteRec: {
+                const std::string fileVar = canonicalVariableName(stringOperandAtIp(instr, ip_));
+                const std::string id = valueToString(pop());
+                const std::string value = valueToString(pop());
+                const auto fit = openFiles_.find(fileVar);
+                if (fit == openFiles_.end()) {
+                    throw std::runtime_error("WRITE failed: file variable not open: " + fileVar);
+                }
+                writeRecord_(fit->second, id, value);
+                break;
+            }
+
+            case OpCode::WriteRecTry: {
+                const std::string fileVar = canonicalVariableName(stringOperandAtIp(instr, ip_));
+                const std::string id = valueToString(pop());
+                const std::string value = valueToString(pop());
+                const auto fit = openFiles_.find(fileVar);
+                if (fit == openFiles_.end()) {
+                    push(0);
+                    break;
+                }
+                try {
+                    writeRecord_(fit->second, id, value);
+                    push(1);
+                } catch (const std::exception &) {
+                    push(0);
+                }
+                break;
+            }
+
+            case OpCode::CloseFile: {
+                const std::string fileVar = canonicalVariableName(stringOperandAtIp(instr, ip_));
+                openFiles_.erase(fileVar); // no-op if not open
                 break;
             }
 

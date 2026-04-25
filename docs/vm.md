@@ -57,6 +57,13 @@ The parser records **1-based physical source line numbers** per instruction (for
 | `ABS_INT` | Pop a `Value`, coerce to int, push `abs(value)`. |
 | `SGN_INT` | Pop a `Value`, coerce to int, push `-1`, `0`, or `1` according to sign. |
 | `SEQ_STR` | Pop a `Value`; if it is an int, stringify it first (`std::to_string`). Push the ASCII value of the first character of the resulting string, or `0` if the string is empty. |
+| `OPEN_FILE name` | Pop file name expression value (stringifies ints), verify that file exists via runtime file backend, and bind it to file variable `name`. Throws on failure. |
+| `OPEN_FILE_TRY name` | Same as `OPEN_FILE`, but pushes success flag (`1` success, `0` failure) instead of throwing on missing file. |
+| `READ_REC name` | Pop record id expression value (stringifies ints), read record from currently open file variable `name`, and push record value. Throws on unopened handle or missing record. |
+| `READ_REC_TRY name` | Try form of `READ_REC`: pushes record value (or `""`) and then success flag (`1`/`0`) instead of throwing for expected read failures. |
+| `WRITE_REC name` | Pop record id, then value; write to currently open file variable `name`. Throws on unopened handle or backend write failure. |
+| `WRITE_REC_TRY name` | Try form of `WRITE_REC`: pushes success flag (`1`/`0`) instead of throwing for expected write failures. |
+| `CLOSE_FILE name` | Release binding for file variable `name`. No-op if `name` is not currently open. |
 
 Jump targets must refer to defined labels and resolve to valid instruction indices; the parser validates range.
 

@@ -3,6 +3,8 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <optional>
+#include <unordered_map>
 #include <variant>
 #include <vector>
 
@@ -1294,4 +1296,83 @@ TEST_CASE("runtime SeqStr stringifies integer operand") {
     rt.run();
     REQUIRE(rt.stack().size() == 1);
     CHECK(std::get<int>(rt.stack()[0]) == 54); // '6'
+}
+
+TEST_CASE("runtime OpenFile binds existing file handle") {
+    Runtime rt;
+    rt.setFileExistsCallback([](const std::string &name) { return name == "CUSTOMERS"; });
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"CUSTOMERS"}},
+        {OpCode::OpenFile, std::string{"FVAR"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    CHECK_NOTHROW(rt.run());
+}
+
+TEST_CASE("runtime OpenFile throws for missing file") {
+    Runtime rt;
+    rt.setFileExistsCallback([](const std::string &) { return false; });
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"MISSING"}},
+        {OpCode::OpenFile, std::string{"FVAR"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    CHECK_THROWS_AS(rt.run(), std::runtime_error);
+}
+
+TEST_CASE("runtime OpenFileTry pushes success flag") {
+    Runtime rt;
+    rt.setFileExistsCallback([](const std::string &name) { return name == "CUSTOMERS"; });
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"CUSTOMERS"}},
+        {OpCode::OpenFileTry, std::string{"FVAR"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<int>(rt.stack()[0]) == 1);
+}
+
+TEST_CASE("runtime ReadRec and WriteRec use callbacks") {
+    Runtime rt;
+    std::unordered_map<std::string, std::string> data;
+    rt.setFileExistsCallback([](const std::string &) { return true; });
+    rt.setReadRecordCallback([&data](const std::string &, const std::string &id) -> std::optional<std::string> {
+        const auto it = data.find(id);
+        if (it == data.end()) {
+            return std::nullopt;
+        }
+        return it->second;
+    });
+    rt.setWriteRecordCallback([&data](const std::string &, const std::string &id, const std::string &value) {
+        data[id] = value;
+    });
+
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"CUST"}},
+        {OpCode::OpenFile, std::string{"FVAR"}},
+        {OpCode::PushStr, std::string{"VALUE"}},
+        {OpCode::PushStr, std::string{"001"}},
+        {OpCode::WriteRec, std::string{"FVAR"}},
+        {OpCode::PushStr, std::string{"001"}},
+        {OpCode::ReadRec, std::string{"FVAR"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<std::string>(rt.stack()[0]) == "VALUE");
+}
+
+TEST_CASE("runtime CloseFile is no-op for unopened handle") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::CloseFile, std::string{"FVAR"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    CHECK_NOTHROW(rt.run());
 }

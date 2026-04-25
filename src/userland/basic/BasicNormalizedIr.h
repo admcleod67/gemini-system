@@ -81,7 +81,31 @@ namespace PickShell::BasicIr {
 
     struct ClearStmt {};
 
-    using NormalizedStmt = std::variant<LetStmt, InputStmt, GotoStmt, GosubStmt, ReturnStmt, ForStmt, NextStmt, IfStmt, PrintStmt, RemStmt, StopStmt, EndStmt, DimStmt, LetArrayStmt, ClearStmt>;
+    struct OpenStmt {
+        std::unique_ptr<BasicAst::Expr> fileExpr;
+        std::string fileVar;
+        std::optional<int> elseLine;
+    };
+
+    struct ReadStmt {
+        std::string targetVar;
+        std::string fileVar;
+        std::unique_ptr<BasicAst::Expr> idExpr;
+        std::optional<int> elseLine;
+    };
+
+    struct WriteStmt {
+        std::unique_ptr<BasicAst::Expr> valueExpr;
+        std::string fileVar;
+        std::unique_ptr<BasicAst::Expr> idExpr;
+        std::optional<int> elseLine;
+    };
+
+    struct CloseStmt {
+        std::string fileVar;
+    };
+
+    using NormalizedStmt = std::variant<LetStmt, InputStmt, GotoStmt, GosubStmt, ReturnStmt, ForStmt, NextStmt, IfStmt, PrintStmt, RemStmt, StopStmt, EndStmt, DimStmt, LetArrayStmt, ClearStmt, OpenStmt, ReadStmt, WriteStmt, CloseStmt>;
 
     struct NormalizedLine {
         // Original BASIC line number used for diagnostics and jump mapping.
