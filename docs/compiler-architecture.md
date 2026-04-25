@@ -26,6 +26,10 @@ flowchart LR
 - `BasicBytecodeEmitter`
   - Lowers normalized IR into VM instructions.
   - Resolves jump addresses and appends implicit trailing `HALT` when required.
+  - Enforces Pick BASIC type-suffix rules:
+    - `$`-suffix variables used as arithmetic operands are rejected with a compile-time error.
+    - `%`-suffix variables get a `COERCE_INT` instruction emitted after the value is produced (on `LET` assignment and `INPUT`).
+  - Emits `PRINT_VAL` for all `PRINT` statements and `INPUT_STR` for all `INPUT` statements.
   - Guards malformed IR payloads and reports deterministic backend diagnostics.
 - `BasicCompiler`
   - Orchestrates parse -> semantic -> emit.
