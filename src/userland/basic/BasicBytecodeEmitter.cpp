@@ -350,6 +350,9 @@ namespace PickShell {
                         }
                         result.program.push_back(PickVM::Instruction{PickVM::OpCode::StoreArr, uppercase(stmt.variableName)});
                         return true;
+                    } else if constexpr (std::is_same_v<StmtT, BasicIr::ClearStmt>) {
+                        result.program.push_back(makeNoOperandInstruction(PickVM::OpCode::ClearVars));
+                        return true;
                     }
                     return false;
                 },

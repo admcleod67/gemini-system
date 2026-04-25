@@ -283,3 +283,24 @@ TEST_CASE("basic statement parser rejects DIM with empty size") {
     CHECK(result.errors[0].message == "DIM size expression cannot be empty");
 }
 
+TEST_CASE("basic statement parser parses CLEAR") {
+    BasicProgram program;
+    program.setLine(10, "CLEAR");
+
+    const BasicAst::StatementParseResult result = BasicStatementParser::parse(program);
+    REQUIRE(result.success);
+    REQUIRE(result.lines.size() == 1);
+    CHECK(std::holds_alternative<BasicAst::ClearStmt>(result.lines[0].statement));
+}
+
+TEST_CASE("basic statement parser rejects CLEAR with arguments") {
+    BasicProgram program;
+    program.setLine(10, "CLEAR 99");
+
+    const BasicAst::StatementParseResult result = BasicStatementParser::parse(program);
+    CHECK_FALSE(result.success);
+    REQUIRE(result.errors.size() == 1);
+    CHECK(result.errors[0].line == 10);
+    CHECK(result.errors[0].message == "CLEAR takes no arguments");
+}
+

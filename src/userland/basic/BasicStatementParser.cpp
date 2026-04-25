@@ -243,6 +243,17 @@ namespace PickShell {
                 continue;
             }
 
+            if (op == "CLEAR") {
+                std::string rest;
+                std::getline(iss, rest);
+                if (!trim(rest).empty()) {
+                    result.errors.push_back({lineNumber, "CLEAR takes no arguments"});
+                    continue;
+                }
+                result.lines.push_back({lineNumber, BasicAst::ClearStmt{}});
+                continue;
+            }
+
             if (op == "FOR") {
                 std::string rest;
                 std::getline(iss, rest);

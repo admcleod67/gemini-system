@@ -1135,3 +1135,32 @@ TEST_CASE("runtime loadProgram clears interrupt flag") {
     // run() should complete normally (no UserInterrupt thrown)
     CHECK_NOTHROW(rt.run());
 }
+
+TEST_CASE("runtime ClearVars removes scalar variables") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt,  42},
+        {OpCode::StoreVar, std::string{"X"}},
+        {OpCode::ClearVars, Value{}},
+        // After CLEAR, X is gone — accessing it should throw "Undefined variable"
+        {OpCode::LoadVar, std::string{"X"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    CHECK_THROWS_AS(rt.run(), std::runtime_error);
+}
+
+TEST_CASE("runtime ClearVars removes array allocations") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt,  3},
+        {OpCode::DimArray, std::string{"A"}},
+        {OpCode::ClearVars, Value{}},
+        // Now accessing A(1) should throw "Array not dimensioned"
+        {OpCode::PushInt, 1},
+        {OpCode::LoadArr, std::string{"A"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    CHECK_THROWS_AS(rt.run(), std::runtime_error);
+}

@@ -44,6 +44,7 @@ namespace PickVM {
             case OpCode::DimArray: return "DIM_ARRAY";
             case OpCode::LoadArr: return "LOAD_ARR";
             case OpCode::StoreArr: return "STORE_ARR";
+            case OpCode::ClearVars: return "CLEAR_VARS";
             case OpCode::LoadVar: return "LOAD_VAR";
             case OpCode::StoreVar: return "STORE_VAR";
         }
@@ -120,6 +121,7 @@ namespace PickVM {
             case OpCode::InputStr:
             case OpCode::CoerceInt:
             case OpCode::Return:
+            case OpCode::ClearVars:
                 break;
         }
 

@@ -331,3 +331,15 @@ TEST_CASE("basic bytecode emitter emits LoadArr for SubscriptExpr in PRINT") {
     CHECK(emitted.program[3].op == OpCode::PrintEol);
     CHECK(emitted.program[4].op == OpCode::Halt);
 }
+
+TEST_CASE("basic bytecode emitter emits ClearVars for ClearStmt") {
+    BasicIr::NormalizedProgram program;
+    program.lines.push_back({10, BasicIr::ClearStmt{}});
+
+    const BasicBytecodeEmissionResult emitted = BasicBytecodeEmitter::emit(program);
+    REQUIRE(emitted.success);
+    // CLEAR_VARS, HALT
+    REQUIRE(emitted.program.size() == 2);
+    CHECK(emitted.program[0].op == OpCode::ClearVars);
+    CHECK(emitted.program[1].op == OpCode::Halt);
+}

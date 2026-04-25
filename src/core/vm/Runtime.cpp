@@ -440,6 +440,12 @@ namespace PickVM {
                 break;
             }
 
+            case OpCode::ClearVars: {
+                variables_.clear();
+                arrays_.clear();
+                break;
+            }
+
             case OpCode::LoadVar: {
                 const std::string name = canonicalVariableName(stringOperandAtIp(instr, ip_));
                 const auto it = variables_.find(name);

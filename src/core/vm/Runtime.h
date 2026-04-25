@@ -46,6 +46,7 @@ namespace PickVM {
         DimArray,
         LoadArr,
         StoreArr,
+        ClearVars,
         LoadVar,
         StoreVar
     };

@@ -102,6 +102,8 @@ namespace PickShell {
                             std::move(stmt.indexExpr),
                             std::move(stmt.valueExpr)
                         };
+                    } else if constexpr (std::is_same_v<StmtT, BasicAst::ClearStmt>) {
+                        return BasicIr::ClearStmt{};
                     } else if constexpr (std::is_same_v<StmtT, BasicAst::IfStmt>) {
                         return BasicIr::IfStmt{std::move(stmt.condition), stmt.thenLine, stmt.elseLine};
                     } else if constexpr (std::is_same_v<StmtT, BasicAst::PrintStmt>) {

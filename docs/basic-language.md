@@ -20,6 +20,7 @@ Compiler internals are in an incremental refactor phase. Expression parsing and 
 - `FOR <var> = <init> TO <limit> [STEP <step>]`
 - `NEXT <var>`
 - `DIM <var>(<size>)`
+- `CLEAR`
 - `IF <cond> THEN <line> [ELSE <line>]`
 - `STOP`
 - `INPUT <var>`
@@ -208,3 +209,16 @@ Expression-related messages include categories such as:
   - `A%(n)` — integer array; values are coerced to int on write.
   - `A(n)` — dynamic array; values are stored as-is and coerced to int in arithmetic contexts.
 - Arrays and scalar variables with the same base name are independent: `A` and `A(1)` are different storage locations.
+
+## CLEAR
+
+```
+CLEAR
+```
+
+`CLEAR` drops all scalar variables and all array allocations from memory. After `CLEAR`:
+
+- Any attempt to read a variable that was previously set will raise a runtime "Undefined variable" error.
+- Any attempt to access an array element will raise a runtime "Array not dimensioned" error until the array is re-dimensioned with `DIM`.
+
+`CLEAR` takes no arguments. It does not affect the program itself, the VM stack, the instruction pointer, the call stack, or the for-stack.

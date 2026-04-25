@@ -655,3 +655,16 @@ TEST_CASE("basic compiler applies CoerceInt when writing to % array") {
     CHECK(result.program[4].op == OpCode::PushInt);
     CHECK(result.program[5].op == OpCode::StoreArr);
 }
+
+TEST_CASE("basic compiler compiles CLEAR to a single ClearVars instruction") {
+    BasicProgram program;
+    program.setLine(10, "CLEAR");
+    program.setLine(20, "END");
+
+    BasicCompiler compiler;
+    const auto result = compiler.compile(program);
+    REQUIRE(result.success);
+    // CLEAR_VARS, HALT
+    CHECK(result.program[0].op == OpCode::ClearVars);
+    CHECK(result.program[1].op == OpCode::Halt);
+}

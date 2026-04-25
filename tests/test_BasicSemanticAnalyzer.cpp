@@ -157,3 +157,16 @@ TEST_CASE("basic semantic analyzer lowers DimStmt and LetArrayStmt to IR") {
     CHECK(letArr.indexExpr != nullptr);
     CHECK(letArr.valueExpr != nullptr);
 }
+
+TEST_CASE("basic semantic analyzer lowers ClearStmt to IR") {
+    BasicProgram program;
+    program.setLine(10, "CLEAR");
+
+    auto parsed = BasicStatementParser::parse(program);
+    REQUIRE(parsed.success);
+
+    const auto semantic = BasicSemanticAnalyzer::analyze(std::move(parsed));
+    REQUIRE(semantic.success);
+    REQUIRE(semantic.program.lines.size() == 1);
+    CHECK(std::holds_alternative<BasicIr::ClearStmt>(semantic.program.lines[0].statement));
+}

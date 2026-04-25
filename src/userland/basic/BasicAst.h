@@ -139,7 +139,9 @@ namespace PickShell::BasicAst {
         std::unique_ptr<Expr> valueExpr;
     };
 
-    using StatementNode = std::variant<LetStmt, InputStmt, GotoStmt, GosubStmt, ReturnStmt, ForStmt, NextStmt, IfStmt, PrintStmt, RemStmt, StopStmt, EndStmt, DimStmt, LetArrayStmt>;
+    struct ClearStmt {};
+
+    using StatementNode = std::variant<LetStmt, InputStmt, GotoStmt, GosubStmt, ReturnStmt, ForStmt, NextStmt, IfStmt, PrintStmt, RemStmt, StopStmt, EndStmt, DimStmt, LetArrayStmt, ClearStmt>;
 
     struct ParsedBasicLine {
         int lineNumber{0};

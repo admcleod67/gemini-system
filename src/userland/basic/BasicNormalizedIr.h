@@ -79,7 +79,9 @@ namespace PickShell::BasicIr {
         std::unique_ptr<BasicAst::Expr> valueExpr;
     };
 
-    using NormalizedStmt = std::variant<LetStmt, InputStmt, GotoStmt, GosubStmt, ReturnStmt, ForStmt, NextStmt, IfStmt, PrintStmt, RemStmt, StopStmt, EndStmt, DimStmt, LetArrayStmt>;
+    struct ClearStmt {};
+
+    using NormalizedStmt = std::variant<LetStmt, InputStmt, GotoStmt, GosubStmt, ReturnStmt, ForStmt, NextStmt, IfStmt, PrintStmt, RemStmt, StopStmt, EndStmt, DimStmt, LetArrayStmt, ClearStmt>;
 
     struct NormalizedLine {
         // Original BASIC line number used for diagnostics and jump mapping.
