@@ -33,6 +33,13 @@ namespace PickShell {
                                 "Unknown target line " + std::to_string(stmt.targetLine)
                             });
                         }
+                    } else if constexpr (std::is_same_v<StmtT, BasicAst::GosubStmt>) {
+                        if (knownLines.find(stmt.targetLine) == knownLines.end()) {
+                            result.errors.push_back({
+                                line.lineNumber,
+                                "Unknown target line " + std::to_string(stmt.targetLine)
+                            });
+                        }
                     } else if constexpr (std::is_same_v<StmtT, BasicAst::IfStmt>) {
                         if (knownLines.find(stmt.thenLine) == knownLines.end()) {
                             result.errors.push_back({
@@ -71,6 +78,10 @@ namespace PickShell {
                         return BasicIr::InputStmt{std::move(stmt.variableName)};
                     } else if constexpr (std::is_same_v<StmtT, BasicAst::GotoStmt>) {
                         return BasicIr::GotoStmt{stmt.targetLine};
+                    } else if constexpr (std::is_same_v<StmtT, BasicAst::GosubStmt>) {
+                        return BasicIr::GosubStmt{stmt.targetLine};
+                    } else if constexpr (std::is_same_v<StmtT, BasicAst::ReturnStmt>) {
+                        return BasicIr::ReturnStmt{};
                     } else if constexpr (std::is_same_v<StmtT, BasicAst::IfStmt>) {
                         return BasicIr::IfStmt{std::move(stmt.condition), stmt.thenLine, stmt.elseLine};
                     } else if constexpr (std::is_same_v<StmtT, BasicAst::PrintStmt>) {

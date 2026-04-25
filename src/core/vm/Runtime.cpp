@@ -141,6 +141,7 @@ namespace PickVM {
         program_ = program;
         ip_ = 0;
         stack_.clear();
+        callStack_.clear();
         variables_.clear();
     }
 
@@ -344,6 +345,22 @@ namespace PickVM {
                     return ip_ < program_.size();
                 }
                 break;
+            }
+
+            case OpCode::Call: {
+                int target = intOperandAtIp(instr, ip_);
+                callStack_.push_back(ip_ + 1);
+                ip_ = static_cast<std::size_t>(target);
+                return ip_ < program_.size();
+            }
+
+            case OpCode::Return: {
+                if (callStack_.empty()) {
+                    throw std::runtime_error("RETURN without GOSUB");
+                }
+                ip_ = callStack_.back();
+                callStack_.pop_back();
+                return ip_ < program_.size();
             }
 
             case OpCode::LoadVar: {

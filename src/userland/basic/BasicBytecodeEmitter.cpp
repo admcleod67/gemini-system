@@ -180,6 +180,14 @@ namespace PickShell {
                         result.program.push_back(PickVM::Instruction{PickVM::OpCode::Jump, 0});
                         jumpFixups.push_back({line.lineNumber, jumpIp, stmt.targetLine});
                         return true;
+                    } else if constexpr (std::is_same_v<StmtT, BasicIr::GosubStmt>) {
+                        const std::size_t callIp = result.program.size();
+                        result.program.push_back(PickVM::Instruction{PickVM::OpCode::Call, 0});
+                        jumpFixups.push_back({line.lineNumber, callIp, stmt.targetLine});
+                        return true;
+                    } else if constexpr (std::is_same_v<StmtT, BasicIr::ReturnStmt>) {
+                        result.program.push_back(makeNoOperandInstruction(PickVM::OpCode::Return));
+                        return true;
                     } else if constexpr (std::is_same_v<StmtT, BasicIr::IfStmt>) {
                         if (!stmt.condition) {
                             result.errors.push_back({line.lineNumber, "IF requires a condition expression"});

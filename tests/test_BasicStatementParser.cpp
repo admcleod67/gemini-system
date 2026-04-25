@@ -107,3 +107,56 @@ TEST_CASE("basic statement parser preserves diagnostic messages") {
     CHECK(result.errors[6].message == "END takes no arguments");
     CHECK(result.errors[7].message == "Unknown keyword 'MAT'");
 }
+
+TEST_CASE("basic statement parser parses GOSUB") {
+    BasicProgram program;
+    program.setLine(10, "GOSUB 100");
+
+    const BasicAst::StatementParseResult result = BasicStatementParser::parse(program);
+    REQUIRE(result.success);
+    REQUIRE(result.lines.size() == 1);
+    REQUIRE(std::holds_alternative<BasicAst::GosubStmt>(result.lines[0].statement));
+    CHECK(std::get<BasicAst::GosubStmt>(result.lines[0].statement).targetLine == 100);
+}
+
+TEST_CASE("basic statement parser parses RETURN") {
+    BasicProgram program;
+    program.setLine(10, "RETURN");
+
+    const BasicAst::StatementParseResult result = BasicStatementParser::parse(program);
+    REQUIRE(result.success);
+    REQUIRE(result.lines.size() == 1);
+    CHECK(std::holds_alternative<BasicAst::ReturnStmt>(result.lines[0].statement));
+}
+
+TEST_CASE("basic statement parser rejects GOSUB without a line number") {
+    BasicProgram program;
+    program.setLine(10, "GOSUB");
+
+    const BasicAst::StatementParseResult result = BasicStatementParser::parse(program);
+    CHECK_FALSE(result.success);
+    REQUIRE(result.errors.size() == 1);
+    CHECK(result.errors[0].line == 10);
+    CHECK(result.errors[0].message == "GOSUB requires a line number");
+}
+
+TEST_CASE("basic statement parser rejects GOSUB with non-numeric target") {
+    BasicProgram program;
+    program.setLine(10, "GOSUB ABC");
+
+    const BasicAst::StatementParseResult result = BasicStatementParser::parse(program);
+    CHECK_FALSE(result.success);
+    REQUIRE(result.errors.size() == 1);
+    CHECK(result.errors[0].message == "GOSUB requires a line number");
+}
+
+TEST_CASE("basic statement parser rejects RETURN with arguments") {
+    BasicProgram program;
+    program.setLine(10, "RETURN 99");
+
+    const BasicAst::StatementParseResult result = BasicStatementParser::parse(program);
+    CHECK_FALSE(result.success);
+    REQUIRE(result.errors.size() == 1);
+    CHECK(result.errors[0].line == 10);
+    CHECK(result.errors[0].message == "RETURN takes no arguments");
+}

@@ -662,3 +662,85 @@ TEST_CASE("runtime ADD numeric strings coerces both operands") {
     REQUIRE(rt.stack().size() == 1);
     CHECK(std::get<int>(rt.stack()[0]) == 30);
 }
+
+TEST_CASE("runtime Call jumps to target and Return resumes after Call") {
+    // ip 0: CALL 3     -> push return addr 1, jump to ip 3
+    // ip 1: PushInt 10  <- execution resumes here after RETURN
+    // ip 2: HALT
+    // ip 3: PushInt 99
+    // ip 4: DROP        <- discard subroutine result
+    // ip 5: RETURN
+    std::vector<Instruction> prog = {
+        {OpCode::Call, 3},
+        {OpCode::PushInt, 10},
+        {OpCode::Halt, Value{}},
+        {OpCode::PushInt, 99},
+        {OpCode::Drop, Value{}},
+        {OpCode::Return, Value{}},
+    };
+    Runtime rt;
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<int>(rt.stack()[0]) == 10);
+}
+
+TEST_CASE("runtime nested Call and Return work correctly") {
+    // ip 0: CALL 4   -> outer gosub, return addr = 1
+    // ip 1: PushInt 1
+    // ip 2: HALT
+    // ip 3 unused (REM-equivalent): just HALT reachable via jump
+    // ip 4: CALL 7   -> inner gosub, return addr = 5
+    // ip 5: RETURN   -> returns to ip 1 (outer caller)
+    // ip 6: HALT (unreachable)
+    // ip 7: PushInt 0
+    // ip 8: DROP
+    // ip 9: RETURN   -> returns to ip 5
+    std::vector<Instruction> prog = {
+        {OpCode::Call, 4},     // ip 0
+        {OpCode::PushInt, 1},  // ip 1
+        {OpCode::Halt, Value{}}, // ip 2
+        {OpCode::Halt, Value{}}, // ip 3 (filler)
+        {OpCode::Call, 7},     // ip 4: outer subroutine calls inner
+        {OpCode::Return, Value{}}, // ip 5: outer RETURN
+        {OpCode::Halt, Value{}}, // ip 6 (unreachable)
+        {OpCode::PushInt, 0},  // ip 7: inner subroutine
+        {OpCode::Drop, Value{}}, // ip 8
+        {OpCode::Return, Value{}}, // ip 9: inner RETURN
+    };
+    Runtime rt;
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<int>(rt.stack()[0]) == 1);
+}
+
+TEST_CASE("runtime Return throws when call stack is empty") {
+    std::vector<Instruction> prog = {
+        {OpCode::Return, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    Runtime rt;
+    rt.loadProgram(prog);
+    CHECK_THROWS_AS(rt.run(), std::runtime_error);
+}
+
+TEST_CASE("runtime loadProgram clears call stack between runs") {
+    // First run: CALL 2 — pushes a return addr but HALT before RETURN
+    std::vector<Instruction> prog1 = {
+        {OpCode::Call, 2},
+        {OpCode::Halt, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    Runtime rt;
+    rt.loadProgram(prog1);
+    rt.run();
+
+    // Second run: bare RETURN must throw (call stack was cleared by loadProgram)
+    std::vector<Instruction> prog2 = {
+        {OpCode::Return, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog2);
+    CHECK_THROWS_AS(rt.run(), std::runtime_error);
+}

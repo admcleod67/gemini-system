@@ -83,3 +83,32 @@ TEST_CASE("basic semantic analyzer reports multiple missing targets in stable or
     CHECK(semantic.errors[1].message == "Unknown target line 98");
     CHECK(semantic.errors[2].message == "Unknown target line 97");
 }
+
+TEST_CASE("basic semantic analyzer passes when GOSUB target exists") {
+    BasicProgram program;
+    program.setLine(10, "GOSUB 30");
+    program.setLine(20, "END");
+    program.setLine(30, "RETURN");
+
+    auto parsed = BasicStatementParser::parse(program);
+    REQUIRE(parsed.success);
+
+    const auto semantic = BasicSemanticAnalyzer::analyze(std::move(parsed));
+    CHECK(semantic.success);
+    CHECK(semantic.errors.empty());
+    CHECK(semantic.program.lines.size() == 3);
+}
+
+TEST_CASE("basic semantic analyzer reports missing GOSUB target") {
+    BasicProgram program;
+    program.setLine(10, "GOSUB 99");
+
+    auto parsed = BasicStatementParser::parse(program);
+    REQUIRE(parsed.success);
+
+    const auto semantic = BasicSemanticAnalyzer::analyze(std::move(parsed));
+    CHECK_FALSE(semantic.success);
+    REQUIRE(semantic.errors.size() == 1);
+    CHECK(semantic.errors[0].line == 10);
+    CHECK(semantic.errors[0].message == "Unknown target line 99");
+}

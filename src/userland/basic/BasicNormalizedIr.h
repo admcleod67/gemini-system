@@ -32,6 +32,13 @@ namespace PickShell::BasicIr {
         int targetLine{0};
     };
 
+    struct GosubStmt {
+        // Guaranteed by semantic pass: targetLine refers to an existing line.
+        int targetLine{0};
+    };
+
+    struct ReturnStmt {};
+
     struct IfStmt {
         // Required: non-null condition.
         // Guaranteed by semantic pass: thenLine/elseLine (if present) refer to existing lines.
@@ -50,7 +57,7 @@ namespace PickShell::BasicIr {
     struct StopStmt {};
     struct EndStmt {};
 
-    using NormalizedStmt = std::variant<LetStmt, InputStmt, GotoStmt, IfStmt, PrintStmt, RemStmt, StopStmt, EndStmt>;
+    using NormalizedStmt = std::variant<LetStmt, InputStmt, GotoStmt, GosubStmt, ReturnStmt, IfStmt, PrintStmt, RemStmt, StopStmt, EndStmt>;
 
     struct NormalizedLine {
         // Original BASIC line number used for diagnostics and jump mapping.

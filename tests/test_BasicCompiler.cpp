@@ -466,3 +466,47 @@ TEST_CASE("basic compiler accepts percent variable in expression parser") {
     CHECK(result.success);
     CHECK(result.errors.empty());
 }
+
+TEST_CASE("basic compiler compiles GOSUB and RETURN") {
+    BasicProgram program;
+    program.setLine(10, "GOSUB 40");
+    program.setLine(20, "PRINT 1");
+    program.setLine(30, "END");
+    program.setLine(40, "PRINT 2");
+    program.setLine(50, "RETURN");
+
+    BasicCompiler compiler;
+    const auto result = compiler.compile(program);
+
+    REQUIRE(result.success);
+    CHECK(result.errors.empty());
+    // Line 10: CALL <ip of line 40>
+    CHECK(result.program[0].op == OpCode::Call);
+    // Line 20: PushInt 1, PrintVal, PrintEol
+    CHECK(result.program[1].op == OpCode::PushInt);
+    CHECK(result.program[2].op == OpCode::PrintVal);
+    CHECK(result.program[3].op == OpCode::PrintEol);
+    // Line 30: HALT (END)
+    CHECK(result.program[4].op == OpCode::Halt);
+    // Line 40: PushInt 2, PrintVal, PrintEol
+    CHECK(result.program[5].op == OpCode::PushInt);
+    CHECK(result.program[6].op == OpCode::PrintVal);
+    CHECK(result.program[7].op == OpCode::PrintEol);
+    // Line 50: RETURN
+    CHECK(result.program[8].op == OpCode::Return);
+    // CALL operand must resolve to ip of line 40 = 5
+    CHECK(std::get<int>(result.program[0].operand) == 5);
+}
+
+TEST_CASE("basic compiler rejects GOSUB to unknown line") {
+    BasicProgram program;
+    program.setLine(10, "GOSUB 99");
+
+    BasicCompiler compiler;
+    const auto result = compiler.compile(program);
+
+    CHECK_FALSE(result.success);
+    REQUIRE(result.errors.size() == 1);
+    CHECK(result.errors[0].line == 10);
+    CHECK(result.errors[0].message == "Unknown target line 99");
+}

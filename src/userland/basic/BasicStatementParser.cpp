@@ -145,6 +145,29 @@ namespace PickShell {
                 continue;
             }
 
+            if (op == "GOSUB") {
+                std::string targetRaw;
+                std::getline(iss, targetRaw);
+                int targetLine = 0;
+                if (!parsePositiveLineNumber(targetRaw, targetLine)) {
+                    result.errors.push_back({lineNumber, "GOSUB requires a line number"});
+                    continue;
+                }
+                result.lines.push_back({lineNumber, BasicAst::GosubStmt{targetLine}});
+                continue;
+            }
+
+            if (op == "RETURN") {
+                std::string rest;
+                std::getline(iss, rest);
+                if (!trim(rest).empty()) {
+                    result.errors.push_back({lineNumber, "RETURN takes no arguments"});
+                    continue;
+                }
+                result.lines.push_back({lineNumber, BasicAst::ReturnStmt{}});
+                continue;
+            }
+
             if (op == "IF") {
                 std::string rest;
                 std::getline(iss, rest);

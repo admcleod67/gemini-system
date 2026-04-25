@@ -15,6 +15,8 @@ Compiler internals are in an incremental refactor phase. Expression parsing and 
 - `LET <var> = <expr>`
 - `PRINT <expr>`
 - `GOTO <line>`
+- `GOSUB <line>`
+- `RETURN`
 - `IF <cond> THEN <line> [ELSE <line>]`
 - `STOP`
 - `INPUT <var>`
@@ -117,6 +119,8 @@ The semicolon form is useful for prompt-style interaction, for example printing 
 ## Control flow
 
 - `GOTO <line>` jumps to the specified BASIC line number.
+- `GOSUB <line>` calls the subroutine beginning at the specified BASIC line number. Execution resumes at the statement following `GOSUB` when a matching `RETURN` is reached.
+- `RETURN` returns from the most recently called `GOSUB`. Raises a runtime error if there is no active `GOSUB` call.
 - `IF <cond> THEN <line>` jumps to `<line>` when `<cond>` is true; otherwise execution continues to the next sequential line.
 - `IF <cond> THEN <line1> ELSE <line2>` jumps to `<line1>` when true, otherwise to `<line2>`.
 - `STOP` halts execution immediately (same runtime effect as `END`).

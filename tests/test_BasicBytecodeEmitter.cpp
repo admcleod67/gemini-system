@@ -165,3 +165,35 @@ TEST_CASE("basic bytecode emitter rejects invalid identifier in expression path"
     CHECK(emitted.errors[0].message == "PRINT expression error: Invalid variable name '1BAD'");
     CHECK(emitted.program.empty());
 }
+
+TEST_CASE("basic bytecode emitter lowers GosubStmt to Call opcode with fixup") {
+    BasicIr::NormalizedProgram program;
+    program.lines.push_back({10, BasicIr::GosubStmt{30}});
+    program.lines.push_back({20, BasicIr::EndStmt{}});
+    program.lines.push_back({30, BasicIr::ReturnStmt{}});
+
+    const BasicBytecodeEmissionResult emitted = BasicBytecodeEmitter::emit(program);
+    CHECK(emitted.success);
+    CHECK(emitted.errors.empty());
+    // line 10: CALL (target=ip of line 30)
+    REQUIRE(emitted.program.size() >= 3);
+    CHECK(emitted.program[0].op == OpCode::Call);
+    // Fixup must have resolved the Call operand to the IP of line 30
+    const int callTarget = std::get<int>(emitted.program[0].operand);
+    CHECK(callTarget == 2); // line 30 is the 3rd line → ip 2
+    // line 20: HALT
+    CHECK(emitted.program[1].op == OpCode::Halt);
+    // line 30: RETURN
+    CHECK(emitted.program[2].op == OpCode::Return);
+}
+
+TEST_CASE("basic bytecode emitter lowers ReturnStmt to Return opcode") {
+    BasicIr::NormalizedProgram program;
+    program.lines.push_back({10, BasicIr::ReturnStmt{}});
+
+    const BasicBytecodeEmissionResult emitted = BasicBytecodeEmitter::emit(program);
+    CHECK(emitted.success);
+    REQUIRE(emitted.program.size() == 2);
+    CHECK(emitted.program[0].op == OpCode::Return);
+    CHECK(emitted.program[1].op == OpCode::Halt);
+}

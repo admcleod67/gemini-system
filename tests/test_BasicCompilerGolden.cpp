@@ -83,3 +83,43 @@ TEST_CASE("basic compiler golden print string semicolon program") {
     CHECK(result.program[5].op == OpCode::PrintVal);
     CHECK(result.program[6].op == OpCode::Halt);
 }
+
+TEST_CASE("basic compiler golden gosub return subroutine program") {
+    // 10 GOSUB 50     <- call subroutine at line 50
+    // 20 PRINT 1      <- executed after return
+    // 30 END
+    // 50 PRINT 2      <- subroutine body
+    // 60 RETURN
+    BasicProgram program;
+    program.setLine(10, "GOSUB 50");
+    program.setLine(20, "PRINT 1");
+    program.setLine(30, "END");
+    program.setLine(50, "PRINT 2");
+    program.setLine(60, "RETURN");
+
+    BasicCompiler compiler;
+    const auto result = compiler.compile(program);
+    CHECK(result.success);
+    // ip 0: CALL 5
+    // ip 1: PUSH_INT 1
+    // ip 2: PRINT_VAL
+    // ip 3: PRINT_EOL
+    // ip 4: HALT
+    // ip 5: PUSH_INT 2
+    // ip 6: PRINT_VAL
+    // ip 7: PRINT_EOL
+    // ip 8: RETURN
+    // ip 9: HALT (implicit)
+    REQUIRE(result.program.size() == 10);
+    CHECK(result.program[0].op == OpCode::Call);
+    CHECK(std::get<int>(result.program[0].operand) == 5);
+    CHECK(result.program[1].op == OpCode::PushInt);
+    CHECK(result.program[2].op == OpCode::PrintVal);
+    CHECK(result.program[3].op == OpCode::PrintEol);
+    CHECK(result.program[4].op == OpCode::Halt);
+    CHECK(result.program[5].op == OpCode::PushInt);
+    CHECK(result.program[6].op == OpCode::PrintVal);
+    CHECK(result.program[7].op == OpCode::PrintEol);
+    CHECK(result.program[8].op == OpCode::Return);
+    CHECK(result.program[9].op == OpCode::Halt);
+}

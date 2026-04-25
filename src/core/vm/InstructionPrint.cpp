@@ -37,6 +37,8 @@ namespace PickVM {
             case OpCode::CoerceInt: return "COERCE_INT";
             case OpCode::Jump: return "JUMP";
             case OpCode::JumpIfZero: return "JZ";
+            case OpCode::Call: return "CALL";
+            case OpCode::Return: return "RETURN";
             case OpCode::LoadVar: return "LOAD_VAR";
             case OpCode::StoreVar: return "STORE_VAR";
         }
@@ -80,6 +82,7 @@ namespace PickVM {
             }
             case OpCode::Jump:
             case OpCode::JumpIfZero:
+            case OpCode::Call:
                 oss << ' ' << intOperandAtIp(instr, ip);
                 break;
             case OpCode::LoadVar:
@@ -106,6 +109,7 @@ namespace PickVM {
             case OpCode::InputInt:
             case OpCode::InputStr:
             case OpCode::CoerceInt:
+            case OpCode::Return:
                 break;
         }
 

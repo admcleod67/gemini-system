@@ -42,6 +42,8 @@ The parser records **1-based physical source line numbers** per instruction (for
 | `INPUT_INT` | Read one input line, parse as int, and push it. Throws `INPUT_INT: end of input` on EOF and `INPUT_INT: invalid integer input` on parse failure. Available for handwritten `.tbc`; the BASIC compiler emits `INPUT_STR` instead. |
 | `INPUT_STR` | Read one input line as a raw string (trimmed), and push it. Emitted by the BASIC compiler for all `INPUT` statements. |
 | `COERCE_INT` | Pop a `Value`, convert to int (`strtol`; empty or non-numeric string → 0), push the resulting int. Emitted by the BASIC compiler after `INPUT_STR` for `%`-suffix variables and after expressions assigned to `%`-suffix variables. |
+| `CALL n` | Push `ip+1` onto the call stack, then set IP to `n`. Used to implement `GOSUB`. |
+| `RETURN` | Pop the top address from the call stack and set IP to it. Throws `"RETURN without GOSUB"` if the call stack is empty. |
 | `JUMP label` | Set IP to the instruction index of `label` (resolved at parse time). |
 | `JZ label` | Pop int; if it is **zero**, jump to `label`; otherwise fall through. |
 | `STORE_VAR name` | Pop value and store it by case-insensitive variable `name` (runtime canonicalizes to uppercase). |
@@ -70,7 +72,7 @@ Jump targets must refer to defined labels and resolve to valid instruction indic
 - **`setOutputStream(ostream*)`** — where **`PRINT_*`** go; **`nullptr`** means **`std::cout`**.
 - **`setInputStream(istream*)`** — where **`INPUT_STR`** and **`INPUT_INT`** read from; **`nullptr`** means **`std::cin`**.
 - **`stack()`** / **`dumpStack()`** — inspection helpers.
-- Runtime keeps a per-loaded-program variable map for `STORE_VAR`/`LOAD_VAR`; loading a new program resets it.
+- Runtime keeps a per-loaded-program variable map for `STORE_VAR`/`LOAD_VAR` and a **call stack** for `CALL`/`RETURN`; loading a new program resets both.
 
 ## Instruction listing
 

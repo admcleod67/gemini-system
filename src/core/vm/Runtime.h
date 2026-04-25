@@ -38,6 +38,8 @@ namespace PickVM {
         CoerceInt,
         Jump,
         JumpIfZero,
+        Call,
+        Return,
         LoadVar,
         StoreVar
     };
@@ -80,6 +82,7 @@ namespace PickVM {
     private:
         std::vector<Instruction> program_;
         std::vector<Value> stack_;
+        std::vector<std::size_t> callStack_; // Return-address stack for GOSUB/RETURN
         std::unordered_map<std::string, Value> variables_;
         std::size_t ip_; // Instruction pointer
         mutable std::ostream *outStream_{nullptr};
