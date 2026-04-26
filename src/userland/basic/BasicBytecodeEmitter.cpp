@@ -1,8 +1,6 @@
 #include "BasicBytecodeEmitter.h"
 
 #include "BasicCompileUtils.h"
-#include "BasicProgram.h"
-#include "BasicStatementParser.h"
 
 #include <functional>
 #include <string>
@@ -185,14 +183,14 @@ namespace PickShell {
         std::unordered_map<int, std::size_t> lineToInstructionIndex;
         std::vector<JumpFixup> jumpFixups;
 
-        std::function<bool(const BasicAst::StatementNode &, int)> emitInlineStatement;
-        std::function<bool(const BasicAst::BranchArm &, int)> emitBranchArm;
+        std::function<bool(const BasicIr::NormalizedStmt &, int)> emitInlineStatement;
+        std::function<bool(const BasicIr::BranchArm &, int)> emitBranchArm;
 
-        emitInlineStatement = [&](const BasicAst::StatementNode &stmtNode, const int sourceLine) -> bool {
+        emitInlineStatement = [&](const BasicIr::NormalizedStmt &stmtNode, const int sourceLine) -> bool {
             return std::visit(
                 [&](const auto &stmt) -> bool {
                     using StmtT = std::decay_t<decltype(stmt)>;
-                    if constexpr (std::is_same_v<StmtT, BasicAst::LetStmt>) {
+                    if constexpr (std::is_same_v<StmtT, BasicIr::LetStmt>) {
                         if (!stmt.expression) {
                             result.errors.push_back({sourceLine, "LET requires an expression"});
                             return false;
@@ -208,27 +206,27 @@ namespace PickShell {
                         }
                         result.program.push_back(PickVM::Instruction{PickVM::OpCode::StoreVar, uppercase(stmt.variableName)});
                         return true;
-                    } else if constexpr (std::is_same_v<StmtT, BasicAst::InputStmt>) {
+                    } else if constexpr (std::is_same_v<StmtT, BasicIr::InputStmt>) {
                         result.program.push_back(makeNoOperandInstruction(PickVM::OpCode::InputStr));
                         if (isIntVar(stmt.variableName)) {
                             result.program.push_back(makeNoOperandInstruction(PickVM::OpCode::CoerceInt));
                         }
                         result.program.push_back(PickVM::Instruction{PickVM::OpCode::StoreVar, uppercase(stmt.variableName)});
                         return true;
-                    } else if constexpr (std::is_same_v<StmtT, BasicAst::GotoStmt>) {
+                    } else if constexpr (std::is_same_v<StmtT, BasicIr::GotoStmt>) {
                         const std::size_t jumpIp = result.program.size();
                         result.program.push_back(PickVM::Instruction{PickVM::OpCode::Jump, 0});
                         jumpFixups.push_back({sourceLine, jumpIp, stmt.targetLine});
                         return true;
-                    } else if constexpr (std::is_same_v<StmtT, BasicAst::GosubStmt>) {
+                    } else if constexpr (std::is_same_v<StmtT, BasicIr::GosubStmt>) {
                         const std::size_t callIp = result.program.size();
                         result.program.push_back(PickVM::Instruction{PickVM::OpCode::Call, 0});
                         jumpFixups.push_back({sourceLine, callIp, stmt.targetLine});
                         return true;
-                    } else if constexpr (std::is_same_v<StmtT, BasicAst::ReturnStmt>) {
+                    } else if constexpr (std::is_same_v<StmtT, BasicIr::ReturnStmt>) {
                         result.program.push_back(makeNoOperandInstruction(PickVM::OpCode::Return));
                         return true;
-                    } else if constexpr (std::is_same_v<StmtT, BasicAst::IfStmt>) {
+                    } else if constexpr (std::is_same_v<StmtT, BasicIr::IfStmt>) {
                         if (!stmt.condition) {
                             result.errors.push_back({sourceLine, "IF requires a condition expression"});
                             return false;
@@ -263,7 +261,7 @@ namespace PickShell {
                             result.program[jzIp].operand = static_cast<int>(result.program.size());
                         }
                         return true;
-                    } else if constexpr (std::is_same_v<StmtT, BasicAst::PrintStmt>) {
+                    } else if constexpr (std::is_same_v<StmtT, BasicIr::PrintStmt>) {
                         if (!stmt.expression) {
                             result.errors.push_back({sourceLine, "PRINT requires an expression"});
                             return false;
@@ -279,11 +277,11 @@ namespace PickShell {
                             result.program.push_back(makeNoOperandInstruction(PickVM::OpCode::PrintEol));
                         }
                         return true;
-                    } else if constexpr (std::is_same_v<StmtT, BasicAst::StopStmt> ||
-                                         std::is_same_v<StmtT, BasicAst::EndStmt>) {
+                    } else if constexpr (std::is_same_v<StmtT, BasicIr::StopStmt> ||
+                                         std::is_same_v<StmtT, BasicIr::EndStmt>) {
                         result.program.push_back(makeNoOperandInstruction(PickVM::OpCode::Halt));
                         return true;
-                    } else if constexpr (std::is_same_v<StmtT, BasicAst::OpenStmt>) {
+                    } else if constexpr (std::is_same_v<StmtT, BasicIr::OpenStmt>) {
                         if (!stmt.fileExpr) {
                             result.errors.push_back({sourceLine, "OPEN requires a file expression"});
                             return false;
@@ -311,7 +309,7 @@ namespace PickShell {
                         result.program[jzIp].operand = static_cast<int>(failPathIp);
                         result.program[skipElseJumpIp].operand = static_cast<int>(result.program.size());
                         return true;
-                    } else if constexpr (std::is_same_v<StmtT, BasicAst::ReadStmt>) {
+                    } else if constexpr (std::is_same_v<StmtT, BasicIr::ReadStmt>) {
                         if (!stmt.idExpr) {
                             result.errors.push_back({sourceLine, "READ requires an ID expression"});
                             return false;
@@ -343,7 +341,7 @@ namespace PickShell {
                         result.program[jzIp].operand = static_cast<int>(failPathIp);
                         result.program[skipElseJumpIp].operand = static_cast<int>(result.program.size());
                         return true;
-                    } else if constexpr (std::is_same_v<StmtT, BasicAst::WriteStmt>) {
+                    } else if constexpr (std::is_same_v<StmtT, BasicIr::WriteStmt>) {
                         if (!stmt.valueExpr || !stmt.idExpr) {
                             result.errors.push_back({sourceLine, "WRITE requires value and ID expressions"});
                             return false;
@@ -381,13 +379,13 @@ namespace PickShell {
                         result.program[jzIp].operand = static_cast<int>(failPathIp);
                         result.program[skipElseJumpIp].operand = static_cast<int>(result.program.size());
                         return true;
-                    } else if constexpr (std::is_same_v<StmtT, BasicAst::CloseStmt>) {
+                    } else if constexpr (std::is_same_v<StmtT, BasicIr::CloseStmt>) {
                         result.program.push_back(PickVM::Instruction{PickVM::OpCode::CloseFile, uppercase(stmt.fileVar)});
                         return true;
-                    } else if constexpr (std::is_same_v<StmtT, BasicAst::ClearStmt>) {
+                    } else if constexpr (std::is_same_v<StmtT, BasicIr::ClearStmt>) {
                         result.program.push_back(makeNoOperandInstruction(PickVM::OpCode::ClearVars));
                         return true;
-                    } else if constexpr (std::is_same_v<StmtT, BasicAst::RemStmt>) {
+                    } else if constexpr (std::is_same_v<StmtT, BasicIr::RemStmt>) {
                         return true;
                     } else {
                         result.errors.push_back({sourceLine, "Unsupported inline branch statement"});
@@ -397,7 +395,7 @@ namespace PickShell {
                 stmtNode);
         };
 
-        emitBranchArm = [&](const BasicAst::BranchArm &arm, const int sourceLine) -> bool {
+        emitBranchArm = [&](const BasicIr::BranchArm &arm, const int sourceLine) -> bool {
             if (arm.line.has_value()) {
                 const std::size_t jumpIp = result.program.size();
                 result.program.push_back(PickVM::Instruction{PickVM::OpCode::Jump, 0});
@@ -405,19 +403,11 @@ namespace PickShell {
                 return true;
             }
 
-            if (arm.statementText.empty()) {
+            if (!arm.inlineStatement) {
                 result.errors.push_back({sourceLine, "Branch arm requires a line target or statement"});
                 return false;
             }
-
-            BasicProgram synthetic;
-            synthetic.setLine(sourceLine, arm.statementText);
-            BasicAst::StatementParseResult parsed = BasicStatementParser::parse(synthetic);
-            if (!parsed.success || parsed.lines.size() != 1) {
-                result.errors.push_back({sourceLine, "Invalid inline branch statement"});
-                return false;
-            }
-            return emitInlineStatement(parsed.lines[0].statement, sourceLine);
+            return emitInlineStatement(arm.inlineStatement->statement, sourceLine);
         };
 
         for (const BasicIr::NormalizedLine &line: program.lines) {
@@ -527,7 +517,7 @@ namespace PickShell {
                         }
                         const std::size_t jzIp = result.program.size();
                         result.program.push_back(PickVM::Instruction{PickVM::OpCode::JumpIfZero, 0});
-                        if (!emitBranchArm(BasicAst::BranchArm{stmt.thenArm.line, stmt.thenArm.statementText}, line.lineNumber)) {
+                        if (!emitBranchArm(stmt.thenArm, line.lineNumber)) {
                             return false;
                         }
                         if (stmt.elseArm.has_value()) {
@@ -538,9 +528,7 @@ namespace PickShell {
                                 result.program.push_back(PickVM::Instruction{PickVM::OpCode::Jump, 0});
                             }
                             const std::size_t elseStartIp = result.program.size();
-                            if (!emitBranchArm(
-                                BasicAst::BranchArm{stmt.elseArm->line, stmt.elseArm->statementText},
-                                line.lineNumber)) {
+                            if (!emitBranchArm(*stmt.elseArm, line.lineNumber)) {
                                 return false;
                             }
                             result.program[jzIp].operand = static_cast<int>(elseStartIp);
@@ -638,9 +626,7 @@ namespace PickShell {
                             const std::size_t skipElseJumpIp = result.program.size();
                             result.program.push_back(PickVM::Instruction{PickVM::OpCode::Jump, 0});
                             const std::size_t elseStartIp = result.program.size();
-                            if (!emitBranchArm(
-                                BasicAst::BranchArm{stmt.elseArm->line, stmt.elseArm->statementText},
-                                line.lineNumber)) {
+                            if (!emitBranchArm(*stmt.elseArm, line.lineNumber)) {
                                 return false;
                             }
                             result.program[jzIp].operand = static_cast<int>(elseStartIp);
@@ -674,9 +660,7 @@ namespace PickShell {
                             const std::size_t failPathIp = result.program.size();
                             result.program.push_back(makeNoOperandInstruction(PickVM::OpCode::Drop)); // drop placeholder value
                             result.program[jzIp].operand = static_cast<int>(failPathIp);
-                            if (!emitBranchArm(
-                                BasicAst::BranchArm{stmt.elseArm->line, stmt.elseArm->statementText},
-                                line.lineNumber)) {
+                            if (!emitBranchArm(*stmt.elseArm, line.lineNumber)) {
                                 return false;
                             }
                             result.program[skipElseJumpIp].operand = static_cast<int>(result.program.size());
@@ -715,9 +699,7 @@ namespace PickShell {
                             const std::size_t skipElseJumpIp = result.program.size();
                             result.program.push_back(PickVM::Instruction{PickVM::OpCode::Jump, 0});
                             const std::size_t elseStartIp = result.program.size();
-                            if (!emitBranchArm(
-                                BasicAst::BranchArm{stmt.elseArm->line, stmt.elseArm->statementText},
-                                line.lineNumber)) {
+                            if (!emitBranchArm(*stmt.elseArm, line.lineNumber)) {
                                 return false;
                             }
                             result.program[jzIp].operand = static_cast<int>(elseStartIp);

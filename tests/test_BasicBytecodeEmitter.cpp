@@ -37,6 +37,12 @@ namespace {
         expr->node = BasicAst::BinaryExpr{BasicAst::BinaryOp::Equal, std::move(lhs), std::move(rhs), {}};
         return expr;
     }
+
+    std::shared_ptr<BasicIr::InlineStatement> makeInlineStmt(BasicIr::NormalizedStmt stmt) {
+        auto out = std::make_shared<BasicIr::InlineStatement>();
+        out->statement = std::move(stmt);
+        return out;
+    }
 } // namespace
 
 TEST_CASE("basic bytecode emitter lowers let print and end") {
@@ -68,8 +74,8 @@ TEST_CASE("basic bytecode emitter lowers if and goto control flow") {
     BasicIr::NormalizedProgram program;
     BasicIr::IfStmt ifStmt{};
     ifStmt.condition = makeEq(makeInt(1), makeInt(1));
-    ifStmt.thenArm = BasicIr::BranchArm{30, ""};
-    ifStmt.elseArm = BasicIr::BranchArm{40, ""};
+    ifStmt.thenArm = BasicIr::BranchArm{30, nullptr};
+    ifStmt.elseArm = BasicIr::BranchArm{40, nullptr};
     program.lines.push_back({10, std::move(ifStmt)});
     program.lines.push_back({20, BasicIr::StopStmt{}});
     program.lines.push_back({30, BasicIr::GotoStmt{20}});
@@ -120,7 +126,7 @@ TEST_CASE("basic bytecode emitter rejects IF with null condition") {
     BasicIr::NormalizedProgram program;
     BasicIr::IfStmt ifStmt{};
     ifStmt.condition = nullptr;
-    ifStmt.thenArm = BasicIr::BranchArm{20, ""};
+    ifStmt.thenArm = BasicIr::BranchArm{20, nullptr};
     ifStmt.elseArm = std::nullopt;
     program.lines.push_back({10, std::move(ifStmt)});
     program.lines.push_back({20, BasicIr::EndStmt{}});
@@ -486,7 +492,7 @@ TEST_CASE("basic bytecode emitter emits *_Try opcodes for file ELSE flow") {
     BasicIr::OpenStmt open{};
     open.fileExpr = makeStr("CUST");
     open.fileVar = "FVAR";
-    open.elseArm = BasicIr::BranchArm{40, ""};
+    open.elseArm = BasicIr::BranchArm{40, nullptr};
     program.lines.push_back({10, std::move(open)});
     program.lines.push_back({40, BasicIr::EndStmt{}});
 
@@ -506,8 +512,8 @@ TEST_CASE("basic bytecode emitter supports IF THEN ELSE inline statements") {
     BasicIr::NormalizedProgram program;
     BasicIr::IfStmt ifStmt{};
     ifStmt.condition = makeEq(makeInt(1), makeInt(1));
-    ifStmt.thenArm = BasicIr::BranchArm{std::nullopt, "PRINT 7"};
-    ifStmt.elseArm = BasicIr::BranchArm{std::nullopt, "PRINT 8"};
+    ifStmt.thenArm = BasicIr::BranchArm{std::nullopt, makeInlineStmt(BasicIr::PrintStmt{makeInt(7), false})};
+    ifStmt.elseArm = BasicIr::BranchArm{std::nullopt, makeInlineStmt(BasicIr::PrintStmt{makeInt(8), false})};
     program.lines.push_back({10, std::move(ifStmt)});
     program.lines.push_back({20, BasicIr::EndStmt{}});
 
@@ -531,7 +537,10 @@ TEST_CASE("basic bytecode emitter supports OPEN ELSE inline statement") {
     BasicIr::OpenStmt open{};
     open.fileExpr = makeStr("CUST");
     open.fileVar = "FVAR";
-    open.elseArm = BasicIr::BranchArm{std::nullopt, "PRINT \"MISS\""};
+    open.elseArm = BasicIr::BranchArm{
+        std::nullopt,
+        makeInlineStmt(BasicIr::PrintStmt{makeStr("MISS"), false})
+    };
     program.lines.push_back({10, std::move(open)});
     program.lines.push_back({20, BasicIr::EndStmt{}});
 

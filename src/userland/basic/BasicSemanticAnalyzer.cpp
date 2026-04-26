@@ -1,8 +1,5 @@
 #include "BasicSemanticAnalyzer.h"
 
-#include "BasicProgram.h"
-#include "BasicStatementParser.h"
-
 #include <unordered_set>
 #include <utility>
 #include <variant>
@@ -10,10 +7,16 @@
 
 namespace PickShell {
     namespace {
+        BasicIr::NormalizedStmt toIrStatement(BasicAst::StatementNode statement);
+
         BasicIr::BranchArm toIrBranchArm(BasicAst::BranchArm arm) {
             BasicIr::BranchArm out{};
             out.line = arm.line;
-            out.statementText = std::move(arm.statementText);
+            if (arm.inlineStatement) {
+                auto inlineStmt = std::make_shared<BasicIr::InlineStatement>();
+                inlineStmt->statement = toIrStatement(std::move(arm.inlineStatement->statement));
+                out.inlineStatement = std::move(inlineStmt);
+            }
             return out;
         }
 
@@ -42,27 +45,6 @@ namespace PickShell {
             return false;
         }
 
-        bool parseInlineBranchStatement(const std::string &statementText,
-                                        int ownerLine,
-                                        BasicAst::StatementNode &outStatement,
-                                        std::vector<BasicAst::SemanticError> &errors) {
-            BasicProgram synthetic;
-            synthetic.setLine(ownerLine, statementText);
-            BasicAst::StatementParseResult parsed = BasicStatementParser::parse(synthetic);
-            if (!parsed.success) {
-                for (const auto &err: parsed.errors) {
-                    errors.push_back({ownerLine, err.message});
-                }
-                return false;
-            }
-            if (parsed.lines.size() != 1) {
-                errors.push_back({ownerLine, "Branch statement must parse as exactly one statement"});
-                return false;
-            }
-            outStatement = std::move(parsed.lines[0].statement);
-            return true;
-        }
-
         void validateStatement(const BasicAst::StatementNode &statement,
                                int ownerLine,
                                const std::unordered_set<int> &knownLines,
@@ -77,16 +59,11 @@ namespace PickShell {
                 return;
             }
 
-            if (arm.statementText.empty()) {
+            if (!arm.inlineStatement) {
                 errors.push_back({ownerLine, "Branch arm requires a line target or statement"});
                 return;
             }
-
-            BasicAst::StatementNode branchStatement;
-            if (!parseInlineBranchStatement(arm.statementText, ownerLine, branchStatement, errors)) {
-                return;
-            }
-            validateStatement(branchStatement, ownerLine, knownLines, errors);
+            validateStatement(arm.inlineStatement->statement, ownerLine, knownLines, errors);
         }
 
         void validateStatement(const BasicAst::StatementNode &statement,
@@ -121,39 +98,9 @@ namespace PickShell {
                 },
                 statement);
         }
-    } // namespace
 
-    BasicSemanticAnalysisResult BasicSemanticAnalyzer::analyze(BasicAst::StatementParseResult parsed) {
-        BasicSemanticAnalysisResult result;
-        if (!parsed.success) {
-            result.success = false;
-            for (const auto &error: parsed.errors) {
-                result.errors.push_back({error.line, error.message});
-            }
-            return result;
-        }
-
-        std::unordered_set<int> knownLines;
-        knownLines.reserve(parsed.lines.size());
-        for (const BasicAst::ParsedBasicLine &line: parsed.lines) {
-            knownLines.insert(line.lineNumber);
-        }
-
-        for (const BasicAst::ParsedBasicLine &line: parsed.lines) {
-            validateStatement(line.statement, line.lineNumber, knownLines, result.errors);
-        }
-
-        if (!result.errors.empty()) {
-            result.success = false;
-            return result;
-        }
-
-        result.success = true;
-        result.program.lines.reserve(parsed.lines.size());
-        for (BasicAst::ParsedBasicLine &line: parsed.lines) {
-            BasicIr::NormalizedLine normalized;
-            normalized.lineNumber = line.lineNumber;
-            normalized.statement = std::visit(
+        BasicIr::NormalizedStmt toIrStatement(BasicAst::StatementNode statement) {
+            return std::visit(
                 [](auto &stmt) -> BasicIr::NormalizedStmt {
                     using StmtT = std::decay_t<decltype(stmt)>;
                     if constexpr (std::is_same_v<StmtT, BasicAst::LetStmt>) {
@@ -226,7 +173,41 @@ namespace PickShell {
                         return BasicIr::EndStmt{};
                     }
                 },
-                line.statement);
+                statement);
+        }
+    } // namespace
+
+    BasicSemanticAnalysisResult BasicSemanticAnalyzer::analyze(BasicAst::StatementParseResult parsed) {
+        BasicSemanticAnalysisResult result;
+        if (!parsed.success) {
+            result.success = false;
+            for (const auto &error: parsed.errors) {
+                result.errors.push_back({error.line, error.message});
+            }
+            return result;
+        }
+
+        std::unordered_set<int> knownLines;
+        knownLines.reserve(parsed.lines.size());
+        for (const BasicAst::ParsedBasicLine &line: parsed.lines) {
+            knownLines.insert(line.lineNumber);
+        }
+
+        for (const BasicAst::ParsedBasicLine &line: parsed.lines) {
+            validateStatement(line.statement, line.lineNumber, knownLines, result.errors);
+        }
+
+        if (!result.errors.empty()) {
+            result.success = false;
+            return result;
+        }
+
+        result.success = true;
+        result.program.lines.reserve(parsed.lines.size());
+        for (BasicAst::ParsedBasicLine &line: parsed.lines) {
+            BasicIr::NormalizedLine normalized;
+            normalized.lineNumber = line.lineNumber;
+            normalized.statement = toIrStatement(std::move(line.statement));
             result.program.lines.push_back(std::move(normalized));
         }
         return result;

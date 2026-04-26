@@ -11,6 +11,7 @@
 #include <variant>
 
 namespace PickShell::BasicAst {
+    struct InlineStatement;
     struct SourceRange {
         std::size_t begin{0};
         std::size_t end{0};
@@ -118,9 +119,8 @@ namespace PickShell::BasicAst {
     };
 
     struct BranchArm {
-        // Stage 1 model: line target remains active; statement text is reserved for stage 2 parsing.
         std::optional<int> line;
-        std::string statementText;
+        std::shared_ptr<InlineStatement> inlineStatement;
     };
 
     struct IfStmt {
@@ -178,6 +178,10 @@ namespace PickShell::BasicAst {
     };
 
     using StatementNode = std::variant<LetStmt, InputStmt, GotoStmt, GosubStmt, ReturnStmt, ForStmt, NextStmt, IfStmt, PrintStmt, RemStmt, StopStmt, EndStmt, DimStmt, LetArrayStmt, ClearStmt, OpenStmt, ReadStmt, WriteStmt, CloseStmt>;
+
+    struct InlineStatement {
+        StatementNode statement;
+    };
 
     struct ParsedBasicLine {
         int lineNumber{0};

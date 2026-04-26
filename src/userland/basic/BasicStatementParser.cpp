@@ -4,6 +4,7 @@
 #include "BasicExpressionParser.h"
 
 #include <optional>
+#include <memory>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -64,7 +65,7 @@ namespace PickShell {
 
             int lineNumber = 0;
             if (parsePositiveLineNumber(token, lineNumber)) {
-                outArm = BasicAst::BranchArm{lineNumber, ""};
+                outArm = BasicAst::BranchArm{lineNumber, nullptr};
                 return true;
             }
 
@@ -82,7 +83,21 @@ namespace PickShell {
                 return false;
             }
 
-            outArm = BasicAst::BranchArm{std::nullopt, token};
+            BasicProgram synthetic;
+            synthetic.setLine(1, token);
+            BasicAst::StatementParseResult parsed = BasicStatementParser::parse(synthetic);
+            if (!parsed.success) {
+                error = parsed.errors.empty() ? context + " statement parse failed" : parsed.errors.front().message;
+                return false;
+            }
+            if (parsed.lines.size() != 1) {
+                error = context + " supports exactly one statement";
+                return false;
+            }
+
+            auto inlineStmt = std::make_shared<BasicAst::InlineStatement>();
+            inlineStmt->statement = std::move(parsed.lines[0].statement);
+            outArm = BasicAst::BranchArm{std::nullopt, std::move(inlineStmt)};
             return true;
         }
     } // namespace

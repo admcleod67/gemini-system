@@ -11,6 +11,7 @@
 #include <vector>
 
 namespace PickShell::BasicIr {
+    struct InlineStatement;
     // Normalized IR contracts:
     // - Produced by BasicSemanticAnalyzer and consumed by BasicBytecodeEmitter.
     // - Control-flow targets (GOTO/IF then/else lines) are validated by semantic analysis.
@@ -40,9 +41,8 @@ namespace PickShell::BasicIr {
     struct ReturnStmt {};
 
     struct BranchArm {
-        // Stage 1 model: line target remains active; statement text is reserved for stage 2 parsing.
         std::optional<int> line;
-        std::string statementText;
+        std::shared_ptr<InlineStatement> inlineStatement;
     };
 
     struct IfStmt {
@@ -112,6 +112,10 @@ namespace PickShell::BasicIr {
     };
 
     using NormalizedStmt = std::variant<LetStmt, InputStmt, GotoStmt, GosubStmt, ReturnStmt, ForStmt, NextStmt, IfStmt, PrintStmt, RemStmt, StopStmt, EndStmt, DimStmt, LetArrayStmt, ClearStmt, OpenStmt, ReadStmt, WriteStmt, CloseStmt>;
+
+    struct InlineStatement {
+        NormalizedStmt statement;
+    };
 
     struct NormalizedLine {
         // Original BASIC line number used for diagnostics and jump mapping.

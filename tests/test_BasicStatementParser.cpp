@@ -57,14 +57,10 @@ TEST_CASE("basic statement parser preserves IF THEN ELSE token boundary behavior
 
     const BasicAst::StatementParseResult result = BasicStatementParser::parse(program);
     CHECK_FALSE(result.success);
-    REQUIRE(result.errors.size() == 1);
+    REQUIRE(result.errors.size() == 2);
     CHECK(result.errors[0].message == "IF requires THEN <line>");
-    REQUIRE(result.lines.size() == 1);
-    REQUIRE(std::holds_alternative<BasicAst::IfStmt>(result.lines[0].statement));
-    const auto &stmt = std::get<BasicAst::IfStmt>(result.lines[0].statement);
-    CHECK_FALSE(stmt.thenArm.line.has_value());
-    CHECK(stmt.thenArm.statementText == "30 ELSEX 40");
-    CHECK_FALSE(stmt.elseArm.has_value());
+    CHECK(result.errors[1].message == "Unknown keyword '30'");
+    CHECK(result.lines.empty());
 }
 
 TEST_CASE("basic statement parser preserves PRINT string and semicolon behavior") {
@@ -350,7 +346,8 @@ TEST_CASE("basic statement parser accepts OPEN ELSE with single statement") {
     const auto &stmt = std::get<BasicAst::OpenStmt>(result.lines[0].statement);
     REQUIRE(stmt.elseArm.has_value());
     CHECK_FALSE(stmt.elseArm->line.has_value());
-    CHECK(stmt.elseArm->statementText == "STOP");
+    REQUIRE(stmt.elseArm->inlineStatement != nullptr);
+    CHECK(std::holds_alternative<BasicAst::StopStmt>(stmt.elseArm->inlineStatement->statement));
 }
 
 TEST_CASE("basic statement parser rejects IF branch with multiple statements") {
