@@ -1,4 +1,4 @@
-add_library(pick-core
+add_library(gemini-core
         vm/Runtime.cpp
         vm/Runtime.h
         vm/Parser.cpp
@@ -14,7 +14,7 @@ add_library(pick-core
 )
 
 target_include_directories(
-        pick-core
+        gemini-core
         PUBLIC
         "${CMAKE_SOURCE_DIR}/include"
         "${CMAKE_CURRENT_SOURCE_DIR}/vm"
@@ -22,8 +22,8 @@ target_include_directories(
 )
 
 target_compile_definitions(
-        pick-core
+        gemini-core
         PRIVATE "PICK_SYSTEM_VERSION=\"${PROJECT_VERSION}\""
 )
 
-pick_system_enable_warnings(pick-core)
+pick_system_enable_warnings(gemini-core)

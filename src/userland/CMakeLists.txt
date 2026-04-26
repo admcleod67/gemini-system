@@ -1,4 +1,4 @@
-add_library(pick-tcl
+add_library(gemini-tcl
         basic/BasicProgram.cpp
         basic/BasicProgram.h
         basic/BasicAst.h
@@ -26,17 +26,17 @@ add_library(pick-tcl
 )
 
 target_include_directories(
-        pick-tcl
+        gemini-tcl
         PUBLIC
         "${CMAKE_CURRENT_SOURCE_DIR}/basic"
         "${CMAKE_CURRENT_SOURCE_DIR}/tcl"
 )
 
-target_link_libraries(pick-tcl PUBLIC pick-core)
+target_link_libraries(gemini-tcl PUBLIC gemini-core)
 
 target_compile_definitions(
-        pick-tcl
+        gemini-tcl
         PRIVATE "PICK_SYSTEM_VERSION=\"${PROJECT_VERSION}\""
 )
 
-pick_system_enable_warnings(pick-tcl)
+pick_system_enable_warnings(gemini-tcl)
