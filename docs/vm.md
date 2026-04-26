@@ -14,6 +14,7 @@ Programs are **newline-separated** lines of text. Rules:
 - **`PUSH_STR`** string literals may be written in **double quotes**; surrounding quotes are stripped.
 
 The parser records **1-based physical source line numbers** per instruction (for diagnostics and optional `(line N)` suffixes in dumps/trace).
+For non-`.tbc` loaders (for example, handwritten instruction vectors), source-line metadata is optional.
 
 ## Opcodes
 
@@ -81,14 +82,17 @@ Jump targets must refer to defined labels and resolve to valid instruction indic
 `PickVM::Runtime`:
 
 - **`loadProgram(program)`** — replace program, clear stack, reset IP.
+- **`loadProgram(program, sourceLinePerInstr)`** — same as above, with optional per-instruction source map.
 - **`run()`** — run until **`HALT`** or IP past the last instruction.
 - **`step()`** — execute **one** instruction; returns **`false`** when execution stops (including after **`HALT`**, which leaves the VM in a finished state with IP at end of image).
 - **`instructionPointer()`** — current IP (0-based index into the loaded program).
+- **`currentSourceLine()`** / **`sourceLineAtInstruction(ip)`** — source line lookup for debugger tooling.
 - **`isLoaded()`** — true if a non-empty program is loaded.
 - **`setOutputStream(ostream*)`** — where **`PRINT_*`** go; **`nullptr`** means **`std::cout`**.
 - **`setInputStream(istream*)`** — where **`INPUT_STR`** and **`INPUT_INT`** read from; **`nullptr`** means **`std::cin`**.
 - **`stack()`** / **`dumpStack()`** — inspection helpers.
 - Runtime keeps a per-loaded-program variable map for `STORE_VAR`/`LOAD_VAR`, a **call stack** for `CALL`/`RETURN`, a **for-stack** for `FOR_SETUP`/`FOR_NEXT`, and an **arrays map** for `DIM_ARRAY`/`LOAD_ARR`/`STORE_ARR`; loading a new program resets all four.
+- When no metadata is supplied (or metadata is shorter than the program), missing entries are treated as source line **`0`** (sentinel for "no source line").
 
 ## Instruction listing
 
@@ -96,7 +100,7 @@ Jump targets must refer to defined labels and resolve to valid instruction indic
 
 `{ip}: MNEMONIC [operands]`
 
-Optional **`(line L)`** suffix when `loaded` is provided and a source line is known. Jump operands are printed as **numeric indices** after label resolution.
+Optional **`(line L)`** suffix when `loaded` is provided and a source line is known (`L > 0`). Jump operands are printed as **numeric indices** after label resolution.
 
 ## Sample programs
 

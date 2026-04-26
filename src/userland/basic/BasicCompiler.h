@@ -23,6 +23,7 @@ namespace PickShell {
     struct BasicCompileResult {
         bool success{false};
         std::vector<PickVM::Instruction> program;
+        std::vector<int> sourceLinePerInstr; // parallel to program; 0 means "no source line"
         std::size_t instructionCount{0};
         std::size_t labelCount{0};
         std::vector<BasicCompileError> errors;

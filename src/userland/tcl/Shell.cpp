@@ -8,8 +8,11 @@
 #include <csignal>
 #include <filesystem>
 #include <iostream>
+#include <limits>
 #include <optional>
+#include <set>
 #include <sstream>
+#include <stdexcept>
 #include <vector>
 
 namespace PickShell {
@@ -44,8 +47,11 @@ namespace PickShell {
         });
         basicShell_.setProgramsRoot(session_.programsRoot());
         basicShell_.setExecuteProgramFn(
-            [this](const std::vector<PickVM::Instruction> &program, std::ostream &out) {
-                executeCompiledBasicProgram(program, out);
+            [this](const std::vector<PickVM::Instruction> &program,
+                   const std::vector<int> &sourceLinePerInstr,
+                   const BasicProgram &sourceProgram,
+                   std::ostream &out) {
+                executeCompiledBasicProgram(program, sourceLinePerInstr, sourceProgram, out);
             });
         registerCommands();
     }
@@ -141,6 +147,7 @@ namespace PickShell {
         tclCommands_["CLEAR-BREAKPOINTS"] = [this](const Tokens &, std::ostream &out, bool &) {
             cmdClearBreakpoints(out);
         };
+        tclCommands_["END"] = [this](const Tokens &, std::ostream &out, bool &) { cmdEnd(out); };
         tclCommands_["DUMP-PROGRAM"] = [this](const Tokens &, std::ostream &out, bool &) { cmdDumpProgram(out); };
         tclCommands_["DUMP-LABELS"] = [this](const Tokens &, std::ostream &out, bool &) { cmdDumpLabels(out); };
         tclCommands_["SET"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdSet(tokens, out); };
@@ -180,10 +187,17 @@ namespace PickShell {
         it->second(tokens, out, quit);
     }
 
-    void Shell::executeCompiledBasicProgram(const std::vector<PickVM::Instruction> &program, std::ostream &out) {
+    void Shell::executeCompiledBasicProgram(const std::vector<PickVM::Instruction> &program,
+                                            const std::vector<int> &sourceLinePerInstr,
+                                            const BasicProgram &sourceProgram,
+                                            std::ostream &out) {
+        basicBreakpoints_.clear();
+        basicResumePastLine_.reset();
+        basicTrace_ = false;
+
         session_.runtime_.setOutputStream(&out);
         session_.runtime_.setInputStream(inputStream_);
-        session_.runtime_.loadProgram(program); // also clears interrupted_ flag
+        session_.runtime_.loadProgram(program, sourceLinePerInstr); // also clears interrupted_ flag
 
         g_interruptRuntime.store(&session_.runtime_);
         const auto previousHandler = std::signal(SIGINT, [](int) {
@@ -196,14 +210,303 @@ namespace PickShell {
             session_.runtime_.run();
         } catch (const PickVM::UserInterrupt &) {
             out << "\nBreak\n";
+            session_.runtime_.clearInterrupt();
+            bool done = false;
+            while (!done && session_.runtime_.instructionPointer() < program.size()) {
+                out << "* " << std::flush;
+                std::string line;
+                std::istream &in = inputStream_ ? *inputStream_ : std::cin;
+                if (!std::getline(in, line)) {
+                    session_.runtime_.setInstructionPointer(program.size());
+                    break;
+                }
+                const std::vector<std::string> tokens = tokenizeDebuggerLine(line);
+                done = handleBasicDebuggerCommand(tokens, program, sourceLinePerInstr, sourceProgram, out);
+            }
         } catch (const std::runtime_error &e) {
             out << "\nRuntime error: " << e.what() << '\n';
+            bool done = false;
+            while (!done && session_.runtime_.instructionPointer() < program.size()) {
+                out << "* " << std::flush;
+                std::string line;
+                std::istream &in = inputStream_ ? *inputStream_ : std::cin;
+                if (!std::getline(in, line)) {
+                    session_.runtime_.setInstructionPointer(program.size());
+                    break;
+                }
+                const std::vector<std::string> tokens = tokenizeDebuggerLine(line);
+                done = handleBasicDebuggerCommand(tokens, program, sourceLinePerInstr, sourceProgram, out);
+            }
         }
 
         std::signal(SIGINT, previousHandler); // restores SIG_IGN
         g_interruptRuntime.store(nullptr);
         session_.runtime_.setOutputStream(nullptr);
         session_.runtime_.setInputStream(nullptr);
+    }
+
+    bool Shell::runBasicUntilStop(const std::vector<PickVM::Instruction> &program,
+                                  const std::vector<int> &sourceLinePerInstr,
+                                  std::ostream &out,
+                                  const bool stopAtNextBasicLine) {
+        bool steppedAny = false;
+        const int initialLine = session_.runtime_.currentSourceLine();
+        while (session_.runtime_.instructionPointer() < program.size()) {
+            const std::size_t ip = session_.runtime_.instructionPointer();
+            const int sourceLine = (ip < sourceLinePerInstr.size()) ? sourceLinePerInstr[ip] : 0;
+            const bool skipLineBreakpointOnce =
+                basicResumePastLine_.has_value() && sourceLine > 0 && *basicResumePastLine_ == sourceLine;
+            if (skipLineBreakpointOnce) {
+                basicResumePastLine_.reset();
+            } else if (sourceLine > 0 && basicBreakpoints_.count(sourceLine) != 0U) {
+                out << "Breakpoint hit at line " << sourceLine << '\n';
+                return false;
+            }
+
+            if (basicTrace_) {
+                PickVM::LoadedBytecode loaded{program, {}, sourceLinePerInstr};
+                out << PickVM::formatInstructionLine(ip, program[ip], &loaded) << '\n';
+            }
+
+            try {
+                if (!session_.runtime_.step()) {
+                    return true;
+                }
+            } catch (const PickVM::UserInterrupt &) {
+                out << "\nBreak\n";
+                session_.runtime_.clearInterrupt();
+                return false;
+            } catch (const std::runtime_error &e) {
+                out << "\nRuntime error: " << e.what() << '\n';
+                return false;
+            }
+
+            steppedAny = true;
+            if (stopAtNextBasicLine) {
+                const int currentLine = session_.runtime_.currentSourceLine();
+                if (currentLine > 0 && currentLine != initialLine && steppedAny) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    std::optional<int> Shell::parsePositiveInt(const std::string &token) {
+        try {
+            const int value = std::stoi(token);
+            if (value > 0) {
+                return value;
+            }
+        } catch (const std::exception &) {
+        }
+        return std::nullopt;
+    }
+
+    std::vector<std::string> Shell::tokenizeDebuggerLine(const std::string &line) {
+        std::istringstream iss(line);
+        std::vector<std::string> tokens;
+        std::string token;
+        while (iss >> token) {
+            tokens.push_back(token);
+        }
+        return tokens;
+    }
+
+    std::set<int> Shell::sourceLinesFromMetadata(const std::vector<int> &sourceLinePerInstr) {
+        std::set<int> lines;
+        for (const int line: sourceLinePerInstr) {
+            if (line > 0) {
+                lines.insert(line);
+            }
+        }
+        return lines;
+    }
+
+    bool Shell::parseBasicListRange(const std::vector<std::string> &tokens, int &startLine, int &endLine) {
+        if (tokens.size() == 1) {
+            startLine = 1;
+            endLine = std::numeric_limits<int>::max();
+            return true;
+        }
+        if (tokens.size() != 2) {
+            return false;
+        }
+        const std::string &arg = tokens[1];
+        const std::size_t dashPos = arg.find('-');
+        if (dashPos == std::string::npos) {
+            const std::optional<int> line = parsePositiveInt(arg);
+            if (!line) {
+                return false;
+            }
+            startLine = *line;
+            endLine = *line;
+            return true;
+        }
+        const std::string startToken = arg.substr(0, dashPos);
+        const std::string endToken = arg.substr(dashPos + 1);
+        const std::optional<int> start = parsePositiveInt(startToken);
+        const std::optional<int> end = parsePositiveInt(endToken);
+        if (!start || !end || *start > *end) {
+            return false;
+        }
+        startLine = *start;
+        endLine = *end;
+        return true;
+    }
+
+    void Shell::listBasicSourceRange(const BasicProgram &program,
+                                     const int startLine,
+                                     const int endLine,
+                                     std::ostream &out) {
+        for (const auto &[lineNumber, text]: program.lines()) {
+            if (lineNumber < startLine || lineNumber > endLine) {
+                continue;
+            }
+            out << lineNumber;
+            if (!text.empty()) {
+                out << ' ' << text;
+            }
+            out << '\n';
+        }
+    }
+
+    std::optional<std::size_t> Shell::firstInstructionForSourceLine(const std::vector<int> &sourceLinePerInstr,
+                                                                     const int sourceLine) {
+        for (std::size_t i = 0; i < sourceLinePerInstr.size(); ++i) {
+            if (sourceLinePerInstr[i] == sourceLine) {
+                return i;
+            }
+        }
+        return std::nullopt;
+    }
+
+    bool Shell::handleBasicDebuggerCommand(const std::vector<std::string> &tokens,
+                                           const std::vector<PickVM::Instruction> &program,
+                                           const std::vector<int> &sourceLinePerInstr,
+                                           const BasicProgram &sourceProgram,
+                                           std::ostream &out) {
+        if (tokens.empty()) {
+            return false;
+        }
+
+        const std::string &cmd = tokens[0];
+        if (cmd == "CONT") {
+            const bool finished = runBasicUntilStop(program, sourceLinePerInstr, out, false);
+            return finished;
+        }
+        if (cmd == "STEP") {
+            const bool finished = runBasicUntilStop(program, sourceLinePerInstr, out, true);
+            return finished;
+        }
+        if (cmd == "BREAKPOINT") {
+            if (tokens.size() != 2) {
+                out << "BREAKPOINT requires a BASIC line number\n";
+                return false;
+            }
+            const std::optional<int> line = parsePositiveInt(tokens[1]);
+            if (!line) {
+                out << "BREAKPOINT requires a BASIC line number\n";
+                return false;
+            }
+            const std::set<int> knownLines = sourceLinesFromMetadata(sourceLinePerInstr);
+            if (knownLines.count(*line) == 0U) {
+                out << "No such BASIC line in compiled program\n";
+                return false;
+            }
+            basicBreakpoints_.insert(*line);
+            return false;
+        }
+        if (cmd == "BREAKPOINTS") {
+            if (basicBreakpoints_.empty()) {
+                out << "No breakpoints\n";
+                return false;
+            }
+            std::vector<int> sorted(basicBreakpoints_.begin(), basicBreakpoints_.end());
+            std::sort(sorted.begin(), sorted.end());
+            out << "Breakpoints:";
+            for (const int line: sorted) {
+                out << ' ' << line;
+            }
+            out << '\n';
+            return false;
+        }
+        if (cmd == "CLEAR-BREAKPOINT") {
+            if (tokens.size() != 2) {
+                out << "CLEAR-BREAKPOINT requires a BASIC line number\n";
+                return false;
+            }
+            const std::optional<int> line = parsePositiveInt(tokens[1]);
+            if (!line) {
+                out << "CLEAR-BREAKPOINT requires a BASIC line number\n";
+                return false;
+            }
+            if (basicBreakpoints_.erase(*line) == 0U) {
+                out << "No such breakpoint\n";
+            }
+            return false;
+        }
+        if (cmd == "CLEAR-BREAKPOINTS") {
+            basicBreakpoints_.clear();
+            return false;
+        }
+        if (cmd == "TRACE") {
+            if (tokens.size() != 2 || (tokens[1] != "ON" && tokens[1] != "OFF")) {
+                out << "TRACE requires ON or OFF\n";
+                return false;
+            }
+            basicTrace_ = (tokens[1] == "ON");
+            return false;
+        }
+        if (cmd == "LIST") {
+            int startLine = 1;
+            int endLine = std::numeric_limits<int>::max();
+            if (!parseBasicListRange(tokens, startLine, endLine)) {
+                out << "LIST takes no args, LIST <line>, or LIST <start-end>\n";
+                return false;
+            }
+            listBasicSourceRange(sourceProgram, startLine, endLine, out);
+            return false;
+        }
+        if (cmd == "GOTO") {
+            if (tokens.size() != 2) {
+                out << "GOTO requires a BASIC line number\n";
+                return false;
+            }
+            const std::optional<int> line = parsePositiveInt(tokens[1]);
+            if (!line) {
+                out << "GOTO requires a BASIC line number\n";
+                return false;
+            }
+            const std::optional<std::size_t> ip = firstInstructionForSourceLine(sourceLinePerInstr, *line);
+            if (!ip) {
+                out << "No such BASIC line in compiled program\n";
+                return false;
+            }
+            session_.runtime_.setInstructionPointer(*ip);
+            return false;
+        }
+        if (cmd == "QUIT" || cmd == "END") {
+            session_.runtime_.setInstructionPointer(program.size());
+            return true;
+        }
+        if (cmd == "HELP") {
+            out << "Debugger commands:\n";
+            out << "  CONT\n";
+            out << "  STEP\n";
+            out << "  BREAKPOINT <line>\n";
+            out << "  BREAKPOINTS\n";
+            out << "  CLEAR-BREAKPOINT <line>\n";
+            out << "  CLEAR-BREAKPOINTS\n";
+            out << "  TRACE ON|OFF\n";
+            out << "  LIST [line|start-end]\n";
+            out << "  GOTO <line>\n";
+            out << "  QUIT\n";
+            return false;
+        }
+
+        out << "Unknown debugger command: " << cmd << '\n';
+        return false;
     }
 
     namespace {
@@ -283,7 +586,7 @@ namespace PickShell {
             session_.lastLoaded_ = std::move(loaded);
             session_.runtime_.setOutputStream(&out);
             session_.runtime_.setInputStream(inputStream_);
-            session_.runtime_.loadProgram(session_.lastLoaded_->program);
+            session_.runtime_.loadProgram(session_.lastLoaded_->program, session_.lastLoaded_->sourceLinePerInstr);
             session_.suspended_ = false;
             session_.resumePastBreakpointIp_.reset();
             session_.executeVmLoop(out);
@@ -376,6 +679,17 @@ namespace PickShell {
     void Shell::cmdClearBreakpoints(std::ostream &out) {
         (void) out;
         session_.breakpoints_.clear();
+    }
+
+    void Shell::cmdEnd(std::ostream &out) {
+        if (!session_.programImageLoaded()) {
+            out << "No program loaded\n";
+            return;
+        }
+        session_.lastLoaded_.reset();
+        session_.suspended_ = false;
+        session_.resumePastBreakpointIp_.reset();
+        session_.runtime_.loadProgram({});
     }
 
     void Shell::cmdDumpProgram(std::ostream &out) {
@@ -484,6 +798,7 @@ namespace PickShell {
         out << "  BREAKPOINTS    list breakpoint indices\n";
         out << "  CLEAR-BREAKPOINT <n>\n";
         out << "  CLEAR-BREAKPOINTS\n";
+        out << "  END            exit VM debugger context\n";
         out << "  DUMP-PROGRAM   disassemble loaded program\n";
         out << "  DUMP-LABELS    list label -> instruction index\n";
         out << "  VERSION\n";

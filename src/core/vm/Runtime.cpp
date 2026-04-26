@@ -5,6 +5,7 @@
 #include "Runtime.h"
 #include "InstructionPrint.h"
 
+#include <algorithm>
 #include <cctype>
 #include <climits>
 #include <cstdlib>
@@ -156,7 +157,18 @@ namespace PickVM {
     }
 
     void Runtime::loadProgram(const std::vector<Instruction> &program) {
+        loadProgram(program, {});
+    }
+
+    void Runtime::loadProgram(const std::vector<Instruction> &program, const std::vector<int> &sourceLinePerInstr) {
         program_ = program;
+        sourceLinePerInstr_.assign(program_.size(), 0);
+        if (!sourceLinePerInstr.empty()) {
+            const std::size_t n = std::min(program_.size(), sourceLinePerInstr.size());
+            for (std::size_t i = 0; i < n; ++i) {
+                sourceLinePerInstr_[i] = sourceLinePerInstr[i];
+            }
+        }
         ip_ = 0;
         stack_.clear();
         callStack_.clear();
@@ -165,6 +177,24 @@ namespace PickVM {
         arrays_.clear();
         interrupted_.store(false, std::memory_order_relaxed);
         variables_.clear();
+    }
+
+    int Runtime::sourceLineAtInstruction(const std::size_t ip) const {
+        if (ip >= sourceLinePerInstr_.size()) {
+            return 0;
+        }
+        return sourceLinePerInstr_[ip];
+    }
+
+    int Runtime::currentSourceLine() const {
+        return sourceLineAtInstruction(ip_);
+    }
+
+    void Runtime::setInstructionPointer(const std::size_t ip) {
+        if (ip > program_.size()) {
+            throw std::out_of_range("Instruction pointer out of range");
+        }
+        ip_ = ip;
     }
 
     void Runtime::setFileExistsCallback(FileExistsFn fn) {

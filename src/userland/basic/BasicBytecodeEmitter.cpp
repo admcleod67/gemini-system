@@ -421,7 +421,8 @@ namespace PickShell {
         };
 
         for (const BasicIr::NormalizedLine &line: program.lines) {
-            lineToInstructionIndex[line.lineNumber] = result.program.size();
+            const std::size_t lineStartIp = result.program.size();
+            lineToInstructionIndex[line.lineNumber] = lineStartIp;
             const bool emitted = std::visit(
                 [&](const auto &stmt) -> bool {
                     using StmtT = std::decay_t<decltype(stmt)>;
@@ -739,6 +740,13 @@ namespace PickShell {
             if (!emitted) {
                 continue;
             }
+            const std::size_t lineEndIp = result.program.size();
+            if (lineEndIp > lineStartIp) {
+                result.sourceLinePerInstr.insert(
+                    result.sourceLinePerInstr.end(),
+                    lineEndIp - lineStartIp,
+                    line.lineNumber);
+            }
         }
 
         for (const JumpFixup &fixup: jumpFixups) {
@@ -751,12 +759,14 @@ namespace PickShell {
 
         if (!result.errors.empty()) {
             result.program.clear();
+            result.sourceLinePerInstr.clear();
             result.success = false;
             return result;
         }
 
         if (!explicitEnd || result.program.empty() || result.program.back().op != PickVM::OpCode::Halt) {
             result.program.push_back(makeNoOperandInstruction(PickVM::OpCode::Halt));
+            result.sourceLinePerInstr.push_back(0); // implicit HALT has no source line
         }
 
         result.success = true;

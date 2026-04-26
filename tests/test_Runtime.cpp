@@ -52,6 +52,31 @@ TEST_CASE("runtime empty program step does nothing") {
     CHECK(rt.instructionPointer() == 0);
 }
 
+TEST_CASE("runtime source line defaults to 0 without metadata") {
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, 2},
+        {OpCode::Halt, Value{}},
+    };
+    Runtime rt;
+    rt.loadProgram(prog);
+    CHECK(rt.currentSourceLine() == 0);
+    CHECK(rt.sourceLineAtInstruction(0) == 0);
+    CHECK(rt.sourceLineAtInstruction(1) == 0);
+    CHECK(rt.sourceLineAtInstruction(99) == 0);
+}
+
+TEST_CASE("runtime source line uses optional metadata map") {
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, 2},
+        {OpCode::Halt, Value{}},
+    };
+    Runtime rt;
+    rt.loadProgram(prog, {120, 0});
+    CHECK(rt.currentSourceLine() == 120);
+    CHECK(rt.step());
+    CHECK(rt.currentSourceLine() == 0);
+}
+
 TEST_CASE("runtime push str and concat") {
     std::vector<Instruction> prog = {
         {OpCode::PushStr, std::string{"hel"}},

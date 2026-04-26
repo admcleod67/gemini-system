@@ -24,7 +24,10 @@ namespace PickShell {
         using Tokens = std::vector<std::string>;
         using CommandFn = std::function<void(const Tokens &, std::ostream &, bool &)>;
         using CommandTable = std::unordered_map<std::string, CommandFn>;
-        using ExecuteProgramFn = std::function<void(const std::vector<PickVM::Instruction> &, std::ostream &)>;
+        using ExecuteProgramFn = std::function<void(const std::vector<PickVM::Instruction> &,
+                                                    const std::vector<int> &,
+                                                    const BasicProgram &,
+                                                    std::ostream &)>;
 
         BasicShell();
 

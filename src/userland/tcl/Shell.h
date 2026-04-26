@@ -14,8 +14,10 @@
 #include <functional>
 #include <iosfwd>
 #include <optional>
+#include <set>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace PickShell {
@@ -63,7 +65,27 @@ namespace PickShell {
 
         void handleTclCommand(const Tokens &tokens, bool &quit, std::ostream &out);
 
-        void executeCompiledBasicProgram(const std::vector<PickVM::Instruction> &program, std::ostream &out);
+        void executeCompiledBasicProgram(const std::vector<PickVM::Instruction> &program,
+                                         const std::vector<int> &sourceLinePerInstr,
+                                         const BasicProgram &sourceProgram,
+                                         std::ostream &out);
+
+        bool runBasicUntilStop(const std::vector<PickVM::Instruction> &program,
+                               const std::vector<int> &sourceLinePerInstr,
+                               std::ostream &out,
+                               bool stopAtNextBasicLine);
+        bool handleBasicDebuggerCommand(const std::vector<std::string> &tokens,
+                                        const std::vector<PickVM::Instruction> &program,
+                                        const std::vector<int> &sourceLinePerInstr,
+                                        const BasicProgram &sourceProgram,
+                                        std::ostream &out);
+        static std::optional<int> parsePositiveInt(const std::string &token);
+        static std::vector<std::string> tokenizeDebuggerLine(const std::string &line);
+        static std::set<int> sourceLinesFromMetadata(const std::vector<int> &sourceLinePerInstr);
+        static bool parseBasicListRange(const std::vector<std::string> &tokens, int &startLine, int &endLine);
+        static void listBasicSourceRange(const BasicProgram &program, int startLine, int endLine, std::ostream &out);
+        static std::optional<std::size_t> firstInstructionForSourceLine(const std::vector<int> &sourceLinePerInstr,
+                                                                        int sourceLine);
 
         void cmdEcho(const std::vector<std::string> &tokens, std::ostream &out);
 
@@ -102,6 +124,7 @@ namespace PickShell {
         void cmdClearBreakpoint(const std::vector<std::string> &tokens, std::ostream &out);
 
         void cmdClearBreakpoints(std::ostream &out);
+        void cmdEnd(std::ostream &out);
 
         void cmdDumpProgram(std::ostream &out);
 
@@ -114,6 +137,10 @@ namespace PickShell {
         void cmdListVars(const std::vector<std::string> &tokens, std::ostream &out);
 
         void cmdUnset(const std::vector<std::string> &tokens, std::ostream &out);
+
+        std::unordered_set<int> basicBreakpoints_;
+        std::optional<int> basicResumePastLine_;
+        bool basicTrace_{false};
     };
 } // namespace PickShell
 

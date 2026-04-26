@@ -27,6 +27,13 @@ TEST_CASE("basic compiler compiles LET PRINT END") {
     CHECK(result.program[3].op == OpCode::PrintVal);
     CHECK(result.program[4].op == OpCode::PrintEol);
     CHECK(result.program[5].op == OpCode::Halt);
+    REQUIRE(result.sourceLinePerInstr.size() == result.program.size());
+    CHECK(result.sourceLinePerInstr[0] == 10);
+    CHECK(result.sourceLinePerInstr[1] == 10);
+    CHECK(result.sourceLinePerInstr[2] == 20);
+    CHECK(result.sourceLinePerInstr[3] == 20);
+    CHECK(result.sourceLinePerInstr[4] == 20);
+    CHECK(result.sourceLinePerInstr[5] == 30);
 }
 
 TEST_CASE("basic compiler compiles arithmetic precedence and parentheses") {
@@ -74,6 +81,8 @@ TEST_CASE("basic compiler adds implicit END halt") {
     CHECK(result.success);
     REQUIRE_FALSE(result.program.empty());
     CHECK(result.program.back().op == OpCode::Halt);
+    REQUIRE(result.sourceLinePerInstr.size() == result.program.size());
+    CHECK(result.sourceLinePerInstr.back() == 0);
 }
 
 TEST_CASE("basic compiler variable names are uppercase") {

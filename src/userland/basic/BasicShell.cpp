@@ -244,7 +244,7 @@ namespace PickShell {
                 out << "Error: BASIC runtime not configured\n";
                 return;
             }
-            executeProgramFn_(compile.program, out);
+            executeProgramFn_(compile.program, compile.sourceLinePerInstr, program_, out);
         };
         basicCommands_["QUIT"] = [this](const Tokens &, std::ostream &, bool &leaveBasicMode) {
             mode_ = Mode::Inactive;

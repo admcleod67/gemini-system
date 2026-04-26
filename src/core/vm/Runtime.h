@@ -91,6 +91,7 @@ namespace PickVM {
         void setInputStream(std::istream *in) const;
 
         void loadProgram(const std::vector<Instruction> &program);
+        void loadProgram(const std::vector<Instruction> &program, const std::vector<int> &sourceLinePerInstr);
 
         // Execute until halt or instruction pointer past end (same observable behavior as before).
         // Throws UserInterrupt if interrupt() has been called.
@@ -100,6 +101,9 @@ namespace PickVM {
         bool step();
 
         std::size_t instructionPointer() const { return ip_; }
+        void setInstructionPointer(std::size_t ip);
+        int currentSourceLine() const;
+        int sourceLineAtInstruction(std::size_t ip) const;
 
         bool isLoaded() const { return !program_.empty(); }
 
@@ -124,6 +128,7 @@ namespace PickVM {
 
     private:
         std::vector<Instruction> program_;
+        std::vector<int> sourceLinePerInstr_; // parallel to program_; 0 means "no source line"
         std::vector<Value> stack_;
         std::vector<std::size_t> callStack_; // Return-address stack for GOSUB/RETURN
         std::vector<ForFrame> forStack_;     // Loop-frame stack for FOR/NEXT

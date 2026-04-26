@@ -58,9 +58,9 @@ Each Pick file is stored as JSON:
 | **`READ`** *file* *record-name* | Print record value if present; if missing record: **`No such record`**. |
 | **`WRITE`** *file* *record-name* *value…* | Upsert record value. Value is remaining tokens joined with single spaces. |
 | **`DUMP-STACK`** | Print the VM stack (uses the command output stream). |
-| **`TRACE ON`** / **`TRACE OFF`** | Enable or disable per-instruction tracing during **`RUN`** / resume loops. Does not require a loaded program. |
+| **`TRACE ON`** / **`TRACE OFF`** | Enable or disable per-instruction tracing during **`RUN`** / resume loops. Does not require a loaded program. Trace remains instruction-index based; optional source metadata only adds an informational `(line N)` suffix when available. |
 | **`STEP`** | Single-step **one** instruction if a program is loaded; prints the same line format as trace for that step. |
-| **`BREAKPOINT`** *n* | Record a breakpoint at instruction index *n* (non-negative integer). May be set **before** any **`RUN`**. Label-based breakpoints are not supported. |
+| **`BREAKPOINT`** *n* | Record a breakpoint at instruction index *n* (non-negative integer). May be set **before** any **`RUN`**. Label-based breakpoints are not supported. Source metadata does not change breakpoint indexing in Tcl mode. |
 | **`BREAKPOINTS`** | List breakpoints (sorted). If none: **`No breakpoints`**. |
 | **`CLEAR-BREAKPOINT`** *n* | Remove breakpoint *n*; if missing: **`No such breakpoint`**. |
 | **`CLEAR-BREAKPOINTS`** | Remove all breakpoints. |
@@ -99,7 +99,7 @@ Otherwise they print exactly:
 
 ## Trace and breakpoints
 
-- **Trace:** when **`TRACE ON`**, before each **`step()`**, the shell prints one line via **`formatInstructionLine`** (0-based IP, mnemonic, operands, optional **`(line L)`**). **`HALT`** is included as a line immediately before it executes.
+- **Trace:** when **`TRACE ON`**, before each **`step()`**, the shell prints one line via **`formatInstructionLine`** (0-based IP, mnemonic, operands, optional **`(line L)`** for `L > 0`). **`HALT`** is included as a line immediately before it executes.
 - **Breakpoints:** checked **before** executing the instruction at the current IP. On hit, the shell prints **`Breakpoint hit at`** *ip* and **does not** advance the IP until you **`STEP`**, **`RUN`** (resume), or clear breakpoints.
 - **Resume:** bare **`RUN`** sets a one-shot skip so the instruction at the stopped-at PC is not treated as a breakpoint again immediately, allowing progress after a hit.
 

@@ -5,6 +5,7 @@
 #include <fstream>
 #include <sstream>
 #include <string>
+#include <thread>
 
 #include <pick_system/version.hpp>
 
@@ -579,6 +580,30 @@ TEST_CASE("shell breakpoint hit then STEP then RUN completes") {
     CHECK(std::get<int>(rt.stack()[0]) == 30);
 }
 
+TEST_CASE("shell BREAKPOINT index behavior is unchanged with source metadata present") {
+    auto dir = uniqueTempDir();
+    std::filesystem::create_directories(dir);
+    {
+        std::ofstream f(dir / "bp_meta.tbc");
+        f << "PUSH_INT 10\nPUSH_INT 20\nADD\nHALT\n";
+    }
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setProgramsRoot(dir);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("BREAKPOINT 2", out, quit);
+    sh.handleLine("RUN bp_meta.tbc", out, quit);
+    CHECK(out.str().find("Breakpoint hit at 2") != std::string::npos);
+
+    out.str("");
+    sh.handleLine("STEP", out, quit);
+    // Parser attaches .tbc physical line metadata; index-oriented STEP remains intact.
+    CHECK(out.str().find("2: ADD") != std::string::npos);
+    CHECK(out.str().find("(line 3)") != std::string::npos);
+}
+
 TEST_CASE("shell BASIC sample session edit flow") {
     auto dir = uniqueTempDir();
     std::filesystem::create_directories(dir);
@@ -1137,6 +1162,8 @@ TEST_CASE("shell ED mode malformed substitute command is rejected") {
 TEST_CASE("shell BASIC RUN reports runtime error for RETURN without GOSUB") {
     PickVM::Runtime rt;
     PickShell::Shell sh(rt);
+    std::istringstream in("QUIT\n");
+    sh.setInputStream(&in);
     std::ostringstream out;
     bool quit = false;
 
@@ -1155,6 +1182,8 @@ TEST_CASE("shell BASIC RUN reports runtime error for RETURN without GOSUB") {
 TEST_CASE("shell BASIC RUN reports runtime error for divide by zero") {
     PickVM::Runtime rt;
     PickShell::Shell sh(rt);
+    std::istringstream in("QUIT\n");
+    sh.setInputStream(&in);
     std::ostringstream out;
     bool quit = false;
 
@@ -1165,6 +1194,74 @@ TEST_CASE("shell BASIC RUN reports runtime error for divide by zero") {
     sh.handleLine("RUN", out, quit);
     CHECK(out.str().find("Runtime error") != std::string::npos);
     CHECK(out.str().find("divide by zero") != std::string::npos);
+}
+
+TEST_CASE("shell BASIC debugger supports LIST and QUIT after runtime error") {
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    std::istringstream in("LIST\nQUIT\n");
+    sh.setInputStream(&in);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("BASIC", out, quit);
+    sh.handleLine("10 PRINT \"before\";", out, quit);
+    sh.handleLine("20 RETURN", out, quit);
+    out.str("");
+
+    sh.handleLine("RUN", out, quit);
+    CHECK(out.str().find("Runtime error: RETURN without GOSUB") != std::string::npos);
+    CHECK(out.str().find("* ") != std::string::npos);
+    CHECK(out.str().find("10 PRINT \"before\";") != std::string::npos);
+}
+
+TEST_CASE("shell BASIC debugger supports breakpoint and CONT by BASIC line") {
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    std::istringstream in("BREAKPOINT 20\nCONT\nQUIT\n");
+    sh.setInputStream(&in);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("BASIC", out, quit);
+    sh.handleLine("10 LET A = 1", out, quit);
+    sh.handleLine("20 GOTO 10", out, quit);
+    out.str("");
+
+    std::thread interrupter([&rt]() {
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+        rt.interrupt();
+    });
+    sh.handleLine("RUN", out, quit);
+    interrupter.join();
+    CHECK(out.str().find("Break") != std::string::npos);
+    CHECK(out.str().find("Breakpoint hit at line 20") != std::string::npos);
+}
+
+TEST_CASE("shell END exits vm debugger context") {
+    auto dir = uniqueTempDir();
+    std::filesystem::create_directories(dir);
+    {
+        std::ofstream f(dir / "bp_end.tbc");
+        f << "PUSH_INT 10\nPUSH_INT 20\nADD\nHALT\n";
+    }
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setProgramsRoot(dir);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("BREAKPOINT 2", out, quit);
+    sh.handleLine("RUN bp_end.tbc", out, quit);
+    CHECK(out.str().find("Breakpoint hit at 2") != std::string::npos);
+
+    out.str("");
+    sh.handleLine("END", out, quit);
+    CHECK(out.str().empty());
+
+    out.str("");
+    sh.handleLine("RUN", out, quit);
+    CHECK(out.str() == "RUN requires a filename\n");
 }
 
 TEST_CASE("shell BASIC RUN executes OPEN WRITE READ CLOSE flow") {

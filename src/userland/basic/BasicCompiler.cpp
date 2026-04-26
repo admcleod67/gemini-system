@@ -14,6 +14,7 @@ namespace PickShell {
         if (!parsed.success) {
             result.success = false;
             result.program.clear();
+            result.sourceLinePerInstr.clear();
             result.instructionCount = 0;
             result.labelCount = 0;
             for (const auto &error: parsed.errors) {
@@ -26,6 +27,7 @@ namespace PickShell {
         if (!semantic.success) {
             result.success = false;
             result.program.clear();
+            result.sourceLinePerInstr.clear();
             result.instructionCount = 0;
             result.labelCount = 0;
             for (const auto &error: semantic.errors) {
@@ -38,6 +40,7 @@ namespace PickShell {
         if (!emitted.success) {
             result.success = false;
             result.program.clear();
+            result.sourceLinePerInstr.clear();
             result.instructionCount = 0;
             result.labelCount = 0;
             result.errors = std::move(emitted.errors);
@@ -45,6 +48,7 @@ namespace PickShell {
         }
 
         result.program = std::move(emitted.program);
+        result.sourceLinePerInstr = std::move(emitted.sourceLinePerInstr);
         result.instructionCount = result.program.size();
         result.labelCount = 0;
         result.success = true;

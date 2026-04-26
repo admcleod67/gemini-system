@@ -55,6 +55,13 @@ TEST_CASE("basic bytecode emitter lowers let print and end") {
     CHECK(emitted.program[3].op == OpCode::PrintVal);
     CHECK(emitted.program[4].op == OpCode::PrintEol);
     CHECK(emitted.program[5].op == OpCode::Halt);
+    REQUIRE(emitted.sourceLinePerInstr.size() == emitted.program.size());
+    CHECK(emitted.sourceLinePerInstr[0] == 10);
+    CHECK(emitted.sourceLinePerInstr[1] == 10);
+    CHECK(emitted.sourceLinePerInstr[2] == 20);
+    CHECK(emitted.sourceLinePerInstr[3] == 20);
+    CHECK(emitted.sourceLinePerInstr[4] == 20);
+    CHECK(emitted.sourceLinePerInstr[5] == 30);
 }
 
 TEST_CASE("basic bytecode emitter lowers if and goto control flow") {
@@ -91,6 +98,10 @@ TEST_CASE("basic bytecode emitter preserves print string and suppress eol") {
     CHECK(emitted.program[0].op == OpCode::PushStr);
     CHECK(emitted.program[1].op == OpCode::PrintVal);
     CHECK(emitted.program[2].op == OpCode::Halt);
+    REQUIRE(emitted.sourceLinePerInstr.size() == emitted.program.size());
+    CHECK(emitted.sourceLinePerInstr[0] == 10);
+    CHECK(emitted.sourceLinePerInstr[1] == 10);
+    CHECK(emitted.sourceLinePerInstr[2] == 0); // implicit HALT
 }
 
 TEST_CASE("basic bytecode emitter rejects LET with null expression") {

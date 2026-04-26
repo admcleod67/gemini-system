@@ -12,6 +12,7 @@ namespace PickShell {
     struct BasicBytecodeEmissionResult {
         bool success{false};
         std::vector<PickVM::Instruction> program;
+        std::vector<int> sourceLinePerInstr; // parallel to program; 0 means "no source line"
         std::vector<BasicCompileError> errors;
     };
 
