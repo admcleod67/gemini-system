@@ -1,4 +1,4 @@
-# gemini-system
+# Gemini System
 
 A **Pick System R83–like** environment built from the ground up in **modern C++**. It is heavily inspired by **Pick OS**
 in spirit and direction, but it is **not** a port or clone: the design evolves deliberately and may include capabilities
