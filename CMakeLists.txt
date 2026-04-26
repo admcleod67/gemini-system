@@ -5,9 +5,9 @@ if (POLICY CMP0169)
 endif ()
 
 project(
-        pick-system
+        gemini-system
         VERSION 0.1.0
-        DESCRIPTION "Pick OS–inspired system (hosted development build)"
+        DESCRIPTION "Gemini System inspired by Pick OS (hosted development build)"
         LANGUAGES CXX
 )
 

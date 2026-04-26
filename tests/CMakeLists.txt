@@ -42,4 +42,4 @@ else ()
     add_test(NAME pick-unit COMMAND pick-tests)
 endif ()
 
-add_test(NAME smoke COMMAND sh -c "echo QUIT | $<TARGET_FILE:pick-system>")
+add_test(NAME smoke COMMAND sh -c "echo QUIT | $<TARGET_FILE:gemini-system>")

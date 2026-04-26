@@ -1,4 +1,4 @@
-# pick-system
+# gemini-system
 
 A **Pick System R83–like** environment built from the ground up in **modern C++**. It is heavily inspired by **Pick OS**
 in spirit and direction, but it is **not** a port or clone: the design evolves deliberately and may include capabilities
@@ -19,7 +19,7 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
-Artifacts include **`pick-system`** (minimal host entry point), **`pick-cli`** (interactive shell over the VM), and **`pick-tests`** (unit tests).
+Artifacts include **`gemini-system`** (minimal host entry point), **`pick-cli`** (interactive shell over the VM), and **`pick-tests`** (unit tests).
 
 ## Documentation
 

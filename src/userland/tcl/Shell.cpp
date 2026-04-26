@@ -76,7 +76,7 @@ namespace PickShell {
 
     void Shell::run() {
         std::signal(SIGINT, SIG_IGN); // Ctrl-C does nothing outside a running program
-        std::cout << "Pick/TCL Developer Shell\n";
+        std::cout << "Gemini/TCL Developer Shell\n";
         std::cout << "Type HELP for commands\n";
 
         bool quit = false;
