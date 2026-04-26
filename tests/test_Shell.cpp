@@ -29,6 +29,17 @@ TEST_CASE("shell HELP") {
     CHECK(out.str().find("RUN") != std::string::npos);
     CHECK(out.str().find("SET") != std::string::npos);
     CHECK(out.str().find("LIST-VARS") != std::string::npos);
+    CHECK(out.str().find("WHO") != std::string::npos);
+}
+
+TEST_CASE("shell WHO returns default port user account line") {
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    std::ostringstream out;
+    bool quit = false;
+    sh.handleLine("WHO", out, quit);
+    CHECK_FALSE(quit);
+    CHECK(out.str() == "0 SYSPROG DM\n");
 }
 
 TEST_CASE("shell VERSION contains project version string") {

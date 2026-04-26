@@ -119,6 +119,7 @@ namespace PickShell {
         };
         tclCommands_["HELP"] = [this](const Tokens &, std::ostream &out, bool &) { cmdHelp(out); };
         tclCommands_["VERSION"] = [this](const Tokens &, std::ostream &out, bool &) { cmdVersion(out); };
+        tclCommands_["WHO"] = [this](const Tokens &, std::ostream &out, bool &) { cmdWho(out); };
         tclCommands_["ECHO"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdEcho(tokens, out); };
         tclCommands_["RUN"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdRun(tokens, out); };
         tclCommands_["DUMP-STACK"] = [this](const Tokens &, std::ostream &out, bool &) { cmdDumpStack(out); };
@@ -781,6 +782,7 @@ namespace PickShell {
         out << "  GET <name>\n";
         out << "  LIST-VARS\n";
         out << "  UNSET <name>\n";
+        out << "  WHO\n";
         out << "  BASIC [name]   enter BASIC editor mode\n";
         out << "  RUN <file>     load and run a .tbc (paths relative to programs root)\n";
         out << "  RUN            resume after a breakpoint (same program in memory)\n";
@@ -808,6 +810,10 @@ namespace PickShell {
     void Shell::cmdVersion(std::ostream &out) {
         out << pick_system::system_title << " " << pick_system::version_string << "\n";
         out << "Build: " << __DATE__ << "\n";
+    }
+
+    void Shell::cmdWho(std::ostream &out) {
+        out << "0 SYSPROG DM\n";
     }
 
     void Shell::cmdDumpStack(std::ostream &out) {

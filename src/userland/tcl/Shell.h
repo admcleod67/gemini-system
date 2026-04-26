@@ -96,6 +96,7 @@ namespace PickShell {
         void cmdHelp(std::ostream &out);
 
         void cmdVersion(std::ostream &out);
+        void cmdWho(std::ostream &out);
 
         void cmdDumpStack(std::ostream &out);
 
