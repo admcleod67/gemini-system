@@ -51,3 +51,4 @@ CTestTestfile.cmake
 Testing/
 compile_commands.json
 /.idea
+.DS_Store
