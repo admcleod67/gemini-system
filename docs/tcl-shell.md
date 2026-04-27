@@ -35,6 +35,8 @@ Each Pick file is stored as JSON:
 }
 ```
 
+For the full current behavior (validation rules, error modes, ordering, and persistence details), see [File system](filesystem.md).
+
 ## TCL commands
 
 | Command | Description |
