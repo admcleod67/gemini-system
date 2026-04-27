@@ -338,10 +338,11 @@ TEST_CASE("shell LIST-PROGRAMS empty directory") {
     CHECK(out.str() == "Programs:\n");
 }
 
-TEST_CASE("shell LIST-PROGRAMS lists tbc") {
+TEST_CASE("shell LIST-PROGRAMS lists logical names from tbc and bas") {
     auto dir = uniqueTempDir();
     std::filesystem::create_directories(dir);
     std::ofstream(dir / "a.tbc") << "HALT\n";
+    std::ofstream(dir / "b.bas") << "10 END\n";
     PickVM::Runtime rt;
     PickShell::Shell sh(rt);
     sh.setProgramsRoot(dir);
@@ -349,7 +350,39 @@ TEST_CASE("shell LIST-PROGRAMS lists tbc") {
     bool quit = false;
     sh.handleLine("LIST-PROGRAMS", out, quit);
     CHECK_FALSE(quit);
-    CHECK(out.str().find("a.tbc") != std::string::npos);
+    CHECK(out.str() == "Programs:\n  a\n  b\n");
+}
+
+TEST_CASE("shell LIST-PROGRAMS deduplicates bas and tbc with same basename") {
+    auto dir = uniqueTempDir();
+    std::filesystem::create_directories(dir);
+    std::ofstream(dir / "HELLO.bas") << "10 PRINT \"HI\"\n";
+    std::ofstream(dir / "HELLO.tbc") << "HALT\n";
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setProgramsRoot(dir);
+    std::ostringstream out;
+    bool quit = false;
+    sh.handleLine("LIST-PROGRAMS", out, quit);
+    CHECK_FALSE(quit);
+    CHECK(out.str() == "Programs:\n  HELLO\n");
+}
+
+TEST_CASE("shell LIST-PROGRAMS matches extension case-insensitively and sorts names") {
+    auto dir = uniqueTempDir();
+    std::filesystem::create_directories(dir);
+    std::ofstream(dir / "zeta.TBC") << "HALT\n";
+    std::ofstream(dir / "alpha.BAS") << "10 END\n";
+    std::ofstream(dir / "ignore.tmp") << "x\n";
+    std::filesystem::create_directory(dir / "folder.tbc");
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setProgramsRoot(dir);
+    std::ostringstream out;
+    bool quit = false;
+    sh.handleLine("LIST-PROGRAMS", out, quit);
+    CHECK_FALSE(quit);
+    CHECK(out.str() == "Programs:\n  alpha\n  zeta\n");
 }
 
 TEST_CASE("shell LIST-PROGRAMS missing directory") {

@@ -17,7 +17,7 @@ Input is tokenized by whitespace (filenames with spaces are not supported by the
 
 **`RUN <programName>`** resolves host artifacts under the **programs root** (default directory name **`programs`**, relative to the process current working directory unless changed in code via **`Shell::setProgramsRoot`**): source at `<programName>` and object code at `<programName>.tbc`.
 
-**`LIST-PROGRAMS`** lists **`.tbc`** files in that root.
+**`LIST-PROGRAMS`** lists logical program names discovered from `.bas` and `.tbc` files in that root (case-insensitive extension match). It strips extensions and deduplicates names.
 
 ## Filesystem directory
 
@@ -53,7 +53,7 @@ For the full current behavior (validation rules, error modes, ordering, and pers
 | **`BASIC`** [*name*] | Enter BASIC mode. See [BASIC shell](basic-shell.md) for BASIC/ED commands and persistence rules. |
 | **`RUN`** *programName* | Run by program name only (no extension). Tcl resolves host bytecode as `<programName>.tbc`, prunes invalid breakpoints (see below), loads VM state, and executes. If `<programName>.tbc` is missing, Tcl attempts to compile BASIC source `<programName>` and writes `<programName>.tbc` before running. |
 | **`RUN`** | **Resume** after a breakpoint: no filename, only when execution is **suspended** at a breakpoint; continues until the next breakpoint, **`HALT`**, or end of program. |
-| **`LIST-PROGRAMS`** | List `.tbc` files under the programs root. |
+| **`LIST-PROGRAMS`** | List logical program names under the programs root by discovering `.bas`/`.tbc` files (case-insensitive), stripping extensions, deduplicating, and sorting. |
 | **`CREATE-FILE`** *name* | Create a Pick file in the filesystem root. Creates JSON with matching `name` and empty `records`. |
 | **`DELETE-FILE`** *name* | Delete a Pick file from the filesystem root. |
 | **`LIST-FILES`** | List Pick file names from the filesystem root (sorted). If none: **`No files`**. Takes no arguments. |

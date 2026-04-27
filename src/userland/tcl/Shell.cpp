@@ -23,6 +23,13 @@ namespace PickShell {
         // Set by executeCompiledBasicProgram while a program is running.
         // Accessed from the SIGINT handler, so must be an atomic pointer.
         std::atomic<PickVM::Runtime *> g_interruptRuntime{nullptr};
+
+        std::string lowerAscii(std::string text) {
+            std::transform(text.begin(), text.end(), text.begin(), [](const unsigned char c) {
+                return static_cast<char>(std::tolower(c));
+            });
+            return text;
+        }
     } // namespace
 
     Shell::Shell(PickVM::Runtime &runtime)
@@ -943,11 +950,24 @@ namespace PickShell {
             return;
         }
 
-        out << "Programs:\n";
+        std::set<std::string> programNames;
         for (const auto &entry: std::filesystem::directory_iterator(session_.programsRoot_)) {
-            if (entry.path().extension() == ".tbc") {
-                out << "  " << entry.path().filename().string() << "\n";
+            if (!entry.is_regular_file()) {
+                continue;
             }
+            const std::string ext = lowerAscii(entry.path().extension().string());
+            if (ext != ".bas" && ext != ".tbc") {
+                continue;
+            }
+            const std::string logicalName = entry.path().stem().string();
+            if (!logicalName.empty()) {
+                programNames.insert(logicalName);
+            }
+        }
+
+        out << "Programs:\n";
+        for (const auto &name: programNames) {
+            out << "  " << name << "\n";
         }
     }
 
