@@ -1,5 +1,7 @@
 #include "Shell.h"
 
+#include "BytecodeText.h"
+
 #include <pick_system/version.hpp>
 
 #include <algorithm>
@@ -7,6 +9,7 @@
 #include <cctype>
 #include <csignal>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <limits>
 #include <optional>
@@ -575,21 +578,24 @@ namespace PickShell {
             session_.runtime_.setInputStream(nullptr);
             return;
         }
+        if (tokens.size() != 2) {
+            out << "RUN takes exactly one program name\n";
+            return;
+        }
 
-        std::filesystem::path filePath(tokens[1]);
-        if (filePath.is_relative() && !std::filesystem::exists(filePath))
-            filePath = session_.programsRoot_ / filePath;
-        {
-            std::error_code ec;
-            if (!std::filesystem::exists(filePath, ec) || ec) {
-                out << "Error: Cannot open bytecode file: " << filePath.string() << "\n";
-                return;
-            }
+        const std::string &programName = tokens[1];
+        std::filesystem::path sourcePath;
+        std::filesystem::path bytecodePath;
+        if (!resolveRunProgramPaths(programName, sourcePath, bytecodePath, out)) {
+            return;
+        }
+        if (!ensureBytecodeExistsForRun(programName, sourcePath, bytecodePath, out)) {
+            return;
         }
 
         try {
             PickVM::Parser parser;
-            PickVM::LoadedBytecode loaded = parser.parseFile(filePath.string());
+            PickVM::LoadedBytecode loaded = parser.parseFile(bytecodePath.string());
             session_.pruneBreakpointsForProgram(loaded.program.size(), out);
             session_.lastLoaded_ = std::move(loaded);
             session_.runtime_.setOutputStream(&out);
@@ -605,6 +611,107 @@ namespace PickShell {
             session_.runtime_.setInputStream(nullptr);
             out << "Error: " << e.what() << "\n";
         }
+    }
+
+    bool Shell::resolveRunProgramPaths(const std::string &programName,
+                                       std::filesystem::path &sourcePath,
+                                       std::filesystem::path &bytecodePath,
+                                       std::ostream &out) const {
+        if (programName.empty()) {
+            out << "RUN requires a program name\n";
+            return false;
+        }
+        if (programName.find('.') != std::string::npos) {
+            out << "RUN expects a program name without extension\n";
+            return false;
+        }
+        const std::filesystem::path namePath(programName);
+        sourcePath = session_.programsRoot_ / namePath;
+        bytecodePath = session_.programsRoot_ / (programName + ".tbc");
+        return true;
+    }
+
+    bool Shell::loadBasicSourceProgram(const std::filesystem::path &sourcePath,
+                                       const std::string &programName,
+                                       BasicProgram &program) {
+        std::ifstream file(sourcePath);
+        if (!file) {
+            return false;
+        }
+        program.setName(programName);
+        program.clearLines();
+        std::string line;
+        while (std::getline(file, line)) {
+            std::istringstream iss(line);
+            std::string lineNumberToken;
+            if (!(iss >> lineNumberToken)) {
+                continue;
+            }
+            int lineNumber = 0;
+            try {
+                lineNumber = std::stoi(lineNumberToken);
+            } catch (const std::exception &) {
+                continue;
+            }
+            if (lineNumber <= 0) {
+                continue;
+            }
+            std::string text;
+            std::getline(iss, text);
+            if (!text.empty() && text.front() == ' ') {
+                text.erase(text.begin());
+            }
+            program.setLine(lineNumber, text);
+        }
+        return true;
+    }
+
+    bool Shell::writeCompiledBytecode(const std::filesystem::path &bytecodePath,
+                                      const BasicCompileResult &compile,
+                                      std::ostream &out) {
+        std::error_code ec;
+        std::filesystem::create_directories(bytecodePath.parent_path(), ec);
+        if (ec) {
+            out << "Error: unable to create programs directory\n";
+            return false;
+        }
+        std::ofstream bytecodeFile(bytecodePath, std::ios::trunc);
+        if (!bytecodeFile) {
+            out << "Error: unable to save BASIC object file\n";
+            return false;
+        }
+        bytecodeFile << PickVM::serializeBytecodeText(compile.program, compile.sourceLinePerInstr);
+        if (!bytecodeFile) {
+            out << "Error: unable to save BASIC object file\n";
+            return false;
+        }
+        return true;
+    }
+
+    bool Shell::ensureBytecodeExistsForRun(const std::string &programName,
+                                           const std::filesystem::path &sourcePath,
+                                           const std::filesystem::path &bytecodePath,
+                                           std::ostream &out) {
+        std::error_code ec;
+        if (std::filesystem::exists(bytecodePath, ec) && !ec) {
+            return true;
+        }
+        BasicProgram program;
+        if (!loadBasicSourceProgram(sourcePath, programName, program)) {
+            out << "Error: Cannot open bytecode file: " << bytecodePath.string() << "\n";
+            return false;
+        }
+
+        BasicCompiler compiler;
+        const BasicCompileResult compile = compiler.compile(program);
+        if (!compile.success) {
+            for (const auto &err: compile.errors) {
+                out << "Error on line " << err.line << ": " << err.message << "\n";
+            }
+            out << "Compilation failed.\n";
+            return false;
+        }
+        return writeCompiledBytecode(bytecodePath, compile, out);
     }
 
     void Shell::cmdTrace(const std::vector<std::string> &tokens, std::ostream &out) {
@@ -791,7 +898,7 @@ namespace PickShell {
         out << "  UNSET <name>\n";
         out << "  WHO\n";
         out << "  BASIC [name]   enter BASIC editor mode\n";
-        out << "  RUN <file>     load and run a .tbc (paths relative to programs root)\n";
+        out << "  RUN <name>     load and run program name (auto-resolves .tbc, auto-compiles BASIC source if needed)\n";
         out << "  RUN            resume after a breakpoint (same program in memory)\n";
         out << "  LIST-PROGRAMS\n";
         out << "  CREATE-FILE <name>\n";

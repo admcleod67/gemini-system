@@ -92,6 +92,20 @@ namespace PickShell {
         [[nodiscard]] std::string expandEchoToken(const std::string &token) const;
 
         void cmdRun(const std::vector<std::string> &tokens, std::ostream &out);
+        bool resolveRunProgramPaths(const std::string &programName,
+                                    std::filesystem::path &sourcePath,
+                                    std::filesystem::path &bytecodePath,
+                                    std::ostream &out) const;
+        bool ensureBytecodeExistsForRun(const std::string &programName,
+                                        const std::filesystem::path &sourcePath,
+                                        const std::filesystem::path &bytecodePath,
+                                        std::ostream &out);
+        static bool loadBasicSourceProgram(const std::filesystem::path &sourcePath,
+                                           const std::string &programName,
+                                           BasicProgram &program);
+        static bool writeCompiledBytecode(const std::filesystem::path &bytecodePath,
+                                          const BasicCompileResult &compile,
+                                          std::ostream &out);
 
         void cmdHelp(std::ostream &out);
 

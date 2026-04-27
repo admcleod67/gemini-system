@@ -251,7 +251,7 @@ TEST_CASE("shell RUN missing file") {
     sh.setProgramsRoot(uniqueTempDir());
     std::ostringstream out;
     bool quit = false;
-    sh.handleLine("RUN missing.tbc", out, quit);
+    sh.handleLine("RUN missing", out, quit);
     CHECK_FALSE(quit);
     CHECK(out.str().find("Error: Cannot open bytecode file:") != std::string::npos);
 }
@@ -267,11 +267,62 @@ TEST_CASE("shell RUN executes bytecode from programs root") {
     sh.setProgramsRoot(dir);
     std::ostringstream out;
     bool quit = false;
-    sh.handleLine("RUN mini.tbc", out, quit);
+    sh.handleLine("RUN mini", out, quit);
     CHECK_FALSE(quit);
     CHECK(out.str().find("Error:") == std::string::npos);
     REQUIRE(rt.stack().size() == 1);
     CHECK(std::get<int>(rt.stack()[0]) == 5);
+}
+
+TEST_CASE("shell RUN rejects extension-bearing names") {
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    std::ostringstream out;
+    bool quit = false;
+    sh.handleLine("RUN mini.tbc", out, quit);
+    CHECK_FALSE(quit);
+    CHECK(out.str() == "RUN expects a program name without extension\n");
+}
+
+TEST_CASE("shell RUN auto-compiles BASIC source when bytecode missing") {
+    auto dir = uniqueTempDir();
+    std::filesystem::create_directories(dir);
+    {
+        std::ofstream src(dir / "HELLO");
+        src << "10 PRINT \"HI\"\n20 END\n";
+    }
+
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setProgramsRoot(dir);
+    std::ostringstream out;
+    bool quit = false;
+
+    CHECK_FALSE(std::filesystem::exists(dir / "HELLO.tbc"));
+    sh.handleLine("RUN HELLO", out, quit);
+    CHECK_FALSE(quit);
+    CHECK(out.str() == "HI\n");
+    CHECK(std::filesystem::exists(dir / "HELLO.tbc"));
+}
+
+TEST_CASE("shell RUN compile failure from BASIC source reports diagnostics") {
+    auto dir = uniqueTempDir();
+    std::filesystem::create_directories(dir);
+    {
+        std::ofstream src(dir / "BROKEN");
+        src << "10 MAT A = 1\n";
+    }
+
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setProgramsRoot(dir);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("RUN BROKEN", out, quit);
+    CHECK_FALSE(quit);
+    CHECK(out.str() == "Error on line 10: Unknown keyword 'MAT'\nCompilation failed.\n");
+    CHECK_FALSE(std::filesystem::exists(dir / "BROKEN.tbc"));
 }
 
 TEST_CASE("shell LIST-PROGRAMS empty directory") {
@@ -520,7 +571,7 @@ TEST_CASE("shell RUN drops out-of-range breakpoints with message") {
     std::ostringstream out;
     bool quit = false;
     sh.handleLine("BREAKPOINT 5", out, quit);
-    sh.handleLine("RUN tiny.tbc", out, quit);
+    sh.handleLine("RUN tiny", out, quit);
     CHECK_FALSE(quit);
     CHECK(out.str().find("Removed invalid breakpoint(s): 5") != std::string::npos);
 }
@@ -538,7 +589,7 @@ TEST_CASE("shell RUN TRACE ON includes HALT line") {
     std::ostringstream out;
     bool quit = false;
     sh.handleLine("TRACE ON", out, quit);
-    sh.handleLine("RUN t.tbc", out, quit);
+    sh.handleLine("RUN t", out, quit);
     CHECK(out.str().find("0: PUSH_INT 7") != std::string::npos);
     CHECK(out.str().find("1: HALT") != std::string::npos);
 }
@@ -555,7 +606,7 @@ TEST_CASE("shell DUMP-PROGRAM and DUMP-LABELS after RUN") {
     sh.setProgramsRoot(dir);
     std::ostringstream out;
     bool quit = false;
-    sh.handleLine("RUN lbl.tbc", out, quit);
+    sh.handleLine("RUN lbl", out, quit);
     out.str("");
     sh.handleLine("DUMP-PROGRAM", out, quit);
     CHECK(out.str().find("0: PUSH_INT 3") != std::string::npos);
@@ -578,7 +629,7 @@ TEST_CASE("shell breakpoint hit then STEP then RUN completes") {
     std::ostringstream out;
     bool quit = false;
     sh.handleLine("BREAKPOINT 2", out, quit);
-    sh.handleLine("RUN bp.tbc", out, quit);
+    sh.handleLine("RUN bp", out, quit);
     CHECK(out.str().find("Breakpoint hit at 2") != std::string::npos);
     REQUIRE(rt.stack().size() == 2);
     out.str("");
@@ -605,7 +656,7 @@ TEST_CASE("shell BREAKPOINT index behavior is unchanged with source metadata pre
     bool quit = false;
 
     sh.handleLine("BREAKPOINT 2", out, quit);
-    sh.handleLine("RUN bp_meta.tbc", out, quit);
+    sh.handleLine("RUN bp_meta", out, quit);
     CHECK(out.str().find("Breakpoint hit at 2") != std::string::npos);
 
     out.str("");
@@ -1331,7 +1382,7 @@ TEST_CASE("shell END exits vm debugger context") {
     bool quit = false;
 
     sh.handleLine("BREAKPOINT 2", out, quit);
-    sh.handleLine("RUN bp_end.tbc", out, quit);
+    sh.handleLine("RUN bp_end", out, quit);
     CHECK(out.str().find("Breakpoint hit at 2") != std::string::npos);
 
     out.str("");
