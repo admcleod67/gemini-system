@@ -88,6 +88,8 @@ namespace PickShell {
 
         void saveProgram(const std::string &name, std::ostream &out);
 
+        bool saveObjectCode(const std::string &name, const BasicCompileResult &compile, std::ostream &out);
+
         void printCompileSuccess(const BasicCompileResult &compile, std::ostream &out);
 
         void printCompileFailure(const BasicCompileResult &compile, std::ostream &out);

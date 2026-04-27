@@ -579,6 +579,13 @@ namespace PickShell {
         std::filesystem::path filePath(tokens[1]);
         if (filePath.is_relative() && !std::filesystem::exists(filePath))
             filePath = session_.programsRoot_ / filePath;
+        {
+            std::error_code ec;
+            if (!std::filesystem::exists(filePath, ec) || ec) {
+                out << "Error: Cannot open bytecode file: " << filePath.string() << "\n";
+                return;
+            }
+        }
 
         try {
             PickVM::Parser parser;

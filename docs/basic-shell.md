@@ -14,9 +14,11 @@ The BASIC shell is a mode inside the interactive shell focused on editing and pe
 - `BASIC <name>` autoloads from the programs root when `<name>` exists.
 - If `<name>` does not exist, an empty in-memory program is started and no file is created.
 - `LOAD` replaces the in-memory program from disk (using explicit name or current active name).
-- `SAVE` writes the in-memory program to disk.
-- In unnamed sessions (`BASIC` without a name), bare `SAVE` fails with:
-  - `No program name specified`
+- `SAVE` writes only the in-memory BASIC source to disk.
+- `COMPILE` writes/replaces a `.tbc` object file for the active program name when compile succeeds.
+- Failed `COMPILE` leaves any existing `.tbc` unchanged.
+- In unnamed sessions (`BASIC` without a name), `SAVE`, `COMPILE`, and `RUN` fail with:
+  - `No program name`
 
 ## BASIC commands
 
@@ -32,9 +34,9 @@ The BASIC shell is a mode inside the interactive shell focused on editing and pe
 | `NEW` | Clear all in-memory lines for the active BASIC program context. |
 | `LOAD [name]` | Reload from disk using explicit name or active program name. Missing files load as empty. |
 | `SAVE [name]` | Save using explicit name or active program name. |
-| `COMPILE` | Compile-only check for BASIC language subset v1; then discard compiled output. |
+| `COMPILE` | Compile current source and persist `<name>.tbc` on success (requires active program name). |
 | `RUN` | Always recompile then execute from memory; quiet on compile success. |
-| `RUN (C` | Compile-only alias of `COMPILE` (reports compile status, does not execute). |
+| `RUN (C` | Compile-only alias of `COMPILE` (reports compile status, writes `.tbc`, does not execute). |
 | `QUIT` | Exit BASIC mode and return to `TCL>`. |
 
 When renumbering, targets that do not resolve to an existing pre-renumber line are left unchanged.
@@ -56,7 +58,7 @@ Error on line <basicLine>: <message>
 Compilation failed.
 ```
 
-Compiled programs are in-memory only; no compiled `.tbc` artifact is written.
+`COMPILE` and `RUN (C)` persist object code to `<programsRoot>/<name>.tbc` on success. `RUN` executes from the freshly compiled in-memory image.
 
 Language details for subset v1 (statements, expression rules, diagnostics, and file handling statements `OPEN`/`READ`/`WRITE`/`CLOSE`) are documented in [BASIC language](basic-language.md).
 

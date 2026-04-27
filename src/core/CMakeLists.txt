@@ -5,6 +5,8 @@ add_library(gemini-core
         vm/Parser.h
         vm/InstructionPrint.cpp
         vm/InstructionPrint.h
+        vm/BytecodeText.cpp
+        vm/BytecodeText.h
         filesystem/Record.cpp
         filesystem/Record.h
         filesystem/Catalog.cpp

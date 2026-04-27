@@ -253,7 +253,7 @@ TEST_CASE("shell RUN missing file") {
     bool quit = false;
     sh.handleLine("RUN missing.tbc", out, quit);
     CHECK_FALSE(quit);
-    CHECK(out.str().find("Error:") != std::string::npos);
+    CHECK(out.str().find("Error: Cannot open bytecode file:") != std::string::npos);
 }
 
 TEST_CASE("shell RUN executes bytecode from programs root") {
@@ -684,7 +684,25 @@ TEST_CASE("shell BASIC SAVE requires name when unnamed") {
     out.str("");
 
     sh.handleLine("SAVE", out, quit);
-    CHECK(out.str() == "No program name specified\n");
+    CHECK(out.str() == "No program name\n");
+}
+
+TEST_CASE("shell BASIC COMPILE and RUN require name when unnamed") {
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("BASIC", out, quit);
+    sh.handleLine("10 PRINT \"HELLO\"", out, quit);
+
+    out.str("");
+    sh.handleLine("COMPILE", out, quit);
+    CHECK(out.str() == "No program name\n");
+
+    out.str("");
+    sh.handleLine("RUN", out, quit);
+    CHECK(out.str() == "No program name\n");
 }
 
 TEST_CASE("shell BASIC SAVE with explicit name persists and autoloads") {
@@ -698,7 +716,7 @@ TEST_CASE("shell BASIC SAVE with explicit name persists and autoloads") {
     std::ostringstream out;
     bool quit = false;
 
-    sh.handleLine("BASIC", out, quit);
+    sh.handleLine("BASIC TEST", out, quit);
     sh.handleLine("10 PRINT \"HELLO\"", out, quit);
     out.str("");
     sh.handleLine("SAVE HELLO", out, quit);
@@ -710,6 +728,56 @@ TEST_CASE("shell BASIC SAVE with explicit name persists and autoloads") {
     sh.handleLine("BASIC HELLO", out, quit);
     sh.handleLine("LIST", out, quit);
     CHECK(out.str() == "10 PRINT \"HELLO\"\n");
+}
+
+TEST_CASE("shell BASIC SAVE writes source only and not bytecode") {
+    auto dir = uniqueTempDir();
+    std::filesystem::create_directories(dir);
+
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setProgramsRoot(dir);
+
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("BASIC TEST", out, quit);
+    sh.handleLine("10 PRINT \"HELLO\"", out, quit);
+    out.str("");
+    sh.handleLine("SAVE HELLO", out, quit);
+    CHECK(out.str().empty());
+    CHECK(std::filesystem::exists(dir / "HELLO"));
+    CHECK_FALSE(std::filesystem::exists(dir / "HELLO.tbc"));
+}
+
+TEST_CASE("shell BASIC COMPILE writes bytecode and failed COMPILE preserves prior bytecode") {
+    auto dir = uniqueTempDir();
+    std::filesystem::create_directories(dir);
+
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setProgramsRoot(dir);
+
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("BASIC HELLO", out, quit);
+    sh.handleLine("10 PRINT \"HELLO\"", out, quit);
+    out.str("");
+    sh.handleLine("COMPILE", out, quit);
+    CHECK(out.str() == "Compiled successfully.\nInstructions: 4\nLabels: 0\n");
+    CHECK(std::filesystem::exists(dir / "HELLO.tbc"));
+
+    const std::filesystem::path tbcPath = dir / "HELLO.tbc";
+    const auto before = std::filesystem::last_write_time(tbcPath);
+
+    sh.handleLine("20 MAT A = 1", out, quit);
+    out.str("");
+    sh.handleLine("COMPILE", out, quit);
+    CHECK(out.str() == "Error on line 20: Unknown keyword 'MAT'\nCompilation failed.\n");
+    CHECK(std::filesystem::exists(tbcPath));
+    const auto after = std::filesystem::last_write_time(tbcPath);
+    CHECK(before == after);
 }
 
 TEST_CASE("shell BASIC named entry missing file starts empty and creates on SAVE only") {
@@ -744,7 +812,7 @@ TEST_CASE("shell BASIC EDIT requires existing line") {
     std::ostringstream out;
     bool quit = false;
 
-    sh.handleLine("BASIC", out, quit);
+    sh.handleLine("BASIC TEST", out, quit);
     out.str("");
     sh.handleLine("EDIT 10", out, quit);
     CHECK(out.str() == "No such line: 10\n");
@@ -756,7 +824,7 @@ TEST_CASE("shell BASIC DELETE supports line and ranges") {
     std::ostringstream out;
     bool quit = false;
 
-    sh.handleLine("BASIC", out, quit);
+    sh.handleLine("BASIC TEST", out, quit);
     sh.handleLine("10 A", out, quit);
     sh.handleLine("20 B", out, quit);
     sh.handleLine("30 C", out, quit);
@@ -782,7 +850,7 @@ TEST_CASE("shell BASIC DELETE rejects malformed ranges") {
     std::ostringstream out;
     bool quit = false;
 
-    sh.handleLine("BASIC", out, quit);
+    sh.handleLine("BASIC TEST", out, quit);
     sh.handleLine("10 A", out, quit);
     sh.handleLine("20 B", out, quit);
 
@@ -805,7 +873,7 @@ TEST_CASE("shell BASIC SAVE and BASIC command arity errors") {
     CHECK(out.str() == "BASIC takes at most one program name\n");
 
     out.str("");
-    sh.handleLine("BASIC", out, quit);
+    sh.handleLine("BASIC TEST", out, quit);
     sh.handleLine("SAVE A B", out, quit);
     CHECK(out.str() == "SAVE takes at most one filename\n");
 }
@@ -821,7 +889,7 @@ TEST_CASE("shell BASIC LOAD behavior and arity") {
     std::ostringstream out;
     bool quit = false;
 
-    sh.handleLine("BASIC", out, quit);
+    sh.handleLine("BASIC TEST", out, quit);
     out.str("");
     sh.handleLine("LOAD", out, quit);
     CHECK(out.str() == "No program name specified\n");
@@ -848,7 +916,7 @@ TEST_CASE("shell BASIC LOAD loads saved program") {
     std::ostringstream out;
     bool quit = false;
 
-    sh.handleLine("BASIC", out, quit);
+    sh.handleLine("BASIC TEST", out, quit);
     sh.handleLine("10 PRINT \"HELLO\"", out, quit);
     sh.handleLine("SAVE HELLO", out, quit);
     sh.handleLine("NEW", out, quit);
@@ -865,7 +933,7 @@ TEST_CASE("shell BASIC COMPILE reports success summary") {
     std::ostringstream out;
     bool quit = false;
 
-    sh.handleLine("BASIC", out, quit);
+    sh.handleLine("BASIC TEST", out, quit);
     sh.handleLine("10 LET A = 5", out, quit);
     sh.handleLine("20 PRINT A", out, quit);
     sh.handleLine("30 END", out, quit);
@@ -881,7 +949,7 @@ TEST_CASE("shell BASIC RUN is quiet on compile success and executes output") {
     std::ostringstream out;
     bool quit = false;
 
-    sh.handleLine("BASIC", out, quit);
+    sh.handleLine("BASIC TEST", out, quit);
     sh.handleLine("10 PRINT \"HELLO\"", out, quit);
     sh.handleLine("20 END", out, quit);
     out.str("");
@@ -896,7 +964,7 @@ TEST_CASE("shell BASIC RUN (C mirrors COMPILE and does not execute") {
     std::ostringstream out;
     bool quit = false;
 
-    sh.handleLine("BASIC", out, quit);
+    sh.handleLine("BASIC TEST", out, quit);
     sh.handleLine("10 PRINT \"HELLO\"", out, quit);
     out.str("");
 
@@ -910,7 +978,7 @@ TEST_CASE("shell BASIC compile failures print line diagnostics") {
     std::ostringstream out;
     bool quit = false;
 
-    sh.handleLine("BASIC", out, quit);
+    sh.handleLine("BASIC TEST", out, quit);
     sh.handleLine("30 MAT A = 1", out, quit);
     out.str("");
 
@@ -924,7 +992,7 @@ TEST_CASE("shell BASIC RUN compile failure skips execution") {
     std::ostringstream out;
     bool quit = false;
 
-    sh.handleLine("BASIC", out, quit);
+    sh.handleLine("BASIC TEST", out, quit);
     sh.handleLine("10 MAT A = 1", out, quit);
     sh.handleLine("20 PRINT \"SHOULD_NOT_RUN\"", out, quit);
     out.str("");
@@ -939,7 +1007,7 @@ TEST_CASE("shell BASIC RUN recompiles each time and does not depend on COMPILE c
     std::ostringstream out;
     bool quit = false;
 
-    sh.handleLine("BASIC", out, quit);
+    sh.handleLine("BASIC TEST", out, quit);
     sh.handleLine("10 PRINT \"ONE\"", out, quit);
     out.str("");
     sh.handleLine("COMPILE", out, quit);
@@ -957,7 +1025,7 @@ TEST_CASE("shell BASIC RUN executes arithmetic expressions") {
     std::ostringstream out;
     bool quit = false;
 
-    sh.handleLine("BASIC", out, quit);
+    sh.handleLine("BASIC TEST", out, quit);
     sh.handleLine("10 LET A = 2+3*4", out, quit);
     sh.handleLine("20 PRINT A", out, quit);
     out.str("");
@@ -974,7 +1042,7 @@ TEST_CASE("shell BASIC RUN executes INPUT then PRINT with injected input") {
     std::ostringstream out;
     bool quit = false;
 
-    sh.handleLine("BASIC", out, quit);
+    sh.handleLine("BASIC TEST", out, quit);
     sh.handleLine("10 INPUT A", out, quit);
     sh.handleLine("20 PRINT A", out, quit);
     out.str("");
@@ -991,7 +1059,7 @@ TEST_CASE("shell BASIC RUN supports PRINT semicolon prompt before INPUT") {
     std::ostringstream out;
     bool quit = false;
 
-    sh.handleLine("BASIC", out, quit);
+    sh.handleLine("BASIC TEST", out, quit);
     sh.handleLine("10 PRINT \"Enter value: \";", out, quit);
     sh.handleLine("20 INPUT A", out, quit);
     sh.handleLine("30 PRINT A", out, quit);
@@ -1007,7 +1075,7 @@ TEST_CASE("shell BASIC COMPILE reports expression syntax errors") {
     std::ostringstream out;
     bool quit = false;
 
-    sh.handleLine("BASIC", out, quit);
+    sh.handleLine("BASIC TEST", out, quit);
     sh.handleLine("10 LET A = (2+3", out, quit);
     out.str("");
 
@@ -1021,7 +1089,7 @@ TEST_CASE("shell BASIC COMPILE reports malformed INPUT") {
     std::ostringstream out;
     bool quit = false;
 
-    sh.handleLine("BASIC", out, quit);
+    sh.handleLine("BASIC TEST", out, quit);
     sh.handleLine("10 INPUT", out, quit);
     out.str("");
 
@@ -1035,7 +1103,7 @@ TEST_CASE("shell BASIC RUN executes IF THEN ELSE and GOTO control flow") {
     std::ostringstream out;
     bool quit = false;
 
-    sh.handleLine("BASIC", out, quit);
+    sh.handleLine("BASIC TEST", out, quit);
     sh.handleLine("10 LET A = 1", out, quit);
     sh.handleLine("20 IF A = 1 THEN 40 ELSE 30", out, quit);
     sh.handleLine("30 PRINT 0", out, quit);
@@ -1055,7 +1123,7 @@ TEST_CASE("shell BASIC RUN executes IF THEN ELSE inline statements") {
     std::ostringstream out;
     bool quit = false;
 
-    sh.handleLine("BASIC", out, quit);
+    sh.handleLine("BASIC TEST", out, quit);
     sh.handleLine("10 LET A = 1", out, quit);
     sh.handleLine("20 IF A = 1 THEN PRINT 111 ELSE PRINT 222", out, quit);
     sh.handleLine("30 IF A = 0 THEN PRINT 333 ELSE PRINT 444", out, quit);
@@ -1072,7 +1140,7 @@ TEST_CASE("shell BASIC COMPILE reports unknown GOTO target line") {
     std::ostringstream out;
     bool quit = false;
 
-    sh.handleLine("BASIC", out, quit);
+    sh.handleLine("BASIC TEST", out, quit);
     sh.handleLine("10 GOTO 99", out, quit);
     out.str("");
 
@@ -1086,7 +1154,7 @@ TEST_CASE("shell BASIC RENUMBER aliases RENUM") {
     std::ostringstream out;
     bool quit = false;
 
-    sh.handleLine("BASIC", out, quit);
+    sh.handleLine("BASIC TEST", out, quit);
     sh.handleLine("100 A", out, quit);
     sh.handleLine("350 B", out, quit);
 
@@ -1105,7 +1173,7 @@ TEST_CASE("shell BASIC RENUM rewrites GOTO targets") {
     std::ostringstream out;
     bool quit = false;
 
-    sh.handleLine("BASIC", out, quit);
+    sh.handleLine("BASIC TEST", out, quit);
     sh.handleLine("100 PRINT 1", out, quit);
     sh.handleLine("200 GOTO 100", out, quit);
 
@@ -1121,7 +1189,7 @@ TEST_CASE("shell BASIC RENUM rewrites IF THEN ELSE targets") {
     std::ostringstream out;
     bool quit = false;
 
-    sh.handleLine("BASIC", out, quit);
+    sh.handleLine("BASIC TEST", out, quit);
     sh.handleLine("100 LET A = 1", out, quit);
     sh.handleLine("200 IF A = 1 THEN 400 ELSE 300", out, quit);
     sh.handleLine("300 PRINT 0", out, quit);
@@ -1139,7 +1207,7 @@ TEST_CASE("shell BASIC RENUM leaves dangling targets unchanged") {
     std::ostringstream out;
     bool quit = false;
 
-    sh.handleLine("BASIC", out, quit);
+    sh.handleLine("BASIC TEST", out, quit);
     sh.handleLine("100 GOTO 999", out, quit);
     sh.handleLine("200 IF 1 = 1 THEN 999 ELSE 100", out, quit);
 
@@ -1155,7 +1223,7 @@ TEST_CASE("shell ED mode malformed substitute command is rejected") {
     std::ostringstream out;
     bool quit = false;
 
-    sh.handleLine("BASIC", out, quit);
+    sh.handleLine("BASIC TEST", out, quit);
     sh.handleLine("10 PRINT \"HELLO\"", out, quit);
     sh.handleLine("EDIT 10", out, quit);
 
@@ -1178,7 +1246,7 @@ TEST_CASE("shell BASIC RUN reports runtime error for RETURN without GOSUB") {
     std::ostringstream out;
     bool quit = false;
 
-    sh.handleLine("BASIC", out, quit);
+    sh.handleLine("BASIC TEST", out, quit);
     sh.handleLine("10 PRINT \"before\";", out, quit);
     sh.handleLine("20 RETURN", out, quit);
     out.str("");
@@ -1198,7 +1266,7 @@ TEST_CASE("shell BASIC RUN reports runtime error for divide by zero") {
     std::ostringstream out;
     bool quit = false;
 
-    sh.handleLine("BASIC", out, quit);
+    sh.handleLine("BASIC TEST", out, quit);
     sh.handleLine("10 PRINT 1/0", out, quit);
     out.str("");
 
@@ -1215,7 +1283,7 @@ TEST_CASE("shell BASIC debugger supports LIST and QUIT after runtime error") {
     std::ostringstream out;
     bool quit = false;
 
-    sh.handleLine("BASIC", out, quit);
+    sh.handleLine("BASIC TEST", out, quit);
     sh.handleLine("10 PRINT \"before\";", out, quit);
     sh.handleLine("20 RETURN", out, quit);
     out.str("");
@@ -1234,7 +1302,7 @@ TEST_CASE("shell BASIC debugger supports breakpoint and CONT by BASIC line") {
     std::ostringstream out;
     bool quit = false;
 
-    sh.handleLine("BASIC", out, quit);
+    sh.handleLine("BASIC TEST", out, quit);
     sh.handleLine("10 LET A = 1", out, quit);
     sh.handleLine("20 GOTO 10", out, quit);
     out.str("");

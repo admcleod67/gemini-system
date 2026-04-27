@@ -1,5 +1,7 @@
 #include "BasicShell.h"
 
+#include "BytecodeText.h"
+
 #include <cctype>
 #include <fstream>
 #include <sstream>
@@ -207,7 +209,7 @@ namespace PickShell {
                 saveName = program_.name();
             }
             if (!saveName || saveName->empty()) {
-                out << "No program name specified\n";
+                out << "No program name\n";
                 return;
             }
             program_.setName(*saveName);
@@ -218,9 +220,16 @@ namespace PickShell {
                 out << "COMPILE takes no arguments\n";
                 return;
             }
+            if (!program_.name() || program_.name()->empty()) {
+                out << "No program name\n";
+                return;
+            }
             const BasicCompileResult compile = compiler_.compile(program_);
             if (!compile.success) {
                 printCompileFailure(compile, out);
+                return;
+            }
+            if (!saveObjectCode(*program_.name(), compile, out)) {
                 return;
             }
             printCompileSuccess(compile, out);
@@ -231,12 +240,19 @@ namespace PickShell {
                 out << "RUN takes no arguments or (C\n";
                 return;
             }
+            if (!program_.name() || program_.name()->empty()) {
+                out << "No program name\n";
+                return;
+            }
             const BasicCompileResult compile = compiler_.compile(program_);
             if (!compile.success) {
                 printCompileFailure(compile, out);
                 return;
             }
             if (compileOnly) {
+                if (!saveObjectCode(*program_.name(), compile, out)) {
+                    return;
+                }
                 printCompileSuccess(compile, out);
                 return;
             }
@@ -395,6 +411,28 @@ namespace PickShell {
             }
             file << '\n';
         }
+    }
+
+    bool BasicShell::saveObjectCode(const std::string &name, const BasicCompileResult &compile, std::ostream &out) {
+        std::error_code ec;
+        std::filesystem::create_directories(programsRoot_, ec);
+        if (ec) {
+            out << "Error: unable to create programs directory\n";
+            return false;
+        }
+
+        const std::filesystem::path bytecodePath = programsRoot_ / (name + ".tbc");
+        std::ofstream bytecodeFile(bytecodePath, std::ios::trunc);
+        if (!bytecodeFile) {
+            out << "Error: unable to save BASIC object file\n";
+            return false;
+        }
+        bytecodeFile << PickVM::serializeBytecodeText(compile.program, compile.sourceLinePerInstr);
+        if (!bytecodeFile) {
+            out << "Error: unable to save BASIC object file\n";
+            return false;
+        }
+        return true;
     }
 
     void BasicShell::printCompileSuccess(const BasicCompileResult &compile, std::ostream &out) {

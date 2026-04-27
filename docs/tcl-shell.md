@@ -51,7 +51,7 @@ For the full current behavior (validation rules, error modes, ordering, and pers
 | **`LIST-VARS`** | List variable names in **ASCII uppercase** (sorted), each on its own line under a **`Variables:`** header. If none: **`No variables`**. Takes no arguments. |
 | **`UNSET`** *name* | Remove *name*. If it was not set: **`No such variable`**. |
 | **`BASIC`** [*name*] | Enter BASIC mode. See [BASIC shell](basic-shell.md) for BASIC/ED commands and persistence rules. |
-| **`RUN`** *file* | Parse *file*, prune invalid breakpoints (see below), load into the VM, then execute (with trace/breakpoints as configured). |
+| **`RUN`** *file* | Load existing `.tbc` *file*, prune invalid breakpoints (see below), load into the VM, then execute (with trace/breakpoints as configured). Missing bytecode file is an error; Tcl mode does not auto-compile BASIC source. |
 | **`RUN`** | **Resume** after a breakpoint: no filename, only when execution is **suspended** at a breakpoint; continues until the next breakpoint, **`HALT`**, or end of program. |
 | **`LIST-PROGRAMS`** | List `.tbc` files under the programs root. |
 | **`CREATE-FILE`** *name* | Create a Pick file in the filesystem root. Creates JSON with matching `name` and empty `records`. |

@@ -8,12 +8,12 @@ Implementation lives under `src/core/vm/` (`Runtime`, `Parser`, `InstructionPrin
 
 Programs are **newline-separated** lines of text. Rules:
 
-- **Blank lines** and lines whose first non-whitespace character is **`#`** are ignored.
+- **Blank lines** and lines whose first non-whitespace character is **`#`** are ignored, except optional metadata header lines like **`#BASICLINES:`**.
 - **`label:`** — optional label at the start of a line (before the opcode). Labels map to the **instruction index** of the next emitted opcode on that logical line (a label-only line does not emit an instruction).
 - **`OPCODE`** and optional **operand** follow; operands are opcode-specific.
-- **`PUSH_STR`** string literals may be written in **double quotes**; surrounding quotes are stripped.
+- **`PUSH_STR`** string literals may be written in **double quotes**; surrounding quotes are stripped and common escapes (`\\`, `\"`, `\n`, `\r`, `\t`) are decoded.
 
-The parser records **1-based physical source line numbers** per instruction (for diagnostics and optional `(line N)` suffixes in dumps/trace).
+When present, the optional `#BASICLINES:` metadata header provides source-line mapping. Otherwise, the parser records **1-based physical source line numbers** per instruction (for diagnostics and optional `(line N)` suffixes in dumps/trace).
 For non-`.tbc` loaders (for example, handwritten instruction vectors), source-line metadata is optional.
 
 ## Opcodes
@@ -50,8 +50,8 @@ For non-`.tbc` loaders (for example, handwritten instruction vectors), source-li
 | `DIM_ARRAY name` | Pop int `n`; allocate (or re-allocate) a 1-based array of `n` elements under key `name`, each initialised to `""`. Throws `"DIM: size must be >= 1"` if `n < 1`. |
 | `LOAD_ARR name` | Pop int index `i` (1-based); push `arrays[name][i-1]`. Throws `"Array not dimensioned: <name>"` if the array does not exist; throws `"Array index out of bounds: <name>"` if `i` is out of range. |
 | `STORE_ARR name` | Pop int index `i` (top), then pop value; store value at `arrays[name][i-1]`. Same error conditions as `LOAD_ARR`. |
-| `JUMP label` | Set IP to the instruction index of `label` (resolved at parse time). |
-| `JZ label` | Pop int; if it is **zero**, jump to `label`; otherwise fall through. |
+| `JUMP label|index` | Set IP to resolved target (`label` or numeric instruction index). |
+| `JZ label|index` | Pop int; if it is **zero**, jump to resolved target (`label` or numeric index); otherwise fall through. |
 | `STORE_VAR name` | Pop value and store it by case-insensitive variable `name` (runtime canonicalizes to uppercase). |
 | `LOAD_VAR name` | Push value stored for case-insensitive variable `name`; throws `Undefined variable: <NAME>` if missing. |
 | `CLEAR_VARS` | Remove all scalar variables and all array allocations. Stack, IP, call stack, and for-stack are untouched. |
