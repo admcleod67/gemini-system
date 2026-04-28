@@ -25,6 +25,7 @@ add_executable(
         test_BasicExpressionParser.cpp
         test_BasicSemanticAnalyzer.cpp
         test_BasicStatementParser.cpp
+        test_AssemblerShell.cpp
         test_Shell.cpp
         test_TclEnvironment.cpp
 )

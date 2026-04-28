@@ -27,6 +27,7 @@ TEST_CASE("shell HELP") {
     CHECK_FALSE(quit);
     CHECK(out.str().find("ECHO") != std::string::npos);
     CHECK(out.str().find("RUN") != std::string::npos);
+    CHECK(out.str().find("ASM") != std::string::npos);
     CHECK(out.str().find("SET") != std::string::npos);
     CHECK(out.str().find("LIST-VARS") != std::string::npos);
     CHECK(out.str().find("WHO") != std::string::npos);
@@ -724,11 +725,35 @@ TEST_CASE("shell DUMP-STACK routes dump to out") {
     CHECK(out.str() == "Stack: [ 9 ]\n");
 }
 
+TEST_CASE("shell ASM mode owns VM debugger commands") {
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("STEP", out, quit);
+    CHECK(out.str() == "Unknown command: STEP\n");
+
+    out.str("");
+    sh.handleLine("ASM", out, quit);
+    sh.handleLine("STEP", out, quit);
+    CHECK(out.str() == "No program loaded\n");
+
+    out.str("");
+    sh.handleLine("QUIT", out, quit);
+    CHECK_FALSE(quit);
+
+    out.str("");
+    sh.handleLine("STEP", out, quit);
+    CHECK(out.str() == "Unknown command: STEP\n");
+}
+
 TEST_CASE("shell STEP DUMP-PROGRAM DUMP-LABELS without loaded program") {
     PickVM::Runtime rt;
     PickShell::Shell sh(rt);
     std::ostringstream out;
     bool quit = false;
+    sh.handleLine("ASM", out, quit);
     sh.handleLine("STEP", out, quit);
     CHECK(out.str() == "No program loaded\n");
     out.str("");
@@ -744,6 +769,7 @@ TEST_CASE("shell BREAKPOINT and BREAKPOINTS without RUN") {
     PickShell::Shell sh(rt);
     std::ostringstream out;
     bool quit = false;
+    sh.handleLine("ASM", out, quit);
     sh.handleLine("BREAKPOINT 0", out, quit);
     CHECK(out.str().empty());
     out.str("");
@@ -756,6 +782,7 @@ TEST_CASE("shell CLEAR-BREAKPOINT and CLEAR-BREAKPOINTS") {
     PickShell::Shell sh(rt);
     std::ostringstream out;
     bool quit = false;
+    sh.handleLine("ASM", out, quit);
     sh.handleLine("BREAKPOINT 1", out, quit);
     sh.handleLine("BREAKPOINT 2", out, quit);
     sh.handleLine("CLEAR-BREAKPOINT 9", out, quit);
@@ -778,6 +805,7 @@ TEST_CASE("shell RUN drops out-of-range breakpoints with message") {
     sh.setProgramsRoot(dir);
     std::ostringstream out;
     bool quit = false;
+    sh.handleLine("ASM", out, quit);
     sh.handleLine("BREAKPOINT 5", out, quit);
     sh.handleLine("RUN tiny", out, quit);
     CHECK_FALSE(quit);
@@ -796,6 +824,7 @@ TEST_CASE("shell RUN TRACE ON includes HALT line") {
     sh.setProgramsRoot(dir);
     std::ostringstream out;
     bool quit = false;
+    sh.handleLine("ASM", out, quit);
     sh.handleLine("TRACE ON", out, quit);
     sh.handleLine("RUN t", out, quit);
     CHECK(out.str().find("0: PUSH_INT 7") != std::string::npos);
@@ -814,6 +843,7 @@ TEST_CASE("shell DUMP-PROGRAM and DUMP-LABELS after RUN") {
     sh.setProgramsRoot(dir);
     std::ostringstream out;
     bool quit = false;
+    sh.handleLine("ASM", out, quit);
     sh.handleLine("RUN lbl", out, quit);
     out.str("");
     sh.handleLine("DUMP-PROGRAM", out, quit);
@@ -836,6 +866,7 @@ TEST_CASE("shell breakpoint hit then STEP then RUN completes") {
     sh.setProgramsRoot(dir);
     std::ostringstream out;
     bool quit = false;
+    sh.handleLine("ASM", out, quit);
     sh.handleLine("BREAKPOINT 2", out, quit);
     sh.handleLine("RUN bp", out, quit);
     CHECK(out.str().find("Breakpoint hit at 2") != std::string::npos);
@@ -862,6 +893,7 @@ TEST_CASE("shell BREAKPOINT index behavior is unchanged with source metadata pre
     sh.setProgramsRoot(dir);
     std::ostringstream out;
     bool quit = false;
+    sh.handleLine("ASM", out, quit);
 
     sh.handleLine("BREAKPOINT 2", out, quit);
     sh.handleLine("RUN bp_meta", out, quit);
@@ -1588,6 +1620,7 @@ TEST_CASE("shell END exits vm debugger context") {
     sh.setProgramsRoot(dir);
     std::ostringstream out;
     bool quit = false;
+    sh.handleLine("ASM", out, quit);
 
     sh.handleLine("BREAKPOINT 2", out, quit);
     sh.handleLine("RUN bp_end", out, quit);

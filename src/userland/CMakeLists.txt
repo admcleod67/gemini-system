@@ -1,4 +1,8 @@
 add_library(gemini-tcl
+        assembler/AssemblerShell.cpp
+        assembler/AssemblerShell.h
+        assembler/VmDebugService.cpp
+        assembler/VmDebugService.h
         basic/BasicProgram.cpp
         basic/BasicProgram.h
         basic/BasicAst.h
@@ -30,6 +34,7 @@ add_library(gemini-tcl
 target_include_directories(
         gemini-tcl
         PUBLIC
+        "${CMAKE_CURRENT_SOURCE_DIR}/assembler"
         "${CMAKE_CURRENT_SOURCE_DIR}/basic"
         "${CMAKE_CURRENT_SOURCE_DIR}/proc"
         "${CMAKE_CURRENT_SOURCE_DIR}/tcl"

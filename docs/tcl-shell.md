@@ -1,6 +1,6 @@
 # Developer shell (TCL)
 
-The Tcl shell is the host REPL for VM/debug/filesystem commands.
+The Tcl shell is the host REPL for system commands, BASIC/PROC entry, and filesystem commands.
 
 - **Prompt:** `TCL> `
 
@@ -13,6 +13,7 @@ Input is tokenized by whitespace (filenames with spaces are not supported by the
 - PROC interpreter (line-oriented Milestone 1 subset): `src/userland/proc/`
 - BASIC compiler is implemented in `src/userland/basic/BasicCompiler.*`.
 - BASIC mode command semantics are documented in [BASIC shell](basic-shell.md); language/compiler semantics are documented in [BASIC language](basic-language.md).
+- ASM debugger mode command semantics are documented in [Assembler shell](assembler-shell.md).
 
 ## Programs directory
 
@@ -54,8 +55,8 @@ For the full current behavior (validation rules, error modes, ordering, and pers
 | **`LIST-VARS`** | List variable names in **ASCII uppercase** (sorted), each on its own line under a **`Variables:`** header. If none: **`No variables`**. Takes no arguments. |
 | **`UNSET`** *name* | Remove *name*. If it was not set: **`No such variable`**. |
 | **`BASIC`** [*name*] | Enter BASIC mode. See [BASIC shell](basic-shell.md) for BASIC/ED commands and persistence rules. |
+| **`ASM`** [*programName*] | Enter ASM mode (instruction-level debugger shell). Optional name immediately executes `RUN <programName>` after entering ASM. See [Assembler shell](assembler-shell.md). |
 | **`RUN`** *programName* | Run by program name only (no extension). Tcl resolves host bytecode as `<programName>.tbc`, prunes invalid breakpoints (see below), loads VM state, and executes. If `<programName>.tbc` is missing, Tcl attempts to compile BASIC source `<programName>` and writes `<programName>.tbc` before running. |
-| **`RUN`** | **Resume** after a breakpoint: no filename, only when execution is **suspended** at a breakpoint; continues until the next breakpoint, **`HALT`**, or end of program. |
 | **`PROC`** *programName* [*args...*] | Execute `<programName>.proc` from programs root using a minimal two-pass PROC interpreter (labels + line execution). Supports `DISPLAY`, `INPUT`, `GO`, `IF A = B THEN GO label`, assignment `NAME = value`, `TCL ...`, and `END`. Positional args map to `P1`, `P2`, ... |
 | **`LIST-PROGRAMS`** | List logical program names under the programs root by discovering `.bas`/`.tbc` files (case-insensitive), stripping extensions, deduplicating, and sorting. |
 | **`CREATE-FILE`** *name* | Create a Pick file in the filesystem root. Creates JSON with matching `name` and empty `records`. |
@@ -65,14 +66,6 @@ For the full current behavior (validation rules, error modes, ordering, and pers
 | **`READ`** *file* *record-name* | Print record value if present; if missing record: **`No such record`**. |
 | **`WRITE`** *file* *record-name* *value…* | Upsert record value. Value is remaining tokens joined with single spaces. |
 | **`DUMP-STACK`** | Print the VM stack (uses the command output stream). |
-| **`TRACE ON`** / **`TRACE OFF`** | Enable or disable per-instruction tracing during **`RUN`** / resume loops. Does not require a loaded program. Trace remains instruction-index based; optional source metadata only adds an informational `(line N)` suffix when available. |
-| **`STEP`** | Single-step **one** instruction if a program is loaded; prints the same line format as trace for that step. |
-| **`BREAKPOINT`** *n* | Record a breakpoint at instruction index *n* (non-negative integer). May be set **before** any **`RUN`**. Label-based breakpoints are not supported. Source metadata does not change breakpoint indexing in Tcl mode. |
-| **`BREAKPOINTS`** | List breakpoints (sorted). If none: **`No breakpoints`**. |
-| **`CLEAR-BREAKPOINT`** *n* | Remove breakpoint *n*; if missing: **`No such breakpoint`**. |
-| **`CLEAR-BREAKPOINTS`** | Remove all breakpoints. |
-| **`DUMP-PROGRAM`** | Disassemble the **currently loaded** program (same mnemonic style as trace). |
-| **`DUMP-LABELS`** | Print **`label -> index`** for the loaded program, sorted by label name. If no labels: **`No labels`**. |
 
 Unknown first token: **`Unknown command: …`**.
 
@@ -105,29 +98,7 @@ Variables are **string key/value** pairs held by the shell (not the VM stack). N
 
 Arity errors: **`SET`** / **`GET`** / **`UNSET`** without a name print a **`… requires a variable name`** line. Extra tokens on **`LIST-VARS`** print **`LIST-VARS takes no arguments`**. Filesystem arity errors follow the same pattern (for example, **`LIST requires a filename`**, **`READ requires a file and record name`**, **`WRITE requires a file, record name, and value`**).
 
-## Loaded program and messages
-
-These commands require a **program image** in the shell **and** a non-empty program in the VM (after a successful **`RUN`** parse/load, including when paused on a breakpoint or finished at **`HALT`**):
-
-- **`STEP`**, **`DUMP-PROGRAM`**, **`DUMP-LABELS`**
-
-Otherwise they print exactly:
-
-**`No program loaded`**
-
-**`STEP`** when the IP is already past the end (finished run): **`Program finished`**.
-
-## Trace and breakpoints
-
-- **Trace:** when **`TRACE ON`**, before each **`step()`**, the shell prints one line via **`formatInstructionLine`** (0-based IP, mnemonic, operands, optional **`(line L)`** for `L > 0`). **`HALT`** is included as a line immediately before it executes.
-- **Breakpoints:** checked **before** executing the instruction at the current IP. On hit, the shell prints **`Breakpoint hit at`** *ip* and **does not** advance the IP until you **`STEP`**, **`RUN`** (resume), or clear breakpoints.
-- **Resume:** bare **`RUN`** sets a one-shot skip so the instruction at the stopped-at PC is not treated as a breakpoint again immediately, allowing progress after a hit.
-
-## Breakpoint validation
-
-On each successful **`RUN`** *programName*, breakpoint indices **`>= program.size()`** are **removed** from the set and a single line is printed:
-
-**`Removed invalid breakpoint(s):`** *indices…* (sorted).
+Instruction-level debugger controls (`STEP`, `CONT`, `TRACE`, breakpoint management, and program/label dumps) now live in [Assembler shell](assembler-shell.md).
 
 ## Errors
 
@@ -136,3 +107,4 @@ Parse/runtime failures during **`RUN`** print **`Error:`** followed by the excep
 ## See also
 
 - [Bytecode VM](vm.md) — opcode reference and parser/runtime details.
+- [Assembler shell](assembler-shell.md) — instruction-level debugger shell.

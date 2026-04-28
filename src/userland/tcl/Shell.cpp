@@ -33,7 +33,9 @@ namespace PickShell {
     } // namespace
 
     Shell::Shell(PickVM::Runtime &runtime)
-        : session_(runtime) {
+        : session_(runtime),
+          vmDebugService_(session_),
+          assemblerShell_(vmDebugService_) {
         session_.runtime_.setFileExistsCallback([this](const std::string &fileName) {
             try {
                 (void) session_.fileSystem_.listRecordNames(fileName);
@@ -63,6 +65,8 @@ namespace PickShell {
                    std::ostream &out) {
                 executeCompiledBasicProgram(program, sourceLinePerInstr, sourceProgram, out);
             });
+        assemblerShell_.setRunCommandFn([this](const Tokens &tokens, std::ostream &out) { cmdRun(tokens, out); });
+        assemblerShell_.setDumpStackFn([this](std::ostream &out) { cmdDumpStack(out); });
         registerCommands();
     }
 
@@ -111,6 +115,9 @@ namespace PickShell {
     }
 
     std::string Shell::prompt() const {
+        if (assemblerShell_.isActive()) {
+            return assemblerShell_.prompt();
+        }
         if (basicShell_.isActive()) {
             return basicShell_.prompt();
         }
@@ -147,21 +154,16 @@ namespace PickShell {
         tclCommands_["LIST"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdList(tokens, out); };
         tclCommands_["READ"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdRead(tokens, out); };
         tclCommands_["WRITE"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdWrite(tokens, out); };
-        tclCommands_["TRACE"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdTrace(tokens, out); };
-        tclCommands_["STEP"] = [this](const Tokens &, std::ostream &out, bool &) { cmdStep(out); };
-        tclCommands_["BREAKPOINT"] = [this](const Tokens &tokens, std::ostream &out, bool &) {
-            cmdBreakpoint(tokens, out);
+        tclCommands_["ASM"] = [this](const Tokens &tokens, std::ostream &out, bool &) {
+            if (tokens.size() > 2) {
+                out << "ASM takes at most one program name\n";
+                return;
+            }
+            assemblerShell_.enter(out);
+            if (tokens.size() == 2) {
+                cmdRun({"RUN", tokens[1]}, out);
+            }
         };
-        tclCommands_["BREAKPOINTS"] = [this](const Tokens &, std::ostream &out, bool &) { cmdBreakpoints(out); };
-        tclCommands_["CLEAR-BREAKPOINT"] = [this](const Tokens &tokens, std::ostream &out, bool &) {
-            cmdClearBreakpoint(tokens, out);
-        };
-        tclCommands_["CLEAR-BREAKPOINTS"] = [this](const Tokens &, std::ostream &out, bool &) {
-            cmdClearBreakpoints(out);
-        };
-        tclCommands_["END"] = [this](const Tokens &, std::ostream &out, bool &) { cmdEnd(out); };
-        tclCommands_["DUMP-PROGRAM"] = [this](const Tokens &, std::ostream &out, bool &) { cmdDumpProgram(out); };
-        tclCommands_["DUMP-LABELS"] = [this](const Tokens &, std::ostream &out, bool &) { cmdDumpLabels(out); };
         tclCommands_["SET"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdSet(tokens, out); };
         tclCommands_["GET"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdGet(tokens, out); };
         tclCommands_["LIST-VARS"] = [this](const Tokens &tokens, std::ostream &out, bool &) {
@@ -182,6 +184,11 @@ namespace PickShell {
     }
 
     void Shell::dispatch(const std::vector<std::string> &tokens, bool &quit, std::ostream &out) {
+        if (assemblerShell_.isActive()) {
+            bool leaveAssembler = false;
+            assemblerShell_.handleCommand(tokens, out, leaveAssembler);
+            return;
+        }
         if (basicShell_.isActive()) {
             bool leaveBasic = false;
             basicShell_.handleCommand(tokens, out, leaveBasic);
@@ -275,21 +282,18 @@ namespace PickShell {
                 return false;
             }
 
-            if (basicTrace_) {
-                PickVM::LoadedBytecode loaded{program, {}, sourceLinePerInstr};
-                out << PickVM::formatInstructionLine(ip, program[ip], &loaded) << '\n';
+            PickVM::LoadedBytecode loaded{program, {}, sourceLinePerInstr};
+            const VmDebugService::StepResult stepResult = vmDebugService_.stepRuntime(basicTrace_, out, &loaded);
+            if (stepResult.outcome == VmDebugService::StepOutcome::Halted) {
+                return true;
             }
-
-            try {
-                if (!session_.runtime_.step()) {
-                    return true;
-                }
-            } catch (const PickVM::UserInterrupt &) {
+            if (stepResult.outcome == VmDebugService::StepOutcome::Interrupted) {
                 out << "\nBreak\n";
                 session_.runtime_.clearInterrupt();
                 return false;
-            } catch (const std::runtime_error &e) {
-                out << "\nRuntime error: " << e.what() << '\n';
+            }
+            if (stepResult.outcome == VmDebugService::StepOutcome::RuntimeError) {
+                out << "\nRuntime error: " << stepResult.runtimeError << '\n';
                 return false;
             }
 
@@ -766,125 +770,6 @@ namespace PickShell {
         return writeCompiledBytecode(bytecodePath, compile, out);
     }
 
-    void Shell::cmdTrace(const std::vector<std::string> &tokens, std::ostream &out) {
-        if (tokens.size() < 2) {
-            out << "TRACE requires ON or OFF\n";
-            return;
-        }
-        if (tokens[1] == "ON") {
-            session_.trace_ = true;
-            return;
-        }
-        if (tokens[1] == "OFF") {
-            session_.trace_ = false;
-            return;
-        }
-        out << "TRACE requires ON or OFF\n";
-    }
-
-    void Shell::cmdStep(std::ostream &out) {
-        if (!session_.programImageLoaded()) {
-            out << "No program loaded\n";
-            return;
-        }
-        if (session_.runtime_.instructionPointer() >= session_.lastLoaded_->program.size()) {
-            out << "Program finished\n";
-            return;
-        }
-        session_.suspended_ = false;
-        session_.resumePastBreakpointIp_.reset();
-        const std::size_t ip = session_.runtime_.instructionPointer();
-        const PickVM::Instruction &instr = session_.lastLoaded_->program[ip];
-        out << PickVM::formatInstructionLine(ip, instr, &*session_.lastLoaded_) << '\n';
-        session_.runtime_.setOutputStream(&out);
-        session_.runtime_.step();
-        session_.runtime_.setOutputStream(nullptr);
-    }
-
-    void Shell::cmdBreakpoint(const std::vector<std::string> &tokens, std::ostream &out) {
-        if (tokens.size() < 2) {
-            out << "BREAKPOINT requires an index\n";
-            return;
-        }
-        try {
-            const std::size_t n = static_cast<std::size_t>(std::stoull(tokens[1]));
-            session_.breakpoints_.insert(n);
-        } catch (const std::exception &) {
-            out << "BREAKPOINT requires a non-negative integer index\n";
-        }
-    }
-
-    void Shell::cmdBreakpoints(std::ostream &out) {
-        if (session_.breakpoints_.empty()) {
-            out << "No breakpoints\n";
-            return;
-        }
-        std::vector<std::size_t> sorted(session_.breakpoints_.begin(), session_.breakpoints_.end());
-        std::sort(sorted.begin(), sorted.end());
-        out << "Breakpoints:";
-        for (const std::size_t b: sorted) {
-            out << ' ' << b;
-        }
-        out << '\n';
-    }
-
-    void Shell::cmdClearBreakpoint(const std::vector<std::string> &tokens, std::ostream &out) {
-        if (tokens.size() < 2) {
-            out << "CLEAR-BREAKPOINT requires an index\n";
-            return;
-        }
-        try {
-            const std::size_t n = static_cast<std::size_t>(std::stoull(tokens[1]));
-            if (session_.breakpoints_.erase(n) == 0U) {
-                out << "No such breakpoint\n";
-            }
-        } catch (const std::exception &) {
-            out << "CLEAR-BREAKPOINT requires a non-negative integer index\n";
-        }
-    }
-
-    void Shell::cmdClearBreakpoints(std::ostream &out) {
-        (void) out;
-        session_.breakpoints_.clear();
-    }
-
-    void Shell::cmdEnd(std::ostream &out) {
-        if (!session_.programImageLoaded()) {
-            out << "No program loaded\n";
-            return;
-        }
-        session_.lastLoaded_.reset();
-        session_.suspended_ = false;
-        session_.resumePastBreakpointIp_.reset();
-        session_.runtime_.loadProgram({});
-    }
-
-    void Shell::cmdDumpProgram(std::ostream &out) {
-        if (!session_.programImageLoaded()) {
-            out << "No program loaded\n";
-            return;
-        }
-        for (std::size_t i = 0; i < session_.lastLoaded_->program.size(); ++i) {
-            out << PickVM::formatInstructionLine(i, session_.lastLoaded_->program[i], &*session_.lastLoaded_) << '\n';
-        }
-    }
-
-    void Shell::cmdDumpLabels(std::ostream &out) {
-        if (!session_.programImageLoaded()) {
-            out << "No program loaded\n";
-            return;
-        }
-        if (session_.lastLoaded_->labels.empty()) {
-            out << "No labels\n";
-            return;
-        }
-        std::vector<std::pair<std::string, int>> pairs(session_.lastLoaded_->labels.begin(), session_.lastLoaded_->labels.end());
-        std::sort(pairs.begin(), pairs.end(), [](const auto &a, const auto &b) { return a.first < b.first; });
-        for (const auto &p: pairs) {
-            out << p.first << " -> " << p.second << '\n';
-        }
-    }
-
     void Shell::cmdSet(const std::vector<std::string> &tokens, std::ostream &out) {
         if (tokens.size() < 2) {
             out << "SET requires a variable name\n";
@@ -950,8 +835,8 @@ namespace PickShell {
         out << "  UNSET <name>\n";
         out << "  WHO\n";
         out << "  BASIC [name]   enter BASIC editor mode\n";
+        out << "  ASM [name]     enter assembler debugger mode (optional program name)\n";
         out << "  RUN <name>     load and run program name (auto-resolves .tbc, auto-compiles BASIC source if needed)\n";
-        out << "  RUN            resume after a breakpoint (same program in memory)\n";
         out << "  PROC <name> [args...]   run PROC script from programs root (<name>.proc)\n";
         out << "  LIST-PROGRAMS\n";
         out << "  CREATE-FILE <name>\n";
@@ -961,15 +846,6 @@ namespace PickShell {
         out << "  READ <file> <record-name>\n";
         out << "  WRITE <file> <record-name> <value...>\n";
         out << "  DUMP-STACK\n";
-        out << "  TRACE ON|OFF   trace each instruction before execution (when running)\n";
-        out << "  STEP           single-step (requires loaded program)\n";
-        out << "  BREAKPOINT <n> set breakpoint at instruction index (may be set before RUN)\n";
-        out << "  BREAKPOINTS    list breakpoint indices\n";
-        out << "  CLEAR-BREAKPOINT <n>\n";
-        out << "  CLEAR-BREAKPOINTS\n";
-        out << "  END            exit VM debugger context\n";
-        out << "  DUMP-PROGRAM   disassemble loaded program\n";
-        out << "  DUMP-LABELS    list label -> instruction index\n";
         out << "  VERSION\n";
         out << "  QUIT\n";
     }

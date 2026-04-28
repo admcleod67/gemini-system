@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include "AssemblerShell.h"
 #include "BasicShell.h"
 #include "ProcInterpreter.h"
 #include "ShellSession.h"
@@ -50,6 +51,8 @@ namespace PickShell {
         using CommandTable = std::unordered_map<std::string, CommandFn>;
 
         ShellSession session_;
+        VmDebugService vmDebugService_;
+        AssemblerShell assemblerShell_;
         BasicShell basicShell_;
         ProcInterpreter procInterpreter_;
         CommandTable tclCommands_;
@@ -131,23 +134,6 @@ namespace PickShell {
         void cmdRead(const std::vector<std::string> &tokens, std::ostream &out);
 
         void cmdWrite(const std::vector<std::string> &tokens, std::ostream &out);
-
-        void cmdTrace(const std::vector<std::string> &tokens, std::ostream &out);
-
-        void cmdStep(std::ostream &out);
-
-        void cmdBreakpoint(const std::vector<std::string> &tokens, std::ostream &out);
-
-        void cmdBreakpoints(std::ostream &out);
-
-        void cmdClearBreakpoint(const std::vector<std::string> &tokens, std::ostream &out);
-
-        void cmdClearBreakpoints(std::ostream &out);
-        void cmdEnd(std::ostream &out);
-
-        void cmdDumpProgram(std::ostream &out);
-
-        void cmdDumpLabels(std::ostream &out);
 
         void cmdSet(const std::vector<std::string> &tokens, std::ostream &out);
 

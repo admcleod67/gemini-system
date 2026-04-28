@@ -26,7 +26,8 @@ Artifacts include **`gemini-system`** (minimal host entry point), **`pick-cli`**
 More detail lives under **[`docs/`](docs/README.md)**:
 
 - **[Bytecode VM](docs/vm.md)** — `.tbc` format, opcodes, parser and runtime.
-- **[Developer shell (TCL)](docs/tcl-shell.md)** — REPL commands, trace, breakpoints.
+- **[Developer shell (TCL)](docs/tcl-shell.md)** — host shell commands and mode entry (`BASIC`, `PROC`, `ASM`).
+- **[Assembler shell (ASM)](docs/assembler-shell.md)** — VM-level debugger workflow and command set.
 - **[BASIC shell](docs/basic-shell.md)** — BASIC and ED mode commands, program editing and SAVE rules.
 - **[BASIC language](docs/basic-language.md)** — supported BASIC compiler subset and expression semantics.
 - **[Compiler architecture](docs/compiler-architecture.md)** — parse/semantic/emit phase boundaries.
