@@ -28,7 +28,7 @@ add_executable(
         test_Shell.cpp
         test_TclEnvironment.cpp
 )
-target_link_libraries(pick-tests PRIVATE pick-tcl doctest_headers)
+target_link_libraries(pick-tests PRIVATE gemini-tcl doctest_headers)
 target_compile_definitions(
         pick-tests
         PRIVATE "PICK_SYSTEM_VERSION=\"${PROJECT_VERSION}\""

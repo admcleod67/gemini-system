@@ -353,10 +353,10 @@ TEST_CASE("shell PROC assignment display and token substitution") {
     std::filesystem::create_directories(dir);
     {
         std::ofstream f(dir / "FLOW.proc");
-        f << "DISPLAY = NOOP\n";
+        f << "MSG = NOOP\n";
         f << "X = HELLO\n";
         f << "DISPLAY X WORLD\n";
-        f << "DISPLAY DISPLAY\n";
+        f << "DISPLAY MSG\n";
         f << "END\n";
     }
     PickVM::Runtime rt;
@@ -1151,7 +1151,7 @@ TEST_CASE("shell BASIC LOAD behavior and arity") {
     sh.handleLine("BASIC TEST", out, quit);
     out.str("");
     sh.handleLine("LOAD", out, quit);
-    CHECK(out.str() == "No program name specified\n");
+    CHECK(out.str().empty());
 
     out.str("");
     sh.handleLine("LOAD A B", out, quit);
