@@ -325,6 +325,181 @@ TEST_CASE("shell RUN compile failure from BASIC source reports diagnostics") {
     CHECK_FALSE(std::filesystem::exists(dir / "BROKEN.tbc"));
 }
 
+TEST_CASE("shell PROC requires program name") {
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    std::ostringstream out;
+    bool quit = false;
+    sh.handleLine("PROC", out, quit);
+    CHECK_FALSE(quit);
+    CHECK(out.str() == "PROC requires a program name\n");
+}
+
+TEST_CASE("shell PROC missing file") {
+    auto dir = uniqueTempDir();
+    std::filesystem::create_directories(dir);
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setProgramsRoot(dir);
+    std::ostringstream out;
+    bool quit = false;
+    sh.handleLine("PROC MISSING", out, quit);
+    CHECK_FALSE(quit);
+    CHECK(out.str().find("Error: Cannot open PROC file:") != std::string::npos);
+}
+
+TEST_CASE("shell PROC assignment display and token substitution") {
+    auto dir = uniqueTempDir();
+    std::filesystem::create_directories(dir);
+    {
+        std::ofstream f(dir / "FLOW.proc");
+        f << "DISPLAY = NOOP\n";
+        f << "X = HELLO\n";
+        f << "DISPLAY X WORLD\n";
+        f << "DISPLAY DISPLAY\n";
+        f << "END\n";
+    }
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setProgramsRoot(dir);
+    std::ostringstream out;
+    bool quit = false;
+    sh.handleLine("PROC FLOW", out, quit);
+    CHECK_FALSE(quit);
+    CHECK(out.str() == "HELLO WORLD\nNOOP\n");
+}
+
+TEST_CASE("shell PROC INPUT stores value and can be displayed") {
+    auto dir = uniqueTempDir();
+    std::filesystem::create_directories(dir);
+    {
+        std::ofstream f(dir / "ASK.proc");
+        f << "INPUT USER\n";
+        f << "DISPLAY USER\n";
+        f << "END\n";
+    }
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setProgramsRoot(dir);
+    std::istringstream in("ALICE\n");
+    sh.setInputStream(&in);
+    std::ostringstream out;
+    bool quit = false;
+    sh.handleLine("PROC ASK", out, quit);
+    CHECK_FALSE(quit);
+    CHECK(out.str() == "ALICE\n");
+}
+
+TEST_CASE("shell PROC GO supports forward and backward labels") {
+    auto dir = uniqueTempDir();
+    std::filesystem::create_directories(dir);
+    {
+        std::ofstream f(dir / "JUMP.proc");
+        f << "GO NEXT\n";
+        f << "DISPLAY BAD\n";
+        f << "NEXT:\n";
+        f << "DISPLAY OK\n";
+        f << "END\n";
+    }
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setProgramsRoot(dir);
+    std::ostringstream out;
+    bool quit = false;
+    sh.handleLine("PROC JUMP", out, quit);
+    CHECK_FALSE(quit);
+    CHECK(out.str() == "OK\n");
+}
+
+TEST_CASE("shell PROC IF THEN GO with case-insensitive labels") {
+    auto dir = uniqueTempDir();
+    std::filesystem::create_directories(dir);
+    {
+        std::ofstream f(dir / "IFLOW.proc");
+        f << "X = YES\n";
+        f << "IF X = YES THEN GO menu\n";
+        f << "DISPLAY FAIL\n";
+        f << "MENU:\n";
+        f << "DISPLAY PASS\n";
+        f << "END\n";
+    }
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setProgramsRoot(dir);
+    std::ostringstream out;
+    bool quit = false;
+    sh.handleLine("PROC IFLOW", out, quit);
+    CHECK_FALSE(quit);
+    CHECK(out.str() == "PASS\n");
+}
+
+TEST_CASE("shell PROC positional parameters substitute into TCL command") {
+    auto dir = uniqueTempDir();
+    std::filesystem::create_directories(dir);
+    {
+        std::ofstream f(dir / "BRIDGE.proc");
+        f << "TCL ECHO P1 P2\n";
+        f << "END\n";
+    }
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setProgramsRoot(dir);
+    std::ostringstream out;
+    bool quit = false;
+    sh.handleLine("PROC BRIDGE HELLO WORLD", out, quit);
+    CHECK_FALSE(quit);
+    CHECK(out.str() == "HELLO WORLD\n");
+}
+
+TEST_CASE("shell PROC duplicate labels are rejected") {
+    auto dir = uniqueTempDir();
+    std::filesystem::create_directories(dir);
+    {
+        std::ofstream f(dir / "DUP.proc");
+        f << "A:\n";
+        f << "A:\n";
+        f << "END\n";
+    }
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setProgramsRoot(dir);
+    std::ostringstream out;
+    bool quit = false;
+    sh.handleLine("PROC DUP", out, quit);
+    CHECK_FALSE(quit);
+    CHECK(out.str() == "Error: Duplicate label: A\n");
+}
+
+TEST_CASE("shell PROC malformed IF and unknown label errors") {
+    auto dir = uniqueTempDir();
+    std::filesystem::create_directories(dir);
+
+    {
+        std::ofstream f(dir / "BADIF.proc");
+        f << "IF A = B THEN DISPLAY X\n";
+        f << "END\n";
+    }
+    {
+        std::ofstream f(dir / "BADGO.proc");
+        f << "GO MISSING\n";
+        f << "END\n";
+    }
+
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setProgramsRoot(dir);
+    std::ostringstream out;
+    bool quit = false;
+    sh.handleLine("PROC BADIF", out, quit);
+    CHECK_FALSE(quit);
+    CHECK(out.str() == "Error: IF requires IF <lhs> = <rhs> THEN GO <label>\n");
+
+    out.str("");
+    sh.handleLine("PROC BADGO", out, quit);
+    CHECK_FALSE(quit);
+    CHECK(out.str() == "Error: Unknown label: MISSING\n");
+}
+
 TEST_CASE("shell LIST-PROGRAMS empty directory") {
     auto dir = uniqueTempDir();
     std::filesystem::create_directories(dir);

@@ -17,6 +17,8 @@ add_library(gemini-tcl
         basic/BasicBytecodeEmitter.h
         basic/BasicStatementParser.cpp
         basic/BasicStatementParser.h
+        proc/ProcInterpreter.cpp
+        proc/ProcInterpreter.h
         tcl/Shell.cpp
         tcl/Shell.h
         tcl/ShellSession.cpp
@@ -29,6 +31,7 @@ target_include_directories(
         gemini-tcl
         PUBLIC
         "${CMAKE_CURRENT_SOURCE_DIR}/basic"
+        "${CMAKE_CURRENT_SOURCE_DIR}/proc"
         "${CMAKE_CURRENT_SOURCE_DIR}/tcl"
 )
 

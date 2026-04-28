@@ -8,6 +8,7 @@
 #pragma once
 
 #include "BasicShell.h"
+#include "ProcInterpreter.h"
 #include "ShellSession.h"
 
 #include <filesystem>
@@ -50,6 +51,7 @@ namespace PickShell {
 
         ShellSession session_;
         BasicShell basicShell_;
+        ProcInterpreter procInterpreter_;
         CommandTable tclCommands_;
         std::istream *inputStream_{nullptr};
 
@@ -92,6 +94,8 @@ namespace PickShell {
         [[nodiscard]] std::string expandEchoToken(const std::string &token) const;
 
         void cmdRun(const std::vector<std::string> &tokens, std::ostream &out);
+        void cmdProc(const std::vector<std::string> &tokens, std::ostream &out);
+        void executeProcTclCommand(const std::string &line, std::ostream &out);
         bool resolveRunProgramPaths(const std::string &programName,
                                     std::filesystem::path &sourcePath,
                                     std::filesystem::path &bytecodePath,

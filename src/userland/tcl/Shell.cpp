@@ -132,6 +132,7 @@ namespace PickShell {
         tclCommands_["WHO"] = [this](const Tokens &, std::ostream &out, bool &) { cmdWho(out); };
         tclCommands_["ECHO"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdEcho(tokens, out); };
         tclCommands_["RUN"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdRun(tokens, out); };
+        tclCommands_["PROC"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdProc(tokens, out); };
         tclCommands_["DUMP-STACK"] = [this](const Tokens &, std::ostream &out, bool &) { cmdDumpStack(out); };
         tclCommands_["LIST-PROGRAMS"] = [this](const Tokens &, std::ostream &out, bool &) { cmdListPrograms(out); };
         tclCommands_["CREATE-FILE"] = [this](const Tokens &tokens, std::ostream &out, bool &) {
@@ -620,6 +621,50 @@ namespace PickShell {
         }
     }
 
+    void Shell::cmdProc(const std::vector<std::string> &tokens, std::ostream &out) {
+        if (tokens.size() < 2) {
+            out << "PROC requires a program name\n";
+            return;
+        }
+        if (tokens[1].empty() || tokens[1].find('.') != std::string::npos) {
+            out << "PROC expects a program name without extension\n";
+            return;
+        }
+
+        const std::filesystem::path procPath = session_.programsRoot_ / (tokens[1] + ".proc");
+        std::ifstream procFile(procPath);
+        if (!procFile) {
+            out << "Error: Cannot open PROC file: " << procPath.string() << "\n";
+            return;
+        }
+
+        std::vector<std::string> lines;
+        std::string line;
+        while (std::getline(procFile, line)) {
+            lines.push_back(line);
+        }
+
+        std::vector<std::string> params;
+        params.reserve(tokens.size() > 2 ? tokens.size() - 2 : 0);
+        for (std::size_t i = 2; i < tokens.size(); ++i) {
+            params.push_back(tokens[i]);
+        }
+
+        (void) procInterpreter_.runScript(lines, params, inputStream_, out,
+                                          [this](const std::string &tclLine, std::ostream &procOut) {
+                                              executeProcTclCommand(tclLine, procOut);
+                                          });
+    }
+
+    void Shell::executeProcTclCommand(const std::string &line, std::ostream &out) {
+        const Tokens tokens = tokenize(line);
+        if (tokens.empty()) {
+            return;
+        }
+        bool quit = false;
+        handleTclCommand(tokens, quit, out);
+    }
+
     bool Shell::resolveRunProgramPaths(const std::string &programName,
                                        std::filesystem::path &sourcePath,
                                        std::filesystem::path &bytecodePath,
@@ -907,6 +952,7 @@ namespace PickShell {
         out << "  BASIC [name]   enter BASIC editor mode\n";
         out << "  RUN <name>     load and run program name (auto-resolves .tbc, auto-compiles BASIC source if needed)\n";
         out << "  RUN            resume after a breakpoint (same program in memory)\n";
+        out << "  PROC <name> [args...]   run PROC script from programs root (<name>.proc)\n";
         out << "  LIST-PROGRAMS\n";
         out << "  CREATE-FILE <name>\n";
         out << "  DELETE-FILE <name>\n";

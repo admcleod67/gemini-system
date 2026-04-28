@@ -10,12 +10,15 @@ Input is tokenized by whitespace (filenames with spaces are not supported by the
 
 - Tcl host shell and VM/filesystem command integration: `src/userland/tcl/`
 - BASIC line buffer + BASIC/ED command interpreter: `src/userland/basic/`
+- PROC interpreter (line-oriented Milestone 1 subset): `src/userland/proc/`
 - BASIC compiler is implemented in `src/userland/basic/BasicCompiler.*`.
 - BASIC mode command semantics are documented in [BASIC shell](basic-shell.md); language/compiler semantics are documented in [BASIC language](basic-language.md).
 
 ## Programs directory
 
 **`RUN <programName>`** resolves host artifacts under the **programs root** (default directory name **`programs`**, relative to the process current working directory unless changed in code via **`Shell::setProgramsRoot`**): source at `<programName>` and object code at `<programName>.tbc`.
+
+**`PROC <programName> [args...]`** resolves source at `<programName>.proc` in the same root and executes it in the TCL host as a non-VM, line-oriented PROC interpreter.
 
 **`LIST-PROGRAMS`** lists logical program names discovered from `.bas` and `.tbc` files in that root (case-insensitive extension match). It strips extensions and deduplicates names.
 
@@ -53,6 +56,7 @@ For the full current behavior (validation rules, error modes, ordering, and pers
 | **`BASIC`** [*name*] | Enter BASIC mode. See [BASIC shell](basic-shell.md) for BASIC/ED commands and persistence rules. |
 | **`RUN`** *programName* | Run by program name only (no extension). Tcl resolves host bytecode as `<programName>.tbc`, prunes invalid breakpoints (see below), loads VM state, and executes. If `<programName>.tbc` is missing, Tcl attempts to compile BASIC source `<programName>` and writes `<programName>.tbc` before running. |
 | **`RUN`** | **Resume** after a breakpoint: no filename, only when execution is **suspended** at a breakpoint; continues until the next breakpoint, **`HALT`**, or end of program. |
+| **`PROC`** *programName* [*args...*] | Execute `<programName>.proc` from programs root using a minimal two-pass PROC interpreter (labels + line execution). Supports `DISPLAY`, `INPUT`, `GO`, `IF A = B THEN GO label`, assignment `NAME = value`, `TCL ...`, and `END`. Positional args map to `P1`, `P2`, ... |
 | **`LIST-PROGRAMS`** | List logical program names under the programs root by discovering `.bas`/`.tbc` files (case-insensitive), stripping extensions, deduplicating, and sorting. |
 | **`CREATE-FILE`** *name* | Create a Pick file in the filesystem root. Creates JSON with matching `name` and empty `records`. |
 | **`DELETE-FILE`** *name* | Delete a Pick file from the filesystem root. |
@@ -79,6 +83,19 @@ Tcl host and BASIC editor responsibilities are now separated:
 - Tcl shell behavior is described in this page.
 - BASIC/ED command set and persistence behavior are documented in [BASIC shell](basic-shell.md).
 - BASIC compiler/language subset details are documented in [BASIC language](basic-language.md).
+
+## PROC mode (Milestone 1 subset)
+
+`PROC` scripts are plain text and run entirely in the TCL host (no VM bytecode, no PROC compiler). Execution is two-pass: first pass records labels (`NAME:`), second pass executes statements line-by-line with `GO`/`IF ... THEN GO ...` jumps.
+
+Variable handling is intentionally minimal and token-based:
+
+- Variables are strings only (including positional `P1`, `P2`, ... from `PROC` args).
+- Tokenization is whitespace-based (no quoting rules).
+- Only operand/payload tokens are substituted by exact variable-name match.
+- Statement keywords are not rewritten by substitution.
+
+`TCL ...` executes the reconstructed command string through the TCL command dispatcher, allowing PROC variable values to flow into TCL command arguments without sharing variable stores.
 
 ## Shell variables
 
