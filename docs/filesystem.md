@@ -1,34 +1,63 @@
-# File system (current implementation)
+# File system (host backend transition)
 
-The current file system is a lightweight, JSON-backed store used by Tcl commands (`CREATE-FILE`, `DELETE-FILE`, `LIST-FILES`, `LIST`, `READ`, `WRITE`) and by BASIC file statements at runtime.
+The filesystem layer provides a Pick-facing abstraction over storage for Tcl and BASIC runtime operations. During the transition phase it uses the host filesystem as backend storage.
 
-It is intentionally simple and is not yet a full Pick account/file dictionary implementation.
+This keeps shell/runtime semantics stable while allowing the backend to be replaced later by a true Pick hashed file implementation.
 
 ## Root directory
 
 - Default root directory: `filesystem` (relative to process working directory).
-- The root can be changed in code via `Shell::setFileSystemRoot(...)`.
-- The root directory is created on demand by write-side operations.
+- The root can be changed via `Shell::setFileSystemRoot(...)`.
+- The root directory is created on-demand by write-side operations.
 
-## Storage model
+## Transitional storage model
 
-Each logical file is stored as a single JSON file named:
+- Each logical Pick file is represented as a **directory**:
+  - `<root>/<fileName>/`
+- Each record is represented as a **file** inside that directory.
+- Logical item-id = filename stem (extension hidden from Tcl).
 
-- `<fileName>.json`
+## Filesystem API shape
 
-Example:
+The backend supports a handle-oriented flow:
 
-```json
-{
-  "name": "BP",
-  "records": {
-    "ID1": "first value",
-    "ID2": "second value"
-  }
-}
-```
+- `openFile(name) -> FileHandle`
+- `listRecords(handle)`
+- `readRecord(handle, id)`
+- `writeRecord(handle, id, record)`
+- `deleteRecord(handle, id)`
+- `createFile(name)`
+- `deleteFile(name)`
 
-`name` must match the logical filename used to open/read/write/list that file.
+Compatibility wrappers still expose current callers to:
+
+- `read(fileName, recordName)`
+- `write(fileName, record)`
+- `listRecordNames(fileName)`
+
+so Tcl commands and VM callbacks do not need backend-specific knowledge.
+
+## Record extension policy
+
+Extensions are backend-only and are not exposed to Tcl:
+
+- `.bas` for BASIC-source style records (logical file `BP`)
+- `.proc` for PROC-style records (logical files `PROC` or `PROCS`)
+- `.item` default for generic Pick records
+
+`LIST` returns logical item-ids (stems), not extension-bearing names.
+
+## `.item` canonical content format
+
+`.item` files represent a single Pick record in transitional storage:
+
+- Plain text only.
+- One attribute per line, in order.
+- Newline is the attribute boundary.
+- Empty attributes are represented by empty lines.
+- No schema, typing, or structural metadata is stored.
+
+This is forward-compatible with future import into true Pick storage by mapping newline-separated attributes to attribute marks (`0xFE`) without transformation.
 
 ## Name validation rules
 
@@ -44,19 +73,19 @@ Invalid names fail with `Error: ...` messages from the shell.
 
 ### `CREATE-FILE <name>`
 
-- Creates `<name>.json` with empty `records`.
+- Creates `<root>/<name>/`.
 - Fails if file already exists.
 - Extra arguments are currently ignored.
 
 ### `DELETE-FILE <name>`
 
-- Deletes `<name>.json`.
+- Deletes `<root>/<name>/` recursively.
 - Fails if file does not exist.
 - Extra arguments are currently ignored.
 
 ### `LIST-FILES`
 
-- Lists logical file names, sorted.
+- Lists logical file names (directory names), sorted.
 - Output is:
   - `No files` when empty.
   - Otherwise:
@@ -66,7 +95,7 @@ Invalid names fail with `Error: ...` messages from the shell.
 
 ### `LIST <file>`
 
-- Lists record names for `<file>`, sorted.
+- Lists record ids for `<file>`, sorted.
 - Output is:
   - `No records` when empty.
   - Otherwise:
@@ -98,29 +127,10 @@ Representative messages include:
 - `Error: File already exists: <name>`
 - `Error: File not found: <name>`
 - `Error: Invalid record name`
-- `Error: Invalid JSON in <path>: <reason>`
-- `Error: File name mismatch in <path>`
-
-## JSON parsing/validation rules
-
-On read/list operations, JSON files are parsed and validated strictly:
-
-- Root must be an object.
-- Only `name` and `records` fields are allowed.
-- Both fields are required.
-- `records` must be an object of string keys to string values.
-- Duplicate `name` or `records` fields are rejected.
-- Trailing content after the JSON object is rejected.
-
-If a file is malformed, commands fail with `Error: Invalid JSON in ...`.
 
 ## Ordering and persistence notes
 
 - `LIST-FILES` sorts names lexicographically.
 - `LIST <file>` sorts record names lexicographically.
-- `WRITE` persists via temp-file + rename (`.tmp`) to reduce partial-write risk.
+- Writes persist via temp-file + rename (`.tmp`) to reduce partial-write risk.
 - Reads and writes are case-sensitive with no normalization.
-
-## Scope note
-
-This is the implemented behavior today. It models a practical JSON-backed record store for shell and BASIC features, not a full historical Pick filesystem/account model.

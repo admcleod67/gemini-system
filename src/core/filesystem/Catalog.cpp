@@ -15,7 +15,7 @@ namespace PickFS {
         if (!isValidName(fileName)) {
             throw std::runtime_error("Invalid file name");
         }
-        return root_ / (fileName + ".json");
+        return root_ / fileName;
     }
 
     void Catalog::ensureRootExists() const {

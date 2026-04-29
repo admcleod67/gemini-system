@@ -22,6 +22,11 @@ namespace PickFS {
 
     class FileSystem {
     public:
+        struct FileHandle {
+            std::string name;
+            std::filesystem::path directoryPath;
+        };
+
         explicit FileSystem(std::filesystem::path root = "filesystem");
 
         void setRoot(std::filesystem::path root);
@@ -32,6 +37,16 @@ namespace PickFS {
 
         void deleteFile(const std::string &name);
 
+        FileHandle openFile(const std::string &name) const;
+
+        std::vector<std::string> listRecords(const FileHandle &handle) const;
+
+        std::optional<Record> readRecord(const FileHandle &handle, const std::string &recordName) const;
+
+        void writeRecord(const FileHandle &handle, const Record &record);
+
+        void deleteRecord(const FileHandle &handle, const std::string &recordName);
+
         std::optional<Record> read(const std::string &fileName, const std::string &recordName) const;
 
         void write(const std::string &fileName, const Record &record);
@@ -41,16 +56,15 @@ namespace PickFS {
         std::vector<std::string> listRecordNames(const std::string &fileName) const;
 
     private:
-        struct StoredFile {
-            std::string name;
-            std::vector<std::pair<std::string, std::string>> records;
-        };
-
         Catalog catalog_;
 
-        StoredFile loadFile(const std::string &fileName) const;
+        static bool isValidRecordName(const std::string &name);
 
-        void saveFile(const StoredFile &stored) const;
+        static std::string preferredExtensionForFile(const std::string &fileName);
+
+        static bool isKnownRecordExtension(const std::string &extension);
+
+        std::filesystem::path resolveRecordPath(const FileHandle &handle, const std::string &recordName) const;
     };
 } // namespace PickFS
 

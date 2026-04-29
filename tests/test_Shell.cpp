@@ -586,6 +586,7 @@ TEST_CASE("shell CREATE-FILE LIST-FILES DELETE-FILE") {
     out.str("");
     sh.handleLine("CREATE-FILE BP", out, quit);
     CHECK(out.str().empty());
+    CHECK(std::filesystem::is_directory(dir / "BP"));
 
     out.str("");
     sh.handleLine("LIST-FILES", out, quit);
@@ -594,6 +595,7 @@ TEST_CASE("shell CREATE-FILE LIST-FILES DELETE-FILE") {
     out.str("");
     sh.handleLine("DELETE-FILE BP", out, quit);
     CHECK(out.str().empty());
+    CHECK_FALSE(std::filesystem::exists(dir / "BP"));
 
     out.str("");
     sh.handleLine("LIST-FILES", out, quit);
@@ -612,6 +614,7 @@ TEST_CASE("shell WRITE READ and overwrite record value") {
     out.str("");
     sh.handleLine("WRITE BP HELLO 001*first value", out, quit);
     CHECK(out.str().empty());
+    CHECK(std::filesystem::exists(dir / "BP" / "HELLO.bas"));
 
     out.str("");
     sh.handleLine("READ BP HELLO", out, quit);
