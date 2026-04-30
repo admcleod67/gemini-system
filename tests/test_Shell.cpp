@@ -9,6 +9,7 @@
 
 #include <pick_system/version.hpp>
 
+#include "FileSystem.h"
 #include "Shell.h"
 #include "Runtime.h"
 
@@ -16,6 +17,27 @@ static std::filesystem::path uniqueTempDir() {
     auto base = std::filesystem::temp_directory_path();
     const auto tick = std::chrono::steady_clock::now().time_since_epoch().count();
     return base / ("pick-shell-test-" + std::to_string(tick));
+}
+
+static void seedVocAndBp(const std::filesystem::path &fsRoot) {
+    PickFS::FileSystem fs(fsRoot);
+    fs.createFile("VOC");
+    fs.createFile("BP");
+    fs.write("VOC", PickFS::Record("BP", "001 F\n002 BP\n003 /gemini/fs/DM/BP\n"));
+}
+
+static void writeProgramSourceRecord(const std::filesystem::path &fsRoot,
+                                     const std::string &programName,
+                                     const std::string &source) {
+    PickFS::FileSystem fs(fsRoot);
+    fs.write("BP", PickFS::Record(programName, source));
+}
+
+static void writeProgramObjectRecord(const std::filesystem::path &fsRoot,
+                                     const std::string &programName,
+                                     const std::string &objectText) {
+    PickFS::FileSystem fs(fsRoot);
+    fs.write("BP", PickFS::Record(programName + "_OBJ", objectText));
 }
 
 TEST_CASE("shell HELP") {
@@ -249,23 +271,23 @@ TEST_CASE("shell RUN requires filename") {
 TEST_CASE("shell RUN missing file") {
     PickVM::Runtime rt;
     PickShell::Shell sh(rt);
-    sh.setProgramsRoot(uniqueTempDir());
+    const auto fsDir = uniqueTempDir();
+    seedVocAndBp(fsDir);
+    sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
     bool quit = false;
     sh.handleLine("RUN missing", out, quit);
     CHECK_FALSE(quit);
-    CHECK(out.str().find("Error: Cannot open bytecode file:") != std::string::npos);
+    CHECK(out.str().find("Error: Cannot open bytecode file for program:") != std::string::npos);
 }
 
 TEST_CASE("shell RUN executes bytecode from programs root") {
-    auto dir = uniqueTempDir();
-    std::filesystem::create_directories(dir); {
-        std::ofstream f(dir / "mini.tbc");
-        f << "PUSH_INT 5\nHALT\n";
-    }
+    auto fsDir = uniqueTempDir();
+    seedVocAndBp(fsDir);
+    writeProgramObjectRecord(fsDir, "mini", "PUSH_INT 5\nHALT\n");
     PickVM::Runtime rt;
     PickShell::Shell sh(rt);
-    sh.setProgramsRoot(dir);
+    sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
     bool quit = false;
     sh.handleLine("RUN mini", out, quit);
@@ -286,44 +308,40 @@ TEST_CASE("shell RUN rejects extension-bearing names") {
 }
 
 TEST_CASE("shell RUN auto-compiles BASIC source when bytecode missing") {
-    auto dir = uniqueTempDir();
-    std::filesystem::create_directories(dir);
-    {
-        std::ofstream src(dir / "HELLO");
-        src << "10 PRINT \"HI\"\n20 END\n";
-    }
+    auto fsDir = uniqueTempDir();
+    seedVocAndBp(fsDir);
+    writeProgramSourceRecord(fsDir, "HELLO", "10 PRINT \"HI\"\n20 END\n");
 
     PickVM::Runtime rt;
     PickShell::Shell sh(rt);
-    sh.setProgramsRoot(dir);
+    sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
     bool quit = false;
 
-    CHECK_FALSE(std::filesystem::exists(dir / "HELLO.tbc"));
+    PickFS::FileSystem fs(fsDir);
+    CHECK_FALSE(fs.read("BP", "HELLO_OBJ").has_value());
     sh.handleLine("RUN HELLO", out, quit);
     CHECK_FALSE(quit);
     CHECK(out.str() == "HI\n");
-    CHECK(std::filesystem::exists(dir / "HELLO.tbc"));
+    CHECK(fs.read("BP", "HELLO_OBJ").has_value());
 }
 
 TEST_CASE("shell RUN compile failure from BASIC source reports diagnostics") {
-    auto dir = uniqueTempDir();
-    std::filesystem::create_directories(dir);
-    {
-        std::ofstream src(dir / "BROKEN");
-        src << "10 MAT A = 1\n";
-    }
+    auto fsDir = uniqueTempDir();
+    seedVocAndBp(fsDir);
+    writeProgramSourceRecord(fsDir, "BROKEN", "10 MAT A = 1\n");
 
     PickVM::Runtime rt;
     PickShell::Shell sh(rt);
-    sh.setProgramsRoot(dir);
+    sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
     bool quit = false;
 
     sh.handleLine("RUN BROKEN", out, quit);
     CHECK_FALSE(quit);
     CHECK(out.str() == "Error on line 10: Unknown keyword 'MAT'\nCompilation failed.\n");
-    CHECK_FALSE(std::filesystem::exists(dir / "BROKEN.tbc"));
+    PickFS::FileSystem fs(fsDir);
+    CHECK_FALSE(fs.read("BP", "BROKEN_OBJ").has_value());
 }
 
 TEST_CASE("shell PROC requires program name") {
@@ -502,11 +520,11 @@ TEST_CASE("shell PROC malformed IF and unknown label errors") {
 }
 
 TEST_CASE("shell LIST-PROGRAMS empty directory") {
-    auto dir = uniqueTempDir();
-    std::filesystem::create_directories(dir);
+    auto fsDir = uniqueTempDir();
+    seedVocAndBp(fsDir);
     PickVM::Runtime rt;
     PickShell::Shell sh(rt);
-    sh.setProgramsRoot(dir);
+    sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
     bool quit = false;
     sh.handleLine("LIST-PROGRAMS", out, quit);
@@ -515,13 +533,14 @@ TEST_CASE("shell LIST-PROGRAMS empty directory") {
 }
 
 TEST_CASE("shell LIST-PROGRAMS lists logical names from tbc and bas") {
-    auto dir = uniqueTempDir();
-    std::filesystem::create_directories(dir);
-    std::ofstream(dir / "a.tbc") << "HALT\n";
-    std::ofstream(dir / "b.bas") << "10 END\n";
+    auto fsDir = uniqueTempDir();
+    seedVocAndBp(fsDir);
+    writeProgramObjectRecord(fsDir, "a", "HALT\n");
+    writeProgramSourceRecord(fsDir, "a", "10 END\n");
+    writeProgramSourceRecord(fsDir, "b", "10 END\n");
     PickVM::Runtime rt;
     PickShell::Shell sh(rt);
-    sh.setProgramsRoot(dir);
+    sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
     bool quit = false;
     sh.handleLine("LIST-PROGRAMS", out, quit);
@@ -530,13 +549,13 @@ TEST_CASE("shell LIST-PROGRAMS lists logical names from tbc and bas") {
 }
 
 TEST_CASE("shell LIST-PROGRAMS deduplicates bas and tbc with same basename") {
-    auto dir = uniqueTempDir();
-    std::filesystem::create_directories(dir);
-    std::ofstream(dir / "HELLO.bas") << "10 PRINT \"HI\"\n";
-    std::ofstream(dir / "HELLO.tbc") << "HALT\n";
+    auto fsDir = uniqueTempDir();
+    seedVocAndBp(fsDir);
+    writeProgramSourceRecord(fsDir, "HELLO", "10 PRINT \"HI\"\n");
+    writeProgramObjectRecord(fsDir, "HELLO", "HALT\n");
     PickVM::Runtime rt;
     PickShell::Shell sh(rt);
-    sh.setProgramsRoot(dir);
+    sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
     bool quit = false;
     sh.handleLine("LIST-PROGRAMS", out, quit);
@@ -545,15 +564,14 @@ TEST_CASE("shell LIST-PROGRAMS deduplicates bas and tbc with same basename") {
 }
 
 TEST_CASE("shell LIST-PROGRAMS matches extension case-insensitively and sorts names") {
-    auto dir = uniqueTempDir();
-    std::filesystem::create_directories(dir);
-    std::ofstream(dir / "zeta.TBC") << "HALT\n";
-    std::ofstream(dir / "alpha.BAS") << "10 END\n";
-    std::ofstream(dir / "ignore.tmp") << "x\n";
-    std::filesystem::create_directory(dir / "folder.tbc");
+    auto fsDir = uniqueTempDir();
+    seedVocAndBp(fsDir);
+    writeProgramObjectRecord(fsDir, "zeta", "HALT\n");
+    writeProgramSourceRecord(fsDir, "zeta", "10 END\n");
+    writeProgramSourceRecord(fsDir, "alpha", "10 END\n");
     PickVM::Runtime rt;
     PickShell::Shell sh(rt);
-    sh.setProgramsRoot(dir);
+    sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
     bool quit = false;
     sh.handleLine("LIST-PROGRAMS", out, quit);
@@ -564,12 +582,12 @@ TEST_CASE("shell LIST-PROGRAMS matches extension case-insensitively and sorts na
 TEST_CASE("shell LIST-PROGRAMS missing directory") {
     PickVM::Runtime rt;
     PickShell::Shell sh(rt);
-    sh.setProgramsRoot(uniqueTempDir());
+    sh.setFileSystemRoot(uniqueTempDir());
     std::ostringstream out;
     bool quit = false;
     sh.handleLine("LIST-PROGRAMS", out, quit);
     CHECK_FALSE(quit);
-    CHECK(out.str().find("Directory not found:") != std::string::npos);
+    CHECK(out.str() == "Programs:\n");
 }
 
 TEST_CASE("shell CREATE-FILE LIST-FILES DELETE-FILE") {
@@ -797,15 +815,12 @@ TEST_CASE("shell CLEAR-BREAKPOINT and CLEAR-BREAKPOINTS") {
 }
 
 TEST_CASE("shell RUN drops out-of-range breakpoints with message") {
-    auto dir = uniqueTempDir();
-    std::filesystem::create_directories(dir);
-    {
-        std::ofstream f(dir / "tiny.tbc");
-        f << "PUSH_INT 1\nHALT\n";
-    }
+    auto fsDir = uniqueTempDir();
+    seedVocAndBp(fsDir);
+    writeProgramObjectRecord(fsDir, "tiny", "PUSH_INT 1\nHALT\n");
     PickVM::Runtime rt;
     PickShell::Shell sh(rt);
-    sh.setProgramsRoot(dir);
+    sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
     bool quit = false;
     sh.handleLine("ASM", out, quit);
@@ -816,15 +831,12 @@ TEST_CASE("shell RUN drops out-of-range breakpoints with message") {
 }
 
 TEST_CASE("shell RUN TRACE ON includes HALT line") {
-    auto dir = uniqueTempDir();
-    std::filesystem::create_directories(dir);
-    {
-        std::ofstream f(dir / "t.tbc");
-        f << "PUSH_INT 7\nHALT\n";
-    }
+    auto fsDir = uniqueTempDir();
+    seedVocAndBp(fsDir);
+    writeProgramObjectRecord(fsDir, "t", "PUSH_INT 7\nHALT\n");
     PickVM::Runtime rt;
     PickShell::Shell sh(rt);
-    sh.setProgramsRoot(dir);
+    sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
     bool quit = false;
     sh.handleLine("ASM", out, quit);
@@ -835,15 +847,12 @@ TEST_CASE("shell RUN TRACE ON includes HALT line") {
 }
 
 TEST_CASE("shell DUMP-PROGRAM and DUMP-LABELS after RUN") {
-    auto dir = uniqueTempDir();
-    std::filesystem::create_directories(dir);
-    {
-        std::ofstream f(dir / "lbl.tbc");
-        f << "start: PUSH_INT 3\nHALT\n";
-    }
+    auto fsDir = uniqueTempDir();
+    seedVocAndBp(fsDir);
+    writeProgramObjectRecord(fsDir, "lbl", "start: PUSH_INT 3\nHALT\n");
     PickVM::Runtime rt;
     PickShell::Shell sh(rt);
-    sh.setProgramsRoot(dir);
+    sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
     bool quit = false;
     sh.handleLine("ASM", out, quit);
@@ -858,15 +867,12 @@ TEST_CASE("shell DUMP-PROGRAM and DUMP-LABELS after RUN") {
 }
 
 TEST_CASE("shell breakpoint hit then STEP then RUN completes") {
-    auto dir = uniqueTempDir();
-    std::filesystem::create_directories(dir);
-    {
-        std::ofstream f(dir / "bp.tbc");
-        f << "PUSH_INT 10\nPUSH_INT 20\nADD\nHALT\n";
-    }
+    auto fsDir = uniqueTempDir();
+    seedVocAndBp(fsDir);
+    writeProgramObjectRecord(fsDir, "bp", "PUSH_INT 10\nPUSH_INT 20\nADD\nHALT\n");
     PickVM::Runtime rt;
     PickShell::Shell sh(rt);
-    sh.setProgramsRoot(dir);
+    sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
     bool quit = false;
     sh.handleLine("ASM", out, quit);
@@ -885,15 +891,12 @@ TEST_CASE("shell breakpoint hit then STEP then RUN completes") {
 }
 
 TEST_CASE("shell BREAKPOINT index behavior is unchanged with source metadata present") {
-    auto dir = uniqueTempDir();
-    std::filesystem::create_directories(dir);
-    {
-        std::ofstream f(dir / "bp_meta.tbc");
-        f << "PUSH_INT 10\nPUSH_INT 20\nADD\nHALT\n";
-    }
+    auto fsDir = uniqueTempDir();
+    seedVocAndBp(fsDir);
+    writeProgramObjectRecord(fsDir, "bp_meta", "PUSH_INT 10\nPUSH_INT 20\nADD\nHALT\n");
     PickVM::Runtime rt;
     PickShell::Shell sh(rt);
-    sh.setProgramsRoot(dir);
+    sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
     bool quit = false;
     sh.handleLine("ASM", out, quit);
@@ -1000,12 +1003,12 @@ TEST_CASE("shell BASIC COMPILE and RUN require name when unnamed") {
 }
 
 TEST_CASE("shell BASIC SAVE with explicit name persists and autoloads") {
-    auto dir = uniqueTempDir();
-    std::filesystem::create_directories(dir);
+    auto fsDir = uniqueTempDir();
+    seedVocAndBp(fsDir);
 
     PickVM::Runtime rt;
     PickShell::Shell sh(rt);
-    sh.setProgramsRoot(dir);
+    sh.setFileSystemRoot(fsDir);
 
     std::ostringstream out;
     bool quit = false;
@@ -1015,7 +1018,8 @@ TEST_CASE("shell BASIC SAVE with explicit name persists and autoloads") {
     out.str("");
     sh.handleLine("SAVE HELLO", out, quit);
     CHECK(out.str().empty());
-    CHECK(std::filesystem::exists(dir / "HELLO"));
+    PickFS::FileSystem fs(fsDir);
+    CHECK(fs.read("BP", "HELLO").has_value());
 
     sh.handleLine("QUIT", out, quit);
     out.str("");
@@ -1025,12 +1029,12 @@ TEST_CASE("shell BASIC SAVE with explicit name persists and autoloads") {
 }
 
 TEST_CASE("shell BASIC SAVE writes source only and not bytecode") {
-    auto dir = uniqueTempDir();
-    std::filesystem::create_directories(dir);
+    auto fsDir = uniqueTempDir();
+    seedVocAndBp(fsDir);
 
     PickVM::Runtime rt;
     PickShell::Shell sh(rt);
-    sh.setProgramsRoot(dir);
+    sh.setFileSystemRoot(fsDir);
 
     std::ostringstream out;
     bool quit = false;
@@ -1040,17 +1044,18 @@ TEST_CASE("shell BASIC SAVE writes source only and not bytecode") {
     out.str("");
     sh.handleLine("SAVE HELLO", out, quit);
     CHECK(out.str().empty());
-    CHECK(std::filesystem::exists(dir / "HELLO"));
-    CHECK_FALSE(std::filesystem::exists(dir / "HELLO.tbc"));
+    PickFS::FileSystem fs(fsDir);
+    CHECK(fs.read("BP", "HELLO").has_value());
+    CHECK_FALSE(fs.read("BP", "HELLO_OBJ").has_value());
 }
 
 TEST_CASE("shell BASIC COMPILE writes bytecode and failed COMPILE preserves prior bytecode") {
-    auto dir = uniqueTempDir();
-    std::filesystem::create_directories(dir);
+    auto fsDir = uniqueTempDir();
+    seedVocAndBp(fsDir);
 
     PickVM::Runtime rt;
     PickShell::Shell sh(rt);
-    sh.setProgramsRoot(dir);
+    sh.setFileSystemRoot(fsDir);
 
     std::ostringstream out;
     bool quit = false;
@@ -1060,44 +1065,44 @@ TEST_CASE("shell BASIC COMPILE writes bytecode and failed COMPILE preserves prio
     out.str("");
     sh.handleLine("COMPILE", out, quit);
     CHECK(out.str() == "Compiled successfully.\nInstructions: 4\nLabels: 0\n");
-    CHECK(std::filesystem::exists(dir / "HELLO.tbc"));
-
-    const std::filesystem::path tbcPath = dir / "HELLO.tbc";
-    const auto before = std::filesystem::last_write_time(tbcPath);
+    PickFS::FileSystem fs(fsDir);
+    const std::optional<PickFS::Record> beforeObj = fs.read("BP", "HELLO_OBJ");
+    REQUIRE(beforeObj.has_value());
 
     sh.handleLine("20 MAT A = 1", out, quit);
     out.str("");
     sh.handleLine("COMPILE", out, quit);
     CHECK(out.str() == "Error on line 20: Unknown keyword 'MAT'\nCompilation failed.\n");
-    CHECK(std::filesystem::exists(tbcPath));
-    const auto after = std::filesystem::last_write_time(tbcPath);
-    CHECK(before == after);
+    const std::optional<PickFS::Record> afterObj = fs.read("BP", "HELLO_OBJ");
+    REQUIRE(afterObj.has_value());
+    CHECK(afterObj->value() == beforeObj->value());
 }
 
 TEST_CASE("shell BASIC named entry missing file starts empty and creates on SAVE only") {
-    auto dir = uniqueTempDir();
-    std::filesystem::create_directories(dir);
+    auto fsDir = uniqueTempDir();
+    seedVocAndBp(fsDir);
 
     PickVM::Runtime rt;
     PickShell::Shell sh(rt);
-    sh.setProgramsRoot(dir);
+    sh.setFileSystemRoot(fsDir);
 
     std::ostringstream out;
     bool quit = false;
 
     sh.handleLine("BASIC HELLO", out, quit);
-    CHECK_FALSE(std::filesystem::exists(dir / "HELLO"));
+    PickFS::FileSystem fs(fsDir);
+    CHECK_FALSE(fs.read("BP", "HELLO").has_value());
     out.str("");
 
     sh.handleLine("LIST", out, quit);
     CHECK(out.str().empty());
-    CHECK_FALSE(std::filesystem::exists(dir / "HELLO"));
+    CHECK_FALSE(fs.read("BP", "HELLO").has_value());
 
     sh.handleLine("10 PRINT \"HELLO\"", out, quit);
     out.str("");
     sh.handleLine("SAVE", out, quit);
     CHECK(out.str().empty());
-    CHECK(std::filesystem::exists(dir / "HELLO"));
+    CHECK(fs.read("BP", "HELLO").has_value());
 }
 
 TEST_CASE("shell BASIC EDIT requires existing line") {
@@ -1612,15 +1617,12 @@ TEST_CASE("shell BASIC debugger supports breakpoint and CONT by BASIC line") {
 }
 
 TEST_CASE("shell END exits vm debugger context") {
-    auto dir = uniqueTempDir();
-    std::filesystem::create_directories(dir);
-    {
-        std::ofstream f(dir / "bp_end.tbc");
-        f << "PUSH_INT 10\nPUSH_INT 20\nADD\nHALT\n";
-    }
+    auto fsDir = uniqueTempDir();
+    seedVocAndBp(fsDir);
+    writeProgramObjectRecord(fsDir, "bp_end", "PUSH_INT 10\nPUSH_INT 20\nADD\nHALT\n");
     PickVM::Runtime rt;
     PickShell::Shell sh(rt);
-    sh.setProgramsRoot(dir);
+    sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
     bool quit = false;
     sh.handleLine("ASM", out, quit);

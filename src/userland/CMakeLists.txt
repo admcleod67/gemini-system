@@ -27,6 +27,8 @@ add_library(gemini-tcl
         tcl/Shell.h
         tcl/ShellSession.cpp
         tcl/ShellSession.h
+        tcl/VocResolver.cpp
+        tcl/VocResolver.h
         tcl/TclEnvironment.cpp
         tcl/TclEnvironment.h
 )

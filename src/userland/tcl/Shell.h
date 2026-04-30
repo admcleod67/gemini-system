@@ -99,20 +99,13 @@ namespace PickShell {
         void cmdRun(const std::vector<std::string> &tokens, std::ostream &out);
         void cmdProc(const std::vector<std::string> &tokens, std::ostream &out);
         void executeProcTclCommand(const std::string &line, std::ostream &out);
-        bool resolveRunProgramPaths(const std::string &programName,
-                                    std::filesystem::path &sourcePath,
-                                    std::filesystem::path &bytecodePath,
-                                    std::ostream &out) const;
-        bool ensureBytecodeExistsForRun(const std::string &programName,
-                                        const std::filesystem::path &sourcePath,
-                                        const std::filesystem::path &bytecodePath,
-                                        std::ostream &out);
-        static bool loadBasicSourceProgram(const std::filesystem::path &sourcePath,
-                                           const std::string &programName,
-                                           BasicProgram &program);
-        static bool writeCompiledBytecode(const std::filesystem::path &bytecodePath,
-                                          const BasicCompileResult &compile,
-                                          std::ostream &out);
+        static std::string programObjectRecordKey(const std::string &recordKey);
+        std::optional<std::string> readProgramRecord(const BasicShell::ProgramLocation &location, bool objectRecord);
+        bool writeProgramRecord(const BasicShell::ProgramLocation &location,
+                                bool objectRecord,
+                                const std::string &payload,
+                                std::string &error);
+        bool ensureProgramObjectExistsForRun(const std::string &programName, std::ostream &out);
 
         void cmdHelp(std::ostream &out);
 

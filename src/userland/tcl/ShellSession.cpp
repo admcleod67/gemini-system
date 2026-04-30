@@ -5,7 +5,7 @@
 
 namespace PickShell {
     ShellSession::ShellSession(PickVM::Runtime &runtime)
-        : runtime_(runtime), fileSystem_(filesystemRoot_) {
+        : runtime_(runtime), fileSystem_(filesystemRoot_), vocResolver_(fileSystem_) {
     }
 
     void ShellSession::setProgramsRoot(std::filesystem::path root) {
@@ -15,6 +15,7 @@ namespace PickShell {
     void ShellSession::setFileSystemRoot(std::filesystem::path root) {
         filesystemRoot_ = std::move(root);
         fileSystem_.setRoot(filesystemRoot_);
+        vocResolver_.invalidate();
     }
 
     bool ShellSession::programImageLoaded() const {

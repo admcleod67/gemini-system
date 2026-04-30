@@ -23,13 +23,6 @@ namespace PickShell {
         // Set by executeCompiledBasicProgram while a program is running.
         // Accessed from the SIGINT handler, so must be an atomic pointer.
         std::atomic<PickVM::Runtime *> g_interruptRuntime{nullptr};
-
-        std::string lowerAscii(std::string text) {
-            std::transform(text.begin(), text.end(), text.begin(), [](const unsigned char c) {
-                return static_cast<char>(std::tolower(c));
-            });
-            return text;
-        }
     } // namespace
 
     Shell::Shell(PickVM::Runtime &runtime)
@@ -57,7 +50,17 @@ namespace PickShell {
         session_.runtime_.setWriteRecordCallback([this](const std::string &fileName, const std::string &recordName, const std::string &value) {
             session_.fileSystem_.write(fileName, PickFS::Record(recordName, value));
         });
-        basicShell_.setProgramsRoot(session_.programsRoot());
+        basicShell_.setResolveProgramLocationFn([this](const std::string &programName) {
+            const VocResolver::ProgramLocation resolved = session_.vocResolver_.resolveProgramLocation(programName);
+            return BasicShell::ProgramLocation{resolved.fileName, resolved.recordKey};
+        });
+        basicShell_.setReadRecordFn([this](const BasicShell::ProgramLocation &location, const bool objectRecord) {
+            return readProgramRecord(location, objectRecord);
+        });
+        basicShell_.setWriteRecordFn(
+            [this](const BasicShell::ProgramLocation &location, const bool objectRecord, const std::string &payload, std::string &error) {
+                return writeProgramRecord(location, objectRecord, payload, error);
+            });
         basicShell_.setExecuteProgramFn(
             [this](const std::vector<PickVM::Instruction> &program,
                    const std::vector<int> &sourceLinePerInstr,
@@ -72,7 +75,6 @@ namespace PickShell {
 
     void Shell::setProgramsRoot(std::filesystem::path root) {
         session_.setProgramsRoot(std::move(root));
-        basicShell_.setProgramsRoot(session_.programsRoot());
     }
 
     void Shell::setFileSystemRoot(std::filesystem::path root) {
@@ -596,18 +598,29 @@ namespace PickShell {
         }
 
         const std::string &programName = tokens[1];
-        std::filesystem::path sourcePath;
-        std::filesystem::path bytecodePath;
-        if (!resolveRunProgramPaths(programName, sourcePath, bytecodePath, out)) {
+        if (programName.empty()) {
+            out << "RUN requires a program name\n";
             return;
         }
-        if (!ensureBytecodeExistsForRun(programName, sourcePath, bytecodePath, out)) {
+        if (programName.find('.') != std::string::npos) {
+            out << "RUN expects a program name without extension\n";
+            return;
+        }
+        if (!ensureProgramObjectExistsForRun(programName, out)) {
             return;
         }
 
         try {
+            const VocResolver::ProgramLocation resolved = session_.vocResolver_.resolveProgramLocation(programName);
+            const BasicShell::ProgramLocation location{resolved.fileName, resolved.recordKey};
+            const std::optional<std::string> objectText = readProgramRecord(location, true);
+            if (!objectText.has_value()) {
+                out << "Error: Cannot open bytecode file for program: " << programName << "\n";
+                return;
+            }
             PickVM::Parser parser;
-            PickVM::LoadedBytecode loaded = parser.parseFile(bytecodePath.string());
+            std::istringstream bytecodeStream(*objectText);
+            PickVM::LoadedBytecode loaded = parser.parse(bytecodeStream);
             session_.pruneBreakpointsForProgram(loaded.program.size(), out);
             session_.lastLoaded_ = std::move(loaded);
             session_.runtime_.setOutputStream(&out);
@@ -669,35 +682,67 @@ namespace PickShell {
         handleTclCommand(tokens, quit, out);
     }
 
-    bool Shell::resolveRunProgramPaths(const std::string &programName,
-                                       std::filesystem::path &sourcePath,
-                                       std::filesystem::path &bytecodePath,
-                                       std::ostream &out) const {
-        if (programName.empty()) {
-            out << "RUN requires a program name\n";
-            return false;
-        }
-        if (programName.find('.') != std::string::npos) {
-            out << "RUN expects a program name without extension\n";
-            return false;
-        }
-        const std::filesystem::path namePath(programName);
-        sourcePath = session_.programsRoot_ / namePath;
-        bytecodePath = session_.programsRoot_ / (programName + ".tbc");
-        return true;
+    std::string Shell::programObjectRecordKey(const std::string &recordKey) {
+        return recordKey + "_OBJ";
     }
 
-    bool Shell::loadBasicSourceProgram(const std::filesystem::path &sourcePath,
-                                       const std::string &programName,
-                                       BasicProgram &program) {
-        std::ifstream file(sourcePath);
-        if (!file) {
+    std::optional<std::string> Shell::readProgramRecord(const BasicShell::ProgramLocation &location,
+                                                        const bool objectRecord) {
+        const std::string recordKey = objectRecord ? programObjectRecordKey(location.recordKey) : location.recordKey;
+        try {
+            const std::optional<PickFS::Record> rec = session_.fileSystem_.read(location.fileName, recordKey);
+            if (!rec.has_value()) {
+                return std::nullopt;
+            }
+            return rec->value();
+        } catch (const PickFS::FileSystemError &) {
+            return std::nullopt;
+        }
+    }
+
+    bool Shell::writeProgramRecord(const BasicShell::ProgramLocation &location,
+                                   const bool objectRecord,
+                                   const std::string &payload,
+                                   std::string &error) {
+        const std::string recordKey = objectRecord ? programObjectRecordKey(location.recordKey) : location.recordKey;
+        try {
+            try {
+                (void) session_.fileSystem_.openFile(location.fileName);
+            } catch (const PickFS::FileSystemError &openError) {
+                if (std::string(openError.what()).find("File not found: ") != 0) {
+                    throw;
+                }
+                session_.fileSystem_.createFile(location.fileName);
+            }
+            session_.fileSystem_.write(location.fileName, PickFS::Record(recordKey, payload));
+            if (location.fileName == "VOC") {
+                session_.vocResolver_.invalidate();
+            }
+            return true;
+        } catch (const std::exception &e) {
+            error = e.what();
             return false;
         }
+    }
+
+    bool Shell::ensureProgramObjectExistsForRun(const std::string &programName, std::ostream &out) {
+        const VocResolver::ProgramLocation resolved = session_.vocResolver_.resolveProgramLocation(programName);
+        const BasicShell::ProgramLocation location{resolved.fileName, resolved.recordKey};
+        if (readProgramRecord(location, true).has_value()) {
+            return true;
+        }
+
+        const std::optional<std::string> sourceText = readProgramRecord(location, false);
+        if (!sourceText.has_value()) {
+            out << "Error: Cannot open bytecode file for program: " << programName << "\n";
+            return false;
+        }
+
+        BasicProgram program;
         program.setName(programName);
-        program.clearLines();
+        std::istringstream in(*sourceText);
         std::string line;
-        while (std::getline(file, line)) {
+        while (std::getline(in, line)) {
             std::istringstream iss(line);
             std::string lineNumberToken;
             if (!(iss >> lineNumberToken)) {
@@ -719,44 +764,6 @@ namespace PickShell {
             }
             program.setLine(lineNumber, text);
         }
-        return true;
-    }
-
-    bool Shell::writeCompiledBytecode(const std::filesystem::path &bytecodePath,
-                                      const BasicCompileResult &compile,
-                                      std::ostream &out) {
-        std::error_code ec;
-        std::filesystem::create_directories(bytecodePath.parent_path(), ec);
-        if (ec) {
-            out << "Error: unable to create programs directory\n";
-            return false;
-        }
-        std::ofstream bytecodeFile(bytecodePath, std::ios::trunc);
-        if (!bytecodeFile) {
-            out << "Error: unable to save BASIC object file\n";
-            return false;
-        }
-        bytecodeFile << PickVM::serializeBytecodeText(compile.program, compile.sourceLinePerInstr);
-        if (!bytecodeFile) {
-            out << "Error: unable to save BASIC object file\n";
-            return false;
-        }
-        return true;
-    }
-
-    bool Shell::ensureBytecodeExistsForRun(const std::string &programName,
-                                           const std::filesystem::path &sourcePath,
-                                           const std::filesystem::path &bytecodePath,
-                                           std::ostream &out) {
-        std::error_code ec;
-        if (std::filesystem::exists(bytecodePath, ec) && !ec) {
-            return true;
-        }
-        BasicProgram program;
-        if (!loadBasicSourceProgram(sourcePath, programName, program)) {
-            out << "Error: Cannot open bytecode file: " << bytecodePath.string() << "\n";
-            return false;
-        }
 
         BasicCompiler compiler;
         const BasicCompileResult compile = compiler.compile(program);
@@ -767,7 +774,16 @@ namespace PickShell {
             out << "Compilation failed.\n";
             return false;
         }
-        return writeCompiledBytecode(bytecodePath, compile, out);
+
+        std::string error;
+        if (!writeProgramRecord(location,
+                                true,
+                                PickVM::serializeBytecodeText(compile.program, compile.sourceLinePerInstr),
+                                error)) {
+            out << "Error: " << error << "\n";
+            return false;
+        }
+        return true;
     }
 
     void Shell::cmdSet(const std::vector<std::string> &tokens, std::ostream &out) {
@@ -836,9 +852,9 @@ namespace PickShell {
         out << "  WHO\n";
         out << "  BASIC [name]   enter BASIC editor mode\n";
         out << "  ASM [name]     enter assembler debugger mode (optional program name)\n";
-        out << "  RUN <name>     load and run program name (auto-resolves .tbc, auto-compiles BASIC source if needed)\n";
+        out << "  RUN <name>     resolve via VOC and run object record (auto-compiles source if needed)\n";
         out << "  PROC <name> [args...]   run PROC script from programs root (<name>.proc)\n";
-        out << "  LIST-PROGRAMS\n";
+        out << "  LIST-PROGRAMS  list VOC-resolved program records\n";
         out << "  CREATE-FILE <name>\n";
         out << "  DELETE-FILE <name>\n";
         out << "  LIST-FILES\n";
@@ -866,24 +882,18 @@ namespace PickShell {
     }
 
     void Shell::cmdListPrograms(std::ostream &out) {
-        std::error_code ec;
-        if (!std::filesystem::exists(session_.programsRoot_, ec)) {
-            out << "Directory not found: " << session_.programsRoot_.string() << "\n";
-            return;
-        }
-
         std::set<std::string> programNames;
-        for (const auto &entry: std::filesystem::directory_iterator(session_.programsRoot_)) {
-            if (!entry.is_regular_file()) {
-                continue;
-            }
-            const std::string ext = lowerAscii(entry.path().extension().string());
-            if (ext != ".bas" && ext != ".tbc") {
-                continue;
-            }
-            const std::string logicalName = entry.path().stem().string();
-            if (!logicalName.empty()) {
-                programNames.insert(logicalName);
+        const std::vector<std::string> files = session_.vocResolver_.listProgramFiles();
+        for (const std::string &fileName: files) {
+            try {
+                const std::vector<std::string> records = session_.fileSystem_.listRecordNames(fileName);
+                for (const std::string &recordName: records) {
+                    if (recordName.size() >= 4 && recordName.substr(recordName.size() - 4) == "_OBJ") {
+                        continue;
+                    }
+                    programNames.insert(recordName);
+                }
+            } catch (const PickFS::FileSystemError &) {
             }
         }
 
@@ -900,6 +910,9 @@ namespace PickShell {
         }
         try {
             session_.fileSystem_.createFile(tokens[1]);
+            if (tokens[1] == "VOC") {
+                session_.vocResolver_.invalidate();
+            }
         } catch (const std::exception &e) {
             out << "Error: " << e.what() << "\n";
         }
@@ -912,6 +925,9 @@ namespace PickShell {
         }
         try {
             session_.fileSystem_.deleteFile(tokens[1]);
+            if (tokens[1] == "VOC") {
+                session_.vocResolver_.invalidate();
+            }
         } catch (const std::exception &e) {
             out << "Error: " << e.what() << "\n";
         }
@@ -988,6 +1004,9 @@ namespace PickShell {
         }
         try {
             session_.fileSystem_.write(tokens[1], PickFS::Record(tokens[2], std::move(value)));
+            if (tokens[1] == "VOC") {
+                session_.vocResolver_.invalidate();
+            }
         } catch (const std::exception &e) {
             out << "Error: " << e.what() << "\n";
         }

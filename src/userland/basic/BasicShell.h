@@ -10,7 +10,6 @@
 #include "BasicCompiler.h"
 #include "BasicProgram.h"
 
-#include <filesystem>
 #include <functional>
 #include <optional>
 #include <ostream>
@@ -28,10 +27,21 @@ namespace PickShell {
                                                     const std::vector<int> &,
                                                     const BasicProgram &,
                                                     std::ostream &)>;
+        struct ProgramLocation {
+            std::string fileName;
+            std::string recordKey;
+        };
+        using ResolveProgramLocationFn = std::function<ProgramLocation(const std::string &)>;
+        using ReadRecordFn = std::function<std::optional<std::string>(const ProgramLocation &, bool objectRecord)>;
+        using WriteRecordFn = std::function<bool(const ProgramLocation &, bool objectRecord, const std::string &, std::string &)>;
 
         BasicShell();
 
-        void setProgramsRoot(std::filesystem::path programsRoot);
+        void setResolveProgramLocationFn(ResolveProgramLocationFn resolveProgramLocationFn);
+
+        void setReadRecordFn(ReadRecordFn readRecordFn);
+
+        void setWriteRecordFn(WriteRecordFn writeRecordFn);
 
         void setExecuteProgramFn(ExecuteProgramFn executeProgramFn);
 
@@ -55,12 +65,14 @@ namespace PickShell {
             std::string text;
         };
 
-        std::filesystem::path programsRoot_{"programs"};
         Mode mode_{Mode::Inactive};
         BasicCompiler compiler_;
         BasicProgram program_;
         std::optional<EditorState> editorState_;
         ExecuteProgramFn executeProgramFn_;
+        ResolveProgramLocationFn resolveProgramLocationFn_;
+        ReadRecordFn readRecordFn_;
+        WriteRecordFn writeRecordFn_;
         CommandTable basicCommands_;
         CommandTable editorCommands_;
 

@@ -3,7 +3,6 @@
 #include "BytecodeText.h"
 
 #include <cctype>
-#include <fstream>
 #include <sstream>
 #include <utility>
 
@@ -12,8 +11,16 @@ namespace PickShell {
         registerCommands();
     }
 
-    void BasicShell::setProgramsRoot(std::filesystem::path programsRoot) {
-        programsRoot_ = std::move(programsRoot);
+    void BasicShell::setResolveProgramLocationFn(ResolveProgramLocationFn resolveProgramLocationFn) {
+        resolveProgramLocationFn_ = std::move(resolveProgramLocationFn);
+    }
+
+    void BasicShell::setReadRecordFn(ReadRecordFn readRecordFn) {
+        readRecordFn_ = std::move(readRecordFn);
+    }
+
+    void BasicShell::setWriteRecordFn(WriteRecordFn writeRecordFn) {
+        writeRecordFn_ = std::move(writeRecordFn);
     }
 
     void BasicShell::setExecuteProgramFn(ExecuteProgramFn executeProgramFn) {
@@ -356,23 +363,18 @@ namespace PickShell {
 
     void BasicShell::loadProgramIfPresent(std::ostream &out) {
         (void) out;
-        if (!program_.name() || program_.name()->empty()) {
+        if (!program_.name() || program_.name()->empty() || !resolveProgramLocationFn_ || !readRecordFn_) {
             return;
         }
-        const std::filesystem::path filePath = programsRoot_ / *program_.name();
-        std::error_code ec;
-        if (!std::filesystem::exists(filePath, ec)) {
+        const ProgramLocation location = resolveProgramLocationFn_(*program_.name());
+        const std::optional<std::string> source = readRecordFn_(location, false);
+        if (!source.has_value()) {
             return;
         }
-
-        std::ifstream file(filePath);
-        if (!file) {
-            return;
-        }
-
         program_.clearLines();
+        std::istringstream in(*source);
         std::string line;
-        while (std::getline(file, line)) {
+        while (std::getline(in, line)) {
             std::istringstream iss(line);
             Tokens tokens;
             std::string tok;
@@ -391,45 +393,38 @@ namespace PickShell {
     }
 
     void BasicShell::saveProgram(const std::string &name, std::ostream &out) {
-        std::error_code ec;
-        std::filesystem::create_directories(programsRoot_, ec);
-        if (ec) {
-            out << "Error: unable to create programs directory\n";
+        if (!resolveProgramLocationFn_ || !writeRecordFn_) {
+            out << "Error: BASIC storage not configured\n";
             return;
+        }
+        std::ostringstream source;
+        for (const auto &[lineNumber, text]: program_.lines()) {
+            source << lineNumber;
+            if (!text.empty()) {
+                source << ' ' << text;
+            }
+            source << '\n';
         }
 
-        const std::filesystem::path filePath = programsRoot_ / name;
-        std::ofstream file(filePath, std::ios::trunc);
-        if (!file) {
-            out << "Error: unable to save BASIC program file\n";
-            return;
-        }
-        for (const auto &[lineNumber, text]: program_.lines()) {
-            file << lineNumber;
-            if (!text.empty()) {
-                file << ' ' << text;
-            }
-            file << '\n';
+        std::string error;
+        const ProgramLocation location = resolveProgramLocationFn_(name);
+        if (!writeRecordFn_(location, false, source.str(), error)) {
+            out << "Error: " << error << "\n";
         }
     }
 
     bool BasicShell::saveObjectCode(const std::string &name, const BasicCompileResult &compile, std::ostream &out) {
-        std::error_code ec;
-        std::filesystem::create_directories(programsRoot_, ec);
-        if (ec) {
-            out << "Error: unable to create programs directory\n";
+        if (!resolveProgramLocationFn_ || !writeRecordFn_) {
+            out << "Error: BASIC storage not configured\n";
             return false;
         }
-
-        const std::filesystem::path bytecodePath = programsRoot_ / (name + ".tbc");
-        std::ofstream bytecodeFile(bytecodePath, std::ios::trunc);
-        if (!bytecodeFile) {
-            out << "Error: unable to save BASIC object file\n";
-            return false;
-        }
-        bytecodeFile << PickVM::serializeBytecodeText(compile.program, compile.sourceLinePerInstr);
-        if (!bytecodeFile) {
-            out << "Error: unable to save BASIC object file\n";
+        std::string error;
+        const ProgramLocation location = resolveProgramLocationFn_(name);
+        if (!writeRecordFn_(location,
+                            true,
+                            PickVM::serializeBytecodeText(compile.program, compile.sourceLinePerInstr),
+                            error)) {
+            out << "Error: " << error << "\n";
             return false;
         }
         return true;

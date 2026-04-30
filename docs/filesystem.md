@@ -59,6 +59,20 @@ Extensions are backend-only and are not exposed to Tcl:
 
 This is forward-compatible with future import into true Pick storage by mapping newline-separated attributes to attribute marks (`0xFE`) without transformation.
 
+## Minimal VOC support
+
+Program-name resolution for `BASIC`, `RUN`, and `LIST-PROGRAMS` is VOC-backed:
+
+- Logical file `VOC` is read as `.item` records.
+- Supported entry types:
+  - `F`: attribute 2 = file name, attribute 3 retained as file identifier/path metadata.
+  - `Q`: attribute 2 = synonym target key (recursive, cycle-protected).
+  - `V`: attribute 2 = verb name (loaded for future verb work).
+- Lookup is case-insensitive.
+- Program location fallback when no explicit entry resolves: `(BP, <program-name>)`.
+
+For this milestone, object code records are stored in the same resolved Pick file as source using key suffix `_OBJ`.
+
 ## Name validation rules
 
 File names and record names use the same validation:

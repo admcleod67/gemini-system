@@ -15,31 +15,23 @@ Input is tokenized by whitespace (filenames with spaces are not supported by the
 - BASIC mode command semantics are documented in [BASIC shell](basic-shell.md); language/compiler semantics are documented in [BASIC language](basic-language.md).
 - ASM debugger mode command semantics are documented in [Assembler shell](assembler-shell.md).
 
-## Programs directory
+## Program resolution (VOC-backed)
 
-**`RUN <programName>`** resolves host artifacts under the **programs root** (default directory name **`programs`**, relative to the process current working directory unless changed in code via **`Shell::setProgramsRoot`**): source at `<programName>` and object code at `<programName>.tbc`.
+`BASIC`, `RUN`, and `LIST-PROGRAMS` resolve program names through logical file `VOC` (Pick records), not by scanning host program-path directories.
 
-**`PROC <programName> [args...]`** resolves source at `<programName>.proc` in the same root and executes it in the TCL host as a non-VM, line-oriented PROC interpreter.
+- Supported VOC entry types for this milestone: `F`, `Q`, `V`.
+- Resolution for program names follows case-insensitive lookup with Q-chain recursion and BP fallback.
+- Resolved location is a `(file, key)` pair used for record I/O via filesystem API.
+- Source record key = `<programName>`.
+- Object record key = `<programName>_OBJ` in the same resolved Pick file.
 
-**`LIST-PROGRAMS`** lists logical program names discovered from `.bas` and `.tbc` files in that root (case-insensitive extension match). It strips extensions and deduplicates names.
+`PROC` currently remains host-path based (`<programName>.proc` under programs root).
 
 ## Filesystem directory
 
 Filesystem commands use a separate root (default directory name **`filesystem`**, relative to the process current working directory unless changed in code via **`Shell::setFileSystemRoot`**).
 
-Each Pick file is stored as JSON:
-
-```json
-{
-  "name": "FILENAME",
-  "records": {
-    "KEY1": "raw record string",
-    "KEY2": "another record"
-  }
-}
-```
-
-For the full current behavior (validation rules, error modes, ordering, and persistence details), see [File system](filesystem.md).
+For the full current behavior (validation rules, storage model, VOC behavior, error modes, ordering, and persistence details), see [File system](filesystem.md).
 
 ## TCL commands
 
@@ -56,10 +48,10 @@ For the full current behavior (validation rules, error modes, ordering, and pers
 | **`UNSET`** *name* | Remove *name*. If it was not set: **`No such variable`**. |
 | **`BASIC`** [*name*] | Enter BASIC mode. See [BASIC shell](basic-shell.md) for BASIC/ED commands and persistence rules. |
 | **`ASM`** [*programName*] | Enter ASM mode (instruction-level debugger shell). Optional name immediately executes `RUN <programName>` after entering ASM. See [Assembler shell](assembler-shell.md). |
-| **`RUN`** *programName* | Run by program name only (no extension). Tcl resolves host bytecode as `<programName>.tbc`, prunes invalid breakpoints (see below), loads VM state, and executes. If `<programName>.tbc` is missing, Tcl attempts to compile BASIC source `<programName>` and writes `<programName>.tbc` before running. |
+| **`RUN`** *programName* | Run by program name only (no extension). Tcl resolves `(file,key)` via VOC, prunes invalid breakpoints, and executes object record `<key>_OBJ`. If object is missing, Tcl compiles source record `<key>` and writes `<key>_OBJ` in the same resolved file before running. |
 | **`PROC`** *programName* [*args...*] | Execute `<programName>.proc` from programs root using a minimal two-pass PROC interpreter (labels + line execution). Supports `DISPLAY`, `INPUT`, `GO`, `IF A = B THEN GO label`, assignment `NAME = value`, `TCL ...`, and `END`. Positional args map to `P1`, `P2`, ... |
-| **`LIST-PROGRAMS`** | List logical program names under the programs root by discovering `.bas`/`.tbc` files (case-insensitive), stripping extensions, deduplicating, and sorting. |
-| **`CREATE-FILE`** *name* | Create a Pick file in the filesystem root. Creates JSON with matching `name` and empty `records`. |
+| **`LIST-PROGRAMS`** | List logical program names from VOC-resolved program files (records in those files, excluding `_OBJ` records), deduplicated and sorted. |
+| **`CREATE-FILE`** *name* | Create a Pick file in the filesystem root. Creates logical file directory. |
 | **`DELETE-FILE`** *name* | Delete a Pick file from the filesystem root. |
 | **`LIST-FILES`** | List Pick file names from the filesystem root (sorted). If none: **`No files`**. Takes no arguments. |
 | **`LIST`** *file* | List record names (keys only) for *file*, sorted, under a **`Records:`** header. If none: **`No records`**. |
@@ -102,7 +94,7 @@ Instruction-level debugger controls (`STEP`, `CONT`, `TRACE`, breakpoint managem
 
 ## Errors
 
-Parse/runtime failures during **`RUN`** print **`Error:`** followed by the exception message. Filesystem command failures also print **`Error:`** with a specific reason (for example missing file or invalid JSON schema). The VM’s output stream is cleared back to default after **`RUN`** attempts.
+Parse/runtime failures during **`RUN`** print **`Error:`** followed by the exception message. Filesystem command failures also print **`Error:`** with a specific reason (for example missing file or invalid record/file name). The VM’s output stream is cleared back to default after **`RUN`** attempts.
 
 ## See also
 
