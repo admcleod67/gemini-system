@@ -1,6 +1,7 @@
 #include "Shell.h"
 
 #include "BytecodeText.h"
+#include "LineRecordEditor.h"
 
 #include <pick_system/version.hpp>
 
@@ -182,6 +183,7 @@ namespace PickShell {
             }
             basicShell_.enter(programName, out);
         };
+        tclCommands_["EDIT"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdEdit(tokens, out); };
     }
 
     void Shell::dispatch(const std::vector<std::string> &tokens, bool &quit, std::ostream &out) {
@@ -862,6 +864,7 @@ namespace PickShell {
         out << "  LIST <file>    list record names for a file\n";
         out << "  READ <file> <record-name>\n";
         out << "  WRITE <file> <record-name> <value...>\n";
+        out << "  EDIT <file> <record> | EDIT <programName>   line editor (ED>); SAVE (FI), QUIT (Q)\n";
         out << "  DUMP-STACK\n";
         out << "  VERSION\n";
         out << "  QUIT\n";
@@ -1011,5 +1014,60 @@ namespace PickShell {
         } catch (const std::exception &e) {
             out << "Error: " << e.what() << "\n";
         }
+    }
+
+    void Shell::cmdEdit(const std::vector<std::string> &tokens, std::ostream &out) {
+        if (tokens.size() < 2) {
+            out << "EDIT requires a program name or a file and record name\n";
+            return;
+        }
+        if (tokens.size() > 3) {
+            out << "EDIT takes a program name or a file and record name\n";
+            return;
+        }
+
+        std::string fileName;
+        std::string recordKey;
+        if (tokens.size() == 2) {
+            const std::string &programName = tokens[1];
+            if (programName.empty() || programName.find('.') != std::string::npos) {
+                out << "EDIT expects a program name without extension\n";
+                return;
+            }
+            const VocResolver::ProgramLocation resolved = session_.vocResolver_.resolveProgramLocation(programName);
+            fileName = resolved.fileName;
+            recordKey = resolved.recordKey;
+        } else {
+            fileName = tokens[1];
+            recordKey = tokens[2];
+        }
+
+        std::vector<std::string> lines;
+        try {
+            const std::optional<PickFS::Record> rec = session_.fileSystem_.read(fileName, recordKey);
+            if (rec.has_value()) {
+                std::istringstream in(rec->value());
+                std::string line;
+                while (std::getline(in, line)) {
+                    lines.push_back(std::move(line));
+                }
+            }
+        } catch (const std::exception &e) {
+            out << "Error: " << e.what() << '\n';
+            return;
+        }
+
+        std::istream &in = inputStream_ ? *inputStream_ : std::cin;
+        LineRecordEditor editor(
+            session_.fileSystem_,
+            std::move(fileName),
+            std::move(recordKey),
+            std::move(lines),
+            [this](const std::string &writtenFile) {
+                if (writtenFile == "VOC") {
+                    session_.vocResolver_.invalidate();
+                }
+            });
+        editor.run(in, out);
     }
 } // namespace PickShell

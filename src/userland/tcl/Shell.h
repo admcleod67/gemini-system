@@ -128,6 +128,8 @@ namespace PickShell {
 
         void cmdWrite(const std::vector<std::string> &tokens, std::ostream &out);
 
+        void cmdEdit(const std::vector<std::string> &tokens, std::ostream &out);
+
         void cmdSet(const std::vector<std::string> &tokens, std::ostream &out);
 
         void cmdGet(const std::vector<std::string> &tokens, std::ostream &out);

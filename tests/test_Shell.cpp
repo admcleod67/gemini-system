@@ -1722,3 +1722,153 @@ TEST_CASE("shell BASIC RUN executes OPEN ELSE inline statement on missing file")
     sh.handleLine("RUN", out, quit);
     CHECK(out.str() == "MISS\nAFTER\n");
 }
+
+TEST_CASE("shell EDIT file record INSERT SAVE QUIT then READ") {
+    auto fsDir = uniqueTempDir();
+    std::filesystem::create_directories(fsDir);
+
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(fsDir);
+
+    std::istringstream in("I\nhello world\n.\nFI\nQ\n");
+    sh.setInputStream(&in);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("CREATE-FILE BP", out, quit);
+    out.str("");
+
+    sh.handleLine("EDIT BP MYREC", out, quit);
+    CHECK(out.str().find("ED>") != std::string::npos);
+
+    out.str("");
+    sh.handleLine("READ BP MYREC", out, quit);
+    CHECK(out.str() == "hello world\n");
+}
+
+TEST_CASE("shell EDIT uses aliases and case-insensitive LIST") {
+    auto fsDir = uniqueTempDir();
+    std::filesystem::create_directories(fsDir);
+
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(fsDir);
+
+    std::istringstream in("I\nonly\n.\nL\nlist 1\nFI\nQ\n");
+    sh.setInputStream(&in);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("CREATE-FILE BP", out, quit);
+    out.str("");
+
+    sh.handleLine("EDIT BP Z", out, quit);
+
+    out.str("");
+    sh.handleLine("READ BP Z", out, quit);
+    CHECK(out.str() == "only\n");
+}
+
+TEST_CASE("shell EDIT REPLACE multiline and DELETE") {
+    auto fsDir = uniqueTempDir();
+    std::filesystem::create_directories(fsDir);
+
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(fsDir);
+
+    PickFS::FileSystem fsInit(fsDir);
+    fsInit.createFile("BP");
+    writeRecord(fsDir, "BP", "RREC", "a\nb\nc");
+
+    std::istringstream in("REPLACE 2\nx\ny\n.\nDELETE 3\nFI\nQ\n");
+    sh.setInputStream(&in);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("EDIT BP RREC", out, quit);
+
+    out.str("");
+    sh.handleLine("READ BP RREC", out, quit);
+    CHECK(out.str() == "a\nx\nc\n");
+}
+
+TEST_CASE("shell EDIT program name shorthand resolves VOC source record") {
+    auto fsDir = uniqueTempDir();
+    std::filesystem::create_directories(fsDir);
+
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(fsDir);
+    seedVocAndBp(fsDir);
+    writeProgramSourceRecord(fsDir, "HELLO", "10 PRINT 1\n");
+
+    std::istringstream in("I\n20 PRINT 2\n.\nFI\nQ\n");
+    sh.setInputStream(&in);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("EDIT HELLO", out, quit);
+
+    out.str("");
+    sh.handleLine("READ BP HELLO", out, quit);
+    CHECK(out.str() == "10 PRINT 1\n20 PRINT 2\n");
+}
+
+TEST_CASE("shell PROC TCL EDIT blocks until editor QUIT before next PROC line") {
+    auto fsDir = uniqueTempDir();
+    std::filesystem::create_directories(fsDir);
+
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(fsDir);
+    seedVocAndProc(fsDir);
+    PickFS::FileSystem fs(fsDir);
+    fs.createFile("BP");
+    writeRecord(fsDir, "BP", "EDTMP", "");
+
+    const std::string procScript = R"(DISPLAY before
+TCL EDIT BP EDTMP
+DISPLAY after
+END
+)";
+    writeProcScriptRecord(fsDir, "EDPROC", procScript);
+
+    std::istringstream in("I\npatched\n.\nFI\nQ\n");
+    sh.setInputStream(&in);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("PROC EDPROC", out, quit);
+    CHECK(out.str().find("before") != std::string::npos);
+    CHECK(out.str().find("after") != std::string::npos);
+    CHECK(out.str().find("before") < out.str().find("after"));
+
+    out.str("");
+    sh.handleLine("READ BP EDTMP", out, quit);
+    CHECK(out.str() == "patched\n");
+}
+
+TEST_CASE("shell EDIT arity errors") {
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("EDIT", out, quit);
+    CHECK(out.str().find("EDIT requires") != std::string::npos);
+
+    out.str("");
+    sh.handleLine("EDIT A B C", out, quit);
+    CHECK(out.str().find("EDIT takes") != std::string::npos);
+}
+
+TEST_CASE("shell HELP lists EDIT") {
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    std::ostringstream out;
+    bool quit = false;
+    sh.handleLine("HELP", out, quit);
+    CHECK(out.str().find("EDIT") != std::string::npos);
+}

@@ -23,6 +23,8 @@ add_library(gemini-tcl
         basic/BasicStatementParser.h
         proc/ProcInterpreter.cpp
         proc/ProcInterpreter.h
+        tcl/LineRecordEditor.cpp
+        tcl/LineRecordEditor.h
         tcl/Shell.cpp
         tcl/Shell.h
         tcl/ShellSession.cpp

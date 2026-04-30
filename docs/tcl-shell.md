@@ -17,7 +17,7 @@ Input is tokenized by whitespace (filenames with spaces are not supported by the
 
 ## Program resolution (VOC-backed)
 
-`BASIC`, `RUN`, and `LIST-PROGRAMS` resolve program names through logical file `VOC` (Pick records), not by scanning host program-path directories.
+`BASIC`, `RUN`, `EDIT` (shorthand form), and `LIST-PROGRAMS` resolve program names through logical file `VOC` (Pick records), not by scanning host program-path directories.
 
 - Supported VOC entry types for this milestone: `F`, `Q`, `V`.
 - Resolution for program names follows case-insensitive lookup with Q-chain recursion and BP fallback.
@@ -61,9 +61,23 @@ For the full current behavior (validation rules, storage model, VOC behavior, er
 | **`LIST`** *file* | List record names (keys only) for *file*, sorted, under a **`Records:`** header. If none: **`No records`**. |
 | **`READ`** *file* *record-name* | Print record value if present; if missing record: **`No such record`**. |
 | **`WRITE`** *file* *record-name* *value…* | Upsert record value. Value is remaining tokens joined with single spaces. |
+| **`EDIT`** *file* *record-name* \| **`EDIT`** *programName* | Open a **blocking** line-oriented record editor (prompt **`ED> `**) on an in-memory copy of the record. Shorthand *programName* resolves the **source** record `(file, key)` via VOC (same as `BASIC` / `RUN` source), never `_OBJ`. Missing record starts with an empty buffer. See [TCL EDIT](#tcl-edit-line-record-editor) below. |
 | **`DUMP-STACK`** | Print the VM stack (uses the command output stream). |
 
 Unknown first token: **`Unknown command: …`**.
+
+## TCL EDIT (line record editor)
+
+`EDIT` is a **Tcl-level** session (not BASIC mode). It does **not** change BASIC’s separate `EDIT <line>` / `ED>` substitute editor documented in [BASIC shell](basic-shell.md).
+
+- **Entry:** `EDIT <file> <record>` or `EDIT <programName>` (program name without extension, same rule as **`RUN`**).
+- **Input:** Commands are **case-insensitive**; friendly verbs and **R83-style aliases** invoke the same behaviour: **LIST** (**L**), **INSERT** (**I**), **REPLACE** (**R**), **DELETE** (**D**), **SAVE** (**FI**), **QUIT** (**Q**), **HELP**.
+- **LIST:** No arguments lists all physical lines (1-based line numbers). Optional **`LIST`** *n* or **`LIST`** *start-end* for a range.
+- **INSERT:** Optional line number *n* (insert **after** line *n*; omit to append at end). Then type body lines; a line containing **only** `.` (after trimming ends) ends insertion. Body lines are stored verbatim (no command parsing inside the block).
+- **REPLACE:** Requires *n*, then the same **`.`**-terminated multiline block; replaces the single existing line *n* with one or more new lines (at least one line required before `.`).
+- **DELETE:** Requires *n*; deletes one physical line.
+- **SAVE / FI:** Writes the buffer back to the same `(file, record)` opened for editing (creates the file if missing, like other writes). **`VOC`** writes invalidate the in-memory VOC cache.
+- **QUIT / Q:** Leave the editor **without** writing.
 
 ## BASIC mode
 
