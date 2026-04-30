@@ -11,6 +11,7 @@
 
 #include <functional>
 #include <istream>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -25,7 +26,7 @@ namespace PickShell {
                          std::vector<std::string> lines,
                          PostWriteHook postWrite = {});
 
-        void run(std::istream &in, std::ostream &out);
+        void run(std::istream &in, std::ostream &out, std::optional<int> highlightPhysicalLine = std::nullopt);
 
     private:
         PickFS::FileSystem &fileSystem_;

@@ -4,7 +4,7 @@ The BASIC shell is a mode inside the interactive shell focused on editing and pe
 
 - Enter from Tcl mode with `BASIC` or `BASIC <name>`.
 - Prompt is `BASIC> `.
-- `EDIT <line>` enters editor submode with prompt `ED> `.
+- `EDIT` opens the **system line editor** (same blocking **`ED> `** session as Tcl `EDIT` on the current program’s source record). See [TCL EDIT (line record editor)](tcl-shell.md#tcl-edit-line-record-editor) for **LIST**, **INSERT**, **REPLACE**, **DELETE**, **SAVE** / **FI**, **QUIT** / **Q**, and aliases.
 - Tcl host shell behavior is documented in [Developer shell (TCL)](tcl-shell.md).
 - BASIC language/compiler semantics are documented in [BASIC language](basic-language.md).
 
@@ -17,7 +17,7 @@ The BASIC shell is a mode inside the interactive shell focused on editing and pe
 - `SAVE` writes only the in-memory BASIC source to disk.
 - `COMPILE` writes/replaces a `.tbc` object file for the active program name when compile succeeds.
 - Failed `COMPILE` leaves any existing `.tbc` unchanged.
-- In unnamed sessions (`BASIC` without a name), `SAVE`, `COMPILE`, and `RUN` fail with:
+- In unnamed sessions (`BASIC` without a name), `SAVE`, `COMPILE`, `RUN`, and `EDIT` fail with:
   - `No program name`
 
 ## BASIC commands
@@ -27,7 +27,8 @@ The BASIC shell is a mode inside the interactive shell focused on editing and pe
 | `<line> <text...>` | Insert or replace a BASIC line. |
 | `<line>` | Delete a BASIC line. |
 | `LIST` | List all lines in numeric order. |
-| `EDIT <line>` | Enter `ED>` for an existing line. |
+| `EDIT` | Open the system line editor on the current program’s source record. Current in-memory lines are **flushed to disk** first; when the editor exits, the program is **reloaded from disk** (so **`SAVE`/`FI`** in the editor updates BASIC’s buffer; **`QUIT`/`Q`** leaves the buffer matching the last flush plus any file changes from the session). |
+| `EDIT <line>` | Same as `EDIT`, but requires that **BASIC** source line number to exist; the editor prints that statement’s **physical record line** once for context before the first `ED> ` prompt. |
 | `DELETE <line>` | Delete one line. |
 | `DELETE <start-end>` | Delete an inclusive range. |
 | `RENUM` / `RENUMBER` | Renumber lines to `10,20,30,...` preserving order, and rewrite supported control-flow targets (`GOTO`, `IF ... THEN ... [ELSE ...]`) when target lines exist. |
@@ -62,19 +63,12 @@ Compilation failed.
 
 Language details for subset v1 (statements, expression rules, diagnostics, and file handling statements `OPEN`/`READ`/`WRITE`/`CLOSE`) are documented in [BASIC language](basic-language.md).
 
-## Editor submode (`ED>`)
-
-Editor mode is line-scoped and entered via `EDIT <line>`.
-
-| Command | Description |
-|---------|-------------|
-| `C/old/new/` | Replace first occurrence of `old` with `new` on the selected line. |
-| `FI` | Finish editing and return to `BASIC>`. |
-
 ## Command validation notes
 
 - `BASIC` with too many arguments: `BASIC takes at most one program name`
 - `SAVE` with too many arguments: `SAVE takes at most one filename`
 - `LOAD` with too many arguments: `LOAD takes at most one filename`
 - malformed `DELETE` ranges (for example `20-10`): `DELETE requires a line number or range`
-- malformed editor substitute command: `Invalid edit command`
+- `EDIT` with too many arguments: `EDIT takes no arguments or one line number`
+- `EDIT` with a line number that does not exist: `No such line: <n>`
+- `EDIT` with a non-numeric operand: `EDIT requires a line number`

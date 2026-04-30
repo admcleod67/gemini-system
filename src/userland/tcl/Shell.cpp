@@ -68,6 +68,11 @@ namespace PickShell {
                    std::ostream &out) {
                 executeCompiledBasicProgram(program, sourceLinePerInstr, sourceProgram, out);
             });
+        basicShell_.setRunLineRecordEditorFn([this](const BasicShell::ProgramLocation &location,
+                                                    const std::optional<int> highlightPhysicalLine,
+                                                    std::ostream &out) {
+            runLineRecordEditorForLocation(location.fileName, location.recordKey, highlightPhysicalLine, out);
+        });
         assemblerShell_.setRunCommandFn([this](const Tokens &tokens, std::ostream &out) { cmdRun(tokens, out); });
         assemblerShell_.setDumpStackFn([this](std::ostream &out) { cmdDumpStack(out); });
         registerCommands();
@@ -1016,6 +1021,39 @@ namespace PickShell {
         }
     }
 
+    void Shell::runLineRecordEditorForLocation(const std::string &fileName,
+                                               const std::string &recordKey,
+                                               const std::optional<int> &highlightPhysicalLine,
+                                               std::ostream &out) {
+        std::vector<std::string> lines;
+        try {
+            const std::optional<PickFS::Record> rec = session_.fileSystem_.read(fileName, recordKey);
+            if (rec.has_value()) {
+                std::istringstream in(rec->value());
+                std::string line;
+                while (std::getline(in, line)) {
+                    lines.push_back(std::move(line));
+                }
+            }
+        } catch (const std::exception &e) {
+            out << "Error: " << e.what() << '\n';
+            return;
+        }
+
+        std::istream &in = inputStream_ ? *inputStream_ : std::cin;
+        LineRecordEditor editor(
+            session_.fileSystem_,
+            fileName,
+            recordKey,
+            std::move(lines),
+            [this](const std::string &writtenFile) {
+                if (writtenFile == "VOC") {
+                    session_.vocResolver_.invalidate();
+                }
+            });
+        editor.run(in, out, highlightPhysicalLine);
+    }
+
     void Shell::cmdEdit(const std::vector<std::string> &tokens, std::ostream &out) {
         if (tokens.size() < 2) {
             out << "EDIT requires a program name or a file and record name\n";
@@ -1042,32 +1080,6 @@ namespace PickShell {
             recordKey = tokens[2];
         }
 
-        std::vector<std::string> lines;
-        try {
-            const std::optional<PickFS::Record> rec = session_.fileSystem_.read(fileName, recordKey);
-            if (rec.has_value()) {
-                std::istringstream in(rec->value());
-                std::string line;
-                while (std::getline(in, line)) {
-                    lines.push_back(std::move(line));
-                }
-            }
-        } catch (const std::exception &e) {
-            out << "Error: " << e.what() << '\n';
-            return;
-        }
-
-        std::istream &in = inputStream_ ? *inputStream_ : std::cin;
-        LineRecordEditor editor(
-            session_.fileSystem_,
-            std::move(fileName),
-            std::move(recordKey),
-            std::move(lines),
-            [this](const std::string &writtenFile) {
-                if (writtenFile == "VOC") {
-                    session_.vocResolver_.invalidate();
-                }
-            });
-        editor.run(in, out);
+        runLineRecordEditorForLocation(fileName, recordKey, std::nullopt, out);
     }
 } // namespace PickShell

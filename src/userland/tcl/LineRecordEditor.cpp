@@ -278,7 +278,14 @@ namespace PickShell {
         out << "QUIT (Q) — exit without saving\n";
     }
 
-    void LineRecordEditor::run(std::istream &in, std::ostream &out) {
+    void LineRecordEditor::run(std::istream &in, std::ostream &out, std::optional<int> highlightPhysicalLine) {
+        if (highlightPhysicalLine.has_value()) {
+            const int row = *highlightPhysicalLine;
+            if (row >= 1 && row <= static_cast<int>(lines_.size())) {
+                const std::vector<std::string> listTok = {"LIST", std::to_string(row)};
+                cmdList(listTok, out);
+            }
+        }
         while (true) {
             out << "ED> " << std::flush;
             std::string line;

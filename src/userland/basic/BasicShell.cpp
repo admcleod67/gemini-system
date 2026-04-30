@@ -27,9 +27,12 @@ namespace PickShell {
         executeProgramFn_ = std::move(executeProgramFn);
     }
 
+    void BasicShell::setRunLineRecordEditorFn(RunLineRecordEditorFn runLineRecordEditorFn) {
+        runLineRecordEditorFn_ = std::move(runLineRecordEditorFn);
+    }
+
     void BasicShell::enter(std::optional<std::string> programName, std::ostream &out) {
         mode_ = Mode::Basic;
-        editorState_.reset();
         program_.setName(std::move(programName));
         program_.clearLines();
         loadProgramIfPresent(out);
@@ -40,9 +43,6 @@ namespace PickShell {
     }
 
     std::string BasicShell::prompt() const {
-        if (mode_ == Mode::Editor) {
-            return "ED> ";
-        }
         return "BASIC> ";
     }
 
@@ -51,10 +51,6 @@ namespace PickShell {
             return;
         }
         leaveBasicMode = false;
-        if (mode_ == Mode::Editor) {
-            handleEditorCommand(tokens, out);
-            return;
-        }
         handleBasicCommand(tokens, out, leaveBasicMode);
     }
 
@@ -104,37 +100,47 @@ namespace PickShell {
         return startLine <= endLine;
     }
 
-    bool BasicShell::applyEditorSubstitute(std::string &line, const std::string &command) {
-        if (command.size() < 4 || command[0] != 'C') {
+    std::optional<int> BasicShell::physicalRowForBasicLine(const int basicLineNumber) const {
+        int row = 0;
+        for (const auto &[k, v]: program_.lines()) {
+            (void) v;
+            ++row;
+            if (k == basicLineNumber) {
+                return row;
+            }
+        }
+        return std::nullopt;
+    }
+
+    bool BasicShell::flushProgramSourceToDisk(std::ostream &out) {
+        if (!program_.name() || program_.name()->empty()) {
+            out << "No program name\n";
             return false;
         }
-        const char delimiter = command[1];
-        const std::size_t firstDelimiter = command.find(delimiter, 2);
-        if (firstDelimiter == std::string::npos) {
+        if (!resolveProgramLocationFn_ || !writeRecordFn_) {
+            out << "Error: BASIC storage not configured\n";
             return false;
         }
-        const std::size_t secondDelimiter = command.find(delimiter, firstDelimiter + 1);
-        if (secondDelimiter == std::string::npos || secondDelimiter != command.size() - 1) {
-            return false;
+        std::ostringstream source;
+        for (const auto &[lineNumber, text]: program_.lines()) {
+            source << lineNumber;
+            if (!text.empty()) {
+                source << ' ' << text;
+            }
+            source << '\n';
         }
 
-        const std::string from = command.substr(2, firstDelimiter - 2);
-        const std::string to = command.substr(firstDelimiter + 1, secondDelimiter - firstDelimiter - 1);
-        if (from.empty()) {
+        std::string error;
+        const ProgramLocation location = resolveProgramLocationFn_(*program_.name());
+        if (!writeRecordFn_(location, false, source.str(), error)) {
+            out << "Error: " << error << "\n";
             return false;
         }
-
-        const std::size_t pos = line.find(from);
-        if (pos == std::string::npos) {
-            return true;
-        }
-        line.replace(pos, from.size(), to);
         return true;
     }
 
     void BasicShell::registerCommands() {
         registerBasicCommands();
-        registerEditorCommands();
     }
 
     void BasicShell::registerBasicCommands() {
@@ -146,16 +152,37 @@ namespace PickShell {
             program_.list(out);
         };
         basicCommands_["EDIT"] = [this](const Tokens &tokens, std::ostream &out, bool &) {
-            if (tokens.size() != 2) {
-                out << "EDIT requires a line number\n";
+            if (tokens.size() > 2) {
+                out << "EDIT takes no arguments or one line number\n";
                 return;
             }
-            int lineNumber = 0;
-            if (!parseLineNumber(tokens[1], lineNumber)) {
-                out << "EDIT requires a line number\n";
+            if (!program_.name() || program_.name()->empty()) {
+                out << "No program name\n";
                 return;
             }
-            enterEditorMode(lineNumber, out);
+            std::optional<int> highlightPhysical;
+            if (tokens.size() == 2) {
+                int basicLine = 0;
+                if (!parseLineNumber(tokens[1], basicLine)) {
+                    out << "EDIT requires a line number\n";
+                    return;
+                }
+                if (!program_.hasLine(basicLine)) {
+                    out << "No such line: " << basicLine << '\n';
+                    return;
+                }
+                highlightPhysical = physicalRowForBasicLine(basicLine);
+            }
+            if (!runLineRecordEditorFn_) {
+                out << "Error: line editor not configured\n";
+                return;
+            }
+            if (!flushProgramSourceToDisk(out)) {
+                return;
+            }
+            const ProgramLocation location = resolveProgramLocationFn_(*program_.name());
+            runLineRecordEditorFn_(location, highlightPhysical, out);
+            loadProgramIfPresent(out);
         };
         basicCommands_["DELETE"] = [this](const Tokens &tokens, std::ostream &out, bool &) {
             if (tokens.size() != 2) {
@@ -220,7 +247,7 @@ namespace PickShell {
                 return;
             }
             program_.setName(*saveName);
-            saveProgram(*saveName, out);
+            (void) flushProgramSourceToDisk(out);
         };
         basicCommands_["COMPILE"] = [this](const Tokens &tokens, std::ostream &out, bool &) {
             if (tokens.size() > 1) {
@@ -271,7 +298,6 @@ namespace PickShell {
         };
         basicCommands_["QUIT"] = [this](const Tokens &, std::ostream &, bool &leaveBasicMode) {
             mode_ = Mode::Inactive;
-            editorState_.reset();
             leaveBasicMode = true;
         };
         basicCommands_["HELP"] = [](const Tokens &, std::ostream &out, bool &) {
@@ -279,7 +305,7 @@ namespace PickShell {
             out << "  <n> <text>     set BASIC line n\n";
             out << "  <n>            delete BASIC line n\n";
             out << "  LIST\n";
-            out << "  EDIT <n>\n";
+            out << "  EDIT [n]       open system line editor (TCL EDIT); optional BASIC line n for context\n";
             out << "  DELETE <n>|<n-m>\n";
             out << "  RENUM\n";
             out << "  RENUMBER\n";
@@ -290,21 +316,6 @@ namespace PickShell {
             out << "  RUN\n";
             out << "  RUN (C\n";
             out << "  QUIT\n";
-        };
-    }
-
-    void BasicShell::registerEditorCommands() {
-        editorCommands_["FI"] = [this](const Tokens &, std::ostream &, bool &) {
-            if (editorState_) {
-                program_.setLine(editorState_->lineNumber, editorState_->text);
-            }
-            editorState_.reset();
-            mode_ = Mode::Basic;
-        };
-        editorCommands_["HELP"] = [](const Tokens &, std::ostream &out, bool &) {
-            out << "Editor commands:\n";
-            out << "  C/old/new/\n";
-            out << "  FI\n";
         };
     }
 
@@ -325,40 +336,6 @@ namespace PickShell {
             return;
         }
         it->second(tokens, out, leaveBasicMode);
-    }
-
-    void BasicShell::handleEditorCommand(const Tokens &tokens, std::ostream &out) {
-        const auto it = editorCommands_.find(tokens[0]);
-        if (it != editorCommands_.end()) {
-            bool ignored = false;
-            it->second(tokens, out, ignored);
-            return;
-        }
-
-        if (tokens[0].size() >= 2 && tokens[0][0] == 'C') {
-            if (tokens.size() != 1 || !editorState_) {
-                out << "Invalid edit command\n";
-                return;
-            }
-            if (!applyEditorSubstitute(editorState_->text, tokens[0])) {
-                out << "Invalid edit command\n";
-                return;
-            }
-            program_.setLine(editorState_->lineNumber, editorState_->text);
-            return;
-        }
-
-        out << "Unknown command: " << tokens[0] << "\n";
-    }
-
-    void BasicShell::enterEditorMode(const int lineNumber, std::ostream &out) {
-        const std::optional<std::string> line = program_.lineText(lineNumber);
-        if (!line) {
-            out << "No such line: " << lineNumber << '\n';
-            return;
-        }
-        editorState_ = EditorState{lineNumber, *line};
-        mode_ = Mode::Editor;
     }
 
     void BasicShell::loadProgramIfPresent(std::ostream &out) {
@@ -384,11 +361,11 @@ namespace PickShell {
             if (tokens.empty()) {
                 continue;
             }
-            int lineNumber = 0;
-            if (!parseLineNumber(tokens[0], lineNumber)) {
+            int ln = 0;
+            if (!parseLineNumber(tokens[0], ln)) {
                 continue;
             }
-            program_.setLine(lineNumber, joinTokens(tokens, 1));
+            program_.setLine(ln, joinTokens(tokens, 1));
         }
     }
 
@@ -397,20 +374,8 @@ namespace PickShell {
             out << "Error: BASIC storage not configured\n";
             return;
         }
-        std::ostringstream source;
-        for (const auto &[lineNumber, text]: program_.lines()) {
-            source << lineNumber;
-            if (!text.empty()) {
-                source << ' ' << text;
-            }
-            source << '\n';
-        }
-
-        std::string error;
-        const ProgramLocation location = resolveProgramLocationFn_(name);
-        if (!writeRecordFn_(location, false, source.str(), error)) {
-            out << "Error: " << error << "\n";
-        }
+        program_.setName(name);
+        (void) flushProgramSourceToDisk(out);
     }
 
     bool BasicShell::saveObjectCode(const std::string &name, const BasicCompileResult &compile, std::ostream &out) {

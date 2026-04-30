@@ -1,5 +1,5 @@
 //
-// BASIC shell/interpreter (BASIC> and ED> modes).
+// BASIC shell/interpreter (BASIC>).
 //
 
 #ifndef PICK_SYSTEM_BASIC_BASICSHELL_H
@@ -34,6 +34,8 @@ namespace PickShell {
         using ResolveProgramLocationFn = std::function<ProgramLocation(const std::string &)>;
         using ReadRecordFn = std::function<std::optional<std::string>(const ProgramLocation &, bool objectRecord)>;
         using WriteRecordFn = std::function<bool(const ProgramLocation &, bool objectRecord, const std::string &, std::string &)>;
+        using RunLineRecordEditorFn =
+            std::function<void(const ProgramLocation &, const std::optional<int> highlightPhysicalLine, std::ostream &out)>;
 
         BasicShell();
 
@@ -44,6 +46,8 @@ namespace PickShell {
         void setWriteRecordFn(WriteRecordFn writeRecordFn);
 
         void setExecuteProgramFn(ExecuteProgramFn executeProgramFn);
+
+        void setRunLineRecordEditorFn(RunLineRecordEditorFn runLineRecordEditorFn);
 
         void enter(std::optional<std::string> programName, std::ostream &out);
 
@@ -57,24 +61,17 @@ namespace PickShell {
         enum class Mode {
             Inactive,
             Basic,
-            Editor,
-        };
-
-        struct EditorState {
-            int lineNumber{0};
-            std::string text;
         };
 
         Mode mode_{Mode::Inactive};
         BasicCompiler compiler_;
         BasicProgram program_;
-        std::optional<EditorState> editorState_;
         ExecuteProgramFn executeProgramFn_;
         ResolveProgramLocationFn resolveProgramLocationFn_;
         ReadRecordFn readRecordFn_;
         WriteRecordFn writeRecordFn_;
+        RunLineRecordEditorFn runLineRecordEditorFn_;
         CommandTable basicCommands_;
-        CommandTable editorCommands_;
 
         static bool parseLineNumber(const std::string &token, int &lineNumber);
 
@@ -82,19 +79,15 @@ namespace PickShell {
 
         static bool parseDeleteRange(const std::string &token, int &startLine, int &endLine);
 
-        static bool applyEditorSubstitute(std::string &line, const std::string &command);
+        [[nodiscard]] std::optional<int> physicalRowForBasicLine(int basicLineNumber) const;
+
+        bool flushProgramSourceToDisk(std::ostream &out);
 
         void registerCommands();
 
         void registerBasicCommands();
 
-        void registerEditorCommands();
-
         void handleBasicCommand(const Tokens &tokens, std::ostream &out, bool &leaveBasicMode);
-
-        void handleEditorCommand(const Tokens &tokens, std::ostream &out);
-
-        void enterEditorMode(int lineNumber, std::ostream &out);
 
         void loadProgramIfPresent(std::ostream &out);
 

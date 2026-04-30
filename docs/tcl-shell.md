@@ -68,7 +68,7 @@ Unknown first token: **`Unknown command: …`**.
 
 ## TCL EDIT (line record editor)
 
-`EDIT` is a **Tcl-level** session (not BASIC mode). It does **not** change BASIC’s separate `EDIT <line>` / `ED>` substitute editor documented in [BASIC shell](basic-shell.md).
+`EDIT` is a **Tcl-level** session (not BASIC mode). **BASIC EDIT** uses the same **`LineRecordEditor`** implementation via an internal host callback (flush current source, run the editor, reload from disk); see [BASIC shell](basic-shell.md).
 
 - **Entry:** `EDIT <file> <record>` or `EDIT <programName>` (program name without extension, same rule as **`RUN`**).
 - **Input:** Commands are **case-insensitive**; friendly verbs and **R83-style aliases** invoke the same behaviour: **LIST** (**L**), **INSERT** (**I**), **REPLACE** (**R**), **DELETE** (**D**), **SAVE** (**FI**), **QUIT** (**Q**), **HELP**.
@@ -81,10 +81,8 @@ Unknown first token: **`Unknown command: …`**.
 
 ## BASIC mode
 
-Tcl host and BASIC editor responsibilities are now separated:
-
 - Tcl shell behavior is described in this page.
-- BASIC/ED command set and persistence behavior are documented in [BASIC shell](basic-shell.md).
+- BASIC command set and persistence (including **`EDIT`** delegating to the TCL line editor) are documented in [BASIC shell](basic-shell.md).
 - BASIC compiler/language subset details are documented in [BASIC language](basic-language.md).
 
 ## PROC mode (Milestone 1 subset)

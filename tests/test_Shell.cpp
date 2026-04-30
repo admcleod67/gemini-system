@@ -939,12 +939,16 @@ TEST_CASE("shell BREAKPOINT index behavior is unchanged with source metadata pre
 }
 
 TEST_CASE("shell BASIC sample session edit flow") {
-    auto dir = uniqueTempDir();
-    std::filesystem::create_directories(dir);
+    auto fsDir = uniqueTempDir();
+    std::filesystem::create_directories(fsDir);
+    seedVocAndBp(fsDir);
 
     PickVM::Runtime rt;
     PickShell::Shell sh(rt);
-    sh.setProgramsRoot(dir);
+    sh.setFileSystemRoot(fsDir);
+
+    std::istringstream editIn("REPLACE 1\n10 PRINT \"WORLD\"\n.\nFI\nQ\n");
+    sh.setInputStream(&editIn);
 
     std::ostringstream out;
     bool quit = false;
@@ -962,13 +966,8 @@ TEST_CASE("shell BASIC sample session edit flow") {
 
     out.str("");
     sh.handleLine("EDIT 10", out, quit);
-    CHECK(out.str().empty());
 
-    out.str("");
-    sh.handleLine("C/HELLO/WORLD/", out, quit);
-    sh.handleLine("FI", out, quit);
-    CHECK(out.str().empty());
-
+    sh.setInputStream(nullptr);
     out.str("");
     sh.handleLine("LIST", out, quit);
     CHECK(out.str() == "10 PRINT \"WORLD\"\n20 GOTO 10\n");
@@ -1542,25 +1541,28 @@ TEST_CASE("shell BASIC RENUM leaves dangling targets unchanged") {
     CHECK(out.str() == "10 GOTO 999\n20 IF 1 = 1 THEN 999 ELSE 10\n");
 }
 
-TEST_CASE("shell ED mode malformed substitute command is rejected") {
+TEST_CASE("shell BASIC EDIT delegates to LineRecordEditor unknown command then QUIT") {
+    auto fsDir = uniqueTempDir();
+    seedVocAndBp(fsDir);
+
     PickVM::Runtime rt;
     PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(fsDir);
+    std::istringstream in("XYZZY\nQ\n");
+    sh.setInputStream(&in);
     std::ostringstream out;
     bool quit = false;
 
     sh.handleLine("BASIC TEST", out, quit);
     sh.handleLine("10 PRINT \"HELLO\"", out, quit);
-    sh.handleLine("EDIT 10", out, quit);
-
     out.str("");
-    sh.handleLine("C/HELLO/WORLD/ extra", out, quit);
-    CHECK(out.str() == "Invalid edit command\n");
+    sh.handleLine("EDIT", out, quit);
+    CHECK(out.str().find("Unknown command") != std::string::npos);
 
+    sh.setInputStream(nullptr);
     out.str("");
-    sh.handleLine("C/HELLO/WORLD/", out, quit);
-    sh.handleLine("FI", out, quit);
     sh.handleLine("LIST", out, quit);
-    CHECK(out.str() == "10 PRINT \"WORLD\"\n");
+    CHECK(out.str() == "10 PRINT \"HELLO\"\n");
 }
 
 TEST_CASE("shell BASIC RUN reports runtime error for RETURN without GOSUB") {
