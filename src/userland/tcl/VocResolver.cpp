@@ -7,6 +7,7 @@
 namespace PickShell {
     namespace {
         constexpr const char *kDefaultProgramFile = "BP";
+        constexpr const char *kDefaultProcFile = "PROC";
     } // namespace
 
     VocResolver::VocResolver(PickFS::FileSystem &fileSystem)
@@ -26,6 +27,29 @@ namespace PickShell {
             location.fileName = *resolvedFile;
         }
         return location;
+    }
+
+    VocResolver::ProgramLocation VocResolver::resolveProcScriptLocation(const std::string &scriptName) {
+        ensureLoaded();
+        ProgramLocation location{kDefaultProcFile, scriptName};
+        std::unordered_set<std::string> visited;
+        if (const std::optional<std::string> resolvedFile = resolveFileFromVocKey(scriptName, visited)) {
+            location.fileName = *resolvedFile;
+        }
+        return location;
+    }
+
+    std::string VocResolver::resolveVerbName(const std::string &token) {
+        ensureLoaded();
+        const auto it = table_.find(upperAscii(token));
+        if (it == table_.end()) {
+            return token;
+        }
+        const VocEntry &entry = it->second;
+        if (entry.type != EntryType::V || entry.attribute2.empty()) {
+            return token;
+        }
+        return entry.attribute2;
     }
 
     std::vector<std::string> VocResolver::listProgramFiles() {

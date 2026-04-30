@@ -70,6 +70,7 @@ Program-name resolution for `BASIC`, `RUN`, and `LIST-PROGRAMS` is VOC-backed:
   - `V`: attribute 2 = verb name (loaded for future verb work).
 - Lookup is case-insensitive.
 - Program location fallback when no explicit entry resolves: `(BP, <program-name>)`.
+- PROC script lookup uses the same VOC table but applies PROC-specific fallback `(PROC, <script-name>)` for unresolved script keys.
 
 For this milestone, object code records are stored in the same resolved Pick file as source using key suffix `_OBJ`.
 

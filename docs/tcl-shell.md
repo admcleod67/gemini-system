@@ -25,7 +25,11 @@ Input is tokenized by whitespace (filenames with spaces are not supported by the
 - Source record key = `<programName>`.
 - Object record key = `<programName>_OBJ` in the same resolved Pick file.
 
-`PROC` currently remains host-path based (`<programName>.proc` under programs root).
+`PROC` is also filesystem/VOC-backed:
+
+- script lookup for `PROC <name>` uses `F/Q` VOC resolution with fallback to `(PROC, <name>)`.
+- `V` entries are not used for script lookup.
+- inside PROC `TCL ...` bridge lines, first-token verb dispatch may be mapped via `V` entries; subsequent name operands follow normal TCL command resolution behavior.
 
 ## Filesystem directory
 
@@ -49,7 +53,7 @@ For the full current behavior (validation rules, storage model, VOC behavior, er
 | **`BASIC`** [*name*] | Enter BASIC mode. See [BASIC shell](basic-shell.md) for BASIC/ED commands and persistence rules. |
 | **`ASM`** [*programName*] | Enter ASM mode (instruction-level debugger shell). Optional name immediately executes `RUN <programName>` after entering ASM. See [Assembler shell](assembler-shell.md). |
 | **`RUN`** *programName* | Run by program name only (no extension). Tcl resolves `(file,key)` via VOC, prunes invalid breakpoints, and executes object record `<key>_OBJ`. If object is missing, Tcl compiles source record `<key>` and writes `<key>_OBJ` in the same resolved file before running. |
-| **`PROC`** *programName* [*args...*] | Execute `<programName>.proc` from programs root using a minimal two-pass PROC interpreter (labels + line execution). Supports `DISPLAY`, `INPUT`, `GO`, `IF A = B THEN GO label`, assignment `NAME = value`, `TCL ...`, and `END`. Positional args map to `P1`, `P2`, ... |
+| **`PROC`** *programName* [*args...*] | Resolve script via VOC/filesystem (`F/Q` with fallback to `PROC` file), then execute with a minimal two-pass PROC interpreter (labels + line execution). Supports `DISPLAY`, `INPUT`, `GO`, `IF A = B THEN GO label`, assignment `NAME = value`, `TCL ...`, and `END`. Positional args map to `P1`, `P2`, ... |
 | **`LIST-PROGRAMS`** | List logical program names from VOC-resolved program files (records in those files, excluding `_OBJ` records), deduplicated and sorted. |
 | **`CREATE-FILE`** *name* | Create a Pick file in the filesystem root. Creates logical file directory. |
 | **`DELETE-FILE`** *name* | Delete a Pick file from the filesystem root. |

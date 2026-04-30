@@ -27,7 +27,7 @@ namespace PickShell {
     public:
         explicit Shell(PickVM::Runtime &runtime);
 
-        // Root for LIST-PROGRAMS and relative RUN paths (default "programs").
+        // Legacy host root setting retained for compatibility.
         void setProgramsRoot(std::filesystem::path root);
 
         const std::filesystem::path &programsRoot() const { return session_.programsRoot(); }

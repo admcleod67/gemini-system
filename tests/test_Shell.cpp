@@ -26,18 +26,36 @@ static void seedVocAndBp(const std::filesystem::path &fsRoot) {
     fs.write("VOC", PickFS::Record("BP", "001 F\n002 BP\n003 /gemini/fs/DM/BP\n"));
 }
 
+static void seedVocAndProc(const std::filesystem::path &fsRoot) {
+    PickFS::FileSystem fs(fsRoot);
+    fs.createFile("VOC");
+    fs.createFile("PROC");
+}
+
+static void writeRecord(const std::filesystem::path &fsRoot,
+                        const std::string &fileName,
+                        const std::string &recordName,
+                        const std::string &value) {
+    PickFS::FileSystem fs(fsRoot);
+    fs.write(fileName, PickFS::Record(recordName, value));
+}
+
 static void writeProgramSourceRecord(const std::filesystem::path &fsRoot,
                                      const std::string &programName,
                                      const std::string &source) {
-    PickFS::FileSystem fs(fsRoot);
-    fs.write("BP", PickFS::Record(programName, source));
+    writeRecord(fsRoot, "BP", programName, source);
 }
 
 static void writeProgramObjectRecord(const std::filesystem::path &fsRoot,
                                      const std::string &programName,
                                      const std::string &objectText) {
-    PickFS::FileSystem fs(fsRoot);
-    fs.write("BP", PickFS::Record(programName + "_OBJ", objectText));
+    writeRecord(fsRoot, "BP", programName + "_OBJ", objectText);
+}
+
+static void writeProcScriptRecord(const std::filesystem::path &fsRoot,
+                                  const std::string &scriptName,
+                                  const std::string &scriptText) {
+    writeRecord(fsRoot, "PROC", scriptName, scriptText);
 }
 
 TEST_CASE("shell HELP") {
@@ -355,32 +373,25 @@ TEST_CASE("shell PROC requires program name") {
 }
 
 TEST_CASE("shell PROC missing file") {
-    auto dir = uniqueTempDir();
-    std::filesystem::create_directories(dir);
+    auto fsDir = uniqueTempDir();
+    seedVocAndProc(fsDir);
     PickVM::Runtime rt;
     PickShell::Shell sh(rt);
-    sh.setProgramsRoot(dir);
+    sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
     bool quit = false;
     sh.handleLine("PROC MISSING", out, quit);
     CHECK_FALSE(quit);
-    CHECK(out.str().find("Error: Cannot open PROC file:") != std::string::npos);
+    CHECK(out.str() == "Error: Cannot open PROC script: MISSING\n");
 }
 
 TEST_CASE("shell PROC assignment display and token substitution") {
-    auto dir = uniqueTempDir();
-    std::filesystem::create_directories(dir);
-    {
-        std::ofstream f(dir / "FLOW.proc");
-        f << "MSG = NOOP\n";
-        f << "X = HELLO\n";
-        f << "DISPLAY X WORLD\n";
-        f << "DISPLAY MSG\n";
-        f << "END\n";
-    }
+    auto fsDir = uniqueTempDir();
+    seedVocAndProc(fsDir);
+    writeProcScriptRecord(fsDir, "FLOW", "MSG = NOOP\nX = HELLO\nDISPLAY X WORLD\nDISPLAY MSG\nEND\n");
     PickVM::Runtime rt;
     PickShell::Shell sh(rt);
-    sh.setProgramsRoot(dir);
+    sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
     bool quit = false;
     sh.handleLine("PROC FLOW", out, quit);
@@ -389,17 +400,12 @@ TEST_CASE("shell PROC assignment display and token substitution") {
 }
 
 TEST_CASE("shell PROC INPUT stores value and can be displayed") {
-    auto dir = uniqueTempDir();
-    std::filesystem::create_directories(dir);
-    {
-        std::ofstream f(dir / "ASK.proc");
-        f << "INPUT USER\n";
-        f << "DISPLAY USER\n";
-        f << "END\n";
-    }
+    auto fsDir = uniqueTempDir();
+    seedVocAndProc(fsDir);
+    writeProcScriptRecord(fsDir, "ASK", "INPUT USER\nDISPLAY USER\nEND\n");
     PickVM::Runtime rt;
     PickShell::Shell sh(rt);
-    sh.setProgramsRoot(dir);
+    sh.setFileSystemRoot(fsDir);
     std::istringstream in("ALICE\n");
     sh.setInputStream(&in);
     std::ostringstream out;
@@ -410,19 +416,12 @@ TEST_CASE("shell PROC INPUT stores value and can be displayed") {
 }
 
 TEST_CASE("shell PROC GO supports forward and backward labels") {
-    auto dir = uniqueTempDir();
-    std::filesystem::create_directories(dir);
-    {
-        std::ofstream f(dir / "JUMP.proc");
-        f << "GO NEXT\n";
-        f << "DISPLAY BAD\n";
-        f << "NEXT:\n";
-        f << "DISPLAY OK\n";
-        f << "END\n";
-    }
+    auto fsDir = uniqueTempDir();
+    seedVocAndProc(fsDir);
+    writeProcScriptRecord(fsDir, "JUMP", "GO NEXT\nDISPLAY BAD\nNEXT:\nDISPLAY OK\nEND\n");
     PickVM::Runtime rt;
     PickShell::Shell sh(rt);
-    sh.setProgramsRoot(dir);
+    sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
     bool quit = false;
     sh.handleLine("PROC JUMP", out, quit);
@@ -431,20 +430,12 @@ TEST_CASE("shell PROC GO supports forward and backward labels") {
 }
 
 TEST_CASE("shell PROC IF THEN GO with case-insensitive labels") {
-    auto dir = uniqueTempDir();
-    std::filesystem::create_directories(dir);
-    {
-        std::ofstream f(dir / "IFLOW.proc");
-        f << "X = YES\n";
-        f << "IF X = YES THEN GO menu\n";
-        f << "DISPLAY FAIL\n";
-        f << "MENU:\n";
-        f << "DISPLAY PASS\n";
-        f << "END\n";
-    }
+    auto fsDir = uniqueTempDir();
+    seedVocAndProc(fsDir);
+    writeProcScriptRecord(fsDir, "IFLOW", "X = YES\nIF X = YES THEN GO menu\nDISPLAY FAIL\nMENU:\nDISPLAY PASS\nEND\n");
     PickVM::Runtime rt;
     PickShell::Shell sh(rt);
-    sh.setProgramsRoot(dir);
+    sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
     bool quit = false;
     sh.handleLine("PROC IFLOW", out, quit);
@@ -453,16 +444,12 @@ TEST_CASE("shell PROC IF THEN GO with case-insensitive labels") {
 }
 
 TEST_CASE("shell PROC positional parameters substitute into TCL command") {
-    auto dir = uniqueTempDir();
-    std::filesystem::create_directories(dir);
-    {
-        std::ofstream f(dir / "BRIDGE.proc");
-        f << "TCL ECHO P1 P2\n";
-        f << "END\n";
-    }
+    auto fsDir = uniqueTempDir();
+    seedVocAndProc(fsDir);
+    writeProcScriptRecord(fsDir, "BRIDGE", "TCL ECHO P1 P2\nEND\n");
     PickVM::Runtime rt;
     PickShell::Shell sh(rt);
-    sh.setProgramsRoot(dir);
+    sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
     bool quit = false;
     sh.handleLine("PROC BRIDGE HELLO WORLD", out, quit);
@@ -471,17 +458,12 @@ TEST_CASE("shell PROC positional parameters substitute into TCL command") {
 }
 
 TEST_CASE("shell PROC duplicate labels are rejected") {
-    auto dir = uniqueTempDir();
-    std::filesystem::create_directories(dir);
-    {
-        std::ofstream f(dir / "DUP.proc");
-        f << "A:\n";
-        f << "A:\n";
-        f << "END\n";
-    }
+    auto fsDir = uniqueTempDir();
+    seedVocAndProc(fsDir);
+    writeProcScriptRecord(fsDir, "DUP", "A:\nA:\nEND\n");
     PickVM::Runtime rt;
     PickShell::Shell sh(rt);
-    sh.setProgramsRoot(dir);
+    sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
     bool quit = false;
     sh.handleLine("PROC DUP", out, quit);
@@ -490,23 +472,14 @@ TEST_CASE("shell PROC duplicate labels are rejected") {
 }
 
 TEST_CASE("shell PROC malformed IF and unknown label errors") {
-    auto dir = uniqueTempDir();
-    std::filesystem::create_directories(dir);
-
-    {
-        std::ofstream f(dir / "BADIF.proc");
-        f << "IF A = B THEN DISPLAY X\n";
-        f << "END\n";
-    }
-    {
-        std::ofstream f(dir / "BADGO.proc");
-        f << "GO MISSING\n";
-        f << "END\n";
-    }
+    auto fsDir = uniqueTempDir();
+    seedVocAndProc(fsDir);
+    writeProcScriptRecord(fsDir, "BADIF", "IF A = B THEN DISPLAY X\nEND\n");
+    writeProcScriptRecord(fsDir, "BADGO", "GO MISSING\nEND\n");
 
     PickVM::Runtime rt;
     PickShell::Shell sh(rt);
-    sh.setProgramsRoot(dir);
+    sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
     bool quit = false;
     sh.handleLine("PROC BADIF", out, quit);
@@ -517,6 +490,59 @@ TEST_CASE("shell PROC malformed IF and unknown label errors") {
     sh.handleLine("PROC BADGO", out, quit);
     CHECK_FALSE(quit);
     CHECK(out.str() == "Error: Unknown label: MISSING\n");
+}
+
+TEST_CASE("shell PROC uses F mapping for script lookup outside PROC file") {
+    auto fsDir = uniqueTempDir();
+    seedVocAndProc(fsDir);
+    PickFS::FileSystem fs(fsDir);
+    fs.createFile("SCRIPTS");
+    fs.write("VOC", PickFS::Record("FLOW", "F\nSCRIPTS\n"));
+    fs.write("SCRIPTS", PickFS::Record("FLOW", "DISPLAY OK\nEND\n"));
+
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(fsDir);
+    std::ostringstream out;
+    bool quit = false;
+    sh.handleLine("PROC FLOW", out, quit);
+    CHECK_FALSE(quit);
+    CHECK(out.str() == "OK\n");
+}
+
+TEST_CASE("shell PROC uses Q chain for script lookup") {
+    auto fsDir = uniqueTempDir();
+    seedVocAndProc(fsDir);
+    PickFS::FileSystem fs(fsDir);
+    fs.write("VOC", PickFS::Record("FLOW", "Q\nREALFLOW\n"));
+    fs.write("VOC", PickFS::Record("REALFLOW", "F\nPROC\n"));
+    fs.write("PROC", PickFS::Record("FLOW", "DISPLAY QOK\nEND\n"));
+
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(fsDir);
+    std::ostringstream out;
+    bool quit = false;
+    sh.handleLine("PROC FLOW", out, quit);
+    CHECK_FALSE(quit);
+    CHECK(out.str() == "QOK\n");
+}
+
+TEST_CASE("shell PROC bridge resolves V-type verb aliases") {
+    auto fsDir = uniqueTempDir();
+    seedVocAndProc(fsDir);
+    PickFS::FileSystem fs(fsDir);
+    fs.write("VOC", PickFS::Record("SAYWHO", "V\nWHO\n"));
+    fs.write("PROC", PickFS::Record("SHOW", "TCL SAYWHO\nEND\n"));
+
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(fsDir);
+    std::ostringstream out;
+    bool quit = false;
+    sh.handleLine("PROC SHOW", out, quit);
+    CHECK_FALSE(quit);
+    CHECK(out.str() == "0 SYSPROG DM\n");
 }
 
 TEST_CASE("shell LIST-PROGRAMS empty directory") {

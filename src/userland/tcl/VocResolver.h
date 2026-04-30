@@ -37,6 +37,10 @@ namespace PickShell {
 
         ProgramLocation resolveProgramLocation(const std::string &programName);
 
+        ProgramLocation resolveProcScriptLocation(const std::string &scriptName);
+
+        std::string resolveVerbName(const std::string &token);
+
         std::vector<std::string> listProgramFiles();
 
         const std::unordered_map<std::string, VocEntry> &table();

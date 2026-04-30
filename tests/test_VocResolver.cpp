@@ -47,3 +47,31 @@ TEST_CASE("VocResolver lookup is case-insensitive and protects against Q-cycles"
     CHECK(cycleFallback.fileName == "BP");
     CHECK(cycleFallback.recordKey == "A");
 }
+
+TEST_CASE("VocResolver resolves PROC scripts with PROC fallback") {
+    const auto root = uniqueVocTempDir();
+    PickFS::FileSystem fs(root);
+    fs.createFile("VOC");
+    fs.write("VOC", PickFS::Record("SCRIPT", "F\nSCRIPTS\n"));
+
+    PickShell::VocResolver resolver(fs);
+    const auto mapped = resolver.resolveProcScriptLocation("SCRIPT");
+    CHECK(mapped.fileName == "SCRIPTS");
+    CHECK(mapped.recordKey == "SCRIPT");
+
+    const auto fallback = resolver.resolveProcScriptLocation("MISSING");
+    CHECK(fallback.fileName == "PROC");
+    CHECK(fallback.recordKey == "MISSING");
+}
+
+TEST_CASE("VocResolver resolves V-type verb aliases for PROC TCL bridge") {
+    const auto root = uniqueVocTempDir();
+    PickFS::FileSystem fs(root);
+    fs.createFile("VOC");
+    fs.write("VOC", PickFS::Record("SAYWHO", "V\nWHO\n"));
+
+    PickShell::VocResolver resolver(fs);
+    CHECK(resolver.resolveVerbName("SAYWHO") == "WHO");
+    CHECK(resolver.resolveVerbName("saywho") == "WHO");
+    CHECK(resolver.resolveVerbName("UNKNOWN") == "UNKNOWN");
+}

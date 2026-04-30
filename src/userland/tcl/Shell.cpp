@@ -9,7 +9,6 @@
 #include <cctype>
 #include <csignal>
 #include <filesystem>
-#include <fstream>
 #include <iostream>
 #include <limits>
 #include <optional>
@@ -648,16 +647,17 @@ namespace PickShell {
             return;
         }
 
-        const std::filesystem::path procPath = session_.programsRoot_ / (tokens[1] + ".proc");
-        std::ifstream procFile(procPath);
-        if (!procFile) {
-            out << "Error: Cannot open PROC file: " << procPath.string() << "\n";
+        const VocResolver::ProgramLocation resolved = session_.vocResolver_.resolveProcScriptLocation(tokens[1]);
+        const BasicShell::ProgramLocation location{resolved.fileName, resolved.recordKey};
+        const std::optional<std::string> scriptText = readProgramRecord(location, false);
+        if (!scriptText.has_value()) {
+            out << "Error: Cannot open PROC script: " << tokens[1] << "\n";
             return;
         }
 
         std::vector<std::string> lines;
-        std::string line;
-        while (std::getline(procFile, line)) {
+        std::istringstream scriptStream(*scriptText);
+        for (std::string line; std::getline(scriptStream, line);) {
             lines.push_back(line);
         }
 
@@ -674,10 +674,11 @@ namespace PickShell {
     }
 
     void Shell::executeProcTclCommand(const std::string &line, std::ostream &out) {
-        const Tokens tokens = tokenize(line);
+        Tokens tokens = tokenize(line);
         if (tokens.empty()) {
             return;
         }
+        tokens[0] = session_.vocResolver_.resolveVerbName(tokens[0]);
         bool quit = false;
         handleTclCommand(tokens, quit, out);
     }
@@ -853,7 +854,7 @@ namespace PickShell {
         out << "  BASIC [name]   enter BASIC editor mode\n";
         out << "  ASM [name]     enter assembler debugger mode (optional program name)\n";
         out << "  RUN <name>     resolve via VOC and run object record (auto-compiles source if needed)\n";
-        out << "  PROC <name> [args...]   run PROC script from programs root (<name>.proc)\n";
+        out << "  PROC <name> [args...]   run PROC script via VOC/filesystem resolution\n";
         out << "  LIST-PROGRAMS  list VOC-resolved program records\n";
         out << "  CREATE-FILE <name>\n";
         out << "  DELETE-FILE <name>\n";
