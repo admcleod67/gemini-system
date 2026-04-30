@@ -34,8 +34,10 @@ More detail lives under **[`docs/`](docs/README.md)**:
 
 ## Layout (high level)
 
-- **`src/core/vm/`** — bytecode parser and VM runtime (`pick-core`)
-- **`src/userland/tcl/`** — Tcl host shell and VM/filesystem command integration
+- **`src/core/vm/`** — bytecode parser and VM runtime (`gemini-core`)
+- **`src/core/filesystem/`** — Pick-style file and record layer (`gemini-core`)
+- **`src/core/voc/`** — VOC dictionary parsing and program/script name resolution (`gemini-core`)
+- **`src/userland/tcl/`** — Tcl host shell and command integration (`gemini-tcl`)
 - **`src/userland/basic/`** — BASIC shell/editor and compiler components
 - **`include/pick_system/`** — shared headers (e.g. version)
 - **`include/pickvm/`** — public VM umbrella header (`core.hpp`)

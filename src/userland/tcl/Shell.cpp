@@ -51,7 +51,7 @@ namespace PickShell {
             session_.fileSystem_.write(fileName, PickFS::Record(recordName, value));
         });
         basicShell_.setResolveProgramLocationFn([this](const std::string &programName) {
-            const VocResolver::ProgramLocation resolved = session_.vocResolver_.resolveProgramLocation(programName);
+            const PickVoc::VocResolver::ProgramLocation resolved = session_.vocResolver_.resolveProgramLocation(programName);
             return BasicShell::ProgramLocation{resolved.fileName, resolved.recordKey};
         });
         basicShell_.setReadRecordFn([this](const BasicShell::ProgramLocation &location, const bool objectRecord) {
@@ -617,7 +617,7 @@ namespace PickShell {
         }
 
         try {
-            const VocResolver::ProgramLocation resolved = session_.vocResolver_.resolveProgramLocation(programName);
+            const PickVoc::VocResolver::ProgramLocation resolved = session_.vocResolver_.resolveProgramLocation(programName);
             const BasicShell::ProgramLocation location{resolved.fileName, resolved.recordKey};
             const std::optional<std::string> objectText = readProgramRecord(location, true);
             if (!objectText.has_value()) {
@@ -654,7 +654,7 @@ namespace PickShell {
             return;
         }
 
-        const VocResolver::ProgramLocation resolved = session_.vocResolver_.resolveProcScriptLocation(tokens[1]);
+        const PickVoc::VocResolver::ProgramLocation resolved = session_.vocResolver_.resolveProcScriptLocation(tokens[1]);
         const BasicShell::ProgramLocation location{resolved.fileName, resolved.recordKey};
         const std::optional<std::string> scriptText = readProgramRecord(location, false);
         if (!scriptText.has_value()) {
@@ -734,7 +734,7 @@ namespace PickShell {
     }
 
     bool Shell::ensureProgramObjectExistsForRun(const std::string &programName, std::ostream &out) {
-        const VocResolver::ProgramLocation resolved = session_.vocResolver_.resolveProgramLocation(programName);
+        const PickVoc::VocResolver::ProgramLocation resolved = session_.vocResolver_.resolveProgramLocation(programName);
         const BasicShell::ProgramLocation location{resolved.fileName, resolved.recordKey};
         if (readProgramRecord(location, true).has_value()) {
             return true;
@@ -1072,7 +1072,7 @@ namespace PickShell {
                 out << "EDIT expects a program name without extension\n";
                 return;
             }
-            const VocResolver::ProgramLocation resolved = session_.vocResolver_.resolveProgramLocation(programName);
+            const PickVoc::VocResolver::ProgramLocation resolved = session_.vocResolver_.resolveProgramLocation(programName);
             fileName = resolved.fileName;
             recordKey = resolved.recordKey;
         } else {

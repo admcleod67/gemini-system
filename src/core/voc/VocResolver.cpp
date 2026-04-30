@@ -4,7 +4,7 @@
 #include <cctype>
 #include <sstream>
 
-namespace PickShell {
+namespace PickVoc {
     namespace {
         constexpr const char *kDefaultProgramFile = "BP";
         constexpr const char *kDefaultProcFile = "PROC";
@@ -171,7 +171,7 @@ namespace PickShell {
     }
 
     std::optional<std::string> VocResolver::resolveFileFromVocKey(const std::string &vocKey,
-                                                                   std::unordered_set<std::string> &visited) const {
+                                                                  std::unordered_set<std::string> &visited) const {
         const std::string normalized = upperAscii(vocKey);
         if (!visited.insert(normalized).second) {
             return std::nullopt;
@@ -195,4 +195,4 @@ namespace PickShell {
         }
         return std::nullopt;
     }
-} // namespace PickShell
+} // namespace PickVoc

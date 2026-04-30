@@ -13,6 +13,8 @@ add_library(gemini-core
         filesystem/Catalog.h
         filesystem/FileSystem.cpp
         filesystem/FileSystem.h
+        voc/VocResolver.cpp
+        voc/VocResolver.h
 )
 
 target_include_directories(
@@ -21,6 +23,7 @@ target_include_directories(
         "${CMAKE_SOURCE_DIR}/include"
         "${CMAKE_CURRENT_SOURCE_DIR}/vm"
         "${CMAKE_CURRENT_SOURCE_DIR}/filesystem"
+        "${CMAKE_CURRENT_SOURCE_DIR}/voc"
 )
 
 target_compile_definitions(

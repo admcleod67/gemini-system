@@ -8,7 +8,7 @@ Input is tokenized by whitespace (filenames with spaces are not supported by the
 
 ## Source layout
 
-- Tcl host shell and VM/filesystem command integration: `src/userland/tcl/`
+- Tcl host shell and filesystem command integration: `src/userland/tcl/` (VOC resolution lives in [`src/core/voc/`](../src/core/voc/), used by [`ShellSession`](../src/userland/tcl/ShellSession.h))
 - BASIC line buffer + BASIC/ED command interpreter: `src/userland/basic/`
 - PROC interpreter (line-oriented Milestone 1 subset): `src/userland/proc/`
 - BASIC compiler is implemented in `src/userland/basic/BasicCompiler.*`.

@@ -1,5 +1,9 @@
-#ifndef PICK_SYSTEM_TCL_VOCRESOLVER_H
-#define PICK_SYSTEM_TCL_VOCRESOLVER_H
+//
+// VOC (dictionary) parsing and lookup for Pick-style name resolution.
+//
+
+#ifndef PICK_SYSTEM_VOC_VOCRESOLVER_H
+#define PICK_SYSTEM_VOC_VOCRESOLVER_H
 
 #pragma once
 
@@ -11,7 +15,7 @@
 #include <unordered_set>
 #include <vector>
 
-namespace PickShell {
+namespace PickVoc {
     class VocResolver {
     public:
         struct ProgramLocation {
@@ -61,6 +65,6 @@ namespace PickShell {
         std::optional<std::string> resolveFileFromVocKey(const std::string &vocKey,
                                                          std::unordered_set<std::string> &visited) const;
     };
-} // namespace PickShell
+} // namespace PickVoc
 
-#endif // PICK_SYSTEM_TCL_VOCRESOLVER_H
+#endif // PICK_SYSTEM_VOC_VOCRESOLVER_H

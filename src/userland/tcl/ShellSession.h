@@ -45,7 +45,7 @@ namespace PickShell {
         std::filesystem::path programsRoot_{"programs"};
         std::filesystem::path filesystemRoot_{"filesystem"};
         PickFS::FileSystem fileSystem_;
-        VocResolver vocResolver_;
+        PickVoc::VocResolver vocResolver_;
         std::optional<PickVM::LoadedBytecode> lastLoaded_;
         bool trace_{false};
         std::unordered_set<std::size_t> breakpoints_;

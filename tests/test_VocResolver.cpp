@@ -21,7 +21,7 @@ TEST_CASE("VocResolver parses F/Q/V records from VOC and resolves program file w
     fs.write("VOC", PickFS::Record("DEFAULT", "Q\nBP\n"));
     fs.write("VOC", PickFS::Record("BASIC", "V\nBASIC\n"));
 
-    PickShell::VocResolver resolver(fs);
+    PickVoc::VocResolver resolver(fs);
     const auto fromQ = resolver.resolveProgramLocation("DEFAULT");
     CHECK(fromQ.fileName == "BP");
     CHECK(fromQ.recordKey == "DEFAULT");
@@ -39,7 +39,7 @@ TEST_CASE("VocResolver lookup is case-insensitive and protects against Q-cycles"
     fs.write("VOC", PickFS::Record("A", "Q\nB\n"));
     fs.write("VOC", PickFS::Record("B", "Q\nA\n"));
 
-    PickShell::VocResolver resolver(fs);
+    PickVoc::VocResolver resolver(fs);
     const auto caseInsensitive = resolver.resolveProgramLocation("Bp");
     CHECK(caseInsensitive.fileName == "BP");
 
@@ -54,7 +54,7 @@ TEST_CASE("VocResolver resolves PROC scripts with PROC fallback") {
     fs.createFile("VOC");
     fs.write("VOC", PickFS::Record("SCRIPT", "F\nSCRIPTS\n"));
 
-    PickShell::VocResolver resolver(fs);
+    PickVoc::VocResolver resolver(fs);
     const auto mapped = resolver.resolveProcScriptLocation("SCRIPT");
     CHECK(mapped.fileName == "SCRIPTS");
     CHECK(mapped.recordKey == "SCRIPT");
@@ -70,7 +70,7 @@ TEST_CASE("VocResolver resolves V-type verb aliases for PROC TCL bridge") {
     fs.createFile("VOC");
     fs.write("VOC", PickFS::Record("SAYWHO", "V\nWHO\n"));
 
-    PickShell::VocResolver resolver(fs);
+    PickVoc::VocResolver resolver(fs);
     CHECK(resolver.resolveVerbName("SAYWHO") == "WHO");
     CHECK(resolver.resolveVerbName("saywho") == "WHO");
     CHECK(resolver.resolveVerbName("UNKNOWN") == "UNKNOWN");
