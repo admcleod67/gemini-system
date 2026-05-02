@@ -19,7 +19,7 @@ This Stage 1 milestone intentionally introduces debugger ownership before introd
 
 | Command | Description |
 |---------|-------------|
-| `RUN [name]` | `RUN name` loads/runs `<name>.tbc` (with existing BASIC auto-compile fallback), `RUN` resumes from breakpoint state. |
+| `RUN [name]` | `RUN name` uses the same VOC-backed resolution as Tcl **`RUN`**: load bytecode from **`<name>_OBJ`** in the resolved Pick file (or compile from source **`name`** if object is missing—see Tcl shell). Bare `RUN` resumes from breakpoint/suspended state in ASM. |
 | `CONT` | Alias for bare `RUN` resume. |
 | `STEP` | Single-step one VM instruction for the loaded program image. |
 | `TRACE ON|OFF` | Toggle per-instruction tracing during `RUN`/`CONT`. |

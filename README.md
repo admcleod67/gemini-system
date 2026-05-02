@@ -9,6 +9,8 @@ The **current implementation is intentionally minimal**: a small virtual machine
 a thin developer shell. The goal is to grow the system in **small, verifiable steps** (tests, clear boundaries) rather
 than landing a large stack at once.
 
+A phased **roadmap** (Milestone 1 onward) is summarized in **[`docs/milestones.md`](docs/milestones.md)**; Milestone 1 aligns with today’s codebase, and later milestones are subject to refinement.
+
 ## Building
 
 Requires **CMake 3.16+** and a **C++17** toolchain.
@@ -28,9 +30,11 @@ More detail lives under **[`docs/`](docs/README.md)**:
 - **[Bytecode VM](docs/vm.md)** — `.tbc` format, opcodes, parser and runtime.
 - **[Developer shell (TCL)](docs/tcl-shell.md)** — host shell commands and mode entry (`BASIC`, `PROC`, `ASM`).
 - **[Assembler shell (ASM)](docs/assembler-shell.md)** — VM-level debugger workflow and command set.
-- **[BASIC shell](docs/basic-shell.md)** — BASIC and ED mode commands, program editing and SAVE rules.
+- **[File system](docs/filesystem.md)** — Pick logical files/records backing Tcl and BASIC I/O.
+- **[BASIC shell](docs/basic-shell.md)** — program buffer, SAVE/LOAD, COMPILE/`RUN`; `EDIT` uses the shared system line editor.
 - **[BASIC language](docs/basic-language.md)** — supported BASIC compiler subset and expression semantics.
 - **[Compiler architecture](docs/compiler-architecture.md)** — parse/semantic/emit phase boundaries.
+- **[Project milestones](docs/milestones.md)** — phased roadmap / future direction.
 
 ## Layout (high level)
 
@@ -38,7 +42,7 @@ More detail lives under **[`docs/`](docs/README.md)**:
 - **`src/core/filesystem/`** — Pick-style file and record layer (`gemini-core`)
 - **`src/core/voc/`** — VOC dictionary parsing and program/script name resolution (`gemini-core`)
 - **`src/userland/tcl/`** — Tcl host shell and command integration (`gemini-tcl`)
-- **`src/userland/basic/`** — BASIC shell/editor and compiler components
+- **`src/userland/basic/`** — BASIC shell, compiler, and runtime components
 - **`include/pick_system/`** — shared headers (e.g. version)
 - **`include/pickvm/`** — public VM umbrella header (`core.hpp`)
 - **`tests/`** — **doctest**-based tests
