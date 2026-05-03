@@ -29,6 +29,7 @@ add_executable(
         test_FileSystem.cpp
         test_VocResolver.cpp
         test_Shell.cpp
+        test_LoginService.cpp
         test_TclEnvironment.cpp
 )
 target_link_libraries(pick-tests PRIVATE gemini-tcl doctest_headers)

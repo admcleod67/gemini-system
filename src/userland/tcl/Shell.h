@@ -11,6 +11,7 @@
 #include "BasicShell.h"
 #include "ProcInterpreter.h"
 #include "ShellSession.h"
+#include "UserSession.h"
 
 #include <filesystem>
 #include <functional>
@@ -23,6 +24,11 @@
 #include <vector>
 
 namespace PickShell {
+    enum class ShellRunResult {
+        ExitProcess,
+        EndSession,
+    };
+
     class Shell {
     public:
         explicit Shell(PickVM::Runtime &runtime);
@@ -37,14 +43,13 @@ namespace PickShell {
 
         const std::filesystem::path &fileSystemRoot() const { return session_.fileSystemRoot(); }
 
-        /// Parent directory of ACCOUNTS.json / USERS.json. When set, interactive `run()` uses a login phase first.
+        /// Parent directory of ACCOUNTS.json / USERS.json. When set, the host (`main`) runs core login before the Tcl REPL.
         void setGeminiCatalogRoot(std::optional<std::filesystem::path> root);
 
-        /// If `GEMINI_AUTO_LOGIN` is set and catalogue is configured, attempt `performLogin` before the REPL.
-        void tryAutoLoginFromEnvironment(std::ostream &warn);
+        [[nodiscard]] const std::optional<std::filesystem::path> &geminiCatalogRoot() const { return session_.geminiCatalogRoot(); }
 
-        /// Catalogue-backed login (also used by the interactive login phase). Returns true on success.
-        [[nodiscard]] bool performLogin(const std::string &username, const std::string &password, std::ostream &err);
+        /// Apply a successful core login (filesystem root, identity, Tcl `@*` variables).
+        void attachUserSession(const PickCore::UserSession &session);
 
         // One line of input; all command output goes to out. For interactive use, pass std::cout.
         void handleLine(const std::string &line, std::ostream &out, bool &quit);
@@ -52,7 +57,8 @@ namespace PickShell {
         // Optional VM input source for instructions like INPUT_INT. nullptr selects std::cin.
         void setInputStream(std::istream *in);
 
-        void run(); // REPL: stdin, prompts on std::cout, command output on std::cout
+        /// Tcl REPL only (no login). `LOGOFF` yields `EndSession`; `QUIT` / EOF yields `ExitProcess`.
+        [[nodiscard]] ShellRunResult runTclRepl();
 
     private:
         using Tokens = std::vector<std::string>;
@@ -66,6 +72,7 @@ namespace PickShell {
         ProcInterpreter procInterpreter_;
         CommandTable tclCommands_;
         std::istream *inputStream_{nullptr};
+        bool sessionEndRequested_{false};
 
         static std::vector<std::string> tokenize(const std::string &line);
 
@@ -152,22 +159,9 @@ namespace PickShell {
 
         void cmdUnset(const std::vector<std::string> &tokens, std::ostream &out);
 
-        [[nodiscard]] bool needsGeminiLogin() const;
-
-        void runInteractiveLoop();
-
-        /// Returns false if stdin closed (exit host). True when logged in.
-        bool runLoginPhase(std::istream &in, std::ostream &out);
-
-        static bool isReservedLoginUsername(const std::string &token);
-
-        static bool parseSingleUsernameLine(const std::string &line, std::string &outUsername);
-
         void cmdLogto(const std::vector<std::string> &tokens, std::ostream &out);
 
         void cmdLogoff(const std::vector<std::string> &tokens, std::ostream &out);
-
-        bool returnToLoginAfterLogoff_{false};
 
         std::unordered_set<int> basicBreakpoints_;
         std::optional<int> basicResumePastLine_;

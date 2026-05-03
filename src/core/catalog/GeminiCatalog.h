@@ -2,15 +2,15 @@
 // Load gemini/USERS.json and gemini/ACCOUNTS.json (host JSON catalogues).
 //
 
-#ifndef PICK_SYSTEM_TCL_GEMINICATALOG_H
-#define PICK_SYSTEM_TCL_GEMINICATALOG_H
+#ifndef PICK_SYSTEM_CORE_CATALOG_GEMINICATALOG_H
+#define PICK_SYSTEM_CORE_CATALOG_GEMINICATALOG_H
 
 #include <filesystem>
 #include <optional>
 #include <string>
 #include <vector>
 
-namespace PickShell {
+namespace PickCore {
     struct GeminiUserRow {
         std::string username;
         std::string passwordHash;
@@ -30,6 +30,6 @@ namespace PickShell {
 
         [[nodiscard]] static std::optional<std::vector<GeminiAccountRow>> loadAccounts(const std::filesystem::path &jsonPath);
     };
-} // namespace PickShell
+} // namespace PickCore
 
 #endif

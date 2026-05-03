@@ -2,6 +2,8 @@
 
 The Tcl shell is the host REPL for system commands, BASIC/PROC entry, and filesystem commands.
 
+When a **Gemini catalogue root** is configured, **`PickCore::LoginService`** (in **`gemini-core`**) runs in **`main`** first; the Tcl layer receives a **`PickCore::UserSession`** via **`Shell::attachUserSession`** and then runs **`Shell::runTclRepl()`** only (no nested login loop inside the shell).
+
 - **Prompt:** `TCL> `
 
 Input is tokenized by whitespace (filenames with spaces are not supported by the tokenizer).
@@ -63,6 +65,8 @@ For the full current behavior (validation rules, storage model, VOC behavior, er
 | **`WRITE`** *file* *record-name* *value…* | Upsert record value. Value is remaining tokens joined with single spaces. |
 | **`EDIT`** *file* *record-name* \| **`EDIT`** *programName* | Open a **blocking** line-oriented record editor (prompt **`ED> `**) on an in-memory copy of the record. Shorthand *programName* resolves the **source** record `(file, key)` via VOC (same as `BASIC` / `RUN` source), never `_OBJ`. Missing record starts with an empty buffer. See [TCL EDIT](#tcl-edit-line-record-editor) below. |
 | **`DUMP-STACK`** | Print the VM stack (uses the command output stream). |
+| **`LOGTO`** *account* | After catalogue login: switch Pick root to another account from **`ACCOUNTS.json`** (requires **`VOC/`** under the resolved path). |
+| **`LOGOFF`** | After catalogue login: clear session and return control to **`main`** so the host can run the core **LOGON** phase again (not an inner Tcl loop). |
 
 Unknown first token: **`Unknown command: …`**.
 

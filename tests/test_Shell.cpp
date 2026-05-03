@@ -10,6 +10,7 @@
 #include <pick_system/version.hpp>
 
 #include "FileSystem.h"
+#include "LoginService.h"
 #include "Shell.h"
 #include "Runtime.h"
 
@@ -1877,7 +1878,7 @@ TEST_CASE("shell HELP lists EDIT") {
     CHECK(out.str().find("LOGOFF") != std::string::npos);
 }
 
-TEST_CASE("shell WHO after performLogin shows session") {
+TEST_CASE("shell WHO after attachUserSession shows session") {
     const auto root = uniqueTempDir();
     const auto gem = root / "gemini";
     std::filesystem::create_directories(gem / "accounts" / "TST" / "VOC");
@@ -1897,10 +1898,11 @@ TEST_CASE("shell WHO after performLogin shows session") {
     PickVM::Runtime rt;
     PickShell::Shell sh(rt);
     sh.setGeminiCatalogRoot(gem);
-    sh.setFileSystemRoot(gem / "accounts" / "TST");
     std::ostringstream err;
-    REQUIRE(sh.performLogin("u1", "", err));
+    const auto session = PickCore::LoginService::authenticate(gem, "u1", "", err);
+    REQUIRE(session.has_value());
     CHECK(err.str().empty());
+    sh.attachUserSession(*session);
 
     std::ostringstream out;
     bool quit = false;

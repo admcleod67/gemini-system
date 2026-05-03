@@ -15,6 +15,13 @@ add_library(gemini-core
         filesystem/FileSystem.h
         voc/VocResolver.cpp
         voc/VocResolver.h
+        catalog/GeminiCatalog.cpp
+        catalog/GeminiCatalog.h
+        login/LoginService.cpp
+        login/LoginService.h
+        login/UserSession.h
+        host/HostBootstrap.cpp
+        host/HostBootstrap.h
 )
 
 target_include_directories(
@@ -24,7 +31,12 @@ target_include_directories(
         "${CMAKE_CURRENT_SOURCE_DIR}/vm"
         "${CMAKE_CURRENT_SOURCE_DIR}/filesystem"
         "${CMAKE_CURRENT_SOURCE_DIR}/voc"
+        "${CMAKE_CURRENT_SOURCE_DIR}/catalog"
+        "${CMAKE_CURRENT_SOURCE_DIR}/login"
+        "${CMAKE_CURRENT_SOURCE_DIR}/host"
 )
+
+target_link_libraries(gemini-core PUBLIC nlohmann_json::nlohmann_json)
 
 target_compile_definitions(
         gemini-core

@@ -3,7 +3,7 @@
 #include <fstream>
 #include <nlohmann/json.hpp>
 
-namespace PickShell {
+namespace PickCore {
     std::optional<std::vector<GeminiUserRow>> GeminiCatalog::loadUsers(const std::filesystem::path &jsonPath) {
         try {
             std::ifstream in(jsonPath);
@@ -53,4 +53,4 @@ namespace PickShell {
             return std::nullopt;
         }
     }
-} // namespace PickShell
+} // namespace PickCore

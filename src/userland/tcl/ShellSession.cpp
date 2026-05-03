@@ -84,6 +84,17 @@ namespace PickShell {
         geminiCatalogRoot_ = std::move(root);
     }
 
+    void ShellSession::applyUserSession(const PickCore::UserSession &session) {
+        geminiCatalogRoot_ = session.catalogRoot;
+        setFileSystemRoot(session.pickRoot);
+        resetForQuit();
+        setSessionIdentity(session.whoPort, session.username, session.accountName);
+        loggedIn_ = true;
+        (void) env_.set("@USERNO", session.userNo);
+        (void) env_.set("@ACCOUNT", session.accountName);
+        (void) env_.set("@LOGNAME", session.username);
+    }
+
     void ShellSession::setSessionIdentity(const int port, std::string username, std::string account) {
         whoPort_ = port;
         sessionUsername_ = std::move(username);

@@ -1,6 +1,8 @@
 #include "Shell.h"
 
 #include "BytecodeText.h"
+#include "Catalog.h"
+#include "GeminiCatalog.h"
 #include "LineRecordEditor.h"
 
 #include <pick_system/version.hpp>
@@ -16,6 +18,7 @@
 #include <set>
 #include <sstream>
 #include <stdexcept>
+#include <string_view>
 #include <vector>
 
 namespace PickShell {
@@ -86,6 +89,14 @@ namespace PickShell {
         session_.setFileSystemRoot(std::move(root));
     }
 
+    void Shell::setGeminiCatalogRoot(std::optional<std::filesystem::path> root) {
+        session_.setGeminiCatalogRoot(std::move(root));
+    }
+
+    void Shell::attachUserSession(const PickCore::UserSession &session) {
+        session_.applyUserSession(session);
+    }
+
     std::vector<std::string> Shell::tokenize(const std::string &line) {
         std::istringstream iss(line);
         std::vector<std::string> out;
@@ -95,9 +106,28 @@ namespace PickShell {
         return out;
     }
 
-    void Shell::run() {
+    ShellRunResult Shell::runTclRepl() {
         std::signal(SIGINT, SIG_IGN); // Ctrl-C does nothing outside a running program
-        runInteractiveLoop();
+        sessionEndRequested_ = false;
+        std::istream &in = inputStream_ != nullptr ? *inputStream_ : std::cin;
+        std::ostream &out = std::cout;
+        out << "Gemini/TCL Developer Shell\n";
+        out << "Type HELP for commands\n";
+        for (;;) {
+            out << prompt() << std::flush;
+            std::string line;
+            if (!std::getline(in, line)) {
+                return ShellRunResult::ExitProcess;
+            }
+            bool quit = false;
+            handleLine(line, out, quit);
+            if (quit) {
+                return ShellRunResult::ExitProcess;
+            }
+            if (sessionEndRequested_) {
+                return ShellRunResult::EndSession;
+            }
+        }
     }
 
     void Shell::handleLine(const std::string &line, std::ostream &out, bool &quit) {
@@ -851,7 +881,7 @@ namespace PickShell {
         out << "  UNSET <name>\n";
         out << "  WHO\n";
         out << "  LOGTO <account>   switch account (reloads Pick root)\n";
-        out << "  LOGOFF            end session; return to login\n";
+        out << "  LOGOFF            end session; host returns to core login\n";
         out << "  BASIC [name]   enter BASIC editor mode\n";
         out << "  ASM [name]     enter assembler debugger mode (optional program name)\n";
         out << "  RUN <name>     resolve via VOC and run object record (auto-compiles source if needed)\n";
@@ -1079,5 +1109,75 @@ namespace PickShell {
         }
 
         runLineRecordEditorForLocation(fileName, recordKey, std::nullopt, out);
+    }
+
+    namespace {
+        bool iequalsAscii(std::string_view a, std::string_view b) {
+            if (a.size() != b.size()) {
+                return false;
+            }
+            for (std::size_t i = 0; i < a.size(); ++i) {
+                if (std::tolower(static_cast<unsigned char>(a[i])) != std::tolower(static_cast<unsigned char>(b[i]))) {
+                    return false;
+                }
+            }
+            return true;
+        }
+    } // namespace
+
+    void Shell::cmdLogto(const std::vector<std::string> &tokens, std::ostream &out) {
+        if (!session_.loggedIn()) {
+            out << "Not logged in.\n";
+            return;
+        }
+        if (tokens.size() != 2U) {
+            out << "LOGTO requires an account name\n";
+            return;
+        }
+        const auto &cat = session_.geminiCatalogRoot();
+        if (!cat.has_value()) {
+            out << "No Gemini catalogue configured.\n";
+            return;
+        }
+        const auto accounts = PickCore::GeminiCatalog::loadAccounts(*cat / "ACCOUNTS.json");
+        if (!accounts.has_value()) {
+            out << "Cannot read ACCOUNTS.json.\n";
+            return;
+        }
+        const PickCore::GeminiAccountRow *acct = nullptr;
+        for (const auto &a: *accounts) {
+            if (iequalsAscii(a.name, tokens[1])) {
+                acct = &a;
+                break;
+            }
+        }
+        if (acct == nullptr) {
+            out << "Unknown account.\n";
+            return;
+        }
+        std::error_code ec;
+        const std::filesystem::path pickRoot = (*cat / acct->root).lexically_normal();
+        if (!std::filesystem::is_directory(pickRoot / "VOC", ec)) {
+            out << "Account path has no VOC.\n";
+            return;
+        }
+        session_.setFileSystemRoot(pickRoot);
+        session_.resetForQuit();
+        session_.setSessionIdentity(session_.whoPort(), session_.sessionUsername(), acct->name);
+        (void) session_.env_.set("@USERNO", "0");
+        (void) session_.env_.set("@ACCOUNT", acct->name);
+        (void) session_.env_.set("@LOGNAME", session_.sessionUsername());
+    }
+
+    void Shell::cmdLogoff(const std::vector<std::string> &tokens, std::ostream &out) {
+        (void) tokens;
+        if (!session_.loggedIn()) {
+            out << "Not logged in.\n";
+            return;
+        }
+        session_.clearLoginSession();
+        session_.resetForQuit();
+        sessionEndRequested_ = true;
+        out << "Logged off.\n";
     }
 } // namespace PickShell

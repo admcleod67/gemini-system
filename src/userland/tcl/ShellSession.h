@@ -9,6 +9,8 @@
 
 #include <pickvm/core.hpp>
 
+#include "UserSession.h"
+
 #include "FileSystem.h"
 #include "TclEnvironment.h"
 #include "VocResolver.h"
@@ -44,6 +46,9 @@ namespace PickShell {
         void setGeminiCatalogRoot(std::optional<std::filesystem::path> root);
 
         [[nodiscard]] const std::optional<std::filesystem::path> &geminiCatalogRoot() const { return geminiCatalogRoot_; }
+
+        /// Apply catalogue login result from core (`PickCore::LoginService`).
+        void applyUserSession(const PickCore::UserSession &session);
 
         [[nodiscard]] bool loggedIn() const { return loggedIn_; }
 

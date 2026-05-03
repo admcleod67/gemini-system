@@ -1,11 +1,3 @@
-include(FetchContent)
-FetchContent_Declare(
-        nlohmann_json
-        GIT_REPOSITORY https://github.com/nlohmann/json.git
-        GIT_TAG v3.11.3
-)
-FetchContent_MakeAvailable(nlohmann_json)
-
 add_library(gemini-tcl
         assembler/AssemblerShell.cpp
         assembler/AssemblerShell.h
@@ -35,11 +27,8 @@ add_library(gemini-tcl
         tcl/LineRecordEditor.h
         tcl/Shell.cpp
         tcl/Shell.h
-        tcl/ShellAuth.cpp
         tcl/DefaultFileSystemRoot.cpp
         tcl/DefaultFileSystemRoot.h
-        tcl/GeminiCatalog.cpp
-        tcl/GeminiCatalog.h
         tcl/ShellSession.cpp
         tcl/ShellSession.h
         tcl/TclEnvironment.cpp
@@ -55,7 +44,7 @@ target_include_directories(
         "${CMAKE_CURRENT_SOURCE_DIR}/tcl"
 )
 
-target_link_libraries(gemini-tcl PUBLIC gemini-core nlohmann_json::nlohmann_json)
+target_link_libraries(gemini-tcl PUBLIC gemini-core)
 
 target_compile_definitions(
         gemini-tcl
