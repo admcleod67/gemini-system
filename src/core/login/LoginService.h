@@ -5,6 +5,7 @@
 #ifndef PICK_SYSTEM_CORE_LOGIN_LOGINSERVICE_H
 #define PICK_SYSTEM_CORE_LOGIN_LOGINSERVICE_H
 
+#include "GeminiCatalog.h"
 #include "UserSession.h"
 
 #include <filesystem>
@@ -27,6 +28,12 @@ namespace PickCore {
                                                                             const std::string &accountName,
                                                                             const std::string &password,
                                                                             std::ostream &err);
+
+        /// If `acctRow` requires a password (non-optional hash, not `dev-` placeholder), read one line from `in`
+        /// into `password`. Returns `false` only when a line was required and `getline` hit EOF before a line.
+        [[nodiscard]] static bool readPasswordLineIfAccountRequires(std::istream &in,
+                                                                    const GeminiAccountRow *acctRow,
+                                                                    std::string &password);
 
         /// After `BootMonitor`. For `ColdStartPortInit` only, may read `MD,AUTO-LOGON` / env and print
         /// `LOGON PLEASE: <account>` then **`endl`** (no stdin Enter — terminates the echoed line like interactive).

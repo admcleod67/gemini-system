@@ -4,6 +4,7 @@
 #include "Catalog.h"
 #include "GeminiCatalog.h"
 #include "LineRecordEditor.h"
+#include "LoginService.h"
 
 #include <pick_system/version.hpp>
 
@@ -1244,9 +1245,10 @@ namespace PickShell {
             out << "Cannot read ACCOUNTS.json.\n";
             return;
         }
+        const std::string &accountName = tokens[1];
         const PickCore::GeminiAccountRow *acct = nullptr;
         for (const auto &a: *accounts) {
-            if (iequalsAscii(a.name, tokens[1])) {
+            if (iequalsAscii(a.name, accountName)) {
                 acct = &a;
                 break;
             }
@@ -1255,15 +1257,18 @@ namespace PickShell {
             out << "Unknown account.\n";
             return;
         }
-        std::error_code ec;
-        const std::filesystem::path pickRoot = (*cat / acct->root).lexically_normal();
-        if (!std::filesystem::is_directory(pickRoot / "VOC", ec)) {
-            out << "Account path has no VOC.\n";
+        std::istream &in = inputStream_ != nullptr ? *inputStream_ : std::cin;
+        std::string password;
+        if (!PickCore::LoginService::readPasswordLineIfAccountRequires(in, acct, password)) {
+            out << "EOF\n";
             return;
         }
-        session_.setFileSystemRoot(pickRoot);
-        session_.resetForQuit();
-        session_.setSessionIdentity(session_.whoPort(), session_.sessionUsername(), acct->name);
+        std::ostringstream err;
+        if (const auto sess = PickCore::LoginService::authenticateAccount(*cat, accountName, password, err)) {
+            session_.applyUserSession(*sess);
+            return;
+        }
+        out << err.str();
     }
 
     void Shell::cmdLogoff(const std::vector<std::string> &tokens, std::ostream &out) {

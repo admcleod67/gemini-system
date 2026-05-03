@@ -1668,6 +1668,83 @@ TEST_CASE("shell WHO after attachUserSession shows session") {
     CHECK(out.str() == "0 TST TST\n");
 }
 
+TEST_CASE("shell LOGTO applies catalogue session like fresh logon") {
+    const auto root = uniqueTempDir();
+    const auto gem = root / "gemini";
+    for (const char *acc: {"TST", "OTH"}) {
+        std::filesystem::create_directories(gem / "accounts" / acc / "VOC");
+        std::ofstream vocEntry(gem / "accounts" / acc / "VOC" / "BP.item");
+        vocEntry << "F\nBP\n";
+    }
+    {
+        std::ofstream accounts(gem / "ACCOUNTS.json");
+        accounts << R"({"accounts":[{"name":"TST","root":"accounts/TST"},{"name":"OTH","root":"accounts/OTH"}]})";
+    }
+
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setGeminiCatalogRoot(gem);
+    std::ostringstream err;
+    const auto session = PickCore::LoginService::authenticateAccount(gem, "TST", "", err);
+    REQUIRE(session.has_value());
+    CHECK(err.str().empty());
+    sh.attachUserSession(*session);
+
+    std::ostringstream out;
+    bool quit = false;
+    sh.handleLine("WHO", out, quit);
+    CHECK(out.str() == "0 TST TST\n");
+
+    out.str("");
+    sh.handleLine("LOGTO OTH", out, quit);
+    CHECK(out.str().empty());
+
+    out.str("");
+    sh.handleLine("WHO", out, quit);
+    CHECK(out.str() == "0 OTH OTH\n");
+
+    out.str("");
+    sh.handleLine("GET @LOGNAME", out, quit);
+    CHECK(out.str() == "OTH\n");
+
+    out.str("");
+    sh.handleLine("GET @USERNO", out, quit);
+    CHECK(out.str() == "0\n");
+}
+
+TEST_CASE("shell LOGTO reads password line when target account requires it") {
+    const auto root = uniqueTempDir();
+    const auto gem = root / "gemini";
+    for (const char *acc: {"TST", "PWD"}) {
+        std::filesystem::create_directories(gem / "accounts" / acc / "VOC");
+        std::ofstream vocEntry(gem / "accounts" / acc / "VOC" / "BP.item");
+        vocEntry << "F\nBP\n";
+    }
+    {
+        std::ofstream accounts(gem / "ACCOUNTS.json");
+        accounts << R"({"accounts":[{"name":"TST","root":"accounts/TST"},{"name":"PWD","root":"accounts/PWD","passwordHash":"secret"}]})";
+    }
+
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setGeminiCatalogRoot(gem);
+    std::ostringstream err;
+    const auto session = PickCore::LoginService::authenticateAccount(gem, "TST", "", err);
+    REQUIRE(session.has_value());
+    sh.attachUserSession(*session);
+
+    std::istringstream in("secret\n");
+    sh.setInputStream(&in);
+    std::ostringstream out;
+    bool quit = false;
+    sh.handleLine("LOGTO PWD", out, quit);
+    CHECK(out.str().empty());
+
+    out.str("");
+    sh.handleLine("WHO", out, quit);
+    CHECK(out.str() == "0 PWD PWD\n");
+}
+
 TEST_CASE("shell session @ system variables Tcl GET SET LIST-VARS PROC and BASIC RUN") {
     const auto root = uniqueTempDir();
     const auto gem = root / "gemini";

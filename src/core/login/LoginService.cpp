@@ -129,20 +129,6 @@ namespace PickCore {
             out.flush();
         }
 
-        /// Returns **`false`** only if a password line was required and `getline` hit EOF.
-        [[nodiscard]] bool readPasswordLineIfAccountRequires(std::istream &in, const GeminiAccountRow *acctRow, std::string &password) {
-            password.clear();
-            if (acctRow == nullptr || !acctRow->passwordHash.has_value() ||
-                passwordPlaceholderSkipsVerify(*acctRow->passwordHash)) {
-                return true;
-            }
-            if (!std::getline(in, password)) {
-                return false;
-            }
-            trimTrailingAsciiWs(password);
-            return true;
-        }
-
         /// **`authenticateAccount`** plus successful stdout seal — shared by catalogue auto-login and interactive login.
         std::optional<UserSession>
         authenticateAccountAndSealStdout(std::ostream &out,
@@ -231,6 +217,31 @@ namespace PickCore {
         return s;
     }
 
+    bool LoginService::readPasswordLineIfAccountRequires(std::istream &in,
+                                                       const GeminiAccountRow *acctRow,
+                                                       std::string &password) {
+        password.clear();
+        if (acctRow == nullptr || !acctRow->passwordHash.has_value()) {
+            return true;
+        }
+        const std::string &hash = *acctRow->passwordHash;
+        if (hash.size() >= 4U && hash.compare(0, 4, "dev-") == 0) {
+            return true;
+        }
+        if (!std::getline(in, password)) {
+            return false;
+        }
+        while (!password.empty()) {
+            const unsigned char c = static_cast<unsigned char>(password.back());
+            if (c == '\r' || c == '\n' || c == ' ' || c == '\t') {
+                password.pop_back();
+            } else {
+                break;
+            }
+        }
+        return true;
+    }
+
     std::optional<UserSession> LoginService::runCatalogLogin(std::istream &in,
                                                              std::ostream &out,
                                                              const std::filesystem::path &catalogRoot,
@@ -252,7 +263,7 @@ namespace PickCore {
                 const GeminiAccountRow *acct =
                     accountsList.has_value() ? findAccountRow(*accountsList, *autoName) : nullptr;
                 std::string password;
-                if (!readPasswordLineIfAccountRequires(in, acct, password)) {
+                if (!LoginService::readPasswordLineIfAccountRequires(in, acct, password)) {
                     return std::nullopt;
                 }
 
@@ -304,7 +315,7 @@ namespace PickCore {
             }
 
             std::string password;
-            if (!readPasswordLineIfAccountRequires(in, acct, password)) {
+            if (!LoginService::readPasswordLineIfAccountRequires(in, acct, password)) {
                 return std::nullopt;
             }
 
