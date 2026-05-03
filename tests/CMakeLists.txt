@@ -30,6 +30,7 @@ add_executable(
         test_VocResolver.cpp
         test_Shell.cpp
         test_LoginService.cpp
+        test_BootMonitor.cpp
         test_TclEnvironment.cpp
 )
 target_link_libraries(pick-tests PRIVATE gemini-tcl doctest_headers)
@@ -48,4 +49,4 @@ else ()
 endif ()
 
 add_test(NAME smoke COMMAND sh -c "echo QUIT | $<TARGET_FILE:gemini-system>")
-set_property(TEST smoke PROPERTY ENVIRONMENT "GEMINI_AUTO_LOGIN=allan")
+set_property(TEST smoke PROPERTY ENVIRONMENT "GEMINI_AUTO_LOGON=SYSPROG")

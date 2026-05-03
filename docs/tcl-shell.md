@@ -2,7 +2,7 @@
 
 The Tcl shell is the host REPL for system commands, BASIC/PROC entry, and filesystem commands.
 
-When a **Gemini catalogue root** is configured, **`PickCore::LoginService`** (in **`gemini-core`**) runs in **`main`** first; the Tcl layer receives a **`PickCore::UserSession`** via **`Shell::attachUserSession`** and then runs **`Shell::runTclRepl()`** only (no nested login loop inside the shell).
+When a **Gemini catalogue root** is configured, **`main`** runs **`PickCore::BootMonitor`** (cold-start lines), then **`PickCore::LoginService::runCatalogLogin`**, which **always prints `LOGON PLEASE:`** (`LOGON PLEASE: <account>` when MD/env supplies an account **before creating a session**) and launches Tcl **only afterward**. The Tcl layer receives a **`PickCore::UserSession`** via **`Shell::attachUserSession`** and then runs **`Shell::runTclRepl()`** only (no nested login loop inside the shell).
 
 - **Prompt:** `TCL> `
 
@@ -45,7 +45,7 @@ For the full current behavior (validation rules, storage model, VOC behavior, er
 |---------|-------------|
 | **`HELP`** | Short command list (same information as this table, in the binary). |
 | **`VERSION`** | Title, project version string, and build date. |
-| **`WHO`** | Print `port username account` when logged in with a Gemini catalogue; otherwise **`0 - -`**. |
+| **`WHO`** | Print `port username account` when logged in with a Gemini catalogue (account-only logon uses the same string for username and account until a user model exists); otherwise **`0 - -`**. |
 | **`QUIT`** | Exit the shell; clears loaded program state in the VM, shell-held bytecode metadata, and **shell variables**. |
 | **`ECHO`** … | Echo remaining tokens, **space-separated**. Within each token, scan left to right: **`$$`** becomes a single **`$`**; **`$Name`** ( **`Name`** = letters, digits, underscore, at least one character) is replaced by that variable’s value, or nothing if unset; any other **`$`** is echoed literally. |
 | **`SET`** *name* *word…* | Set a **shell variable**. Names are **case-insensitive**; the canonical name is **ASCII uppercase** (what **`LIST-VARS`** shows). The value is the remaining tokens joined with single spaces; **`SET`** *name* alone sets an empty string. Variable names must be non-empty. |

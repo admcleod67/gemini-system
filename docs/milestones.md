@@ -36,7 +36,7 @@ Roughly reflects what exists in the tree today:
 
 **User-facing flow**
 
-- **Core boot:** Catalogue-backed **LOGON** (console prompts and **`PickCore::LoginService`**) is a **`gemini-core`** stage in **`main`**, not part of the Tcl REPL; Tcl starts only after a **`UserSession`** exists.
+- **Core boot:** **`PickCore::BootMonitor`** cold-start output, then catalogue-backed **LOGON** (**`PickCore::LoginService`**, account-based, optional **`MD,AUTO-LOGON`**) in **`main`**, not part of the Tcl REPL; Tcl starts only after a **`UserSession`** exists.
 - **`LOGIN`:** Load user, apply default account, load MD/VOC, initialise session context (pointers, TCL, BASIC as needed).
 - **`LOGTO`:** Switch account, reload MD/VOC, reset session context for the new account.
 - **`WHO`** and **`LOGOFF`:** Minimal introspection and clean session teardown / logout.

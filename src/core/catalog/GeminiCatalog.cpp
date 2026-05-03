@@ -46,6 +46,12 @@ namespace PickCore {
                 GeminiAccountRow a;
                 a.name = row.value("name", "");
                 a.root = row.value("root", "");
+                if (row.contains("passwordHash") && !row["passwordHash"].is_null() && row["passwordHash"].is_string()) {
+                    std::string ph = row["passwordHash"].get<std::string>();
+                    if (!ph.empty()) {
+                        a.passwordHash = std::move(ph);
+                    }
+                }
                 out.push_back(std::move(a));
             }
             return out;

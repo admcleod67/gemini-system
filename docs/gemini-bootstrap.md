@@ -14,7 +14,7 @@ So `VOC` lives at `<Pick-root>/VOC/` (a directory of `.item` records), not at `f
 ## Catalogue root vs Pick root
 
 - **Pick filesystem root** — where logical `VOC`, `BP`, … live (`setFileSystemRoot` / `ShellSession`).
-- **Gemini catalogue root** — the directory that contains **`ACCOUNTS.json`** and **`USERS.json`** (typically **`cwd/gemini`**). **`PickCore::LoginService`** (in **`gemini-core`**) reads these files; the Tcl shell only runs **after** a successful login has produced a **`PickCore::UserSession`**. The catalogue directory is **not** the same path as the Pick root.
+- **Gemini catalogue root** — the directory that contains **`ACCOUNTS.json`** (and optionally **`USERS.json`** for future or reporting use; it is **not** required for console logon). **`PickCore::LoginService`** (in **`gemini-core`**) reads **`ACCOUNTS.json`** for authentication; the Tcl shell only runs **after** a successful login has produced a **`PickCore::UserSession`**. The catalogue directory is **not** the same path as the Pick root.
 
 When the bootstrap marker `cwd/gemini/accounts/SYSPROG/VOC` is present, `applyDefaultFileSystemRoot` sets **both** the Pick root to `cwd/gemini/accounts/SYSPROG` and the catalogue root to **`cwd/gemini`**.
 
@@ -32,6 +32,10 @@ Paths are relative to the repository (or to a copy placed next to the executable
 
 `MD/`, `BP/`, and `PROC/` may be empty except for placeholder files so Git tracks the directories.
 
+### `MD/AUTO-LOGON` (optional)
+
+If the bootstrap Pick root contains logical file **`MD`** with record **`AUTO-LOGON`** (`.item` body: first line = account name), **`main`** attempts account logon from that line **before** environment auto-logon and before the interactive **`LOGON PLEASE:`** loop. Missing **`MD`** or record is ignored (no error).
+
 ## `ACCOUNTS.json` schema
 
 Top-level object:
@@ -39,39 +43,42 @@ Top-level object:
 - **`accounts`** (array): each element:
   - **`name`** (string): account id (e.g. `SYSPROG`).
   - **`root`** (string): path to the account’s Pick root, **relative to the catalogue directory** (the parent of `ACCOUNTS.json`). Example: `accounts/SYSPROG` resolves to `gemini/accounts/SYSPROG/`.
+  - **`passwordHash`** (optional string): if omitted, no password is required for that account at logon. If present and the value begins with **`dev-`**, the interactive logon phase does **not** read a password line for that account. Otherwise one additional line is read **without a `Password:` banner** and compared as plain text (development-only; not secure for production).
 
 ## `USERS.json` schema
 
-Top-level object:
+Optional file (same shape as before). If present and parses, the cold-start **`PickCore::BootMonitor`** prints **`USERS ATTACHED`**. It is **not** used for the account-only console logon path today.
 
-- **`users`** (array): each element:
-  - **`username`** (string): login id.
-  - **`passwordHash`** (string): if this value begins with **`dev-`**, the interactive login phase **does not prompt for a password** (development placeholder). Otherwise the user must enter a password line, compared to this field as plain text (not secure; replace for real deployments).
-  - **`defaultAccount`** (string): must match an `accounts[].name`.
-  - **`privileges`** (string): reserved for future use; may be empty.
+## Cold start (`PickCore::BootMonitor`)
 
-## Interactive login (R83-style, core boot stage)
+After `Runtime` and default roots are prepared, **`PickCore::BootMonitor::runColdStart`** prints a short milestone sequence (version line, init, memory line as **`(host n/a)`** until a real policy exists, filesystem / **`MD`** / catalogue probes, **`PORT MANAGER: (stub)`**, **`SYSTEM READY`**). Each line reflects an actual check where possible; see [`src/core/boot/BootMonitor.cpp`](../src/core/boot/BootMonitor.cpp).
 
-When a **catalogue root** is configured, **`gemini-system`** / **`gemini-cli`** run **`PickCore::LoginService`** in the host **`main`** loop **before** the Tcl REPL:
+## Interactive login (account-only, core boot stage)
 
-1. The host prints **`LOGON PLEASE:`** and **`Enter your username (EOF to exit).`**, then a **`Username:`** prompt. This is **not** Tcl: the user must type **one username token only** (same character rules as Pick file names; reserved words such as `LOGIN`, `QUIT`, `HELP`, … are rejected).
-2. If the user’s `passwordHash` does **not** start with `dev-`, a **`Password:`** prompt appears and one line is read as the password.
-3. On success, **`PickShell::Shell::attachUserSession`** applies the resulting **`PickCore::UserSession`**: default account Pick root, VM/Tcl reset, **`@USERNO`**, **`@ACCOUNT`**, **`@LOGNAME`**, and only then the **`TCL>`** REPL runs via **`Shell::runTclRepl()`**.
+When a **catalogue root** is configured, **`gemini-system`** / **`gemini-cli`** call **`PickCore::LoginService::runCatalogLogin`** after **`SYSTEM READY`** and **before** the Tcl REPL. The boot monitor never starts Tcl — **`main`** does, only after **`runCatalogLogin`** returns a **`UserSession`**.
+
+Every successful entry into userland prints a **`LOGON PLEASE:`** boundary first:
+
+1. **`MD,AUTO-LOGON`** and then **`GEMINI_AUTO_LOGON`** / deprecated **`GEMINI_AUTO_LOGIN`** provide an optional **account** token **without** skipping the boundary: **`stdout`** prints **`LOGON PLEASE:`** and the resolved account **on one line** (for example **`LOGON PLEASE: SYSPROG`**), then authentication runs (silent password line if the account JSON row has a non-`dev-` **`passwordHash`**). If authentication fails after that visible line, the service falls through to interactive logon (**`stderr`** may carry diagnostics).
+2. **Interactive retry** prints **`LOGON PLEASE:`** on its own line (no `Username:` helper). The next line must be a **single account id** token (same character rules as Pick file names; reserved words such as `LOGIN`, `QUIT`, `HELP`, … are rejected). This is **not** Tcl.
+3. On success, **`PickShell::Shell::attachUserSession`** applies **`PickCore::UserSession`**: Pick root for that account, VM/Tcl reset, **`@USERNO`**, **`@ACCOUNT`**, **`@LOGNAME`**. For account-only logon, **`username`** and **`accountName`** are the same string until a distinct user model exists.
 4. **EOF / Ctrl-D** during the login phase exits the host (no `QUIT` keyword in login phase).
 
-**`LOGTO account`** and **`LOGOFF`** remain **Tcl commands** after login. **`LOGOFF`** clears the session and **`runTclRepl()`** returns to **`main`**, which **re-enters** the core login service (same pattern a future port monitor would use when a channel is released).
+**`LOGTO account`** and **`LOGOFF`** remain **Tcl commands** after login. **`LOGOFF`** clears the session and **`runTclRepl()`** returns to **`main`**, which **re-enters** the core login service.
 
-**`WHO`** prints `port username account` when logged in (port is `0` for now). When not logged in (e.g. tests without a catalogue), **`WHO`** prints **`0 - -`**.
+**`WHO`** prints `port username account` when logged in (port is `0` for now). With account-only logon, **`username`** and **`account`** match. When not logged in (e.g. tests without a catalogue), **`WHO`** prints **`0 - -`**.
 
-## `GEMINI_AUTO_LOGIN`
+**Breaking change:** logon is **account-based** (`ACCOUNTS.json` only). The previous **`USERS.json` username + defaultAccount** logon path has been removed.
 
-If **`GEMINI_AUTO_LOGIN`** is set to a **username** and a catalogue root is configured, **`main`** calls **`PickCore::LoginService::tryAutoLoginFromEnv`** (with **`stderr`** for failure messages) before the console login prompts—equivalent to a successful username/password flow for a `dev-` style hash. If that fails, the usual **`LOGON PLEASE:`** interactive phase runs. On each new login cycle after **`LOGOFF`**, **`tryAutoLoginFromEnv`** is attempted again when the variable is still set.
+## `GEMINI_AUTO_LOGON` and `GEMINI_AUTO_LOGIN`
 
-The **smoke** test sets **`GEMINI_AUTO_LOGIN=allan`** so `echo QUIT | gemini-system` still works when the bootstrap tree is present.
+If **`GEMINI_AUTO_LOGON`** is set to an **account name** and a catalogue root is configured, **`runCatalogLogin`** uses it whenever **`MD,AUTO-LOGON`** does not yield a valid account (with **`stderr`** on failure **after** the visible **`LOGON PLEASE: …`** line, when auth fails). **`GEMINI_AUTO_LOGIN`** is accepted as a **deprecated alias** (same value: account name).
+
+The **smoke** test sets **`GEMINI_AUTO_LOGON=SYSPROG`** so `echo QUIT | gemini-system` still works when the bootstrap tree is present (and may also succeed via committed **`MD/AUTO-LOGON`** alone when the copied tree is used).
 
 ## Default filesystem root in executables
 
-`gemini-system` and `gemini-cli` call `applyDefaultFileSystemRoot` (which uses **`PickCore::resolveDefaultHostPaths`**) before the login / REPL loop. Pick root resolution order:
+`gemini-system` and `gemini-cli` call `applyDefaultFileSystemRoot` (which uses **`PickCore::resolveDefaultHostPaths`**) before **`BootMonitor`** and the login / REPL loop. Pick root resolution order:
 
 1. If **`GEMINI_FILESYSTEM_ROOT`** is set and non-empty, its value is used as the Pick filesystem root. If **`GEMINI_CATALOG_ROOT`** is also set, it becomes the catalogue root.
 2. Else if **`gemini/accounts/SYSPROG/VOC`** exists relative to **cwd**, the Pick root is **`gemini/accounts/SYSPROG`** and the catalogue root is **`gemini/`** (relative to cwd).

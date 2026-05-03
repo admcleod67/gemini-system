@@ -1,17 +1,22 @@
-#include <cstdio>
 #include <iostream>
+#include <optional>
 
-#include <pick_system/version.hpp>
 #include <pickvm/core.hpp>
+#include <BootMonitor.h>
 #include <DefaultFileSystemRoot.h>
+#include <HostBootstrap.h>
 #include <LoginService.h>
 #include <Shell.h>
 
 int main() {
-    std::printf("%s %s\n", pick_system::system_title, pick_system::version_string);
     PickVM::Runtime vm;
     PickShell::Shell shell(vm);
     applyDefaultFileSystemRoot(shell);
+
+    PickCore::BootContext bootCtx;
+    bootCtx.runtime = &vm;
+    bootCtx.hostPaths = PickCore::resolveDefaultHostPaths();
+    PickCore::BootMonitor::runColdStart(std::cout, bootCtx);
 
     const auto &catalog = shell.geminiCatalogRoot();
     if (!catalog.has_value()) {
@@ -20,10 +25,8 @@ int main() {
     }
 
     for (;;) {
-        std::optional<PickCore::UserSession> session = PickCore::LoginService::tryAutoLoginFromEnv(*catalog, &std::cerr);
-        if (!session.has_value()) {
-            session = PickCore::LoginService::runConsoleLogin(std::cin, std::cout, *catalog);
-        }
+        std::optional<PickCore::UserSession> session = PickCore::LoginService::runCatalogLogin(
+            std::cin, std::cout, *catalog, shell.fileSystemRoot(), &std::cerr);
         if (!session.has_value()) {
             return 0;
         }

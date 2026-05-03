@@ -1887,10 +1887,6 @@ TEST_CASE("shell WHO after attachUserSession shows session") {
         vocEntry << "F\nBP\n";
     }
     {
-        std::ofstream users(gem / "USERS.json");
-        users << R"({"users":[{"username":"u1","passwordHash":"dev-x","defaultAccount":"TST","privileges":""}]})";
-    }
-    {
         std::ofstream accounts(gem / "ACCOUNTS.json");
         accounts << R"({"accounts":[{"name":"TST","root":"accounts/TST"}]})";
     }
@@ -1899,7 +1895,7 @@ TEST_CASE("shell WHO after attachUserSession shows session") {
     PickShell::Shell sh(rt);
     sh.setGeminiCatalogRoot(gem);
     std::ostringstream err;
-    const auto session = PickCore::LoginService::authenticate(gem, "u1", "", err);
+    const auto session = PickCore::LoginService::authenticateAccount(gem, "TST", "", err);
     REQUIRE(session.has_value());
     CHECK(err.str().empty());
     sh.attachUserSession(*session);
@@ -1907,5 +1903,5 @@ TEST_CASE("shell WHO after attachUserSession shows session") {
     std::ostringstream out;
     bool quit = false;
     sh.handleLine("WHO", out, quit);
-    CHECK(out.str() == "0 u1 TST\n");
+    CHECK(out.str() == "0 TST TST\n");
 }

@@ -1,5 +1,5 @@
 //
-// Core login: catalogue authentication and console LOGON phase.
+// Core login: catalogue authentication and console LOGON phase (account-based).
 //
 
 #ifndef PICK_SYSTEM_CORE_LOGIN_LOGINSERVICE_H
@@ -15,25 +15,30 @@
 namespace PickCore {
     class LoginService {
     public:
-        /// Build a session from username/password; writes errors to `err` on failure.
-        [[nodiscard]] static std::optional<UserSession> authenticate(const std::filesystem::path &catalogRoot,
-                                                                     const std::string &username,
-                                                                     const std::string &password,
-                                                                     std::ostream &err);
+        /// Authenticate by account name in ACCOUNTS.json; optional per-account `passwordHash` (see GeminiAccountRow).
+        [[nodiscard]] static std::optional<UserSession> authenticateAccount(const std::filesystem::path &catalogRoot,
+                                                                            const std::string &accountName,
+                                                                            const std::string &password,
+                                                                            std::ostream &err);
 
-        /// If `GEMINI_AUTO_LOGIN` is set, attempt authenticate for that username (empty password).
-        /// On failure, if `err` is non-null, writes the same messages as `authenticate`.
-        [[nodiscard]] static std::optional<UserSession> tryAutoLoginFromEnv(const std::filesystem::path &catalogRoot,
-                                                                            std::ostream *err = nullptr);
+        /// Cold-start catalogue login after `BootMonitor`: always prints `LOGON PLEASE:` — or
+        /// `LOGON PLEASE: <account>` when MD/env auto-account applies — before creating a session
+        /// and returning. Interactive entry is used if auto-account is absent or fails.
+        [[nodiscard]] static std::optional<UserSession> runCatalogLogin(std::istream &in,
+                                                                        std::ostream &out,
+                                                                        const std::filesystem::path &catalogRoot,
+                                                                        const std::filesystem::path &pickRoot,
+                                                                        std::ostream *err = nullptr);
 
-        /// Interactive console login. Returns `std::nullopt` on EOF (exit host). On success returns session.
+        /// Interactive console login. Prints only `LOGON PLEASE:` per line; returns `std::nullopt` on EOF.
         [[nodiscard]] static std::optional<UserSession> runConsoleLogin(std::istream &in,
                                                                         std::ostream &out,
                                                                         const std::filesystem::path &catalogRoot);
 
         static bool isReservedLoginUsername(const std::string &token);
 
-        static bool parseSingleUsernameLine(const std::string &line, std::string &outUsername);
+        /// One non-reserved Pick name token (used for account id at logon).
+        static bool parseSingleUsernameLine(const std::string &line, std::string &outToken);
     };
 } // namespace PickCore
 

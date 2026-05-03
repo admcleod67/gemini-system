@@ -22,6 +22,8 @@ namespace PickCore {
         std::string name;
         /// Path relative to the catalogue directory (parent of ACCOUNTS.json).
         std::string root;
+        /// If set: `dev-` prefix skips password prompt; otherwise console reads one password line (no banner).
+        std::optional<std::string> passwordHash;
     };
 
     class GeminiCatalog {

@@ -1,11 +1,11 @@
 #include "LoginService.h"
 
 #include "Catalog.h"
+#include "FileSystem.h"
 #include "GeminiCatalog.h"
 
 #include <cctype>
 #include <cstdlib>
-#include <iostream>
 #include <sstream>
 #include <string_view>
 
@@ -32,23 +32,98 @@ namespace PickCore {
                                                    "GET",   "UNSET",  "WHO",     "LOGTO",   "LOGOFF",  "CREATE-FILE",
                                                    "DELETE-FILE", "LIST-FILES", "LIST", "READ", "WRITE", "LIST-PROGRAMS",
                                                    "LIST-VARS", "DUMP-STACK"};
+
+        void trimTrailingAsciiWs(std::string &s) {
+            while (!s.empty()) {
+                const unsigned char c = static_cast<unsigned char>(s.back());
+                if (c == '\r' || c == '\n' || c == ' ' || c == '\t') {
+                    s.pop_back();
+                } else {
+                    break;
+                }
+            }
+        }
+
+        std::string firstLineFromRecordBody(const std::string &body) {
+            std::string line;
+            for (const char ch: body) {
+                if (ch == '\n') {
+                    break;
+                }
+                line.push_back(ch);
+            }
+            trimTrailingAsciiWs(line);
+            return line;
+        }
+
+        const GeminiAccountRow *findAccountRow(const std::vector<GeminiAccountRow> &accounts, const std::string &accountName) {
+            for (const auto &a: accounts) {
+                if (iequalsAscii(a.name, accountName)) {
+                    return &a;
+                }
+            }
+            return nullptr;
+        }
+
+        bool reservedLogonTokenUpper(const std::string &upper) {
+            for (const char *name: kReservedLoginNames) {
+                if (upper == name) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        bool reservedLogonToken(const std::string &token) {
+            std::string upper;
+            upper.reserve(token.size());
+            for (const unsigned char c: token) {
+                upper.push_back(static_cast<char>(std::toupper(c)));
+            }
+            return reservedLogonTokenUpper(upper);
+        }
+
+        std::optional<std::string> readAutoLogonAccountIdFromMd(const std::filesystem::path &pickRoot) {
+            try {
+                const PickFS::FileSystem fs(pickRoot);
+                const std::optional<PickFS::Record> rec = fs.read("MD", "AUTO-LOGON");
+                if (!rec.has_value()) {
+                    return std::nullopt;
+                }
+                const std::string accountToken = firstLineFromRecordBody(rec->value());
+                if (accountToken.empty()) {
+                    return std::nullopt;
+                }
+                if (!PickFS::Catalog::isValidName(accountToken) || reservedLogonToken(accountToken)) {
+                    return std::nullopt;
+                }
+                return accountToken;
+            } catch (const PickFS::FileSystemError &) {
+                return std::nullopt;
+            }
+        }
+
+        std::optional<std::string> readAutoLogonAccountIdFromEnv() {
+            const char *acc = std::getenv("GEMINI_AUTO_LOGON");
+            if (acc == nullptr || acc[0] == '\0') {
+                acc = std::getenv("GEMINI_AUTO_LOGIN");
+            }
+            if (acc == nullptr || acc[0] == '\0') {
+                return std::nullopt;
+            }
+            std::string tok(acc);
+            if (!PickFS::Catalog::isValidName(tok) || reservedLogonToken(tok)) {
+                return std::nullopt;
+            }
+            return tok;
+        }
     } // namespace
 
     bool LoginService::isReservedLoginUsername(const std::string &token) {
-        std::string upper;
-        upper.reserve(token.size());
-        for (const unsigned char c: token) {
-            upper.push_back(static_cast<char>(std::toupper(c)));
-        }
-        for (const char *name: kReservedLoginNames) {
-            if (upper == name) {
-                return true;
-            }
-        }
-        return false;
+        return reservedLogonToken(token);
     }
 
-    bool LoginService::parseSingleUsernameLine(const std::string &line, std::string &outUsername) {
+    bool LoginService::parseSingleUsernameLine(const std::string &line, std::string &outToken) {
         std::istringstream iss(line);
         std::string tok;
         if (!(iss >> tok)) {
@@ -61,56 +136,42 @@ namespace PickCore {
         if (!PickFS::Catalog::isValidName(tok) || isReservedLoginUsername(tok)) {
             return false;
         }
-        outUsername = std::move(tok);
+        outToken = std::move(tok);
         return true;
     }
 
-    std::optional<UserSession> LoginService::authenticate(const std::filesystem::path &catalogRoot,
-                                                          const std::string &username,
-                                                          const std::string &password,
-                                                          std::ostream &err) {
-        const std::filesystem::path usersPath = catalogRoot / "USERS.json";
+    std::optional<UserSession> LoginService::authenticateAccount(const std::filesystem::path &catalogRoot,
+                                                                 const std::string &accountName,
+                                                                 const std::string &password,
+                                                                 std::ostream &err) {
         const std::filesystem::path accountsPath = catalogRoot / "ACCOUNTS.json";
-        const auto users = GeminiCatalog::loadUsers(usersPath);
         const auto accounts = GeminiCatalog::loadAccounts(accountsPath);
-        if (!users.has_value() || !accounts.has_value()) {
-            err << "Cannot read USERS.json or ACCOUNTS.json.\n";
+        if (!accounts.has_value()) {
+            err << "Cannot read ACCOUNTS.json.\n";
             return std::nullopt;
-        }
-
-        const GeminiUserRow *userRow = nullptr;
-        for (const auto &u: *users) {
-            if (iequalsAscii(u.username, username)) {
-                userRow = &u;
-                break;
-            }
-        }
-        if (userRow == nullptr) {
-            err << "Unknown user.\n";
-            return std::nullopt;
-        }
-
-        if (!passwordPlaceholderSkipsVerify(userRow->passwordHash)) {
-            if (password.empty()) {
-                err << "Password required.\n";
-                return std::nullopt;
-            }
-            if (password != userRow->passwordHash) {
-                err << "Login failed.\n";
-                return std::nullopt;
-            }
         }
 
         const GeminiAccountRow *acct = nullptr;
         for (const auto &a: *accounts) {
-            if (iequalsAscii(a.name, userRow->defaultAccount)) {
+            if (iequalsAscii(a.name, accountName)) {
                 acct = &a;
                 break;
             }
         }
         if (acct == nullptr) {
-            err << "Default account not found.\n";
+            err << "Unknown account.\n";
             return std::nullopt;
+        }
+
+        if (acct->passwordHash.has_value() && !passwordPlaceholderSkipsVerify(*acct->passwordHash)) {
+            if (password.empty()) {
+                err << "Password required.\n";
+                return std::nullopt;
+            }
+            if (password != *acct->passwordHash) {
+                err << "Login failed.\n";
+                return std::nullopt;
+            }
         }
 
         std::error_code ec;
@@ -123,75 +184,100 @@ namespace PickCore {
         UserSession s;
         s.catalogRoot = catalogRoot;
         s.pickRoot = pickRoot;
-        s.username = userRow->username;
+        s.username = acct->name;
         s.accountName = acct->name;
         s.whoPort = 0;
         s.userNo = "0";
         return s;
     }
 
-    std::optional<UserSession> LoginService::tryAutoLoginFromEnv(const std::filesystem::path &catalogRoot,
-                                                                 std::ostream *err) {
-        const char *const user = std::getenv("GEMINI_AUTO_LOGIN");
-        if (user == nullptr || user[0] == '\0') {
-            return std::nullopt;
+    std::optional<UserSession> LoginService::runCatalogLogin(std::istream &in,
+                                                             std::ostream &out,
+                                                             const std::filesystem::path &catalogRoot,
+                                                             const std::filesystem::path &pickRoot,
+                                                             std::ostream *err) {
+        std::optional<std::string> autoName = readAutoLogonAccountIdFromMd(pickRoot);
+        if (!autoName.has_value()) {
+            autoName = readAutoLogonAccountIdFromEnv();
         }
-        std::ostringstream errBuf;
-        const auto sess = authenticate(catalogRoot, user, "", errBuf);
-        if (!sess.has_value() && err != nullptr) {
-            *err << errBuf.str();
+
+        if (autoName.has_value()) {
+            out << "LOGON PLEASE: " << *autoName << '\n' << std::flush;
+
+            std::string password;
+            const auto accountsList = GeminiCatalog::loadAccounts(catalogRoot / "ACCOUNTS.json");
+            if (accountsList.has_value()) {
+                const GeminiAccountRow *acct = findAccountRow(*accountsList, *autoName);
+                if (acct != nullptr && acct->passwordHash.has_value() &&
+                    !passwordPlaceholderSkipsVerify(*acct->passwordHash)) {
+                    if (!std::getline(in, password)) {
+                        return std::nullopt;
+                    }
+                    trimTrailingAsciiWs(password);
+                }
+            }
+
+            std::ostringstream errBuf;
+            std::optional<UserSession> sess = authenticateAccount(catalogRoot, *autoName, password, errBuf);
+            if (sess.has_value()) {
+                return sess;
+            }
+            if (err != nullptr) {
+                *err << errBuf.str();
+            }
         }
-        return sess;
+
+        return runConsoleLogin(in, out, catalogRoot);
     }
 
     std::optional<UserSession> LoginService::runConsoleLogin(std::istream &in,
                                                              std::ostream &out,
                                                              const std::filesystem::path &catalogRoot) {
-        out << "LOGON PLEASE:\n";
-        out << "Enter your username (EOF to exit).\n";
         for (;;) {
-            out << "Username: " << std::flush;
+            out << "LOGON PLEASE:\n" << std::flush;
             std::string line;
             if (!std::getline(in, line)) {
                 return std::nullopt;
             }
-            std::string username;
-            if (!parseSingleUsernameLine(line, username)) {
-                out << "Invalid username.\n";
+            trimTrailingAsciiWs(line);
+            std::string accountName;
+            if (!parseSingleUsernameLine(line, accountName)) {
+                out << '\n';
                 continue;
             }
 
-            const auto users = GeminiCatalog::loadUsers(catalogRoot / "USERS.json");
-            if (!users.has_value()) {
-                out << "Cannot read USERS.json.\n";
+            const auto accounts = GeminiCatalog::loadAccounts(catalogRoot / "ACCOUNTS.json");
+            if (!accounts.has_value()) {
+                out << '\n';
                 continue;
             }
-            const GeminiUserRow *userRow = nullptr;
-            for (const auto &u: *users) {
-                if (iequalsAscii(u.username, username)) {
-                    userRow = &u;
+            const GeminiAccountRow *acct = nullptr;
+            for (const auto &a: *accounts) {
+                if (iequalsAscii(a.name, accountName)) {
+                    acct = &a;
                     break;
                 }
             }
-            if (userRow == nullptr) {
-                out << "Unknown user.\n";
+            if (acct == nullptr) {
+                out << '\n';
                 continue;
             }
 
             std::string password;
-            if (!passwordPlaceholderSkipsVerify(userRow->passwordHash)) {
-                out << "Password: " << std::flush;
+            if (acct->passwordHash.has_value() && !passwordPlaceholderSkipsVerify(*acct->passwordHash)) {
                 if (!std::getline(in, password)) {
                     return std::nullopt;
                 }
+                trimTrailingAsciiWs(password);
             }
 
             std::ostringstream err;
-            const auto sess = authenticate(catalogRoot, username, password, err);
+            const auto sess = authenticateAccount(catalogRoot, accountName, password, err);
             if (!sess.has_value()) {
-                out << err.str();
+                out << '\n';
                 continue;
             }
+            out << '\n';
             return sess;
         }
     }
