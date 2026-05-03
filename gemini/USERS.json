@@ -1,0 +1,10 @@
+{
+  "users": [
+    {
+      "username": "allan",
+      "passwordHash": "dev-no-password",
+      "defaultAccount": "SYSPROG",
+      "privileges": ""
+    }
+  ]
+}

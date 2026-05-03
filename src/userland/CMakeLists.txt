@@ -27,6 +27,8 @@ add_library(gemini-tcl
         tcl/LineRecordEditor.h
         tcl/Shell.cpp
         tcl/Shell.h
+        tcl/DefaultFileSystemRoot.cpp
+        tcl/DefaultFileSystemRoot.h
         tcl/ShellSession.cpp
         tcl/ShellSession.h
         tcl/TclEnvironment.cpp

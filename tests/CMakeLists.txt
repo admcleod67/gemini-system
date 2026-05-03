@@ -35,6 +35,7 @@ target_link_libraries(pick-tests PRIVATE gemini-tcl doctest_headers)
 target_compile_definitions(
         pick-tests
         PRIVATE "PICK_SYSTEM_VERSION=\"${PROJECT_VERSION}\""
+                "PICK_SYSTEM_GEMINI_SYSPROG_FIXTURE=\"${CMAKE_SOURCE_DIR}/gemini/accounts/SYSPROG\""
 )
 pick_system_enable_warnings(pick-tests)
 

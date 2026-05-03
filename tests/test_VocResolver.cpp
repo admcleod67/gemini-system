@@ -1,6 +1,7 @@
 #include <doctest/doctest.h>
 
 #include <chrono>
+#include <cstring>
 #include <filesystem>
 #include <string>
 
@@ -74,4 +75,27 @@ TEST_CASE("VocResolver resolves V-type verb aliases for PROC TCL bridge") {
     CHECK(resolver.resolveVerbName("SAYWHO") == "WHO");
     CHECK(resolver.resolveVerbName("saywho") == "WHO");
     CHECK(resolver.resolveVerbName("UNKNOWN") == "UNKNOWN");
+}
+
+#ifndef PICK_SYSTEM_GEMINI_SYSPROG_FIXTURE
+#define PICK_SYSTEM_GEMINI_SYSPROG_FIXTURE ""
+#endif
+
+TEST_CASE("committed bootstrap SYSPROG fixture VOC resolves ED to EDIT and BP program fallback") {
+    if (std::strlen(PICK_SYSTEM_GEMINI_SYSPROG_FIXTURE) == 0) {
+        return;
+    }
+    const std::filesystem::path root(PICK_SYSTEM_GEMINI_SYSPROG_FIXTURE);
+    if (!std::filesystem::exists(root / "VOC" / "ED.item")) {
+        return;
+    }
+
+    PickFS::FileSystem fs(root);
+    PickVoc::VocResolver resolver(fs);
+    CHECK(resolver.resolveVerbName("ED") == "EDIT");
+    CHECK(resolver.resolveVerbName("ed") == "EDIT");
+
+    const auto loc = resolver.resolveProgramLocation("ANYPRG");
+    CHECK(loc.fileName == "BP");
+    CHECK(loc.recordKey == "ANYPRG");
 }

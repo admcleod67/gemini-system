@@ -9,6 +9,7 @@ This keeps shell/runtime semantics stable while allowing the backend to be repla
 - Default root directory: `filesystem` (relative to process working directory).
 - The root can be changed via `Shell::setFileSystemRoot(...)`.
 - The root directory is created on-demand by write-side operations.
+- Optional **bootstrap account** layout and default-root behaviour for executables are documented in [Gemini bootstrap](gemini-bootstrap.md).
 
 ## Transitional storage model
 
