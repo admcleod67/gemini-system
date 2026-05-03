@@ -32,7 +32,9 @@ add_executable(
         tcl/test_AssemblerShell.cpp
         tcl/test_Shell.cpp
         tcl/test_TclEnvironment.cpp
+        proc/test_ProcShell.cpp
 )
+target_include_directories(pick-tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(pick-tests PRIVATE gemini-tcl doctest_headers)
 target_compile_definitions(
         pick-tests
