@@ -17,21 +17,21 @@ target_include_directories(doctest_headers SYSTEM INTERFACE ${doctest_SOURCE_DIR
 add_executable(
         pick-tests
         test_Main.cpp
-        test_Parser.cpp
-        test_Runtime.cpp
-        test_BasicCompiler.cpp
-        test_BasicCompilerGolden.cpp
-        test_BasicBytecodeEmitter.cpp
-        test_BasicExpressionParser.cpp
-        test_BasicSemanticAnalyzer.cpp
-        test_BasicStatementParser.cpp
-        test_AssemblerShell.cpp
-        test_FileSystem.cpp
-        test_VocResolver.cpp
-        test_Shell.cpp
-        test_LoginService.cpp
-        test_BootMonitor.cpp
-        test_TclEnvironment.cpp
+        core/test_BootMonitor.cpp
+        core/test_FileSystem.cpp
+        core/test_LoginService.cpp
+        core/test_Parser.cpp
+        core/test_Runtime.cpp
+        core/test_VocResolver.cpp
+        basic/test_BasicBytecodeEmitter.cpp
+        basic/test_BasicCompiler.cpp
+        basic/test_BasicCompilerGolden.cpp
+        basic/test_BasicExpressionParser.cpp
+        basic/test_BasicSemanticAnalyzer.cpp
+        basic/test_BasicStatementParser.cpp
+        tcl/test_AssemblerShell.cpp
+        tcl/test_Shell.cpp
+        tcl/test_TclEnvironment.cpp
 )
 target_link_libraries(pick-tests PRIVATE gemini-tcl doctest_headers)
 target_compile_definitions(
