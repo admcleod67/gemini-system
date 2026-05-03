@@ -13,16 +13,18 @@ Roughly reflects what exists in the tree today:
 - VOC resolver and command lookup
 - Ability to run BASIC programs end-to-end
 
-## Milestone 2 — Multi-user (non-concurrent): account & dictionary model
+## Milestone 2 — Multi-account (single session): catalogue, account context & dictionary model
 
-**Goal:** Add a Pick-authentic **session**, **account**, and **login** model on top of the existing core: users and accounts are first-class; each session has its own account context, MD/VOC bindings, and runtime state. **No concurrency or locking**—single active session per process (or equivalent) is acceptable for this milestone.
+**Goal:** Add a Pick-authentic **session** and **account** model on top of the existing core. **Accounts** are first-class: each session has one **current account** (Pick root, MD/VOC bindings, and runtime state). **Distinct user identities** (separate from account, `USERS` catalogue, default-account selection) are **out of scope** for the delivered Milestone 2 path and remain roadmap. **No concurrency or locking**—one active session per process is acceptable for this milestone.
+
+The host hands **`PickCore::UserSession`** into userland; today **`username`** and **`accountName`** mirror the **account id** until a real user catalogue exists.
 
 **Catalogue & host layout**
 
-- **`USERS` file:** Pick-style attribute records (e.g. username, password hash, default account, privileges). Initial implementation may remain host-backed (e.g. JSON) as long as the record shape and access path match the intended Pick model.
-- **`ACCOUNTS` file:** Maps account names to host directories (e.g. account → VOC path / account root).
-- **Per-account directory layout:** Under the host, e.g. `/gemini/accounts/<ACCOUNT>/` with **`MD`** and **`VOC`** (and any minimal structure required for command lookup).
-- **`MD` / `VOC`:** Implemented as Pick-style **attribute-per-line** text files (not ad hoc blobs), with a **minimal MD/VOC structure per account** suitable for bootstrapping that account.
+- **`ACCOUNTS` catalogue (host-backed, e.g. JSON):** Maps account names to host directories (account → Pick root / VOC path). This is what **console `LOGON`** uses today; see **`docs/gemini-bootstrap.md`**.
+- **Per-account directory layout:** Under the catalogue, e.g. `gemini/accounts/<ACCOUNT>/` with **`MD`** and **`VOC`** (and minimal structure for command lookup).
+- **`MD` / `VOC`:** Pick-style **attribute-per-line** text (not ad hoc blobs), with a **minimal MD/VOC structure per account** suitable for bootstrapping that account.
+- **`USERS` catalogue (deferred):** Pick-style records (username, password hash, default account, privileges) and host-backed JSON (`USERS.json`) remain the **target** model; optional attachment for boot messaging may exist, but **logon does not depend on it** until user–account separation is implemented.
 
 **Pointers & command resolution**
 
@@ -31,15 +33,14 @@ Roughly reflects what exists in the tree today:
 
 **Session model**
 
-- Per-session state includes at least: **current account**, **current VOC** (and MD binding), **default file pointers**, **TCL environment**, and **BASIC runtime state**.
-- **Session variables / bindings** aligned with a Pick-style model (e.g. **`@USERNO`**, **`@ACCOUNT`**, **`@LOGNAME`**, **`@TTY`**, **`@PRIVILEGES`**, plus MD/VOC bindings as implied by the account load).
+- Per-session state includes at least: **current account** (Pick root), **current VOC** (and MD binding), **default file pointers**, **TCL environment**, and **BASIC runtime state**.
+- **Session system fields** (read-only, session-backed): **`@USERNO`**, **`@ACCOUNT`**, **`@LOGNAME`**—aligned with Tcl/PROC/BASIC and catalogue logon. Further Pick-style bindings (**`@TTY`**, **`@PRIVILEGES`**, and richer MD-derived state) remain **stretch** targets for this milestone.
 
-**User-facing flow**
+**Operator-facing flow**
 
-- **Core boot:** **`PickCore::BootMonitor`** cold-start output, then catalogue-backed **LOGON** (**`PickCore::LoginService`**, account-based, optional **`MD,AUTO-LOGON`**) in **`main`**, not part of the Tcl REPL; Tcl starts only after a **`UserSession`** exists. **`stdout`** cadence: interactive vs cold-start **`MD`/env auto** (echo + **`endl`**) spelled out under **`docs/gemini-bootstrap.md`**; **`runTclRepl`** banner has **no** leading newline.
-- **`LOGIN`:** Load user, apply default account, load MD/VOC, initialise session context (pointers, TCL, BASIC as needed).
-- **`LOGTO`:** Switch account, reload MD/VOC, reset session context for the new account.
-- **`WHO`** and **`LOGOFF`:** Minimal introspection and clean session teardown / logout.
+- **Core boot:** **`PickCore::BootMonitor`** cold-start output, then catalogue **`LOGON`** (**`PickCore::LoginService::runCatalogLogin`**, **account id** only, optional **`MD,AUTO-LOGON`** / env auto-logon) in **`main`**—not inside the Tcl REPL. Tcl starts only after **`Shell::attachUserSession`** receives a **`UserSession`**. **`stdout`** cadence (interactive **`LOGON PLEASE:`** vs auto-logon **`endl`** behaviour, blank line before the Tcl banner) is spelled out under **`docs/gemini-bootstrap.md`**; **`runTclRepl`** has **no** leading newline.
+- **`LOGTO`:** Switch account within an existing Tcl session, reload Pick root / MD/VOC context, reset session state for the new account.
+- **`WHO`** and **`LOGOFF`:** Minimal introspection and clean session teardown; **`LOGOFF`** returns the host to the core **`LOGON`** phase (**no nested Tcl login loop**).
 
 ## Milestone 3 — TCL & filesystem maturation
 
