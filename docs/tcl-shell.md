@@ -2,7 +2,7 @@
 
 The Tcl shell is the host REPL for system commands, BASIC/PROC entry, and filesystem commands.
 
-When a **Gemini catalogue root** is configured, **`main`** runs **`PickCore::BootMonitor`** (cold-start lines), then **`PickCore::LoginService::runCatalogLogin`**, which **always prints `LOGON PLEASE:`** (`LOGON PLEASE: <account>` when MD/env supplies an account **before creating a session**) and launches Tcl **only afterward**. The Tcl layer receives a **`PickCore::UserSession`** via **`Shell::attachUserSession`** and then runs **`Shell::runTclRepl()`** only (no nested login loop inside the shell).
+When a **Gemini catalogue root** is configured, **`main`** runs **`PickCore::BootMonitor`** (**`SYSTEM READY`** is followed by one blank **`stdout`** line), then **`PickCore::LoginService::runCatalogLogin`**. **`LOGON PLEASE:`** and the account share one line (**interactive**: prefix flushed, then **`getline`**; **`MD`/env auto**: echoed account **`endl`** so there is no stdin Return). Successful logon emits **exactly one** flushed newline before **`Shell::runTclRepl()`** (Pick/Mentor blank line **before** Tcl — same boundary for both flows; auto adds an extra `\n` when echoing the account). The Tcl banner has **no** leading newline — see [`gemini-bootstrap.md`](gemini-bootstrap.md). After **`LOGOFF`**, only interactive logon is used (**no auto-login**). The Tcl layer receives a **`PickCore::UserSession`** via **`Shell::attachUserSession`** and then runs **`Shell::runTclRepl()`** only (no nested login loop inside the shell).
 
 - **Prompt:** `TCL> `
 

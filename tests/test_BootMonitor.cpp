@@ -39,7 +39,7 @@ TEST_CASE("BootMonitor cold start prints ordered milestones") {
     CHECK(s.find("MD ATTACHED") != std::string::npos);
     CHECK(s.find("CATALOG ATTACHED") != std::string::npos);
     CHECK(s.find("PORT MANAGER:") != std::string::npos);
-    CHECK(s.find("SYSTEM READY") != std::string::npos);
+    CHECK(s.find("SYSTEM READY\n\n") != std::string::npos);
     CHECK(s.find("INITIALIZING") < s.find("MD ATTACHED"));
     CHECK(s.find("MD ATTACHED") < s.find("SYSTEM READY"));
 }

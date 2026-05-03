@@ -111,8 +111,10 @@ namespace PickShell {
         sessionEndRequested_ = false;
         std::istream &in = inputStream_ != nullptr ? *inputStream_ : std::cin;
         std::ostream &out = std::cout;
-        out << "Gemini/TCL Developer Shell\n";
-        out << "Type HELP for commands\n";
+        // First stdout bytes here are banner text — no leading `\n` (successful login emits one flushed `\n` first).
+        static constexpr std::string_view kBanner = "Gemini/TCL Developer Shell\n"
+                                                    "Type HELP for commands\n";
+        out.write(kBanner.data(), static_cast<std::streamsize>(kBanner.size()));
         for (;;) {
             out << prompt() << std::flush;
             std::string line;

@@ -81,10 +81,11 @@ TEST_CASE("LoginService runCatalogLogin prints LOGON PLEASE with MD auto account
     std::istringstream in;
     std::ostringstream out;
     std::ostringstream err;
-    const auto s = PickCore::LoginService::runCatalogLogin(in, out, gem, pick, &err);
+    const auto s =
+        PickCore::LoginService::runCatalogLogin(in, out, gem, pick, &err, PickCore::CatalogLoginPhase::ColdStartPortInit);
     REQUIRE(s.has_value());
     CHECK(s->accountName == "TST");
-    CHECK(out.str() == "LOGON PLEASE: TST\n");
+    CHECK(out.str() == "LOGON PLEASE: TST\n\n");
 }
 
 TEST_CASE("LoginService runCatalogLogin falls back interactive when MD token invalid") {
@@ -104,7 +105,33 @@ TEST_CASE("LoginService runCatalogLogin falls back interactive when MD token inv
 
     std::istringstream in("TST\n");
     std::ostringstream out;
-    const auto s = PickCore::LoginService::runCatalogLogin(in, out, gem, pick, nullptr);
+    const auto s =
+        PickCore::LoginService::runCatalogLogin(in, out, gem, pick, nullptr, PickCore::CatalogLoginPhase::ColdStartPortInit);
     REQUIRE(s.has_value());
-    CHECK(out.str().find("LOGON PLEASE:\n") != std::string::npos);
+    CHECK(out.str().find("LOGON PLEASE: ") != std::string::npos);
+    CHECK(out.str() == "LOGON PLEASE: \n");
+}
+
+TEST_CASE("LoginService runCatalogLogin InteractiveOnly ignores MD AUTO-LOGON") {
+    const auto root = uniqueTempDir();
+    const auto gem = root / "gemini";
+    const auto pick = gem / "accounts" / "TST";
+    std::filesystem::create_directories(pick / "MD");
+    std::filesystem::create_directories(pick / "VOC");
+    {
+        std::ofstream md(pick / "MD" / "AUTO-LOGON.item");
+        md << "TST\n";
+    }
+    {
+        std::ofstream accounts(gem / "ACCOUNTS.json");
+        accounts << R"({"accounts":[{"name":"TST","root":"accounts/TST"}]})";
+    }
+
+    std::istringstream in("TST\n");
+    std::ostringstream out;
+    const auto s =
+        PickCore::LoginService::runCatalogLogin(in, out, gem, pick, nullptr, PickCore::CatalogLoginPhase::InteractiveOnly);
+    REQUIRE(s.has_value());
+    CHECK(out.str().find("LOGON PLEASE: TST") == std::string::npos);
+    CHECK(out.str() == "LOGON PLEASE: \n");
 }

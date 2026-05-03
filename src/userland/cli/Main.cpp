@@ -27,9 +27,11 @@ int main() {
         return 0;
     }
 
+    PickCore::CatalogLoginPhase loginPhase = PickCore::CatalogLoginPhase::ColdStartPortInit;
     for (;;) {
         std::optional<PickCore::UserSession> session = PickCore::LoginService::runCatalogLogin(
-            std::cin, std::cout, *catalog, shell.fileSystemRoot(), &std::cerr);
+            std::cin, std::cout, *catalog, shell.fileSystemRoot(), &std::cerr, loginPhase);
+        loginPhase = PickCore::CatalogLoginPhase::InteractiveOnly;
         if (!session.has_value()) {
             return 0;
         }

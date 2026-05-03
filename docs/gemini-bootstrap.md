@@ -51,20 +51,34 @@ Optional file (same shape as before). If present and parses, the cold-start **`P
 
 ## Cold start (`PickCore::BootMonitor`)
 
-After `Runtime` and default roots are prepared, **`PickCore::BootMonitor::runColdStart`** prints a short milestone sequence (version line, init, memory line as **`(host n/a)`** until a real policy exists, filesystem / **`MD`** / catalogue probes, **`PORT MANAGER: (stub)`**, **`SYSTEM READY`**). Each line reflects an actual check where possible; see [`src/core/boot/BootMonitor.cpp`](../src/core/boot/BootMonitor.cpp).
+After `Runtime` and default roots are prepared, **`PickCore::BootMonitor::runColdStart`** prints a short milestone sequence (version line, init, memory line as **`(host n/a)`** until a real policy exists, filesystem / **`MD`** / catalogue probes, **`PORT MANAGER: (stub)`**, **`SYSTEM READY`**) **followed by one blank line**. Each milestone line reflects an actual check where possible; see [`src/core/boot/BootMonitor.cpp`](../src/core/boot/BootMonitor.cpp).
 
 ## Interactive login (account-only, core boot stage)
 
 When a **catalogue root** is configured, **`gemini-system`** / **`gemini-cli`** call **`PickCore::LoginService::runCatalogLogin`** after **`SYSTEM READY`** and **before** the Tcl REPL. The boot monitor never starts Tcl — **`main`** does, only after **`runCatalogLogin`** returns a **`UserSession`**.
 
-Every successful entry into userland prints a **`LOGON PLEASE:`** boundary first:
+### Login → Tcl **`stdout`** contract (Pick-style cadence)
 
-1. **`MD,AUTO-LOGON`** and then **`GEMINI_AUTO_LOGON`** / deprecated **`GEMINI_AUTO_LOGIN`** provide an optional **account** token **without** skipping the boundary: **`stdout`** prints **`LOGON PLEASE:`** and the resolved account **on one line** (for example **`LOGON PLEASE: SYSPROG`**), then authentication runs (silent password line if the account JSON row has a non-`dev-` **`passwordHash`**). If authentication fails after that visible line, the service falls through to interactive logon (**`stderr`** may carry diagnostics).
-2. **Interactive retry** prints **`LOGON PLEASE:`** on its own line (no `Username:` helper). The next line must be a **single account id** token (same character rules as Pick file names; reserved words such as `LOGIN`, `QUIT`, `HELP`, … are rejected). This is **not** Tcl.
-3. On success, **`PickShell::Shell::attachUserSession`** applies **`PickCore::UserSession`**: Pick root for that account, VM/Tcl reset, **`@USERNO`**, **`@ACCOUNT`**, **`@LOGNAME`**. For account-only logon, **`username`** and **`accountName`** are the same string until a distinct user model exists.
-4. **EOF / Ctrl-D** during the login phase exits the host (no `QUIT` keyword in login phase).
+Target layout (cold start after **`SYSTEM READY`** + blank line):
 
-**`LOGTO account`** and **`LOGOFF`** remain **Tcl commands** after login. **`LOGOFF`** clears the session and **`runTclRepl()`** returns to **`main`**, which **re-enters** the core login service.
+```text
+LOGON PLEASE: SYSPROG
+
+Gemini/TCL Developer Shell
+```
+
+- **Interactive**: **`LOGON PLEASE: `** is flushed with **no newline**; the operator completes the **same programmatic line**. **`getline`** reads the token (the terminal handles Return separately). Authentication may read a silent password line. On success, login emits **exactly one** flushed newline — one **blank programmatic line** before the Tcl banner. **`Shell::runTclRepl()`** writes **no** leading newline (`Gemini/TCL Developer Shell`).
+- **`MD`/env auto-logon** (cold start **only**): there is **no keyed Return** after the echoed account — **`stdout`** prints **`LOGON PLEASE: `**, the resolved account identifier, then **`std::endl`** (terminates the logon echo line — same outcome as pressing Return after typing the account). Optional silent password read, then **`authenticateAccount`**. On success, login emits the **same** single flushed newline as interactive (another blank programmatic line **before** the Tcl banner).
+
+Programmatic **`stdout`** for auto-login is therefore **`LOGON PLEASE: `** plus the resolved account, **`'\n'`** from **`std::endl`**, then **`'\n'`** on success (**two** `\n`) before **`Gemini/…`**; interactive login still puts only **one** programmatic **`'\n'`** on success (**`println`** boundary), matching the terminal because the typed account and Return came from **`stdin`**, not from **`stdout`**.
+
+1. **Port cold start only** (`CatalogLoginPhase::ColdStartPortInit`): **`MD,AUTO-LOGON`** then **`GEMINI_AUTO_LOGON`** / deprecated **`GEMINI_AUTO_LOGIN`** are evaluated exactly once after boot. Outputs **`LOGON PLEASE:`** plus resolved account **`endl`**; optional silent password read; **`authenticateAccount`** path; success uses the **same** Tcl boundary (**`println`** = one flushed newline) as interactive (**`authenticateAccount`** + **`printlnLoginToTclBoundary`** in code). If authentication fails, falls through to interactive logon (**`stderr`** may carry diagnostics).
+2. **After `LOGOFF`** (`CatalogLoginPhase::InteractiveOnly`), **`runCatalogLogin` does not** read **`AUTO-LOGON`** or environment auto-logon variables — same interactive **`LOGON PLEASE: `** behaviour only.
+3. **Interactive** (no `Username:` helper): **`LOGON PLEASE: `** is printed with **no** newline; the operator types the **single account id** token and Return (same name rules as Pick file names; reserved words rejected). **Not** Tcl.
+4. On success, **`PickShell::Shell::attachUserSession`** applies **`PickCore::UserSession`**: Pick root for that account, VM/Tcl reset, **`@USERNO`**, **`@ACCOUNT`**, **`@LOGNAME`**. For account-only logon, **`username`** and **`accountName`** are the same string until a distinct user model exists.
+5. **EOF / Ctrl-D** during the login phase exits the host (no `QUIT` keyword in login phase).
+
+**`LOGTO account`** and **`LOGOFF`** remain **Tcl commands** after login. **`LOGOFF`** clears the session and **`runTclRepl()`** returns to **`main`**, which repeats **`runCatalogLogin`** in **`InteractiveOnly`** phase (no **`MD`** / env auto-logon).
 
 **`WHO`** prints `port username account` when logged in (port is `0` for now). With account-only logon, **`username`** and **`account`** match. When not logged in (e.g. tests without a catalogue), **`WHO`** prints **`0 - -`**.
 
@@ -72,9 +86,11 @@ Every successful entry into userland prints a **`LOGON PLEASE:`** boundary first
 
 ## `GEMINI_AUTO_LOGON` and `GEMINI_AUTO_LOGIN`
 
-If **`GEMINI_AUTO_LOGON`** is set to an **account name** and a catalogue root is configured, **`runCatalogLogin`** uses it whenever **`MD,AUTO-LOGON`** does not yield a valid account (with **`stderr`** on failure **after** the visible **`LOGON PLEASE: …`** line, when auth fails). **`GEMINI_AUTO_LOGIN`** is accepted as a **deprecated alias** (same value: account name).
+These variables apply **only** on the **first** catalogue **`runCatalogLogin`** after process start (**port initialisation / cold start**), not after **`LOGOFF`**.
 
-The **smoke** test sets **`GEMINI_AUTO_LOGON=SYSPROG`** so `echo QUIT | gemini-system` still works when the bootstrap tree is present (and may also succeed via committed **`MD/AUTO-LOGON`** alone when the copied tree is used).
+If **`GEMINI_AUTO_LOGON`** is set to an **account name** and a catalogue root is configured, **`runCatalogLogin`** uses it on cold start whenever **`MD,AUTO-LOGON`** does not yield a valid account (with **`stderr`** on failure **after** the visible **`LOGON PLEASE: …`** line, when auth fails). **`GEMINI_AUTO_LOGIN`** is accepted as a **deprecated alias** (same value: account name).
+
+The **smoke** test sets **`GEMINI_AUTO_LOGON=SYSPROG`** so `echo QUIT | gemini-system` still works when the bootstrap tree is present (and cold start may also succeed via committed **`MD/AUTO-LOGON`** alone when the copied tree is used).
 
 ## Default filesystem root in executables
 

@@ -117,6 +117,46 @@ namespace PickCore {
             }
             return tok;
         }
+
+        /// Pick-style: emit `LOGON PLEASE: ` with **no** trailing newline; prompt and account occupy one line.
+        void printLogonPleasePrefix(std::ostream &out) {
+            out << "LOGON PLEASE: " << std::flush;
+        }
+
+        /// Exactly one `\n`, flushed — one blank stdout line before the Tcl banner (no extra leading `\n` in Shell).
+        void printlnLoginToTclBoundary(std::ostream &out) {
+            out.put('\n');
+            out.flush();
+        }
+
+        /// Returns **`false`** only if a password line was required and `getline` hit EOF.
+        [[nodiscard]] bool readPasswordLineIfAccountRequires(std::istream &in, const GeminiAccountRow *acctRow, std::string &password) {
+            password.clear();
+            if (acctRow == nullptr || !acctRow->passwordHash.has_value() ||
+                passwordPlaceholderSkipsVerify(*acctRow->passwordHash)) {
+                return true;
+            }
+            if (!std::getline(in, password)) {
+                return false;
+            }
+            trimTrailingAsciiWs(password);
+            return true;
+        }
+
+        /// **`authenticateAccount`** plus successful stdout seal — shared by catalogue auto-login and interactive login.
+        std::optional<UserSession>
+        authenticateAccountAndSealStdout(std::ostream &out,
+                                           const std::filesystem::path &catalogRoot,
+                                           const std::string &accountName,
+                                           const std::string &password,
+                                           std::ostream &err) {
+            std::optional<UserSession> sess = LoginService::authenticateAccount(catalogRoot, accountName, password, err);
+            if (!sess.has_value()) {
+                return std::nullopt;
+            }
+            printlnLoginToTclBoundary(out);
+            return sess;
+        }
     } // namespace
 
     bool LoginService::isReservedLoginUsername(const std::string &token) {
@@ -195,35 +235,35 @@ namespace PickCore {
                                                              std::ostream &out,
                                                              const std::filesystem::path &catalogRoot,
                                                              const std::filesystem::path &pickRoot,
-                                                             std::ostream *err) {
-        std::optional<std::string> autoName = readAutoLogonAccountIdFromMd(pickRoot);
-        if (!autoName.has_value()) {
-            autoName = readAutoLogonAccountIdFromEnv();
-        }
+                                                             std::ostream *err,
+                                                             CatalogLoginPhase phase) {
+        if (phase == CatalogLoginPhase::ColdStartPortInit) {
+            std::optional<std::string> autoName = readAutoLogonAccountIdFromMd(pickRoot);
+            if (!autoName.has_value()) {
+                autoName = readAutoLogonAccountIdFromEnv();
+            }
 
-        if (autoName.has_value()) {
-            out << "LOGON PLEASE: " << *autoName << '\n' << std::flush;
+            if (autoName.has_value()) {
+                printLogonPleasePrefix(out);
+                // No keyed Return on stdin — end the echoed `LOGON PLEASE: account` line (like interactive), then optional password / auth.
+                out << *autoName << std::endl;
 
-            std::string password;
-            const auto accountsList = GeminiCatalog::loadAccounts(catalogRoot / "ACCOUNTS.json");
-            if (accountsList.has_value()) {
-                const GeminiAccountRow *acct = findAccountRow(*accountsList, *autoName);
-                if (acct != nullptr && acct->passwordHash.has_value() &&
-                    !passwordPlaceholderSkipsVerify(*acct->passwordHash)) {
-                    if (!std::getline(in, password)) {
-                        return std::nullopt;
-                    }
-                    trimTrailingAsciiWs(password);
+                const auto accountsList = GeminiCatalog::loadAccounts(catalogRoot / "ACCOUNTS.json");
+                const GeminiAccountRow *acct =
+                    accountsList.has_value() ? findAccountRow(*accountsList, *autoName) : nullptr;
+                std::string password;
+                if (!readPasswordLineIfAccountRequires(in, acct, password)) {
+                    return std::nullopt;
                 }
-            }
 
-            std::ostringstream errBuf;
-            std::optional<UserSession> sess = authenticateAccount(catalogRoot, *autoName, password, errBuf);
-            if (sess.has_value()) {
-                return sess;
-            }
-            if (err != nullptr) {
-                *err << errBuf.str();
+                std::ostringstream errBuf;
+                if (const auto sess =
+                        authenticateAccountAndSealStdout(out, catalogRoot, *autoName, password, errBuf)) {
+                    return sess;
+                }
+                if (err != nullptr) {
+                    *err << errBuf.str();
+                }
             }
         }
 
@@ -234,7 +274,7 @@ namespace PickCore {
                                                              std::ostream &out,
                                                              const std::filesystem::path &catalogRoot) {
         for (;;) {
-            out << "LOGON PLEASE:\n" << std::flush;
+            printLogonPleasePrefix(out);
             std::string line;
             if (!std::getline(in, line)) {
                 return std::nullopt;
@@ -264,20 +304,16 @@ namespace PickCore {
             }
 
             std::string password;
-            if (acct->passwordHash.has_value() && !passwordPlaceholderSkipsVerify(*acct->passwordHash)) {
-                if (!std::getline(in, password)) {
-                    return std::nullopt;
-                }
-                trimTrailingAsciiWs(password);
+            if (!readPasswordLineIfAccountRequires(in, acct, password)) {
+                return std::nullopt;
             }
 
             std::ostringstream err;
-            const auto sess = authenticateAccount(catalogRoot, accountName, password, err);
+            const auto sess = authenticateAccountAndSealStdout(out, catalogRoot, accountName, password, err);
             if (!sess.has_value()) {
                 out << '\n';
                 continue;
             }
-            out << '\n';
             return sess;
         }
     }
