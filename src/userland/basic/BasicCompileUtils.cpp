@@ -10,9 +10,17 @@ namespace PickShell {
         return s;
     }
 
+    bool isReadonlySessionSystemVariable(const std::string &token) {
+        const std::string u = uppercase(token);
+        return u == "@USERNO" || u == "@ACCOUNT" || u == "@LOGNAME";
+    }
+
     bool isValidVariableName(const std::string &token) {
         if (token.empty()) {
             return false;
+        }
+        if (token.front() == '@') {
+            return isReadonlySessionSystemVariable(token);
         }
         const char first = token.front();
         if (std::isalpha(static_cast<unsigned char>(first)) == 0) {

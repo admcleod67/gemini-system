@@ -26,6 +26,58 @@ namespace PickShell {
         // Set by executeCompiledBasicProgram while a program is running.
         // Accessed from the SIGINT handler, so must be an atomic pointer.
         std::atomic<PickVM::Runtime *> g_interruptRuntime{nullptr};
+
+        struct SystemVarReaderScope {
+            PickVM::Runtime &rt;
+            explicit SystemVarReaderScope(PickVM::Runtime &r, ShellSession &s) : rt(r) {
+                rt.setSystemVariableReader([&s](const std::string_view n) -> std::optional<PickVM::Value> {
+                    const std::optional<std::string> v = s.resolveSystemVariable(n);
+                    if (!v.has_value()) {
+                        return std::nullopt;
+                    }
+                    return PickVM::Value{*v};
+                });
+            }
+            ~SystemVarReaderScope() { rt.setSystemVariableReader({}); }
+        };
+
+        void asciiUpperInPlace(std::string &s) {
+            for (char &c: s) {
+                c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+            }
+        }
+
+        [[nodiscard]] std::string asciiUpperCopy(const std::string &s) {
+            std::string o = s;
+            asciiUpperInPlace(o);
+            return o;
+        }
+
+        void expandSessionAtOperands(ShellSession &sess, std::vector<std::string> &tokens) {
+            if (tokens.size() < 2) {
+                return;
+            }
+            const std::string verbUp = asciiUpperCopy(tokens[0]);
+            for (std::size_t i = 1; i < tokens.size(); ++i) {
+                if ((verbUp == "SET" || verbUp == "GET" || verbUp == "UNSET") && i == 1) {
+                    continue;
+                }
+                if ((verbUp == "RUN" || verbUp == "PROC") && i == 1) {
+                    continue;
+                }
+                std::string &tok = tokens[i];
+                if (tok.empty() || tok[0] != '@') {
+                    continue;
+                }
+                if (!ShellSession::isSessionSystemVariableName(tok)) {
+                    continue;
+                }
+                const std::optional<std::string> v = sess.resolveSystemVariable(tok);
+                if (v.has_value()) {
+                    tok = *v;
+                }
+            }
+        }
     } // namespace
 
     Shell::Shell(PickVM::Runtime &runtime)
@@ -229,13 +281,15 @@ namespace PickShell {
         handleTclCommand(tokens, quit, out);
     }
 
-    void Shell::handleTclCommand(const Tokens &tokens, bool &quit, std::ostream &out) {
-        const auto it = tclCommands_.find(tokens[0]);
+    void Shell::handleTclCommand(const Tokens &tokensIn, bool &quit, std::ostream &out) {
+        Tokens work = tokensIn;
+        expandSessionAtOperands(session_, work);
+        const auto it = tclCommands_.find(work[0]);
         if (it == tclCommands_.end()) {
-            out << "Unknown command: " << tokens[0] << "\n";
+            out << "Unknown command: " << work[0] << "\n";
             return;
         }
-        it->second(tokens, out, quit);
+        it->second(work, out, quit);
     }
 
     void Shell::executeCompiledBasicProgram(const std::vector<PickVM::Instruction> &program,
@@ -249,6 +303,8 @@ namespace PickShell {
         session_.runtime_.setOutputStream(&out);
         session_.runtime_.setInputStream(inputStream_);
         session_.runtime_.loadProgram(program, sourceLinePerInstr); // also clears interrupted_ flag
+
+        const SystemVarReaderScope sysScope(session_.runtime_, session_);
 
         g_interruptRuntime.store(&session_.runtime_);
         const auto previousHandler = std::signal(SIGINT, [](int) {
@@ -300,6 +356,7 @@ namespace PickShell {
                                   const std::vector<int> &sourceLinePerInstr,
                                   std::ostream &out,
                                   const bool stopAtNextBasicLine) {
+        const SystemVarReaderScope sysScope(session_.runtime_, session_);
         bool steppedAny = false;
         const int initialLine = session_.runtime_.currentSourceLine();
         while (session_.runtime_.instructionPointer() < program.size()) {
@@ -572,15 +629,27 @@ namespace PickShell {
                 i += 2;
                 continue;
             }
-            if (token[i] == '$' && i + 1 < token.size() && echoVarNameChar(token[i + 1])) {
+            if (token[i] == '$' && i + 1 < token.size() && (echoVarNameChar(token[i + 1]) || token[i + 1] == '@')) {
                 std::size_t j = i + 1;
+                if (j < token.size() && token[j] == '@') {
+                    ++j;
+                }
                 while (j < token.size() && echoVarNameChar(token[j])) {
                     ++j;
                 }
-                const std::string name(token.data() + i + 1, j - i - 1);
-                out += session_.env_.get(name).value_or("");
-                i = j;
-                continue;
+                if (j > i + 1) {
+                    const std::string name(token.data() + i + 1, j - i - 1);
+                    const std::optional<std::string> ev = session_.env_.get(name);
+                    if (ev.has_value()) {
+                        out += *ev;
+                    } else if (ShellSession::isSessionSystemVariableName(name)) {
+                        out += session_.resolveSystemVariable(name).value_or("");
+                    } else {
+                        out += "";
+                    }
+                    i = j;
+                    continue;
+                }
             }
             if (token[i] == '$') {
                 out.push_back('$');
@@ -617,7 +686,10 @@ namespace PickShell {
             session_.resumePastBreakpointIp_ = session_.runtime_.instructionPointer();
             session_.runtime_.setOutputStream(&out);
             session_.runtime_.setInputStream(inputStream_);
-            session_.executeVmLoop(out);
+            {
+                const SystemVarReaderScope sysScope(session_.runtime_, session_);
+                session_.executeVmLoop(out);
+            }
             session_.runtime_.setOutputStream(nullptr);
             session_.runtime_.setInputStream(nullptr);
             return;
@@ -658,7 +730,10 @@ namespace PickShell {
             session_.runtime_.loadProgram(session_.lastLoaded_->program, session_.lastLoaded_->sourceLinePerInstr);
             session_.suspended_ = false;
             session_.resumePastBreakpointIp_.reset();
-            session_.executeVmLoop(out);
+            {
+                const SystemVarReaderScope sysScope(session_.runtime_, session_);
+                session_.executeVmLoop(out);
+            }
             session_.runtime_.setOutputStream(nullptr);
             session_.runtime_.setInputStream(nullptr);
         } catch (const std::exception &e) {
@@ -698,10 +773,14 @@ namespace PickShell {
             params.push_back(tokens[i]);
         }
 
+        const ProcInterpreter::SessionAtFn sessionAt = [this](const std::string_view n) {
+            return session_.resolveSystemVariable(n);
+        };
         (void) procInterpreter_.runScript(lines, params, inputStream_, out,
                                           [this](const std::string &tclLine, std::ostream &procOut) {
                                               executeProcTclCommand(tclLine, procOut);
-                                          });
+                                          },
+                                          sessionAt);
     }
 
     void Shell::executeProcTclCommand(const std::string &line, std::ostream &out) {
@@ -823,6 +902,10 @@ namespace PickShell {
             out << "SET requires a variable name\n";
             return;
         }
+        if (ShellSession::isSessionSystemVariableName(tokens[1])) {
+            out << "Read-only system variable\n";
+            return;
+        }
         std::string value;
         for (size_t i = 2; i < tokens.size(); ++i) {
             if (i > 2) {
@@ -840,6 +923,10 @@ namespace PickShell {
             out << "GET requires a variable name\n";
             return;
         }
+        if (const std::optional<std::string> sys = session_.resolveSystemVariable(tokens[1])) {
+            out << *sys << '\n';
+            return;
+        }
         const std::optional<std::string> val = session_.env_.get(tokens[1]);
         if (!val) {
             out << "No such variable: " << tokens[1] << '\n';
@@ -853,7 +940,14 @@ namespace PickShell {
             out << "LIST-VARS takes no arguments\n";
             return;
         }
-        const std::vector<std::string> names = session_.env_.names();
+        std::vector<std::string> names = session_.env_.names();
+        if (session_.loggedIn()) {
+            names.push_back("@ACCOUNT");
+            names.push_back("@LOGNAME");
+            names.push_back("@USERNO");
+        }
+        std::sort(names.begin(), names.end());
+        names.erase(std::unique(names.begin(), names.end()), names.end());
         if (names.empty()) {
             out << "No variables\n";
             return;
@@ -867,6 +961,10 @@ namespace PickShell {
     void Shell::cmdUnset(const std::vector<std::string> &tokens, std::ostream &out) {
         if (tokens.size() < 2) {
             out << "UNSET requires a variable name\n";
+            return;
+        }
+        if (ShellSession::isSessionSystemVariableName(tokens[1])) {
+            out << "Read-only system variable\n";
             return;
         }
         if (!session_.env_.unset(tokens[1])) {
@@ -1166,9 +1264,6 @@ namespace PickShell {
         session_.setFileSystemRoot(pickRoot);
         session_.resetForQuit();
         session_.setSessionIdentity(session_.whoPort(), session_.sessionUsername(), acct->name);
-        (void) session_.env_.set("@USERNO", "0");
-        (void) session_.env_.set("@ACCOUNT", acct->name);
-        (void) session_.env_.set("@LOGNAME", session_.sessionUsername());
     }
 
     void Shell::cmdLogoff(const std::vector<std::string> &tokens, std::ostream &out) {

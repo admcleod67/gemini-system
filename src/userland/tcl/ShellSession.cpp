@@ -1,6 +1,9 @@
 #include "ShellSession.h"
 
+#include "TclEnvironment.h"
+
 #include <algorithm>
+#include <cctype>
 #include <vector>
 
 namespace PickShell {
@@ -90,9 +93,7 @@ namespace PickShell {
         resetForQuit();
         setSessionIdentity(session.whoPort, session.username, session.accountName);
         loggedIn_ = true;
-        (void) env_.set("@USERNO", session.userNo);
-        (void) env_.set("@ACCOUNT", session.accountName);
-        (void) env_.set("@LOGNAME", session.username);
+        userNo_ = session.userNo.empty() ? std::string{"0"} : session.userNo;
     }
 
     void ShellSession::setSessionIdentity(const int port, std::string username, std::string account) {
@@ -106,6 +107,26 @@ namespace PickShell {
         whoPort_ = 0;
         sessionUsername_.clear();
         sessionAccount_.clear();
+        userNo_ = "0";
+    }
+
+    bool ShellSession::isSessionSystemVariableName(const std::string_view name) {
+        const std::string key = TclEnvironment::canonicalVariableName(name);
+        return key == "@USERNO" || key == "@ACCOUNT" || key == "@LOGNAME";
+    }
+
+    std::optional<std::string> ShellSession::resolveSystemVariable(const std::string_view name) const {
+        const std::string key = TclEnvironment::canonicalVariableName(name);
+        if (key == "@USERNO") {
+            return userNo_;
+        }
+        if (key == "@ACCOUNT") {
+            return sessionAccount_;
+        }
+        if (key == "@LOGNAME") {
+            return sessionUsername_;
+        }
+        return std::nullopt;
     }
 
 } // namespace PickShell

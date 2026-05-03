@@ -10,6 +10,7 @@
 #include <iosfwd>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <variant>
 #include <vector>
@@ -120,6 +121,10 @@ namespace PickVM {
         void setReadRecordCallback(ReadRecordFn fn);
         void setWriteRecordCallback(WriteRecordFn fn);
 
+        /// Optional read-only `@USERNO` / `@ACCOUNT` / `@LOGNAME` (canonical names). Cleared with empty function.
+        using SystemVarReaderFn = std::function<std::optional<Value>(std::string_view canonicalName)>;
+        void setSystemVariableReader(SystemVarReaderFn fn);
+
         // Debug helper (optional)
         void dumpStack() const;
 
@@ -142,6 +147,7 @@ namespace PickVM {
         FileExistsFn fileExists_;
         ReadRecordFn readRecord_;
         WriteRecordFn writeRecord_;
+        SystemVarReaderFn systemVarReader_;
 
         std::ostream &out() const;
         std::istream &in() const;

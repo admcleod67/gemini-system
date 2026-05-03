@@ -1401,3 +1401,30 @@ TEST_CASE("runtime CloseFile is no-op for unopened handle") {
     rt.loadProgram(prog);
     CHECK_NOTHROW(rt.run());
 }
+
+TEST_CASE("runtime system variable reader supplies LoadVar and StoreVar rejects @ names") {
+    Runtime rt;
+    rt.setSystemVariableReader([](const std::string_view name) -> std::optional<Value> {
+        if (name == "@ACCOUNT") {
+            return Value{std::string{"ACC1"}};
+        }
+        return std::nullopt;
+    });
+
+    std::vector<Instruction> loadProg = {
+        {OpCode::LoadVar, std::string{"@account"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(loadProg);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<std::string>(rt.stack()[0]) == "ACC1");
+
+    std::vector<Instruction> storeProg = {
+        {OpCode::PushInt, 1},
+        {OpCode::StoreVar, std::string{"@ACCOUNT"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(storeProg);
+    CHECK_THROWS_AS(rt.run(), std::runtime_error);
+}

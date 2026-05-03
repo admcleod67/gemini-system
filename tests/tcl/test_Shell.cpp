@@ -1905,3 +1905,66 @@ TEST_CASE("shell WHO after attachUserSession shows session") {
     sh.handleLine("WHO", out, quit);
     CHECK(out.str() == "0 TST TST\n");
 }
+
+TEST_CASE("shell session @ system variables Tcl GET SET LIST-VARS PROC and BASIC RUN") {
+    const auto root = uniqueTempDir();
+    const auto gem = root / "gemini";
+    std::filesystem::create_directories(gem / "accounts" / "TST" / "VOC");
+    {
+        std::ofstream vocEntry(gem / "accounts" / "TST" / "VOC" / "BP.item");
+        vocEntry << "F\nBP\n";
+    }
+    {
+        std::ofstream accounts(gem / "ACCOUNTS.json");
+        accounts << R"({"accounts":[{"name":"TST","root":"accounts/TST"}]})";
+    }
+
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setGeminiCatalogRoot(gem);
+    std::ostringstream err;
+    const auto session = PickCore::LoginService::authenticateAccount(gem, "TST", "", err);
+    REQUIRE(session.has_value());
+    CHECK(err.str().empty());
+    sh.attachUserSession(*session);
+
+    PickFS::FileSystem fsPick(session->pickRoot);
+    fsPick.createFile("BP");
+    fsPick.write("BP", PickFS::Record("SVAR", "10 PRINT @ACCOUNT\n20 END\n"));
+    fsPick.createFile("PROC");
+    writeProcScriptRecord(session->pickRoot, "SESS", "DISPLAY @LOGNAME\nTCL ECHO @ACCOUNT\nEND\n");
+
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("ECHO @account @LOGNAME", out, quit);
+    CHECK_FALSE(quit);
+    CHECK(out.str() == "TST TST\n");
+
+    out.str("");
+    sh.handleLine("GET @USERNO", out, quit);
+    CHECK(out.str() == "0\n");
+
+    out.str("");
+    sh.handleLine("SET @ACCOUNT x", out, quit);
+    CHECK(out.str() == "Read-only system variable\n");
+
+    out.str("");
+    sh.handleLine("UNSET @USERNO", out, quit);
+    CHECK(out.str() == "Read-only system variable\n");
+
+    out.str("");
+    sh.handleLine("SET zed 1", out, quit);
+    out.str("");
+    sh.handleLine("LIST-VARS", out, quit);
+    CHECK(out.str() == "Variables:\n  @ACCOUNT\n  @LOGNAME\n  @USERNO\n  ZED\n");
+
+    out.str("");
+    sh.handleLine("PROC SESS", out, quit);
+    CHECK_FALSE(quit);
+    CHECK(out.str() == "TST\nTST\n");
+
+    out.str("");
+    sh.handleLine("RUN SVAR", out, quit);
+    CHECK(out.str() == "TST\n");
+}

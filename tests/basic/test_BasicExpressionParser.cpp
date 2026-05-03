@@ -170,3 +170,24 @@ TEST_CASE("basic expression parser treats unknown name followed by paren as arra
     REQUIRE(result.expression != nullptr);
     CHECK(std::holds_alternative<BasicAst::SubscriptExpr>(result.expression->node));
 }
+
+TEST_CASE("basic expression parser accepts session @ system variable identifiers") {
+    const auto lower = BasicExpressionParser::parse("@account = \"TST\"");
+    REQUIRE(lower.success);
+    REQUIRE(lower.expression != nullptr);
+    REQUIRE(std::holds_alternative<BasicAst::BinaryExpr>(lower.expression->node));
+    const auto &bin = std::get<BasicAst::BinaryExpr>(lower.expression->node);
+    REQUIRE(std::holds_alternative<BasicAst::IdentifierExpr>(bin.left->node));
+    CHECK(std::get<BasicAst::IdentifierExpr>(bin.left->node).name == "@account");
+
+    const auto userno = BasicExpressionParser::parse("@USERNO");
+    REQUIRE(userno.success);
+    REQUIRE(std::holds_alternative<BasicAst::IdentifierExpr>(userno.expression->node));
+    CHECK(std::get<BasicAst::IdentifierExpr>(userno.expression->node).name == "@USERNO");
+}
+
+TEST_CASE("basic expression parser rejects unknown @ identifier") {
+    const auto bad = BasicExpressionParser::parse("@OTHER = 1");
+    CHECK_FALSE(bad.success);
+    CHECK(bad.error.find("Unknown system variable") != std::string::npos);
+}

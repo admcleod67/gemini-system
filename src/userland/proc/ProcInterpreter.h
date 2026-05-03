@@ -5,19 +5,23 @@
 
 #include <functional>
 #include <iosfwd>
+#include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace PickShell {
     class ProcInterpreter {
     public:
         using TclBridgeFn = std::function<void(const std::string &, std::ostream &)>;
+        using SessionAtFn = std::function<std::optional<std::string>(std::string_view)>;
 
         bool runScript(const std::vector<std::string> &lines,
                        const std::vector<std::string> &params,
                        std::istream *inputStream,
                        std::ostream &out,
-                       const TclBridgeFn &tclBridgeFn) const;
+                       const TclBridgeFn &tclBridgeFn,
+                       const SessionAtFn &sessionAt = {}) const;
     };
 } // namespace PickShell
 

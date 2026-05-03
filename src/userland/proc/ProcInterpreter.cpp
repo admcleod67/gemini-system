@@ -28,6 +28,11 @@ namespace PickShell {
             return text;
         }
 
+        bool isReadonlySessionAtTarget(const std::string &token) {
+            const std::string c = upperAscii(token);
+            return c == "@USERNO" || c == "@ACCOUNT" || c == "@LOGNAME";
+        }
+
         std::vector<std::string> tokenize(const std::string &line) {
             std::vector<std::string> tokens;
             std::istringstream iss(line);
@@ -49,25 +54,31 @@ namespace PickShell {
             return out;
         }
 
+        std::string substituteToken(const std::string &token,
+                                    const std::unordered_map<std::string, std::string> &variables,
+                                    const ProcInterpreter::SessionAtFn *sessionAt) {
+            const auto it = variables.find(token);
+            if (it != variables.end()) {
+                return it->second;
+            }
+            if (sessionAt != nullptr && static_cast<bool>(*sessionAt)) {
+                if (const std::optional<std::string> v = (*sessionAt)(token)) {
+                    return *v;
+                }
+            }
+            return token;
+        }
+
         std::vector<std::string> substituteTokens(const std::vector<std::string> &tokens,
-                                                  const std::size_t startIndex,
-                                                  const std::unordered_map<std::string, std::string> &variables) {
+                                                    const std::size_t startIndex,
+                                                    const std::unordered_map<std::string, std::string> &variables,
+                                                    const ProcInterpreter::SessionAtFn *sessionAt) {
             std::vector<std::string> out;
             out.reserve(tokens.size() - std::min(startIndex, tokens.size()));
             for (std::size_t i = startIndex; i < tokens.size(); ++i) {
-                const auto it = variables.find(tokens[i]);
-                if (it != variables.end()) {
-                    out.push_back(it->second);
-                } else {
-                    out.push_back(tokens[i]);
-                }
+                out.push_back(substituteToken(tokens[i], variables, sessionAt));
             }
             return out;
-        }
-
-        std::string substituteToken(const std::string &token, const std::unordered_map<std::string, std::string> &variables) {
-            const auto it = variables.find(token);
-            return (it != variables.end()) ? it->second : token;
         }
     } // namespace
 
@@ -75,7 +86,10 @@ namespace PickShell {
                                     const std::vector<std::string> &params,
                                     std::istream *inputStream,
                                     std::ostream &out,
-                                    const TclBridgeFn &tclBridgeFn) const {
+                                    const TclBridgeFn &tclBridgeFn,
+                                    const SessionAtFn &sessionAt) const {
+        const SessionAtFn *const sessionPtr = static_cast<bool>(sessionAt) ? &sessionAt : nullptr;
+
         std::unordered_map<std::string, int> labels;
         labels.reserve(lines.size());
         for (int i = 0; i < static_cast<int>(lines.size()); ++i) {
@@ -118,13 +132,17 @@ namespace PickShell {
 
             const std::string keyword = upperAscii(tokens[0]);
             if (keyword == "DISPLAY") {
-                out << joinTokens(substituteTokens(tokens, 1, variables), 0) << "\n";
+                out << joinTokens(substituteTokens(tokens, 1, variables, sessionPtr), 0) << "\n";
                 ++pc;
                 continue;
             }
             if (keyword == "INPUT") {
                 if (tokens.size() != 2) {
                     out << "Error: INPUT requires a variable name\n";
+                    return false;
+                }
+                if (isReadonlySessionAtTarget(tokens[1])) {
+                    out << "Error: Read-only system variable\n";
                     return false;
                 }
                 std::string value;
@@ -140,8 +158,8 @@ namespace PickShell {
                     out << "Error: IF requires IF <lhs> = <rhs> THEN GO <label>\n";
                     return false;
                 }
-                const std::string lhsVal = substituteToken(tokens[1], variables);
-                const std::string rhsVal = substituteToken(tokens[3], variables);
+                const std::string lhsVal = substituteToken(tokens[1], variables, sessionPtr);
+                const std::string rhsVal = substituteToken(tokens[3], variables, sessionPtr);
                 if (lhsVal == rhsVal) {
                     const std::string label = upperAscii(tokens[6]);
                     const auto labelIt = labels.find(label);
@@ -170,7 +188,7 @@ namespace PickShell {
                 continue;
             }
             if (keyword == "TCL") {
-                const std::string cmd = joinTokens(substituteTokens(tokens, 1, variables), 0);
+                const std::string cmd = joinTokens(substituteTokens(tokens, 1, variables, sessionPtr), 0);
                 tclBridgeFn(cmd, out);
                 ++pc;
                 continue;
@@ -180,7 +198,11 @@ namespace PickShell {
             }
 
             if (tokens.size() >= 3 && tokens[1] == "=") {
-                variables[tokens[0]] = joinTokens(substituteTokens(tokens, 2, variables), 0);
+                if (isReadonlySessionAtTarget(tokens[0])) {
+                    out << "Error: Read-only system variable\n";
+                    return false;
+                }
+                variables[tokens[0]] = joinTokens(substituteTokens(tokens, 2, variables, sessionPtr), 0);
                 ++pc;
                 continue;
             }

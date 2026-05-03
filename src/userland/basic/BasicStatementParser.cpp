@@ -145,6 +145,10 @@ namespace PickShell {
                         result.errors.push_back({lineNumber, "Invalid array variable name '" + baseName + "'"});
                         continue;
                     }
+                    if (isReadonlySessionSystemVariable(baseName)) {
+                        result.errors.push_back({lineNumber, "Read-only system variable '" + baseName + "'"});
+                        continue;
+                    }
                     const std::size_t rparenPos = lhsRaw.rfind(')');
                     if (rparenPos == std::string::npos || rparenPos <= lparenPos) {
                         result.errors.push_back({lineNumber, "Missing ')' in array subscript"});
@@ -178,6 +182,10 @@ namespace PickShell {
                     result.errors.push_back({lineNumber, "Invalid variable name '" + lhsRaw + "'"});
                     continue;
                 }
+                if (isReadonlySessionSystemVariable(lhsRaw)) {
+                    result.errors.push_back({lineNumber, "Read-only system variable '" + lhsRaw + "'"});
+                    continue;
+                }
 
                 BasicExpressionParseResult expression = BasicExpressionParser::parse(rhsRaw);
                 if (!expression.success || !expression.expression) {
@@ -205,6 +213,10 @@ namespace PickShell {
                 const std::string baseName = trim(rest.substr(0, lparenPos));
                 if (!isValidVariableName(baseName)) {
                     result.errors.push_back({lineNumber, "Invalid array variable name '" + baseName + "'"});
+                    continue;
+                }
+                if (isReadonlySessionSystemVariable(baseName)) {
+                    result.errors.push_back({lineNumber, "Read-only system variable '" + baseName + "'"});
                     continue;
                 }
                 const std::size_t rparenPos = rest.rfind(')');
@@ -250,6 +262,10 @@ namespace PickShell {
                 const std::string varName = inputTokens[0];
                 if (!isValidVariableName(varName)) {
                     result.errors.push_back({lineNumber, "Invalid variable name '" + varName + "'"});
+                    continue;
+                }
+                if (isReadonlySessionSystemVariable(varName)) {
+                    result.errors.push_back({lineNumber, "Read-only system variable '" + varName + "'"});
                     continue;
                 }
 
@@ -531,6 +547,10 @@ namespace PickShell {
                     result.errors.push_back({lineNumber, "FOR requires a valid variable name"});
                     continue;
                 }
+                if (isReadonlySessionSystemVariable(varRaw)) {
+                    result.errors.push_back({lineNumber, "Read-only system variable '" + varRaw + "'"});
+                    continue;
+                }
 
                 // Split remainder on TO keyword
                 const std::string afterEq = trim(rest.substr(eqPos + 1));
@@ -599,6 +619,10 @@ namespace PickShell {
                 // Variable name is optional in Pick BASIC; omitting it matches the innermost frame.
                 if (!varName.empty() && !isValidVariableName(varName)) {
                     result.errors.push_back({lineNumber, "NEXT requires a valid variable name"});
+                    continue;
+                }
+                if (!varName.empty() && isReadonlySessionSystemVariable(varName)) {
+                    result.errors.push_back({lineNumber, "Read-only system variable '" + varName + "'"});
                     continue;
                 }
                 result.lines.push_back({lineNumber, BasicAst::NextStmt{varName}});

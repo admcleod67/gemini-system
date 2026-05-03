@@ -18,6 +18,7 @@
 #include <filesystem>
 #include <optional>
 #include <ostream>
+#include <string_view>
 #include <unordered_set>
 #include <vector>
 
@@ -64,6 +65,11 @@ namespace PickShell {
 
         [[nodiscard]] const std::string &sessionAccount() const { return sessionAccount_; }
 
+        /// `@USERNO`, `@ACCOUNT`, `@LOGNAME` — read from session frame (not `TclEnvironment`).
+        [[nodiscard]] std::optional<std::string> resolveSystemVariable(std::string_view name) const;
+
+        [[nodiscard]] static bool isSessionSystemVariableName(std::string_view name);
+
         PickVM::Runtime &runtime_;
         TclEnvironment env_;
         std::filesystem::path programsRoot_{"programs"};
@@ -75,6 +81,7 @@ namespace PickShell {
         int whoPort_{0};
         std::string sessionUsername_;
         std::string sessionAccount_;
+        std::string userNo_{"0"};
         std::optional<PickVM::LoadedBytecode> lastLoaded_;
         bool trace_{false};
         std::unordered_set<std::size_t> breakpoints_;

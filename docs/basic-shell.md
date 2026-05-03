@@ -61,6 +61,8 @@ Compilation failed.
 
 On success, **`COMPILE`** and **`RUN (C)`** persist object code to Pick record **`<name>_OBJ`** under the same VOC-resolved logical file as the source. **`RUN`** always recompiles then executes from memory (it does not rely on a standalone host `programs/<name>.tbc` path for BASIC programs).
 
+When the program is started from the Tcl host after catalogue logon, **`@USERNO`**, **`@ACCOUNT`**, and **`@LOGNAME`** may appear in expressions (same string values as Tcl **`GET`**). They are read-only at compile time and at run time; see [BASIC language — Variables and naming](basic-language.md#variables-and-naming).
+
 Language details for subset v1 (statements, expression rules, diagnostics, and file handling statements `OPEN`/`READ`/`WRITE`/`CLOSE`) are documented in [BASIC language](basic-language.md).
 
 ## Command validation notes

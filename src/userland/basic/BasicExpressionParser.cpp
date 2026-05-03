@@ -1,5 +1,7 @@
 #include "BasicExpressionParser.h"
 
+#include "BasicCompileUtils.h"
+
 #include <cerrno>
 #include <cctype>
 #include <cstdlib>
@@ -101,6 +103,27 @@ namespace PickShell {
                         return std::nullopt;
                     }
                     tokens.push_back({ExprTokenType::IntLiteral, literal, parsed, {start, i}, {}});
+                    continue;
+                }
+
+                if (c == '@') {
+                    const std::size_t start = i;
+                    ++i;
+                    if (i >= expressionText.size() ||
+                        std::isalpha(static_cast<unsigned char>(expressionText[i])) == 0) {
+                        error = "Invalid identifier after '@'";
+                        return std::nullopt;
+                    }
+                    while (i < expressionText.size() &&
+                           std::isalnum(static_cast<unsigned char>(expressionText[i])) != 0) {
+                        ++i;
+                    }
+                    const std::string ident = std::string(expressionText.substr(start, i - start));
+                    if (!isReadonlySessionSystemVariable(ident)) {
+                        error = "Unknown system variable '" + ident + "'";
+                        return std::nullopt;
+                    }
+                    tokens.push_back({ExprTokenType::Identifier, ident, 0, {start, i}, {}});
                     continue;
                 }
 

@@ -47,11 +47,11 @@ For the full current behavior (validation rules, storage model, VOC behavior, er
 | **`VERSION`** | Title, project version string, and build date. |
 | **`WHO`** | Print `port username account` when logged in with a Gemini catalogue (account-only logon uses the same string for username and account until a user model exists); otherwise **`0 - -`**. |
 | **`QUIT`** | Exit the shell; clears loaded program state in the VM, shell-held bytecode metadata, and **shell variables**. |
-| **`ECHO`** … | Echo remaining tokens, **space-separated**. Within each token, scan left to right: **`$$`** becomes a single **`$`**; **`$Name`** ( **`Name`** = letters, digits, underscore, at least one character) is replaced by that variable’s value, or nothing if unset; any other **`$`** is echoed literally. |
-| **`SET`** *name* *word…* | Set a **shell variable**. Names are **case-insensitive**; the canonical name is **ASCII uppercase** (what **`LIST-VARS`** shows). The value is the remaining tokens joined with single spaces; **`SET`** *name* alone sets an empty string. Variable names must be non-empty. |
-| **`GET`** *name* | Print the variable’s value and a newline. If unset: **`No such variable:`** *name* (as you typed it). |
-| **`LIST-VARS`** | List variable names in **ASCII uppercase** (sorted), each on its own line under a **`Variables:`** header. If none: **`No variables`**. Takes no arguments. |
-| **`UNSET`** *name* | Remove *name*. If it was not set: **`No such variable`**. |
+| **`ECHO`** … | Echo remaining tokens, **space-separated**. Known session tokens **`@USERNO`**, **`@ACCOUNT`**, and **`@LOGNAME`** (case-insensitive) expand from the catalogue session before **`$`** rules. Within each token, scan left to right: **`$$`** becomes a single **`$`**; **`$Name`** ( **`Name`** = letters, digits, underscore, **`@`**, at least one character) is replaced by that shell variable’s value, or—if **`Name`** is one of the three **`@`** system names—by the session value; otherwise nothing if unset; any other **`$`** is echoed literally. |
+| **`SET`** *name* *word…* | Set a **shell variable**. Names are **case-insensitive**; the canonical name is **ASCII uppercase** (what **`LIST-VARS`** shows). The value is the remaining tokens joined with single spaces; **`SET`** *name* alone sets an empty string. Variable names must be non-empty. Targets **`@USERNO`**, **`@ACCOUNT`**, and **`@LOGNAME`** are rejected (**`Read-only system variable`**). Value tokens may include those **`@`** names; they expand from the session when used as operands (not as the **`SET`** target name). |
+| **`GET`** *name* | Print the variable’s value and a newline. **`@USERNO`**, **`@ACCOUNT`**, and **`@LOGNAME`** read from the session (not from the shell variable map). Other names use the shell map; if unset: **`No such variable:`** *name* (as you typed it). |
+| **`LIST-VARS`** | List shell variable names in **ASCII uppercase** (sorted), each on its own line under a **`Variables:`** header. When logged in with a Gemini session, **`@ACCOUNT`**, **`@LOGNAME`**, and **`@USERNO`** are included once (they are not stored as ordinary shell variables). If none: **`No variables`**. Takes no arguments. |
+| **`UNSET`** *name* | Remove *name* from the shell map. The three session **`@`** names cannot be unset (**`Read-only system variable`**). If it was not set: **`No such variable`**. |
 | **`BASIC`** [*name*] | Enter BASIC mode. See [BASIC shell](basic-shell.md) for BASIC/ED commands and persistence rules. |
 | **`ASM`** [*programName*] | Enter ASM mode (instruction-level debugger shell). Optional name immediately executes `RUN <programName>` after entering ASM. See [Assembler shell](assembler-shell.md). |
 | **`RUN`** *programName* | Run by program name only (no extension). Tcl resolves `(file,key)` via VOC, prunes invalid breakpoints, and executes object record `<key>_OBJ`. If object is missing, Tcl compiles source record `<key>` and writes `<key>_OBJ` in the same resolved file before running. |
@@ -99,12 +99,17 @@ Variable handling is intentionally minimal and token-based:
 - Tokenization is whitespace-based (no quoting rules).
 - Only operand/payload tokens are substituted by exact variable-name match.
 - Statement keywords are not rewritten by substitution.
+- After PROC locals, tokens that are exactly **`@USERNO`**, **`@ACCOUNT`**, or **`@LOGNAME`** (any ASCII case) substitute from the same session snapshot as Tcl **`GET`** (read-only; assignments and **`INPUT`** to those names are errors).
 
-`TCL ...` executes the reconstructed command string through the TCL command dispatcher, allowing PROC variable values to flow into TCL command arguments without sharing variable stores.
+`TCL ...` executes the reconstructed command string through the TCL command dispatcher, allowing PROC variable values to flow into TCL command arguments without sharing variable stores. Tcl operand expansion for **`@`** session names applies again on the bridged line (so **`TCL ECHO @ACCOUNT`** behaves like interactive Tcl).
 
 ## Shell variables
 
 Variables are **string key/value** pairs held by the shell (not the VM stack). Names are **case-insensitive**; the shell stores and lists them in **ASCII uppercase** (see **`LIST-VARS`**). Because input is whitespace-tokenized with no quoting, values **cannot contain spaces** unless you express them as multiple tokens (which are joined with single spaces), same idea as **`ECHO`**.
+
+### Session **`@`** names (read-only)
+
+**`@USERNO`**, **`@ACCOUNT`**, and **`@LOGNAME`** are **session fields**, not entries in the Tcl environment map. They follow the same canonicalization as other names (ASCII uppercase for letters). Values come from catalogue logon (**`LOGTO`** updates the session; **`LOGOFF`** / **`QUIT`** clear them). For Tcl commands, operand tokens (all arguments after the verb except the variable name slot on **`SET`** / **`GET`** / **`UNSET`**, and the program name on **`RUN`** / **`PROC`**) that are exactly those three names expand to their current string values; other **`@FOO`** tokens are left unchanged. **`GET`** for the three names reads the session fields directly (when not logged in, **`@ACCOUNT`** / **`@LOGNAME`** are typically empty and **`@USERNO`** defaults to **`0`**).
 
 **`ECHO`:** each argument token is scanned for **`$$`** (escaped dollar), **`$Name`** substitution, and literal **`$`**. There is **no** expression evaluation. Unset **`$Name`** expands to an empty segment.
 

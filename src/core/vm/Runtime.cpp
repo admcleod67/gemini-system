@@ -14,6 +14,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <utility>
 
 namespace PickVM {
@@ -24,6 +25,10 @@ namespace PickVM {
                 c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
             }
             return out;
+        }
+
+        bool isReadOnlySystemVariableName(const std::string &canonical) {
+            return canonical == "@USERNO" || canonical == "@ACCOUNT" || canonical == "@LOGNAME";
         }
 
         int intOperandAtIp(const Instruction &instr, std::size_t ip) {
@@ -223,6 +228,10 @@ namespace PickVM {
                 throw std::runtime_error("File backend not configured");
             };
         }
+    }
+
+    void Runtime::setSystemVariableReader(SystemVarReaderFn fn) {
+        systemVarReader_ = std::move(fn);
     }
 
     void Runtime::push(const Value &v) {
@@ -467,6 +476,9 @@ namespace PickVM {
                 const auto it = variables_.find(frame.varName);
                 const int cur = (it != variables_.end()) ? coerceToInt(it->second) : 0;
                 const int newVal = cur + frame.step;
+                if (isReadOnlySystemVariableName(frame.varName)) {
+                    throw std::runtime_error("Read-only system variable: " + frame.varName);
+                }
                 variables_[frame.varName] = newVal;
                 const bool done = (frame.step > 0) ? (newVal > frame.limit)
                                                    : (newVal < frame.limit);
@@ -480,6 +492,9 @@ namespace PickVM {
 
             case OpCode::DimArray: {
                 const std::string name = canonicalVariableName(stringOperandAtIp(instr, ip_));
+                if (isReadOnlySystemVariableName(name)) {
+                    throw std::runtime_error("Read-only system variable: " + name);
+                }
                 const int size = coerceToInt(pop());
                 if (size < 1) {
                     throw std::runtime_error("DIM: size must be >= 1");
@@ -504,6 +519,9 @@ namespace PickVM {
 
             case OpCode::StoreArr: {
                 const std::string name = canonicalVariableName(stringOperandAtIp(instr, ip_));
+                if (isReadOnlySystemVariableName(name)) {
+                    throw std::runtime_error("Read-only system variable: " + name);
+                }
                 const int idx = coerceToInt(pop()); // index on top
                 Value val = pop();                  // value underneath
                 const auto it = arrays_.find(name);
@@ -638,6 +656,12 @@ namespace PickVM {
 
             case OpCode::LoadVar: {
                 const std::string name = canonicalVariableName(stringOperandAtIp(instr, ip_));
+                if (systemVarReader_ && isReadOnlySystemVariableName(name)) {
+                    if (const std::optional<Value> sv = systemVarReader_(std::string_view(name))) {
+                        push(*sv);
+                        break;
+                    }
+                }
                 const auto it = variables_.find(name);
                 if (it == variables_.end()) {
                     throw std::runtime_error("Undefined variable: " + name);
@@ -648,6 +672,9 @@ namespace PickVM {
 
             case OpCode::StoreVar: {
                 const std::string name = canonicalVariableName(stringOperandAtIp(instr, ip_));
+                if (isReadOnlySystemVariableName(name)) {
+                    throw std::runtime_error("Read-only system variable: " + name);
+                }
                 variables_[name] = pop();
                 break;
             }

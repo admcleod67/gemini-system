@@ -372,3 +372,17 @@ TEST_CASE("basic statement parser rejects FOR and NEXT in branch arms") {
     CHECK(result.errors[1].message == "OPEN ELSE does not allow FOR/NEXT");
 }
 
+TEST_CASE("basic statement parser rejects assignment and input to session @ system variables") {
+    BasicProgram program;
+    program.setLine(10, "LET @ACCOUNT = 1");
+    program.setLine(20, "INPUT @USERNO");
+    program.setLine(30, "FOR @LOGNAME = 1 TO 2");
+
+    const BasicAst::StatementParseResult result = BasicStatementParser::parse(program);
+    CHECK_FALSE(result.success);
+    REQUIRE(result.errors.size() == 3);
+    CHECK(result.errors[0].message == "Read-only system variable '@ACCOUNT'");
+    CHECK(result.errors[1].message == "Read-only system variable '@USERNO'");
+    CHECK(result.errors[2].message == "Read-only system variable '@LOGNAME'");
+}
+
