@@ -97,17 +97,7 @@ namespace PickShell {
 
     void Shell::run() {
         std::signal(SIGINT, SIG_IGN); // Ctrl-C does nothing outside a running program
-        std::cout << "Gemini/TCL Developer Shell\n";
-        std::cout << "Type HELP for commands\n";
-
-        bool quit = false;
-        while (!quit) {
-            std::cout << prompt() << std::flush;
-            std::string line;
-            if (!std::getline(std::cin, line))
-                break;
-            handleLine(line, std::cout, quit);
-        }
+        runInteractiveLoop();
     }
 
     void Shell::handleLine(const std::string &line, std::ostream &out, bool &quit) {
@@ -189,6 +179,8 @@ namespace PickShell {
             basicShell_.enter(programName, out);
         };
         tclCommands_["EDIT"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdEdit(tokens, out); };
+        tclCommands_["LOGTO"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdLogto(tokens, out); };
+        tclCommands_["LOGOFF"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdLogoff(tokens, out); };
     }
 
     void Shell::dispatch(const std::vector<std::string> &tokens, bool &quit, std::ostream &out) {
@@ -858,6 +850,8 @@ namespace PickShell {
         out << "  LIST-VARS\n";
         out << "  UNSET <name>\n";
         out << "  WHO\n";
+        out << "  LOGTO <account>   switch account (reloads Pick root)\n";
+        out << "  LOGOFF            end session; return to login\n";
         out << "  BASIC [name]   enter BASIC editor mode\n";
         out << "  ASM [name]     enter assembler debugger mode (optional program name)\n";
         out << "  RUN <name>     resolve via VOC and run object record (auto-compiles source if needed)\n";
@@ -881,7 +875,11 @@ namespace PickShell {
     }
 
     void Shell::cmdWho(std::ostream &out) {
-        out << "0 SYSPROG DM\n";
+        if (!session_.loggedIn()) {
+            out << "0 - -\n";
+            return;
+        }
+        out << session_.whoPort() << ' ' << session_.sessionUsername() << ' ' << session_.sessionAccount() << '\n';
     }
 
     void Shell::cmdDumpStack(std::ostream &out) {

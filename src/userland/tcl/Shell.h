@@ -37,6 +37,15 @@ namespace PickShell {
 
         const std::filesystem::path &fileSystemRoot() const { return session_.fileSystemRoot(); }
 
+        /// Parent directory of ACCOUNTS.json / USERS.json. When set, interactive `run()` uses a login phase first.
+        void setGeminiCatalogRoot(std::optional<std::filesystem::path> root);
+
+        /// If `GEMINI_AUTO_LOGIN` is set and catalogue is configured, attempt `performLogin` before the REPL.
+        void tryAutoLoginFromEnvironment(std::ostream &warn);
+
+        /// Catalogue-backed login (also used by the interactive login phase). Returns true on success.
+        [[nodiscard]] bool performLogin(const std::string &username, const std::string &password, std::ostream &err);
+
         // One line of input; all command output goes to out. For interactive use, pass std::cout.
         void handleLine(const std::string &line, std::ostream &out, bool &quit);
 
@@ -142,6 +151,23 @@ namespace PickShell {
         void cmdListVars(const std::vector<std::string> &tokens, std::ostream &out);
 
         void cmdUnset(const std::vector<std::string> &tokens, std::ostream &out);
+
+        [[nodiscard]] bool needsGeminiLogin() const;
+
+        void runInteractiveLoop();
+
+        /// Returns false if stdin closed (exit host). True when logged in.
+        bool runLoginPhase(std::istream &in, std::ostream &out);
+
+        static bool isReservedLoginUsername(const std::string &token);
+
+        static bool parseSingleUsernameLine(const std::string &line, std::string &outUsername);
+
+        void cmdLogto(const std::vector<std::string> &tokens, std::ostream &out);
+
+        void cmdLogoff(const std::vector<std::string> &tokens, std::ostream &out);
+
+        bool returnToLoginAfterLogoff_{false};
 
         std::unordered_set<int> basicBreakpoints_;
         std::optional<int> basicResumePastLine_;

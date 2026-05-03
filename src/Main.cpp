@@ -1,4 +1,5 @@
 #include <cstdio>
+#include <iostream>
 
 #include <pick_system/version.hpp>
 #include <pickvm/core.hpp>
@@ -10,6 +11,7 @@ int main() {
   PickVM::Runtime vm;
   PickShell::Shell shell(vm);
   applyDefaultFileSystemRoot(shell);
+  shell.tryAutoLoginFromEnvironment(std::cerr);
   shell.run();
   return 0;
 }

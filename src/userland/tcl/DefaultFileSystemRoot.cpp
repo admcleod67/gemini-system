@@ -10,6 +10,11 @@ void applyDefaultFileSystemRoot(PickShell::Shell &shell) {
     if (const char *const env = std::getenv("GEMINI_FILESYSTEM_ROOT")) {
         if (env[0] != '\0') {
             shell.setFileSystemRoot(fs::path(env));
+            if (const char *const cat = std::getenv("GEMINI_CATALOG_ROOT")) {
+                if (cat[0] != '\0') {
+                    shell.setGeminiCatalogRoot(fs::path(cat));
+                }
+            }
             return;
         }
     }
@@ -19,5 +24,6 @@ void applyDefaultFileSystemRoot(PickShell::Shell &shell) {
     std::error_code ec;
     if (fs::is_directory(marker, ec) && !ec) {
         shell.setFileSystemRoot(cwd / "gemini/accounts/SYSPROG");
+        shell.setGeminiCatalogRoot(cwd / "gemini");
     }
 }

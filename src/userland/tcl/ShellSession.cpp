@@ -79,4 +79,22 @@ namespace PickShell {
         env_.clear();
         runtime_.loadProgram({});
     }
+
+    void ShellSession::setGeminiCatalogRoot(std::optional<std::filesystem::path> root) {
+        geminiCatalogRoot_ = std::move(root);
+    }
+
+    void ShellSession::setSessionIdentity(const int port, std::string username, std::string account) {
+        whoPort_ = port;
+        sessionUsername_ = std::move(username);
+        sessionAccount_ = std::move(account);
+    }
+
+    void ShellSession::clearLoginSession() {
+        loggedIn_ = false;
+        whoPort_ = 0;
+        sessionUsername_.clear();
+        sessionAccount_.clear();
+    }
+
 } // namespace PickShell

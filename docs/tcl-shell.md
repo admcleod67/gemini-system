@@ -43,7 +43,7 @@ For the full current behavior (validation rules, storage model, VOC behavior, er
 |---------|-------------|
 | **`HELP`** | Short command list (same information as this table, in the binary). |
 | **`VERSION`** | Title, project version string, and build date. |
-| **`WHO`** | Print default single-user identity as one line: **`0 SYSPROG DM`** (`port username account`). |
+| **`WHO`** | Print `port username account` when logged in with a Gemini catalogue; otherwise **`0 - -`**. |
 | **`QUIT`** | Exit the shell; clears loaded program state in the VM, shell-held bytecode metadata, and **shell variables**. |
 | **`ECHO`** … | Echo remaining tokens, **space-separated**. Within each token, scan left to right: **`$$`** becomes a single **`$`**; **`$Name`** ( **`Name`** = letters, digits, underscore, at least one character) is replaced by that variable’s value, or nothing if unset; any other **`$`** is echoed literally. |
 | **`SET`** *name* *word…* | Set a **shell variable**. Names are **case-insensitive**; the canonical name is **ASCII uppercase** (what **`LIST-VARS`** shows). The value is the remaining tokens joined with single spaces; **`SET`** *name* alone sets an empty string. Variable names must be non-empty. |

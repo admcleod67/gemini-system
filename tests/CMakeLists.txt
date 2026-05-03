@@ -47,3 +47,4 @@ else ()
 endif ()
 
 add_test(NAME smoke COMMAND sh -c "echo QUIT | $<TARGET_FILE:gemini-system>")
+set_property(TEST smoke PROPERTY ENVIRONMENT "GEMINI_AUTO_LOGIN=allan")

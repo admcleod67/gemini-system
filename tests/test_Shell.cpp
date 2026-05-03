@@ -80,7 +80,7 @@ TEST_CASE("shell WHO returns default port user account line") {
     bool quit = false;
     sh.handleLine("WHO", out, quit);
     CHECK_FALSE(quit);
-    CHECK(out.str() == "0 SYSPROG DM\n");
+    CHECK(out.str() == "0 - -\n");
 }
 
 TEST_CASE("shell VERSION contains project version string") {
@@ -542,7 +542,7 @@ TEST_CASE("shell PROC bridge resolves V-type verb aliases") {
     bool quit = false;
     sh.handleLine("PROC SHOW", out, quit);
     CHECK_FALSE(quit);
-    CHECK(out.str() == "0 SYSPROG DM\n");
+    CHECK(out.str() == "0 - -\n");
 }
 
 TEST_CASE("shell LIST-PROGRAMS empty directory") {
@@ -1873,4 +1873,37 @@ TEST_CASE("shell HELP lists EDIT") {
     bool quit = false;
     sh.handleLine("HELP", out, quit);
     CHECK(out.str().find("EDIT") != std::string::npos);
+    CHECK(out.str().find("LOGTO") != std::string::npos);
+    CHECK(out.str().find("LOGOFF") != std::string::npos);
+}
+
+TEST_CASE("shell WHO after performLogin shows session") {
+    const auto root = uniqueTempDir();
+    const auto gem = root / "gemini";
+    std::filesystem::create_directories(gem / "accounts" / "TST" / "VOC");
+    {
+        std::ofstream vocEntry(gem / "accounts" / "TST" / "VOC" / "BP.item");
+        vocEntry << "F\nBP\n";
+    }
+    {
+        std::ofstream users(gem / "USERS.json");
+        users << R"({"users":[{"username":"u1","passwordHash":"dev-x","defaultAccount":"TST","privileges":""}]})";
+    }
+    {
+        std::ofstream accounts(gem / "ACCOUNTS.json");
+        accounts << R"({"accounts":[{"name":"TST","root":"accounts/TST"}]})";
+    }
+
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setGeminiCatalogRoot(gem);
+    sh.setFileSystemRoot(gem / "accounts" / "TST");
+    std::ostringstream err;
+    REQUIRE(sh.performLogin("u1", "", err));
+    CHECK(err.str().empty());
+
+    std::ostringstream out;
+    bool quit = false;
+    sh.handleLine("WHO", out, quit);
+    CHECK(out.str() == "0 u1 TST\n");
 }
