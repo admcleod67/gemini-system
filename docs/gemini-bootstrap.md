@@ -109,8 +109,8 @@ Building `gemini-system` or `gemini-cli` triggers a **`gemini-bootstrap-copy`** 
 Logical file `VOC` holds dictionary records as `.item` files (attribute-per-line). The committed fixture includes at least:
 
 - **`BP`**: `F`-type pointer to file `BP` (program fallback behaviour matches tests).
-- **`ED`**: `V`-type alias to **`EDIT`** (PROC TCL uses `resolveVerbName`).
-- **`WHO`**, **`LOGIN`**, **`LOGTO`**, **`LOGOFF`**: `V`-type stubs in VOC; **`LOGTO`** / **`LOGOFF`** are implemented as Tcl builtins when logged in. Top-level Tcl does not resolve arbitrary verbs through VOC yet.
+- **`ED`**: `V`-type alias to **`EDIT`** (interactive Tcl and PROC **`TCL`** both resolve the first token through **`VOC`** via `resolveVerbName`).
+- **`WHO`**, **`LOGIN`**, **`LOGTO`**, **`LOGOFF`**: `V`-type stubs in VOC; **`LOGTO`** / **`LOGOFF`** are implemented as Tcl builtins when logged in. Other dictionary names can map to those builtins with matching **`V`** entries.
 
 ## Mutable data
 

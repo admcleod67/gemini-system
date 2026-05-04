@@ -8,6 +8,10 @@ When a **Gemini catalogue root** is configured, **`main`** runs **`PickCore::Boo
 
 Input is tokenized by whitespace (filenames with spaces are not supported by the tokenizer).
 
+## Tcl command verb (first token)
+
+The first token of each interactive Tcl line is resolved through logical file **`VOC`**: **`V`**-type entries map a dictionary name to another verb name (same behaviour as the PROC **`TCL ...`** bridge). The resolved verb is then canonicalized to **ASCII uppercase** for dispatch to the built-in command set. If there is no applicable **`V`** entry, the token is still uppercased for lookup. Operand expansion for **`@USERNO`**, **`@ACCOUNT`**, and **`@LOGNAME`** runs **after** this step so aliases do not break **`SET`**, **`GET`**, **`UNSET`**, **`RUN`**, or **`PROC`** argument rules.
+
 ## Source layout
 
 - Tcl host shell and filesystem command integration: `src/userland/tcl/` (VOC resolution lives in [`src/core/voc/`](../src/core/voc/), used by [`ShellSession`](../src/userland/tcl/ShellSession.h))
@@ -31,7 +35,7 @@ Input is tokenized by whitespace (filenames with spaces are not supported by the
 
 - script lookup for `PROC <name>` uses `F/Q` VOC resolution with fallback to `(PROC, <name>)`.
 - `V` entries are not used for script lookup.
-- inside PROC `TCL ...` bridge lines, first-token verb dispatch may be mapped via `V` entries; subsequent name operands follow normal TCL command resolution behavior.
+- Interactive Tcl and PROC `TCL ...` bridge lines share the same first-token path: **`V`** entries in `VOC` map the verb before builtin dispatch; subsequent tokens follow normal Tcl operand and command rules.
 
 ## Filesystem directory
 

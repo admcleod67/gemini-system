@@ -63,6 +63,48 @@ TEST_CASE("shell WHO returns default port user account line") {
     CHECK(out.str() == "0 - -\n");
 }
 
+TEST_CASE("shell top-level Tcl resolves VOC verb alias SAYWHO to WHO") {
+    const auto fsDir = uniqueTempDir();
+    std::filesystem::create_directories(fsDir);
+    PickFS::FileSystem fs(fsDir);
+    fs.createFile("VOC");
+    fs.write("VOC", PickFS::Record("SAYWHO", "V\nWHO\n"));
+
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(fsDir);
+    std::ostringstream out;
+    bool quit = false;
+    sh.handleLine("SAYWHO", out, quit);
+    CHECK_FALSE(quit);
+    CHECK(out.str() == "0 - -\n");
+    out.str("");
+    sh.handleLine("saywho", out, quit);
+    CHECK_FALSE(quit);
+    CHECK(out.str() == "0 - -\n");
+}
+
+TEST_CASE("shell top-level Tcl resolves VOC ED alias to EDIT") {
+    const auto fsDir = uniqueTempDir();
+    std::filesystem::create_directories(fsDir);
+    PickFS::FileSystem fs(fsDir);
+    fs.createFile("VOC");
+    fs.write("VOC", PickFS::Record("ED", "V\nEDIT\n"));
+
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(fsDir);
+    std::ostringstream out;
+    bool quit = false;
+    sh.handleLine("ED", out, quit);
+    CHECK_FALSE(quit);
+    CHECK(out.str().find("EDIT requires") != std::string::npos);
+    out.str("");
+    sh.handleLine("ed", out, quit);
+    CHECK_FALSE(quit);
+    CHECK(out.str().find("EDIT requires") != std::string::npos);
+}
+
 TEST_CASE("shell VERSION contains project version string") {
     PickVM::Runtime rt;
     PickShell::Shell sh(rt);

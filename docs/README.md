@@ -24,3 +24,4 @@ Technical reference for Gemini System. Paths below are relative to this director
 ## Roadmap
 
 - **[Project milestones](milestones.md)** — phased roadmap; Milestone 1 matches the core stack above; higher milestones evolve.
+- **[Milestone 2 gaps](milestone-2-gaps.md)** — implementation gaps vs the Milestone 2 catalogue/session/dictionary plan.

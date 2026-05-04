@@ -284,6 +284,10 @@ namespace PickShell {
 
     void Shell::handleTclCommand(const Tokens &tokensIn, bool &quit, std::ostream &out) {
         Tokens work = tokensIn;
+        if (!work.empty()) {
+            work[0] = session_.vocResolver_.resolveVerbName(work[0]);
+            asciiUpperInPlace(work[0]);
+        }
         expandSessionAtOperands(session_, work);
         const auto it = tclCommands_.find(work[0]);
         if (it == tclCommands_.end()) {
