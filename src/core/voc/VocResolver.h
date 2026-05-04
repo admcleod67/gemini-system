@@ -27,6 +27,9 @@ namespace PickVoc {
             F,
             Q,
             V,
+            D,
+            A,
+            X,
         };
 
         struct VocEntry {

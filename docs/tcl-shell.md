@@ -10,7 +10,7 @@ Input is tokenized by whitespace (filenames with spaces are not supported by the
 
 ## Tcl command verb (first token)
 
-The first token of each interactive Tcl line is resolved through logical file **`VOC`**: **`V`**-type entries map a dictionary name to another verb name (same behaviour as the PROC **`TCL ...`** bridge). The resolved verb is then canonicalized to **ASCII uppercase** for dispatch to the built-in command set. If there is no applicable **`V`** entry, the token is still uppercased for lookup. Operand expansion for **`@USERNO`**, **`@ACCOUNT`**, and **`@LOGNAME`** runs **after** this step so aliases do not break **`SET`**, **`GET`**, **`UNSET`**, **`RUN`**, or **`PROC`** argument rules.
+The first token of each interactive Tcl line is resolved through logical file **`VOC`**: **`V`**- and **`X`**-type entries map a dictionary name to another verb name, with **`Q`** indirection, the same way as the PROC **`TCL ...`** bridge (see [Program resolution](#program-resolution-voc-backed)). The resolved verb is then canonicalized to **ASCII uppercase** for dispatch to the built-in command set. If there is no applicable VOC chain, the token is still uppercased for lookup. Operand expansion for **`@USERNO`**, **`@ACCOUNT`**, and **`@LOGNAME`** runs **after** this step so aliases do not break **`SET`**, **`GET`**, **`UNSET`**, **`RUN`**, or **`PROC`** argument rules.
 
 ## Source layout
 
@@ -25,7 +25,11 @@ The first token of each interactive Tcl line is resolved through logical file **
 
 `BASIC`, `RUN`, `EDIT` (shorthand form), and `LIST-PROGRAMS` resolve program names through logical file `VOC` (Pick records), not by scanning host program-path directories.
 
-- Supported VOC entry types for this milestone: `F`, `Q`, `V`.
+- Supported VOC entry types for this milestone: `F`, `Q`, `V`, `D`, `A`, `X` (Gemini subset — see below).
+- **`F`**, **`D`**, **`A`**: attribute 2 = logical Pick file name; **`D`**/**`A`** are treated like **`F`** for program and PROC script file resolution (not full Pick data-dictionary **`D`** semantics).
+- **`Q`**: attribute 2 = next VOC key (recursive for file resolution; also followed for verb resolution).
+- **`V`**, **`X`**: attribute 2 = target verb name for Tcl’s first-token resolution; **`X`** does **not** execute multi-line TCL stored in the VOC body (alias-only, same role as **`V`** for dispatch).
+- **`resolveVerbName`** follows **`Q`**/**`V`**/**`X`** chains with cycle detection and a hop limit (64); landing on **`F`**/**`D`**/**`A`** stops with the last resolved verb string.
 - Resolution for program names follows case-insensitive lookup with Q-chain recursion and BP fallback.
 - Resolved location is a `(file, key)` pair used for record I/O via filesystem API.
 - Source record key = `<programName>`.
@@ -33,9 +37,9 @@ The first token of each interactive Tcl line is resolved through logical file **
 
 `PROC` is also filesystem/VOC-backed:
 
-- script lookup for `PROC <name>` uses `F/Q` VOC resolution with fallback to `(PROC, <name>)`.
-- `V` entries are not used for script lookup.
-- Interactive Tcl and PROC `TCL ...` bridge lines share the same first-token path: **`V`** entries in `VOC` map the verb before builtin dispatch; subsequent tokens follow normal Tcl operand and command rules.
+- script lookup for `PROC <name>` uses `F`/`Q`/`D`/`A` VOC resolution with fallback to `(PROC, <name>)`.
+- `V` and `X` entries are not used for script lookup.
+- Interactive Tcl and PROC `TCL ...` bridge lines share the same first-token path: **`V`** and **`X`** entries in `VOC` map the verb (including multi-hop through **`Q`**/**`V`**/**`X`**) before builtin dispatch; subsequent tokens follow normal Tcl operand and command rules.
 
 ## Filesystem directory
 

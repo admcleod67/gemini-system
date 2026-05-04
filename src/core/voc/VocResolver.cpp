@@ -41,15 +41,41 @@ namespace PickVoc {
 
     std::string VocResolver::resolveVerbName(const std::string &token) {
         ensureLoaded();
-        const auto it = table_.find(upperAscii(token));
-        if (it == table_.end()) {
-            return token;
+        std::string nextKey = upperAscii(token);
+        std::string resolved = token;
+        std::unordered_set<std::string> visited;
+        for (int hop = 0; hop < 64; ++hop) {
+            if (!visited.insert(nextKey).second) {
+                return resolved;
+            }
+            const auto it = table_.find(nextKey);
+            if (it == table_.end()) {
+                return resolved;
+            }
+            const VocEntry &entry = it->second;
+            switch (entry.type) {
+            case EntryType::Q:
+                if (entry.attribute2.empty()) {
+                    return resolved;
+                }
+                nextKey = upperAscii(entry.attribute2);
+                break;
+            case EntryType::V:
+            case EntryType::X:
+                if (entry.attribute2.empty()) {
+                    return resolved;
+                }
+                resolved = entry.attribute2;
+                nextKey = upperAscii(entry.attribute2);
+                break;
+            case EntryType::F:
+            case EntryType::D:
+            case EntryType::A:
+            default:
+                return resolved;
+            }
         }
-        const VocEntry &entry = it->second;
-        if (entry.type != EntryType::V || entry.attribute2.empty()) {
-            return token;
-        }
-        return entry.attribute2;
+        return resolved;
     }
 
     std::vector<std::string> VocResolver::listProgramFiles() {
@@ -57,7 +83,7 @@ namespace PickVoc {
         std::unordered_set<std::string> files;
         files.insert(kDefaultProgramFile);
         for (const auto &[key, entry]: table_) {
-            if (entry.type == EntryType::F) {
+            if (entry.type == EntryType::F || entry.type == EntryType::D || entry.type == EntryType::A) {
                 if (!entry.attribute2.empty()) {
                     files.insert(entry.attribute2);
                 }
@@ -167,6 +193,15 @@ namespace PickVoc {
         if (type == "V") {
             return VocEntry{EntryType::V, attrs.size() > 1 ? attrs[1] : "", attrs.size() > 2 ? attrs[2] : ""};
         }
+        if (type == "D" || type == "A") {
+            if (attrs.size() < 2 || attrs[1].empty()) {
+                return std::nullopt;
+            }
+            return VocEntry{type == "D" ? EntryType::D : EntryType::A, attrs[1], attrs.size() > 2 ? attrs[2] : ""};
+        }
+        if (type == "X") {
+            return VocEntry{EntryType::X, attrs.size() > 1 ? attrs[1] : "", attrs.size() > 2 ? attrs[2] : ""};
+        }
         return std::nullopt;
     }
 
@@ -181,7 +216,7 @@ namespace PickVoc {
             return std::nullopt;
         }
         const VocEntry &entry = it->second;
-        if (entry.type == EntryType::F) {
+        if (entry.type == EntryType::F || entry.type == EntryType::D || entry.type == EntryType::A) {
             if (entry.attribute2.empty()) {
                 return std::nullopt;
             }

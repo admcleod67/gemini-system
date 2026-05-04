@@ -66,9 +66,9 @@ Program-name resolution for `BASIC`, `RUN`, and `LIST-PROGRAMS` is VOC-backed:
 
 - Logical file `VOC` is read as `.item` records.
 - Supported entry types:
-  - `F`: attribute 2 = file name, attribute 3 retained as file identifier/path metadata.
+  - `F`, `D`, `A`: attribute 2 = logical file name (`D`/`A` are file-pointer aliases for resolution, not full Pick data-dictionary definitions).
   - `Q`: attribute 2 = synonym target key (recursive, cycle-protected).
-  - `V`: attribute 2 = verb name (loaded for future verb work).
+  - `V`, `X`: attribute 2 = verb target for Tcl (`X` is alias-only; no execution of VOC-stored TCL). Verb chains: see [Developer shell (TCL)](tcl-shell.md#program-resolution-voc-backed).
 - Lookup is case-insensitive.
 - Program location fallback when no explicit entry resolves: `(BP, <program-name>)`.
 - PROC script lookup uses the same VOC table but applies PROC-specific fallback `(PROC, <script-name>)` for unresolved script keys.

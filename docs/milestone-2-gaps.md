@@ -25,17 +25,15 @@ These areas largely match the milestone intent:
 
 **Resolution:** Interactive Tcl now applies **`PickVoc::VocResolver::resolveVerbName`** to the first token in **`Shell::handleTclCommand`** (before operand expansion and builtin dispatch), with ASCII-uppercase canonicalization for the builtin map. PROC **`TCL ...`** lines use the same path (PROC may still pre-resolve once; a second hop is a no-op for typical **`V`** → builtin targets).
 
-**Remaining stretch:** multi-hop **`V`** chains, executing verbs that exist only in **`VOC`** without a C++ builtin, and pointer types **`D`** / **`A`** / **`X`** are still separate items (see Gap 2 and [`tcl-shell.md`](tcl-shell.md)).
+**Remaining stretch:** executing verbs that exist only in **`VOC`** without a C++ builtin; full Pick **`D`** data-dictionary semantics; **`X`**-item execution of embedded multi-line TCL from VOC.
 
-## Gap 2 — Dictionary pointer types **D**, **A**, **X** (and full **V** / **Q** semantics)
+## Gap 2 — Dictionary pointer types **D**, **A**, **X** (and full **V** / **Q** semantics) (addressed — minimal subset)
 
 **Milestone text:** Full pointer semantics where applicable: **V, Q, D, A, X**.
 
-**Current behaviour:** **`PickVoc::VocResolver`** parses and uses **F**, **Q**, and **V** only. **D**, **A**, and **X** entries are ignored by the parser (`parseVocEntry` returns no entry for unknown type letters).
+**Resolution:** **`PickVoc::VocResolver`** now parses **`D`**, **`A`**, and **`X`**. **`D`** and **`A`** participate in program/PROC file resolution like **`F`**. **`X`** is treated like **`V`** for verb alias strings (attribute 2 only). **`resolveVerbName`** follows **`Q`** / **`V`** / **`X`** chains with cycle detection and a 64-hop cap; **`listProgramFiles`** includes **`D`**/**`A`** file pointers.
 
-**Implication:** VOC content that relies on **D** / **A** / **X** cannot behave Pick-authentically until those types are defined and wired into resolution rules.
-
-**Subtlety:** **`resolveVerbName`** performs a **single** **V** hop; it does not recurse if the resolved name is itself another VOC entry (behaviour may need to match chosen Pick-era rules when extended).
+**Remaining stretch (documented in [`tcl-shell.md`](tcl-shell.md)):** full Pick **`D`**-item data dictionary behaviour (I-descriptors, correlatives, etc.); **`X`** as execute body; arbitrary deeper **`Q`** semantics beyond the current file/verb walks.
 
 ## Gap 3 — Session model: **MD** binding and default file pointers
 

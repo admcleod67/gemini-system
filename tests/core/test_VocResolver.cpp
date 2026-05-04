@@ -77,6 +77,71 @@ TEST_CASE("VocResolver resolves V-type verb aliases for PROC TCL bridge") {
     CHECK(resolver.resolveVerbName("UNKNOWN") == "UNKNOWN");
 }
 
+TEST_CASE("VocResolver D and A file pointers resolve like F for programs") {
+    const auto root = uniqueVocTempDir();
+    PickFS::FileSystem fs(root);
+    fs.createFile("VOC");
+    fs.write("VOC", PickFS::Record("FROM_D", "D\nCUSTOM\n"));
+    fs.write("VOC", PickFS::Record("FROM_A", "A\nOTHER\n"));
+
+    PickVoc::VocResolver resolver(fs);
+    const auto locD = resolver.resolveProgramLocation("FROM_D");
+    CHECK(locD.fileName == "CUSTOM");
+    CHECK(locD.recordKey == "FROM_D");
+    const auto locA = resolver.resolveProgramLocation("FROM_A");
+    CHECK(locA.fileName == "OTHER");
+    CHECK(locA.recordKey == "FROM_A");
+}
+
+TEST_CASE("VocResolver X-type verb alias matches V behaviour") {
+    const auto root = uniqueVocTempDir();
+    PickFS::FileSystem fs(root);
+    fs.createFile("VOC");
+    fs.write("VOC", PickFS::Record("SHOUT", "X\nECHO\n"));
+
+    PickVoc::VocResolver resolver(fs);
+    CHECK(resolver.resolveVerbName("SHOUT") == "ECHO");
+}
+
+TEST_CASE("VocResolver resolveVerbName follows Q then V and V chains") {
+    const auto root = uniqueVocTempDir();
+    PickFS::FileSystem fs(root);
+    fs.createFile("VOC");
+    fs.write("VOC", PickFS::Record("USEWHO", "Q\nCHAIN\n"));
+    fs.write("VOC", PickFS::Record("CHAIN", "V\nWHO\n"));
+    fs.write("VOC", PickFS::Record("ALIAS", "V\nMID\n"));
+    fs.write("VOC", PickFS::Record("MID", "V\nWHO\n"));
+
+    PickVoc::VocResolver resolver(fs);
+    CHECK(resolver.resolveVerbName("USEWHO") == "WHO");
+    CHECK(resolver.resolveVerbName("ALIAS") == "WHO");
+}
+
+TEST_CASE("VocResolver resolveVerbName Q cycle returns original token") {
+    const auto root = uniqueVocTempDir();
+    PickFS::FileSystem fs(root);
+    fs.createFile("VOC");
+    fs.write("VOC", PickFS::Record("QA", "Q\nQB\n"));
+    fs.write("VOC", PickFS::Record("QB", "Q\nQA\n"));
+
+    PickVoc::VocResolver resolver(fs);
+    CHECK(resolver.resolveVerbName("QA") == "QA");
+}
+
+TEST_CASE("VocResolver resolveVerbName stops after max hops on long Q chain") {
+    const auto root = uniqueVocTempDir();
+    PickFS::FileSystem fs(root);
+    fs.createFile("VOC");
+    for (int i = 0; i < 70; ++i) {
+        const std::string name = "L" + std::to_string(i);
+        const std::string next = "L" + std::to_string(i + 1);
+        fs.write("VOC", PickFS::Record(name, "Q\n" + next + "\n"));
+    }
+
+    PickVoc::VocResolver resolver(fs);
+    CHECK(resolver.resolveVerbName("L0") == "L0");
+}
+
 #ifndef PICK_SYSTEM_GEMINI_SYSPROG_FIXTURE
 #define PICK_SYSTEM_GEMINI_SYSPROG_FIXTURE ""
 #endif
