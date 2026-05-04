@@ -75,6 +75,8 @@ Program-name resolution for `BASIC`, `RUN`, and `LIST-PROGRAMS` is VOC-backed:
 
 For this milestone, object code records are stored in the same resolved Pick file as source using key suffix `_OBJ`.
 
+Account-level **default data file** (logical **`MD`** record **`DEFDATA`**) is documented in [Gemini bootstrap](gemini-bootstrap.md) and used by the Tcl shell for **`@DEFDATA`** and optional **`READ`** / **`WRITE`** shorthand; it is not part of the VOC program-resolution table.
+
 ## Name validation rules
 
 File names and record names use the same validation:

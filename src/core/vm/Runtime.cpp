@@ -28,7 +28,7 @@ namespace PickVM {
         }
 
         bool isReadOnlySystemVariableName(const std::string &canonical) {
-            return canonical == "@USERNO" || canonical == "@ACCOUNT" || canonical == "@LOGNAME";
+            return canonical == "@USERNO" || canonical == "@ACCOUNT" || canonical == "@LOGNAME" || canonical == "@DEFDATA";
         }
 
         int intOperandAtIp(const Instruction &instr, std::size_t ip) {

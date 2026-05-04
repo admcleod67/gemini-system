@@ -30,7 +30,7 @@ namespace PickShell {
 
         bool isReadonlySessionAtTarget(const std::string &token) {
             const std::string c = upperAscii(token);
-            return c == "@USERNO" || c == "@ACCOUNT" || c == "@LOGNAME";
+            return c == "@USERNO" || c == "@ACCOUNT" || c == "@LOGNAME" || c == "@DEFDATA";
         }
 
         std::vector<std::string> tokenize(const std::string &line) {

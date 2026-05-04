@@ -35,13 +35,13 @@ These areas largely match the milestone intent:
 
 **Remaining stretch (documented in [`tcl-shell.md`](tcl-shell.md)):** full Pick **`D`**-item data dictionary behaviour (I-descriptors, correlatives, etc.); **`X`** as execute body; arbitrary deeper **`Q`** semantics beyond the current file/verb walks.
 
-## Gap 3 — Session model: **MD** binding and default file pointers
+## Gap 3 — Session model: **MD** binding and default file pointers (addressed — minimal subset)
 
 **Milestone text:** Per-session state includes **current account** (Pick root), **current VOC** (and **MD** binding), **default file pointers**, Tcl environment, and BASIC runtime state.
 
-**Current behaviour:** Session setup applies **catalogue root**, **Pick root** (filesystem root), VM reset, and identity fields (`ShellSession::applyUserSession`). Program/PROC/EDIT paths use **VOC** (plus defaults such as **BP** / **PROC** in the resolver). There is no separate **MD** dictionary layer or explicit **default file pointer** state distinct from that resolution path.
+**Resolution:** Logical **`MD`** record **`DEFDATA`** supplies a validated default logical file name, loaded whenever the Pick root changes (`ShellSession::setFileSystemRoot`), cleared on catalogue **`LOGOFF`** (`clearLoginSession`). Read-only session token **`@DEFDATA`** mirrors **`@USERNO`** / **`@ACCOUNT`** / **`@LOGNAME`** in Tcl, PROC, and BASIC compile-time checks; VM stores reject **`@DEFDATA`**. Tcl **`READ`** / **`WRITE`** accept shortened forms when a default is set. Tcl command resolution remains **VOC-only**; **`MD`** is not used as a second verb dictionary.
 
-**Implication:** If Milestone 2 is read strictly, **MD**-driven bindings and **Pick-style default pointers** (beyond what falls out of VOC + resolver defaults) remain to be modelled in session and Tcl/BASIC I/O.
+**Remaining stretch:** full **MD** dictionary authoring and resolution; **`OPEN`** defaulting from **`MD`** in BASIC; additional MD-derived session fields beyond **`DEFDATA`**.
 
 ## Not gaps for delivered Milestone 2 (per roadmap)
 
@@ -54,5 +54,5 @@ These areas largely match the milestone intent:
 |--------|-------------------|
 | Tcl dispatch | `src/userland/tcl/Shell.cpp` — `handleTclCommand` (VOC `resolveVerbName` + dispatch), `executeProcTclCommand`, `dispatch` |
 | VOC parse / lookup | `src/core/voc/VocResolver.cpp`, `VocResolver.h` |
-| Session / login | `src/userland/tcl/ShellSession.cpp`, `src/core/login/LoginService.cpp`, `UserSession.h` |
+| Session / login | `src/userland/tcl/ShellSession.cpp`, `src/core/login/LoginService.cpp`, `UserSession.h`, `src/core/md/MdDefaultDataFile.*` |
 | Host entry / login loop | `src/userland/cli/Main.cpp`, `src/Main.cpp` |

@@ -36,6 +36,10 @@ Paths are relative to the repository (or to a copy placed next to the executable
 
 If the bootstrap Pick root contains logical file **`MD`** with record **`AUTO-LOGON`** (`.item` body: first line = account name), **`main`** attempts account logon from that line **before** environment auto-logon and before the interactive **`LOGON PLEASE:`** loop. Missing **`MD`** or record is ignored (no error).
 
+### `MD/DEFDATA` (optional)
+
+If logical file **`MD`** contains record **`DEFDATA`**, the first non-empty line is treated as a **logical Pick file name** (same character rules as other logical files). After logon (or whenever the Pick root changes), the Tcl shell loads it into session state as read-only **`@DEFDATA`** and uses it for optional **`READ`** / **`WRITE`** shorthand (see [Developer shell](tcl-shell.md)). Missing record or invalid name is ignored.
+
 ## `ACCOUNTS.json` schema
 
 Top-level object:

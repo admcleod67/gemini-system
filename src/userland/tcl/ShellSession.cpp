@@ -1,5 +1,6 @@
 #include "ShellSession.h"
 
+#include "MdDefaultDataFile.h"
 #include "TclEnvironment.h"
 
 #include <algorithm>
@@ -19,6 +20,7 @@ namespace PickShell {
         filesystemRoot_ = std::move(root);
         fileSystem_.setRoot(filesystemRoot_);
         vocResolver_.invalidate();
+        reloadMdDefaultDataFile();
     }
 
     bool ShellSession::programImageLoaded() const {
@@ -108,11 +110,16 @@ namespace PickShell {
         sessionUsername_.clear();
         sessionAccount_.clear();
         userNo_ = "0";
+        defaultDataFile_.reset();
+    }
+
+    void ShellSession::reloadMdDefaultDataFile() {
+        defaultDataFile_ = PickCore::loadDefaultDataFileFromMd(fileSystem_);
     }
 
     bool ShellSession::isSessionSystemVariableName(const std::string_view name) {
         const std::string key = TclEnvironment::canonicalVariableName(name);
-        return key == "@USERNO" || key == "@ACCOUNT" || key == "@LOGNAME";
+        return key == "@USERNO" || key == "@ACCOUNT" || key == "@LOGNAME" || key == "@DEFDATA";
     }
 
     std::optional<std::string> ShellSession::resolveSystemVariable(const std::string_view name) const {
@@ -125,6 +132,12 @@ namespace PickShell {
         }
         if (key == "@LOGNAME") {
             return sessionUsername_;
+        }
+        if (key == "@DEFDATA") {
+            if (defaultDataFile_.has_value()) {
+                return *defaultDataFile_;
+            }
+            return std::string{};
         }
         return std::nullopt;
     }

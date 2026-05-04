@@ -45,7 +45,7 @@ Pick BASIC variables are fundamentally typeless dynamic strings. The suffix on a
 Additional naming rules:
 
 - Variable names are case-insensitive; the compiler and runtime canonicalize them to uppercase.
-- The base name (before the suffix) must begin with a letter and contain only letters and digits (for example `A`, `X9`, `TOTAL1`), **or** the whole identifier (no `$` / `%` suffix) is exactly **`@USERNO`**, **`@ACCOUNT`**, or **`@LOGNAME`** — the three **session system variables**. They are allowed in **expressions** only; **`LET`**, **`INPUT`**, **`FOR`**, **`NEXT`**, and **`DIM`** targets may not use these names (compile error: read-only system variable). Other **`@Something`** identifiers are invalid in expressions.
+- The base name (before the suffix) must begin with a letter and contain only letters and digits (for example `A`, `X9`, `TOTAL1`), **or** the whole identifier (no `$` / `%` suffix) is exactly **`@USERNO`**, **`@ACCOUNT`**, **`@LOGNAME`**, or **`@DEFDATA`** — **session system variables** (the last is the logical file name from **`MD,DEFDATA`** when configured). They are allowed in **expressions** only; **`LET`**, **`INPUT`**, **`FOR`**, **`NEXT`**, and **`DIM`** targets may not use these names (compile error: read-only system variable). Other **`@Something`** identifiers are invalid in expressions.
 
 ## Expressions
 
@@ -55,7 +55,7 @@ Supported expression features:
 
 - int literals (for example `42`)
 - string literals (for example `"hello"`)
-- variable references (for example `A`, `A$`, `A%`, `@ACCOUNT`)
+- variable references (for example `A`, `A$`, `A%`, `@ACCOUNT`, `@DEFDATA`)
 - parentheses
 - unary minus
 - binary operators `+`, `-`, `*`, `/`

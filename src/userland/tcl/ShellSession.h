@@ -35,6 +35,9 @@ namespace PickShell {
 
         [[nodiscard]] const std::filesystem::path &fileSystemRoot() const { return filesystemRoot_; }
 
+        /// Logical Pick file from `MD,DEFDATA` when set (after each `setFileSystemRoot`; cleared on `clearLoginSession`).
+        [[nodiscard]] const std::optional<std::string> &defaultDataFile() const { return defaultDataFile_; }
+
         [[nodiscard]] bool programImageLoaded() const;
 
         void pruneBreakpointsForProgram(std::size_t programSize, std::ostream &out);
@@ -65,7 +68,7 @@ namespace PickShell {
 
         [[nodiscard]] const std::string &sessionAccount() const { return sessionAccount_; }
 
-        /// `@USERNO`, `@ACCOUNT`, `@LOGNAME` — read from session frame (not `TclEnvironment`).
+        /// `@USERNO`, `@ACCOUNT`, `@LOGNAME`, `@DEFDATA` — read from session frame (not `TclEnvironment`).
         [[nodiscard]] std::optional<std::string> resolveSystemVariable(std::string_view name) const;
 
         [[nodiscard]] static bool isSessionSystemVariableName(std::string_view name);
@@ -82,11 +85,15 @@ namespace PickShell {
         std::string sessionUsername_;
         std::string sessionAccount_;
         std::string userNo_{"0"};
+        std::optional<std::string> defaultDataFile_;
         std::optional<PickVM::LoadedBytecode> lastLoaded_;
         bool trace_{false};
         std::unordered_set<std::size_t> breakpoints_;
         bool suspended_{false};
         std::optional<std::size_t> resumePastBreakpointIp_;
+
+    private:
+        void reloadMdDefaultDataFile();
     };
 } // namespace PickShell
 

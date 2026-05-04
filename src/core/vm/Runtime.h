@@ -121,7 +121,7 @@ namespace PickVM {
         void setReadRecordCallback(ReadRecordFn fn);
         void setWriteRecordCallback(WriteRecordFn fn);
 
-        /// Optional read-only `@USERNO` / `@ACCOUNT` / `@LOGNAME` (canonical names). Cleared with empty function.
+        /// Optional read-only `@USERNO` / `@ACCOUNT` / `@LOGNAME` / `@DEFDATA` (canonical names). Cleared with empty function.
         using SystemVarReaderFn = std::function<std::optional<Value>(std::string_view canonicalName)>;
         void setSystemVariableReader(SystemVarReaderFn fn);
 

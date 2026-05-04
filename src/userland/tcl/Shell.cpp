@@ -951,6 +951,9 @@ namespace PickShell {
             names.push_back("@LOGNAME");
             names.push_back("@USERNO");
         }
+        if (session_.defaultDataFile().has_value()) {
+            names.push_back("@DEFDATA");
+        }
         std::sort(names.begin(), names.end());
         names.erase(std::unique(names.begin(), names.end()), names.end());
         if (names.empty()) {
@@ -996,8 +999,8 @@ namespace PickShell {
         out << "  DELETE-FILE <name>\n";
         out << "  LIST-FILES\n";
         out << "  LIST <file>    list record names for a file\n";
-        out << "  READ <file> <record-name>\n";
-        out << "  WRITE <file> <record-name> <value...>\n";
+        out << "  READ <file> <record-name>   (or READ <record> when MD DEFDATA names default file)\n";
+        out << "  WRITE <file> <record-name> <value...>   (or WRITE <record> <value> when MD DEFDATA is set)\n";
         out << "  EDIT <file> <record> | EDIT <programName>   line editor (ED>); SAVE (FI), QUIT (Q)\n";
         out << "  DUMP-STACK\n";
         out << "  VERSION\n";
@@ -1116,12 +1119,20 @@ namespace PickShell {
     }
 
     void Shell::cmdRead(const std::vector<std::string> &tokens, std::ostream &out) {
-        if (tokens.size() < 3) {
-            out << "READ requires a file and record name\n";
+        std::string fileName;
+        std::string recordKey;
+        if (tokens.size() == 3) {
+            fileName = tokens[1];
+            recordKey = tokens[2];
+        } else if (tokens.size() == 2 && session_.defaultDataFile().has_value()) {
+            fileName = *session_.defaultDataFile();
+            recordKey = tokens[1];
+        } else {
+            out << "READ requires a file and record name (or READ <record> when MD DEFDATA is set)\n";
             return;
         }
         try {
-            const std::optional<PickFS::Record> record = session_.fileSystem_.read(tokens[1], tokens[2]);
+            const std::optional<PickFS::Record> record = session_.fileSystem_.read(fileName, recordKey);
             if (!record) {
                 out << "No such record\n";
                 return;
@@ -1133,20 +1144,31 @@ namespace PickShell {
     }
 
     void Shell::cmdWrite(const std::vector<std::string> &tokens, std::ostream &out) {
-        if (tokens.size() < 4) {
-            out << "WRITE requires a file, record name, and value\n";
+        std::string fileName;
+        std::string recordKey;
+        std::size_t valueStart = 0;
+        if (tokens.size() >= 4) {
+            fileName = tokens[1];
+            recordKey = tokens[2];
+            valueStart = 3;
+        } else if (tokens.size() == 3 && session_.defaultDataFile().has_value()) {
+            fileName = *session_.defaultDataFile();
+            recordKey = tokens[1];
+            valueStart = 2;
+        } else {
+            out << "WRITE requires a file, record name, and value (or WRITE <record> <value> when MD DEFDATA is set)\n";
             return;
         }
         std::string value;
-        for (std::size_t i = 3; i < tokens.size(); ++i) {
-            if (i > 3) {
+        for (std::size_t i = valueStart; i < tokens.size(); ++i) {
+            if (i > valueStart) {
                 value += ' ';
             }
             value += tokens[i];
         }
         try {
-            session_.fileSystem_.write(tokens[1], PickFS::Record(tokens[2], std::move(value)));
-            if (tokens[1] == "VOC") {
+            session_.fileSystem_.write(fileName, PickFS::Record(recordKey, std::move(value)));
+            if (fileName == "VOC") {
                 session_.vocResolver_.invalidate();
             }
         } catch (const std::exception &e) {

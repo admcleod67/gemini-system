@@ -567,11 +567,80 @@ TEST_CASE("shell filesystem command arity and missing record") {
 
     out.str("");
     sh.handleLine("READ BP", out, quit);
-    CHECK(out.str() == "READ requires a file and record name\n");
+    CHECK(out.str().find("READ requires a file and record name") == 0);
 
     out.str("");
     sh.handleLine("WRITE BP HELLO", out, quit);
-    CHECK(out.str() == "WRITE requires a file, record name, and value\n");
+    CHECK(out.str().find("WRITE requires a file, record name, and value") == 0);
+}
+
+TEST_CASE("shell READ WRITE use MD DEFDATA default file and GET LIST-VARS SET") {
+    const auto dir = uniqueTempDir();
+    std::filesystem::create_directories(dir / "MD");
+    {
+        std::ofstream md(dir / "MD" / "DEFDATA.item");
+        md << "DATA\n";
+    }
+    PickFS::FileSystem fsInit(dir);
+    fsInit.createFile("DATA");
+
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(dir);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("GET @DEFDATA", out, quit);
+    CHECK(out.str() == "DATA\n");
+
+    out.str("");
+    sh.handleLine("WRITE MYREC hello", out, quit);
+    CHECK(out.str().empty());
+
+    out.str("");
+    sh.handleLine("READ MYREC", out, quit);
+    CHECK(out.str() == "hello\n");
+
+    out.str("");
+    sh.handleLine("WRITE DATA MYREC hello world", out, quit);
+    CHECK(out.str().empty());
+
+    out.str("");
+    sh.handleLine("READ MYREC", out, quit);
+    CHECK(out.str() == "hello world\n");
+
+    out.str("");
+    sh.handleLine("LIST-VARS", out, quit);
+    CHECK(out.str().find("@DEFDATA") != std::string::npos);
+
+    out.str("");
+    sh.handleLine("SET @DEFDATA X", out, quit);
+    CHECK(out.str() == "Read-only system variable\n");
+}
+
+TEST_CASE("shell MD DEFDATA reloads when Pick root changes") {
+    const auto dirWith = uniqueTempDir();
+    std::filesystem::create_directories(dirWith / "MD");
+    {
+        std::ofstream md(dirWith / "MD" / "DEFDATA.item");
+        md << "BP\n";
+    }
+    const auto dirWithout = uniqueTempDir();
+    std::filesystem::create_directories(dirWithout);
+
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.setFileSystemRoot(dirWith);
+    sh.handleLine("GET @DEFDATA", out, quit);
+    CHECK(out.str() == "BP\n");
+
+    out.str("");
+    sh.setFileSystemRoot(dirWithout);
+    sh.handleLine("GET @DEFDATA", out, quit);
+    CHECK(out.str() == "\n");
 }
 
 TEST_CASE("shell filesystem missing file and missing record") {

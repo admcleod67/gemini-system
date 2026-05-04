@@ -24,6 +24,8 @@ add_library(gemini-core
         host/HostBootstrap.h
         boot/BootMonitor.cpp
         boot/BootMonitor.h
+        md/MdDefaultDataFile.cpp
+        md/MdDefaultDataFile.h
 )
 
 target_include_directories(
@@ -37,6 +39,7 @@ target_include_directories(
         "${CMAKE_CURRENT_SOURCE_DIR}/login"
         "${CMAKE_CURRENT_SOURCE_DIR}/host"
         "${CMAKE_CURRENT_SOURCE_DIR}/boot"
+        "${CMAKE_CURRENT_SOURCE_DIR}/md"
 )
 
 target_link_libraries(gemini-core PUBLIC nlohmann_json::nlohmann_json)
