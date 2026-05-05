@@ -42,13 +42,70 @@ The host hands **`PickCore::UserSession`** into userland; today **`username`** a
 - **`LOGTO`:** Switch account within an existing Tcl session, reload Pick root / MD/VOC context, reset session state for the new account.
 - **`WHO`** and **`LOGOFF`:** Minimal introspection and clean session teardown; **`LOGOFF`** returns the host to the core **`LOGON`** phase (**no nested Tcl login loop**).
 
-## Milestone 3 — TCL & filesystem maturation
+**Milestone 2 residual fidelity items (deferred)**
 
-- Additional TCL verbs beyond the Milestone 1 set (e.g. catalog/maintenance commands not covered today—distinct from existing **`LIST`** *file*, **`LIST-FILES`**, **`LIST-PROGRAMS`**, **`DELETE-FILE`**, …)
-- Improved `READ` / `WRITE` behaviour
-- Editor refinements
-- Resolver introspection commands
-- Early groundwork for attribute-aware records (no format changes yet)
+- **Dictionary depth:** full Pick **`D`**-item data dictionary semantics; **`X`** execute-body behaviour; deeper/expanded **`Q`** behaviour beyond the current resolver walks.
+- **Verb model:** executing verbs that exist only in **`VOC`** without a corresponding built-in Tcl handler.
+- **MD model:** full MD dictionary authoring/resolution beyond **`MD,DEFDATA`**, including broader MD-derived session behaviour.
+- **BASIC file semantics:** defaulting `OPEN`/file-variable behaviour from MD-derived defaults.
+- **Session identity richness:** additional session fields such as **`@TTY`** / **`@PRIVILEGES`** and related policy/state.
+- **User model:** distinct **`USERS`**-driven identities (separate from account) remain roadmap.
+
+## Milestone 3 — ENGLISH core, DICT evolution & filesystem maturation
+
+**Goal:** Introduce a minimal, Pick-authentic **ENGLISH** core (`LIST`, `SORT`, `COUNT`, `SELECT`) and use it to drive a stable **DICT** and record-access model for later processors.
+
+**Milestone slices (delivery order)**
+
+- **M3a — DICT + record API groundwork:** Land dictionary lookup, attribute-aware extraction primitives, and a stable record API used by Tcl/BASIC/ENGLISH.
+- **M3b — ENGLISH query core:** Implement `LIST`, `COUNT`, and `SELECT` on top of the M3a primitives.
+- **M3c — Ordering + list lifecycle:** Add `SORT`, active-list lifecycle commands, and resolver/debug ergonomics needed to operate ENGLISH predictably.
+
+**ENGLISH subsystem (minimal core)**
+
+- Implement **`LIST`**, **`SORT`**, **`COUNT`**, **`SELECT`** as an ENGLISH processor module.
+- Route Tcl dispatch through VOC into ENGLISH (no parallel command path).
+- No report-formatting layer yet: no headings, breaks, totals, pagination, or printer semantics.
+
+**DICT model evolution**
+
+- Support **A-type** attributes (attribute number and extraction rules).
+- Support **S-type** synonyms (simple indirection).
+- Support a minimal conversion subset (**`D`**, **`MD`**, **`MC`**) for numeric/date coercion.
+- Define and document deterministic DICT lookup precedence (file name, `DICT` file, attribute fallback).
+
+**Filesystem maturation**
+
+- Attribute-aware record access for multi-attribute / multi-value extraction.
+- Clean separation between raw record storage and DICT-driven interpretation.
+- Stable record API shared by ENGLISH, BASIC, and future processors.
+- Session-scoped active-list storage as the base for `SELECT`/`SSELECT` evolution.
+
+**TCL integration**
+
+- `LIST` / `SORT` / `COUNT` / `SELECT` routed through VOC and dispatched to ENGLISH.
+- Minimal active-list operations: **`LIST-LIST`** and **`CLEAR-LIST`**.
+- Resolver introspection improvements as needed for ENGLISH diagnostics.
+
+**Processor architecture**
+
+- ENGLISH implemented as a standalone module with explicit subcomponents:
+  - Parser
+  - Dictionary resolver
+  - Planner
+  - Executor
+- Formatter remains deferred to a later milestone.
+- This establishes the long-term processor pattern without requiring dynamic registration in M3.
+
+**Non-goals (explicitly deferred)**
+
+- Formatting/report layer: `HEADING`, `FOOTING`, `BREAK-ON`, `TOTAL`, `ID-SUPP`, pagination.
+- Printer/report delivery semantics.
+- Computed attributes (e.g. F/I-type and correlative expression support).
+- Full `SSELECT` semantics (until sorting/list behaviour matures).
+- SQL-like or extended ENGLISH feature surface.
+- Concurrency / multi-user support.
+- Dynamic processor registration.
 
 ## Milestone 4 — R83-flavoured fidelity pass
 
