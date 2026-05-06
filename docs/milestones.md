@@ -80,6 +80,7 @@ The host hands **`PickCore::UserSession`** into userland; today **`username`** a
 - Clean separation between raw record storage and DICT-driven interpretation.
 - Stable record API shared by ENGLISH, BASIC, and future processors.
 - Session-scoped active-list storage as the base for `SELECT`/`SSELECT` evolution.
+- Detailed filesystem model/spec for this milestone is captured in **`docs/filesystem-m3.md`**.
 
 **TCL integration**
 

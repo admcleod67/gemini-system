@@ -1,0 +1,137 @@
+# Filesystem M3: attribute-aware record model
+
+This document defines the **Milestone 3** filesystem evolution from raw record blobs to a
+structured, attribute-aware model suitable for DICT and ENGLISH.
+
+It complements:
+
+- [Project milestones](milestones.md) (Milestone 3 scope)
+- [File system (host backend transition)](filesystem.md) (current baseline behaviour)
+
+## Purpose
+
+Milestone 3 introduces the first semantically meaningful change to record handling:
+
+- External Tcl semantics for `READ` / `WRITE` remain Pick-style raw record text.
+- Internally, records become **attribute-indexed** so ENGLISH, DICT resolution, and BASIC can
+  access canonical attribute/value views.
+
+This is the minimum structural step needed before formatting, correlatives, computed attributes,
+and report semantics.
+
+## Scope and non-goals
+
+### In scope (M3)
+
+- Attribute-aware record model (`attributeNo -> RecordAttribute`).
+- Canonical parse/serialize rules between raw Pick text and structured attributes.
+- Shared multi-value splitting logic used by ENGLISH and BASIC.
+- Stable API layer for processor consumers.
+
+### Deferred (not in this document's implementation scope)
+
+- Formatting/reporting semantics (`HEADING`, `BREAK-ON`, `TOTAL`, pagination, printer model).
+- Correlative and computed-attribute execution (`I`/`F` item semantics).
+- Full Pick MD dictionary semantics (beyond current M2 `MD,DEFDATA` session default).
+
+## Data model
+
+## `RecordAttribute`
+
+`RecordAttribute` starts as a thin wrapper around raw attribute text and provides centralized
+helpers for multi-value parsing.
+
+Planned responsibilities:
+
+- store raw attribute text exactly as parsed;
+- return first value and value-by-index (Pick multivalue semantics);
+- expose canonical split representation (single implementation used by ENGLISH and BASIC).
+
+## Structured record view
+
+Each record is represented internally as:
+
+- `map<int, RecordAttribute>`
+- key = **1-indexed** attribute number;
+- only present attributes are stored.
+
+Missing attributes are represented by key absence; lookup of a non-existent attribute returns an
+empty `RecordAttribute` view, preserving Pick-style empty results without vector padding.
+
+## Parse and serialize contract
+
+## `WRITE` path (raw -> structured)
+
+Input remains a Pick-style raw record body where newline separates attributes.
+
+On write:
+
+1. Parse newline-delimited attributes.
+2. Build structured map entries (`1..N`) as `RecordAttribute`.
+3. Preserve empty attributes as empty attribute payloads when explicitly present.
+
+## `READ` path (structured -> raw)
+
+Tcl callers still receive raw Pick-style newline-delimited text.
+
+Internally, the same record instance must expose the structured map to ENGLISH/DICT/BASIC.
+
+## Round-trip invariants
+
+For accepted input, parse + serialize should be stable under these rules:
+
+- attribute boundaries are newline-based;
+- empty attributes remain representable;
+- ordering remains attribute-number order;
+- absent attributes remain absent (not auto-padded).
+
+Detailed newline-ending policy should be fixed in tests so consumers do not guess.
+
+## API shape and compatibility
+
+External compatibility remains:
+
+- existing Tcl `READ` / `WRITE` command contracts stay valid;
+- filesystem callers can still pass/receive raw record text.
+
+Internal additions provide:
+
+- attribute-number access;
+- multivalue access by index;
+- shared parser/splitter primitives for higher-level processors.
+
+The compatibility boundary should keep current callers working while enabling progressive migration
+to structured access.
+
+## Integration targets
+
+## ENGLISH
+
+- projection and selection read attributes by number through the structured view;
+- conversion and DICT item processing consume canonical multivalue splits from `RecordAttribute`.
+
+## DICT resolver
+
+- A/S type resolution can access attribute payloads directly by number;
+- conversion and extraction rules build on the same record/attribute primitives.
+
+## BASIC
+
+- compiler/runtime features needing attribute-level reads use shared primitives;
+- avoid introducing a second split/parse implementation in BASIC codepaths.
+
+## Test matrix
+
+Minimum expected tests for this milestone:
+
+- raw write/read round-trip with normal attributes;
+- explicit empty attributes (including interior empties);
+- sparse lookup semantics (missing attribute => empty `RecordAttribute`);
+- multivalue splitting parity between ENGLISH and BASIC consumers;
+- serialization order/invariance by attribute number.
+
+## Migration notes
+
+- Keep current on-disk format (`.item` text) during M3.
+- Introduce structured model in-memory first.
+- Defer any persistent binary/hashed-storage redesign to a later milestone.

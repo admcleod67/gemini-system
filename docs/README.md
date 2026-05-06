@@ -20,6 +20,7 @@ Technical reference for Gemini System. Paths below are relative to this director
 ## Storage and VOC
 
 - **[File system](filesystem.md)** — Pick-style logical files and records (host-backed store used by Tcl and BASIC runtime I/O).
+- **[Filesystem M3 model](filesystem-m3.md)** — Milestone 3 attribute-aware record model and parse/serialize contract.
 
 ## Roadmap
 
