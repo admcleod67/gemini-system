@@ -82,6 +82,7 @@ namespace PickShell {
         suspended_ = false;
         resumePastBreakpointIp_.reset();
         env_.clear();
+        activeList_.clear();
         runtime_.loadProgram({});
     }
 
@@ -111,6 +112,7 @@ namespace PickShell {
         sessionAccount_.clear();
         userNo_ = "0";
         defaultDataFile_.reset();
+        activeList_.clear();
     }
 
     void ShellSession::reloadMdDefaultDataFile() {

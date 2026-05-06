@@ -30,6 +30,17 @@ add_library(gemini-core
         boot/BootMonitor.h
         md/MdDefaultDataFile.cpp
         md/MdDefaultDataFile.h
+        english/EnglishTypes.h
+        english/EnglishParser.cpp
+        english/EnglishParser.h
+        english/DictionaryResolver.cpp
+        english/DictionaryResolver.h
+        english/Planner.cpp
+        english/Planner.h
+        english/Executor.cpp
+        english/Executor.h
+        english/EnglishService.cpp
+        english/EnglishService.h
 )
 
 target_include_directories(
@@ -44,6 +55,7 @@ target_include_directories(
         "${CMAKE_CURRENT_SOURCE_DIR}/host"
         "${CMAKE_CURRENT_SOURCE_DIR}/boot"
         "${CMAKE_CURRENT_SOURCE_DIR}/md"
+        "${CMAKE_CURRENT_SOURCE_DIR}/english"
 )
 
 target_link_libraries(gemini-core PUBLIC nlohmann_json::nlohmann_json)

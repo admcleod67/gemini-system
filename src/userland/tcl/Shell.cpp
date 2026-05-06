@@ -234,6 +234,10 @@ namespace PickShell {
             cmdListFiles(tokens, out);
         };
         tclCommands_["LIST"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdList(tokens, out); };
+        tclCommands_["COUNT"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdCount(tokens, out); };
+        tclCommands_["SELECT"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdSelect(tokens, out); };
+        tclCommands_["LIST-LIST"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdListList(tokens, out); };
+        tclCommands_["CLEAR-LIST"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdClearList(tokens, out); };
         tclCommands_["READ"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdRead(tokens, out); };
         tclCommands_["WRITE"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdWrite(tokens, out); };
         tclCommands_["ASM"] = [this](const Tokens &tokens, std::ostream &out, bool &) {
@@ -998,7 +1002,11 @@ namespace PickShell {
         out << "  CREATE-FILE <name>\n";
         out << "  DELETE-FILE <name>\n";
         out << "  LIST-FILES\n";
-        out << "  LIST <file>    list record names for a file\n";
+        out << "  LIST <file> [fields...]   ENGLISH LIST when fields are present; LIST <file> shows record names\n";
+        out << "  COUNT <file> [fields...]\n";
+        out << "  SELECT <file> [fields...]\n";
+        out << "  LIST-LIST\n";
+        out << "  CLEAR-LIST\n";
         out << "  READ <file> <record-name>   (or READ <record> when MD DEFDATA names default file)\n";
         out << "  WRITE <file> <record-name> <value...>   (or WRITE <record> <value> when MD DEFDATA is set)\n";
         out << "  EDIT <file> <record> | EDIT <programName>   line editor (ED>); SAVE (FI), QUIT (Q)\n";
@@ -1099,6 +1107,18 @@ namespace PickShell {
     }
 
     void Shell::cmdList(const std::vector<std::string> &tokens, std::ostream &out) {
+        if (tokens.size() >= 3) {
+            std::string error;
+            const std::optional<PickCore::English::Result> result = englishService_.run(session_.fileSystem_, tokens, error);
+            if (!result.has_value()) {
+                out << "Error: " << error << "\n";
+                return;
+            }
+            for (const std::string &line: result->lines) {
+                out << line << '\n';
+            }
+            return;
+        }
         if (tokens.size() != 2) {
             out << "LIST requires a filename\n";
             return;
@@ -1116,6 +1136,63 @@ namespace PickShell {
         } catch (const std::exception &e) {
             out << "Error: " << e.what() << "\n";
         }
+    }
+
+    void Shell::cmdCount(const std::vector<std::string> &tokens, std::ostream &out) {
+        if (tokens.size() < 2) {
+            out << "COUNT requires a filename\n";
+            return;
+        }
+        std::string error;
+        const std::optional<PickCore::English::Result> result = englishService_.run(session_.fileSystem_, tokens, error);
+        if (!result.has_value()) {
+            out << "Error: " << error << "\n";
+            return;
+        }
+        for (const std::string &line: result->lines) {
+            out << line << '\n';
+        }
+    }
+
+    void Shell::cmdSelect(const std::vector<std::string> &tokens, std::ostream &out) {
+        if (tokens.size() < 2) {
+            out << "SELECT requires a filename\n";
+            return;
+        }
+        std::string error;
+        const std::optional<PickCore::English::Result> result = englishService_.run(session_.fileSystem_, tokens, error);
+        if (!result.has_value()) {
+            out << "Error: " << error << "\n";
+            return;
+        }
+        session_.setActiveList(result->selectedIds);
+        for (const std::string &line: result->lines) {
+            out << line << '\n';
+        }
+    }
+
+    void Shell::cmdListList(const std::vector<std::string> &tokens, std::ostream &out) {
+        if (tokens.size() > 1) {
+            out << "LIST-LIST takes no arguments\n";
+            return;
+        }
+        if (session_.activeList().empty()) {
+            out << "No active list\n";
+            return;
+        }
+        out << "Active list:\n";
+        for (const std::string &id: session_.activeList()) {
+            out << "  " << id << '\n';
+        }
+    }
+
+    void Shell::cmdClearList(const std::vector<std::string> &tokens, std::ostream &out) {
+        if (tokens.size() > 1) {
+            out << "CLEAR-LIST takes no arguments\n";
+            return;
+        }
+        session_.clearActiveList();
+        out << "Active list cleared\n";
     }
 
     void Shell::cmdRead(const std::vector<std::string> &tokens, std::ostream &out) {

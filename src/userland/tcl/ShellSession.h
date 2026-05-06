@@ -20,6 +20,7 @@
 #include <ostream>
 #include <string_view>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 namespace PickShell {
@@ -68,6 +69,10 @@ namespace PickShell {
 
         [[nodiscard]] const std::string &sessionAccount() const { return sessionAccount_; }
 
+        [[nodiscard]] const std::vector<std::string> &activeList() const { return activeList_; }
+        void setActiveList(std::vector<std::string> ids) { activeList_ = std::move(ids); }
+        void clearActiveList() { activeList_.clear(); }
+
         /// `@USERNO`, `@ACCOUNT`, `@LOGNAME`, `@DEFDATA` — read from session frame (not `TclEnvironment`).
         [[nodiscard]] std::optional<std::string> resolveSystemVariable(std::string_view name) const;
 
@@ -86,6 +91,7 @@ namespace PickShell {
         std::string sessionAccount_;
         std::string userNo_{"0"};
         std::optional<std::string> defaultDataFile_;
+        std::vector<std::string> activeList_;
         std::optional<PickVM::LoadedBytecode> lastLoaded_;
         bool trace_{false};
         std::unordered_set<std::size_t> breakpoints_;

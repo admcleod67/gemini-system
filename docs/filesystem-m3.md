@@ -28,6 +28,23 @@ contracts:
 - Core filesystem paths normalize raw payloads through shared parse/serialize helpers.
 - Record internals expose attribute-indexed access and centralized multivalue splitting primitives.
 
+## M3b implementation status
+
+M3b now adds a minimal ENGLISH processor layer on top of the M3a structured model:
+
+- standalone core module at `src/core/english/` with parser, dictionary resolver, planner, executor, and service facade;
+- supported minimal grammar forms: `LIST <file> [field ...]`, `COUNT <file> [field ...]`, `SELECT <file> [field ...]`;
+- executor scans records through filesystem APIs and reads projected fields through `Record::structured()`;
+- DICT baseline resolves numeric fields directly, plus `A` and simple `S` indirection from `DICT` records (minimal subset);
+- Tcl integration uses contextual `LIST`: bare `LIST <file>` keeps legacy record-name listing, while field-bearing `LIST` routes to ENGLISH.
+
+Active-list behavior for M3b is session-scoped in Tcl:
+
+- `SELECT` stores selected IDs into the shell session active list;
+- `LIST-LIST` prints the current active list;
+- `CLEAR-LIST` clears it;
+- list state clears on session reset and `LOGOFF`.
+
 ## Scope and non-goals
 
 ### In scope (M3)

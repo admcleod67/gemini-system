@@ -9,6 +9,7 @@
 
 #include "AssemblerShell.h"
 #include "BasicShell.h"
+#include "EnglishService.h"
 #include "ProcInterpreter.h"
 #include "ShellSession.h"
 #include "UserSession.h"
@@ -70,6 +71,7 @@ namespace PickShell {
         AssemblerShell assemblerShell_;
         BasicShell basicShell_;
         ProcInterpreter procInterpreter_;
+        PickCore::English::EnglishService englishService_;
         CommandTable tclCommands_;
         std::istream *inputStream_{nullptr};
         bool sessionEndRequested_{false};
@@ -139,6 +141,10 @@ namespace PickShell {
         void cmdListFiles(const std::vector<std::string> &tokens, std::ostream &out);
 
         void cmdList(const std::vector<std::string> &tokens, std::ostream &out);
+        void cmdCount(const std::vector<std::string> &tokens, std::ostream &out);
+        void cmdSelect(const std::vector<std::string> &tokens, std::ostream &out);
+        void cmdListList(const std::vector<std::string> &tokens, std::ostream &out);
+        void cmdClearList(const std::vector<std::string> &tokens, std::ostream &out);
 
         void cmdRead(const std::vector<std::string> &tokens, std::ostream &out);
 

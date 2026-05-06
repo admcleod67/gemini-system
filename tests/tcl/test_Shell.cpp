@@ -548,6 +548,64 @@ TEST_CASE("shell LIST file empty and arity") {
     CHECK(out.str() == "LIST requires a filename\n");
 }
 
+TEST_CASE("shell LIST with fields routes to ENGLISH while LIST file stays legacy") {
+    auto dir = uniqueTempDir();
+    PickFS::FileSystem fs(dir);
+    fs.createFile("DATA");
+    fs.createFile("DICT");
+    fs.write("DICT", PickFS::Record("NAME", "A\n1\n"));
+    fs.write("DATA", PickFS::Record("R1", "ALICE"));
+    fs.write("DATA", PickFS::Record("R2", "BOB"));
+
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(dir);
+    std::ostringstream out;
+    bool quit = false;
+
+    out.str("");
+    sh.handleLine("LIST DATA", out, quit);
+    CHECK(out.str() == "Records:\n  R1\n  R2\n");
+
+    out.str("");
+    sh.handleLine("LIST DATA NAME", out, quit);
+    CHECK(out.str().find("R1 ALICE") != std::string::npos);
+    CHECK(out.str().find("R2 BOB") != std::string::npos);
+}
+
+TEST_CASE("shell COUNT SELECT LIST-LIST CLEAR-LIST") {
+    auto dir = uniqueTempDir();
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(dir);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("CREATE-FILE DATA", out, quit);
+    sh.handleLine("WRITE DATA R1 A", out, quit);
+    sh.handleLine("WRITE DATA R2 B", out, quit);
+
+    out.str("");
+    sh.handleLine("COUNT DATA", out, quit);
+    CHECK(out.str() == "2\n");
+
+    out.str("");
+    sh.handleLine("SELECT DATA", out, quit);
+    CHECK(out.str() == "2 records selected\n");
+
+    out.str("");
+    sh.handleLine("LIST-LIST", out, quit);
+    CHECK(out.str() == "Active list:\n  R1\n  R2\n");
+
+    out.str("");
+    sh.handleLine("CLEAR-LIST", out, quit);
+    CHECK(out.str() == "Active list cleared\n");
+
+    out.str("");
+    sh.handleLine("LIST-LIST", out, quit);
+    CHECK(out.str() == "No active list\n");
+}
+
 TEST_CASE("shell filesystem command arity and missing record") {
     PickVM::Runtime rt;
     PickShell::Shell sh(rt);
