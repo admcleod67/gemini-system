@@ -15,6 +15,8 @@ namespace PickCore::English {
                                                 const EnglishRunOptions &execOpts,
                                                 std::string &error) const;
 
+        [[nodiscard]] const DictionaryResolver &dictionaryResolver() const { return resolver_; }
+
     private:
         EnglishParser parser_;
         DictionaryResolver resolver_;

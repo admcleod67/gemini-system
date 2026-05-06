@@ -4,7 +4,6 @@
 
 #include <algorithm>
 #include <cctype>
-
 namespace PickCore::English {
     namespace {
         std::optional<int> parsePositiveInt(const std::string &text) {
@@ -73,52 +72,127 @@ namespace PickCore::English {
             return ConversionCode::None;
         }
 
-        std::optional<FieldRef> resolveFieldRec(PickFS::FileSystem &fs, const std::string &token, int depth) {
-            if (depth > 16) {
+        std::optional<PickFS::Record> tryReadDictRecord(PickFS::FileSystem &fs,
+                                                        const std::string &dictLogicalFile,
+                                                        const std::string &token) {
+            try {
+                return fs.read(dictLogicalFile, token);
+            } catch (const PickFS::FileSystemError &) {
                 return std::nullopt;
             }
-            if (const std::optional<int> numeric = parsePositiveInt(token)) {
-                return FieldRef{token, *numeric, ConversionCode::None};
+        }
+
+        bool logicalFileExists(PickFS::FileSystem &fs, const std::string &logicalName) {
+            try {
+                (void) fs.openFile(logicalName);
+                return true;
+            } catch (const PickFS::FileSystemError &) {
+                return false;
             }
-            const std::optional<PickFS::Record> rec = fs.read("DICT", token);
-            if (!rec.has_value()) {
-                return std::nullopt;
-            }
-            const auto &attrs = rec->structured();
+        }
+
+        std::optional<FieldRef> fieldFromStructuredDict(const PickFS::StructuredRecord &attrs,
+                                                        const std::string &originalToken) {
             const std::string type = attrs.attribute(1).firstValue();
             if (type == "A" || type == "a") {
                 const std::optional<int> attrNum = parsePositiveInt(attrs.attribute(2).firstValue());
                 const ConversionCode conv = classifyFromAttrs(attrs);
                 if (!attrNum.has_value()) {
-                    return FieldRef{token, std::nullopt, conv};
+                    return FieldRef{originalToken, std::nullopt, conv};
                 }
-                return FieldRef{token, *attrNum, conv};
+                return FieldRef{originalToken, *attrNum, conv};
             }
             if (type == "S" || type == "s") {
-                const std::string target = attrs.attribute(2).firstValue();
-                if (target.empty()) {
-                    return FieldRef{token, std::nullopt, ConversionCode::None};
-                }
-                return resolveFieldRec(fs, target, depth + 1);
+                return std::nullopt;
             }
-            return FieldRef{token, std::nullopt, ConversionCode::None};
+            return FieldRef{originalToken, std::nullopt, ConversionCode::None};
+        }
+
+        std::optional<FieldRef> resolveFieldRec(PickFS::FileSystem &fs,
+                                                const std::string &originalToken,
+                                                const std::string &lookupToken,
+                                                const int depth,
+                                                const std::string &dataFileName) {
+            if (depth > 16) {
+                return std::nullopt;
+            }
+            if (const std::optional<int> numeric = parsePositiveInt(lookupToken)) {
+                return FieldRef{originalToken, *numeric, ConversionCode::None};
+            }
+
+            const std::optional<PickFS::Record> scoped = [&]() -> std::optional<PickFS::Record> {
+                if (dataFileName.empty()) {
+                    return std::nullopt;
+                }
+                const std::string scopedName = DictionaryResolver::scopedDictLogicalName(dataFileName);
+                if (!logicalFileExists(fs, scopedName)) {
+                    return std::nullopt;
+                }
+                return tryReadDictRecord(fs, scopedName, lookupToken);
+            }();
+
+            const std::optional<PickFS::Record> global = tryReadDictRecord(fs, "DICT", lookupToken);
+
+            const PickFS::Record *chosen = nullptr;
+            if (scoped.has_value()) {
+                chosen = &*scoped;
+            } else if (global.has_value()) {
+                chosen = &*global;
+            }
+            if (chosen == nullptr) {
+                return std::nullopt;
+            }
+
+            const auto &structured = chosen->structured();
+            const std::string type = structured.attribute(1).firstValue();
+            if (type == "S" || type == "s") {
+                const std::string target = structured.attribute(2).firstValue();
+                if (target.empty()) {
+                    return FieldRef{originalToken, std::nullopt, ConversionCode::None};
+                }
+                return resolveFieldRec(fs, originalToken, target, depth + 1, dataFileName);
+            }
+            if (auto f = fieldFromStructuredDict(structured, originalToken)) {
+                return *f;
+            }
+            return FieldRef{originalToken, std::nullopt, ConversionCode::None};
         }
     } // namespace
 
-    FieldRef DictionaryResolver::resolveField(PickFS::FileSystem &fs, const std::string &token) const {
-        if (auto r = resolveFieldRec(fs, token, 0)) {
+    std::string DictionaryResolver::scopedDictLogicalName(const std::string &dataFileName) {
+        return std::string{"DICT-"} + dataFileName;
+    }
+
+    std::string DictionaryResolver::describeConversion(const FieldRef &ref) {
+        switch (ref.conversion) {
+            case ConversionCode::D:
+                return "D";
+            case ConversionCode::MD:
+                return "MD";
+            case ConversionCode::MC:
+                return "MC";
+            case ConversionCode::None:
+            default:
+                return "none";
+        }
+    }
+
+    FieldRef DictionaryResolver::resolveField(PickFS::FileSystem &fs,
+                                              const std::string &dataFileName,
+                                              const std::string &token) const {
+        if (auto r = resolveFieldRec(fs, token, token, 0, dataFileName)) {
             return *r;
         }
         return FieldRef{token, std::nullopt, ConversionCode::None};
     }
 
     std::vector<FieldRef> DictionaryResolver::resolveFields(PickFS::FileSystem &fs,
-                                                          const std::string & /*fileName*/,
-                                                          const std::vector<std::string> &fields) const {
+                                                            const std::string &fileName,
+                                                            const std::vector<std::string> &fields) const {
         std::vector<FieldRef> out;
         out.reserve(fields.size());
         for (const std::string &field: fields) {
-            out.push_back(resolveField(fs, field));
+            out.push_back(resolveField(fs, fileName, field));
         }
         return out;
     }

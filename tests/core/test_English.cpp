@@ -170,3 +170,56 @@ TEST_CASE("english COUNT single token parses with implicit scope") {
     REQUIRE(q.has_value());
     CHECK(q->verb == PickCore::English::Verb::COUNT);
 }
+
+TEST_CASE("english file-scoped DICT-DATA overrides global DICT") {
+    const auto root = uniqueEnglishTempDir();
+    PickFS::FileSystem fs(root);
+    fs.createFile("DATA");
+    fs.createFile("DICT-DATA");
+    fs.createFile("DICT");
+    fs.write("DICT-DATA", PickFS::Record("NM", "A\n1\n"));
+    fs.write("DICT", PickFS::Record("NM", "A\n2\n"));
+    fs.write("DATA", PickFS::Record("R1", "ATTR1_VAL\nATTR2_VAL\n"));
+
+    PickCore::English::EnglishService svc;
+    PickCore::English::ParseContext pc;
+    PickCore::English::EnglishRunOptions eo;
+    std::string error;
+    const auto res = svc.run(fs, {"LIST", "DATA", "NM"}, pc, eo, error);
+    REQUIRE(res.has_value());
+    CHECK(error.empty());
+    REQUIRE(!res->lines.empty());
+    CHECK(res->lines[0].find("ATTR1_VAL") != std::string::npos);
+    CHECK(res->lines[0].find("ATTR2_VAL") == std::string::npos);
+}
+
+TEST_CASE("english LIST unknown field yields error") {
+    const auto root = uniqueEnglishTempDir();
+    PickFS::FileSystem fs(root);
+    fs.createFile("DATA");
+    fs.createFile("DICT");
+    fs.write("DATA", PickFS::Record("R1", "A\n"));
+
+    PickCore::English::EnglishService svc;
+    PickCore::English::ParseContext pc;
+    PickCore::English::EnglishRunOptions eo;
+    std::string error;
+    CHECK_FALSE(svc.run(fs, {"LIST", "DATA", "UNKNOWNFIELD"}, pc, eo, error).has_value());
+    CHECK(error.find("Unknown ENGLISH field") != std::string::npos);
+    CHECK(error.find("UNKNOWNFIELD") != std::string::npos);
+}
+
+TEST_CASE("english SORT unknown BY field yields error") {
+    const auto root = uniqueEnglishTempDir();
+    PickFS::FileSystem fs(root);
+    fs.createFile("DATA");
+    fs.createFile("DICT");
+    fs.write("DATA", PickFS::Record("R1", "X\n"));
+
+    PickCore::English::EnglishService svc;
+    PickCore::English::ParseContext pc;
+    PickCore::English::EnglishRunOptions eo;
+    std::string error;
+    CHECK_FALSE(svc.run(fs, {"SORT", "DATA", "BY", "NOSUCHKEY"}, pc, eo, error).has_value());
+    CHECK(error.find("Unknown ENGLISH field") != std::string::npos);
+}

@@ -64,7 +64,7 @@ The host hands **`PickCore::UserSession`** into userland; today **`username`** a
 **ENGLISH subsystem (minimal core)**
 
 - Implement **`LIST`**, **`SORT`**, **`COUNT`**, **`SELECT`** as an ENGLISH processor module.
-- Route Tcl dispatch through VOC into ENGLISH (no parallel command path).
+- Tcl first-token synonym resolution (**`V`/`X`/`Q`**) reads **`VOC`**; verbs dispatch to compiled-in handlers (see **Milestone 3 delivery status** below — VOC execute-body processors remain non-goals for M3).
 - No report-formatting layer yet: no headings, breaks, totals, pagination, or printer semantics.
 
 **DICT model evolution**
@@ -84,9 +84,9 @@ The host hands **`PickCore::UserSession`** into userland; today **`username`** a
 
 **TCL integration**
 
-- `LIST` / `SORT` / `COUNT` / `SELECT` routed through VOC and dispatched to ENGLISH.
+- `LIST` / `SORT` / `COUNT` / `SELECT` exposed as Tcl built-ins after **`resolveVerbName`**; catalogue **`VOC`** may carry **`V`** entries matching those verbs for Pick-authentic vocabulary.
 - Minimal active-list operations: **`LIST-LIST`** and **`CLEAR-LIST`**.
-- Resolver introspection improvements as needed for ENGLISH diagnostics.
+- Resolver introspection via **`RESOLVE-FIELD`** (and hard errors on unknown ENGLISH fields in the executor).
 
 **Processor architecture**
 
@@ -107,6 +107,14 @@ The host hands **`PickCore::UserSession`** into userland; today **`username`** a
 - SQL-like or extended ENGLISH feature surface.
 - Concurrency / multi-user support.
 - Dynamic processor registration.
+
+### Milestone 3 delivery status (closed)
+
+Slices **M3a/M3b/M3c** are implemented in-tree and summarized in **`docs/filesystem-m3.md`**.
+
+- **ENGLISH subsystem:** standalone module (`LIST`, `SORT`, `COUNT`, `SELECT`) with **`DICT-<file>`** / **`DICT`** precedence, stable **`SORT`**, active-list helpers, **`RESOLVE-FIELD`** diagnostics — see **`docs/english.md`** and **`docs/tcl-shell.md`**.
+- **TCL + VOC:** first-token **`V`** / **`X`** / **`Q`** resolution through **`VOC`** (**`PickVoc::VocResolver::resolveVerbName`** in **`src/userland/tcl/Shell.cpp`**) precedes uppercase dispatch into the **built-in** command map. **`LIST`/`SORT`/`COUNT`/`SELECT`** handlers are compiled-in (Pick-style **catalogue VOC** entries ship for **`SYSPROG`** for visibility). VOC records that invoke arbitrary processor bodies (**dynamic processor registration**) remain deferred as above — this is deliberate for M3.
+- **Residual / later milestones:** full Pick **`SSELECT`**, report formatting, correlate execution, VOC-authored ENGLISH invocation without built-ins — see **Non-goals**.
 
 ## Milestone 4 — R83-flavoured fidelity pass
 

@@ -51,6 +51,7 @@ TEST_CASE("shell HELP") {
     CHECK(out.str().find("SET") != std::string::npos);
     CHECK(out.str().find("LIST-VARS") != std::string::npos);
     CHECK(out.str().find("WHO") != std::string::npos);
+    CHECK(out.str().find("RESOLVE-FIELD") != std::string::npos);
 }
 
 TEST_CASE("shell WHO returns default port user account line") {
@@ -635,6 +636,48 @@ TEST_CASE("shell SORT ENGLISH sorts and legacy SORT reserved message") {
     out.str("");
     sh.handleLine("SORT GARBAGE", out, quit);
     CHECK(out.str() == "SORT: ENGLISH syntax not detected; legacy Tcl SORT is not implemented\n");
+}
+
+TEST_CASE("shell RESOLVE-FIELD arity and DICT resolution") {
+    auto dir = uniqueTempDir();
+    PickFS::FileSystem fs(dir);
+    fs.createFile("DATA");
+    fs.createFile("DICT");
+    fs.write("DICT", PickFS::Record("NM", "A\n1\n"));
+
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(dir);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("RESOLVE-FIELD", out, quit);
+    CHECK(out.str().find("RESOLVE-FIELD takes") == 0);
+
+    out.str("");
+    sh.handleLine("RESOLVE-FIELD DATA NM", out, quit);
+    CHECK(out.str().find("DICT-DATA") != std::string::npos);
+    CHECK(out.str().find("Resolved attribute: 1") != std::string::npos);
+    CHECK(out.str().find("Conversion hint") != std::string::npos);
+}
+
+TEST_CASE("shell VOC verb alias routes ENGLISH LIST") {
+    auto dir = uniqueTempDir();
+    PickFS::FileSystem fs(dir);
+    fs.createFile("VOC");
+    fs.createFile("DATA");
+    fs.createFile("DICT");
+    fs.write("VOC", PickFS::Record("L", "V\nLIST\n"));
+    fs.write("DICT", PickFS::Record("NAME", "A\n1\n"));
+    fs.write("DATA", PickFS::Record("R1", "ALICE\n"));
+
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(dir);
+    std::ostringstream out;
+    bool quit = false;
+    sh.handleLine("L DATA NAME", out, quit);
+    CHECK(out.str().find("R1 ALICE") != std::string::npos);
 }
 
 TEST_CASE("shell COUNT LIST SORT use active list when filename omitted") {

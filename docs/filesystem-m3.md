@@ -51,6 +51,8 @@ Ordering and execution scope build on M3b:
 
 - **`SORT`** verb shares parser/projection/`DICT` resolution with **`LIST`**, adds stable ordering; **`WITH`** absorbed (selection deferred); **`BY`** / **`BY-DSND`** drive sort keys; no `BY` → sort by item-id.
 - Sort comparisons: **`D`** / **`MD`** / **`MC`** hints enable numeric compare after minimal parse when possible; otherwise string compare on the primary sub-value; deterministic tie-break on item-id.
+- **`DICT` lookup precedence:** literal attribute index → **`DICT-<logicalDataFile>`** if that Pick file exists → global **`DICT`**; unnamed tokens that fail lookup are **`Unknown ENGLISH field`** errors. Synonym **`S`** uses the same rule for each hop.
+- Tcl **`RESOLVE-FIELD`** prints DICT outcome for diagnostics; **`SYSPROG/VOC`** ships **`V`** entries for **`LIST`/`SORT`/`COUNT`/`SELECT`** (catalog visibility; handlers stay built-ins).
 - **Active-list scope:** after **`SELECT`**, Tcl stores IDs plus **`activeListSourceFile`**; **`COUNT`**, **`LIST`**, and **`SORT`** honor implicit file + constrained IDs until a logical file name appears as an explicit leading token (**full-file scope** overrides). Clearing happens on **`CLEAR-LIST`**, **`LOGOFF`**, **`QUIT`** session reset, and **filesystem root** changes (**`ShellSession::setFileSystemRoot`**).
 - **`SORT`** that does not match ENGLISH-shaped Tcl patterns is explicitly reserved (**message** emitted); legacy Tcl `SORT` is not implemented.
 

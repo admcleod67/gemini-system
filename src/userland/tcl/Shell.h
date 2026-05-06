@@ -149,6 +149,8 @@ namespace PickShell {
         void cmdListList(const std::vector<std::string> &tokens, std::ostream &out);
         void cmdClearList(const std::vector<std::string> &tokens, std::ostream &out);
 
+        void cmdResolveField(const std::vector<std::string> &tokens, std::ostream &out);
+
         void cmdRead(const std::vector<std::string> &tokens, std::ostream &out);
 
         void cmdWrite(const std::vector<std::string> &tokens, std::ostream &out);

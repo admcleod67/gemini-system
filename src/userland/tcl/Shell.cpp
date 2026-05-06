@@ -349,6 +349,9 @@ namespace PickShell {
         tclCommands_["SORT"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdSort(tokens, out); };
         tclCommands_["LIST-LIST"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdListList(tokens, out); };
         tclCommands_["CLEAR-LIST"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdClearList(tokens, out); };
+        tclCommands_["RESOLVE-FIELD"] = [this](const Tokens &tokens, std::ostream &out, bool &) {
+            cmdResolveField(tokens, out);
+        };
         tclCommands_["READ"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdRead(tokens, out); };
         tclCommands_["WRITE"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdWrite(tokens, out); };
         tclCommands_["ASM"] = [this](const Tokens &tokens, std::ostream &out, bool &) {
@@ -1117,6 +1120,7 @@ namespace PickShell {
         out << "  SORT <file> [...] BY ... — ENGLISH sort (same pipeline as LIST + ordering)\n";
         out << "  COUNT <file> [fields...] | COUNT (active-list scope)\n";
         out << "  SELECT <file> [fields...]\n";
+        out << "  RESOLVE-FIELD <data-file> <field-token>   ENGLISH DICT resolution (DICT-<file> then DICT)\n";
         out << "  LIST-LIST\n";
         out << "  CLEAR-LIST\n";
         out << "  READ <file> <record-name>   (or READ <record> when MD DEFDATA names default file)\n";
@@ -1345,6 +1349,27 @@ namespace PickShell {
         }
         session_.clearActiveList();
         out << "Active list cleared\n";
+    }
+
+    void Shell::cmdResolveField(const std::vector<std::string> &tokens, std::ostream &out) {
+        if (tokens.size() != 3) {
+            out << "RESOLVE-FIELD takes <data-file> <field-token>\n";
+            return;
+        }
+        const PickCore::English::DictionaryResolver &resolver = englishService_.dictionaryResolver();
+        const PickCore::English::FieldRef ref =
+            resolver.resolveField(session_.fileSystem_, tokens[1], tokens[2]);
+        out << "Data file: " << tokens[1] << '\n';
+        out << "Field token: " << tokens[2] << '\n';
+        out << "File-scoped dict: "
+            << PickCore::English::DictionaryResolver::scopedDictLogicalName(tokens[1]) << '\n';
+        if (ref.attributeNo.has_value()) {
+            out << "Resolved attribute: " << *ref.attributeNo << '\n';
+        } else {
+            out << "Resolved attribute: (none — unknown field)\n";
+        }
+        out << "Conversion hint (D/MD/MC): "
+            << PickCore::English::DictionaryResolver::describeConversion(ref) << '\n';
     }
 
     void Shell::cmdRead(const std::vector<std::string> &tokens, std::ostream &out) {

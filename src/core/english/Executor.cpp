@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cctype>
 #include <numeric>
+#include <optional>
 #include <sstream>
 
 namespace PickCore::English {
@@ -127,6 +128,18 @@ namespace PickCore::English {
             p.str = id;
             return {p};
         }
+
+        std::optional<std::string> firstUnresolvedFieldError(const std::vector<FieldRef> &refs,
+                                                               const std::string &dataFile) {
+            for (const FieldRef &r: refs) {
+                if (!r.attributeNo.has_value()) {
+                    const std::string scoped = DictionaryResolver::scopedDictLogicalName(dataFile);
+                    return std::optional<std::string>{
+                        "Unknown ENGLISH field \"" + r.token + "\" (not in " + scoped + " nor DICT)"};
+                }
+            }
+            return std::nullopt;
+        }
     } // namespace
 
     Result Executor::execute(PickFS::FileSystem &fs,
@@ -155,6 +168,14 @@ namespace PickCore::English {
         }
 
         const std::vector<FieldRef> fields = dictResolver.resolveFields(fs, fn, plan.query.fields);
+
+        if (!plan.query.fields.empty()) {
+            if (const std::optional<std::string> err = firstUnresolvedFieldError(fields, fn)) {
+                error = *err;
+                return Result{};
+            }
+        }
+
         std::vector<std::string> projectionLines;
         std::vector<std::optional<PickFS::Record>> records;
         projectionLines.reserve(ids.size());
@@ -187,8 +208,13 @@ namespace PickCore::English {
             std::vector<FieldRef> sortRefs;
             std::vector<bool> sortDesc;
             for (const SortKeySpec &sk: plan.query.sortKeys) {
-                sortRefs.push_back(dictResolver.resolveField(fs, sk.fieldToken));
+                sortRefs.push_back(dictResolver.resolveField(fs, fn, sk.fieldToken));
                 sortDesc.push_back(sk.descending);
+            }
+
+            if (const std::optional<std::string> err = firstUnresolvedFieldError(sortRefs, fn)) {
+                error = *err;
+                return Result{};
             }
 
             std::vector<std::vector<KeyPart>> rowKeys;

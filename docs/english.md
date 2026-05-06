@@ -14,6 +14,8 @@ For the attribute record model, see [Filesystem M3 model](filesystem-m3.md).
 
 Session helpers: `LIST-LIST`, `CLEAR-LIST`.
 
+Tcl **`RESOLVE-FIELD`** *\<data-file\>* *\<token\>* prints how that token resolves (attribute number, conversion hint, and whether file-scoped `DICT-*` applies). See [Developer shell (TCL)](tcl-shell.md).
+
 ## Grammar (whitespace-separated tokens)
 
 After the verb:
@@ -35,13 +37,17 @@ Examples:
 
 ## Field and sort-key resolution
 
-For both projection and `BY` keys:
+For both projection and `BY` keys, resolution order is deterministic:
 
-1. Decimal attribute number → that attribute (1-based).
-2. `DICT` type `A`: attribute 2 holds the attribute number. Attributes 7–10 are scanned (first non-empty cell) for conversion hint: leading `D`, `MD`, or `MC` (case-insensitive) marks the key for **numeric** comparison when the value parses (*see Ordering*).
-3. `DICT` type `S`: follow to another `DICT` id (depth limited).
+1. **Decimal attribute number** → that attribute on the **data** record (1-based literal token).
+2. **File-scoped dictionary** — if logical file **`DICT-<dataFile>`** exists (hyphen naming), look up the token there first (**`S`** synonyms follow targets using the same file-scoped-then-global rule).
+3. **Global dictionary** — logical file **`DICT`**, same `A` / `S` rules.
+4. **Unknown name** → the executor rejects the query (`Unknown ENGLISH field "…"`); there is no silent empty projection for named fields anymore.
 
-If lookup fails, projected values are empty; sort keys compare as empty strings or fall back to non-numeric comparison.
+Inside a dictionary record:
+
+- Type **`A`**: attribute 2 = attribute number on the **data** file. Attributes **7–10** on the dictionary item supply conversion hints (`D`, `MD`, `MC`) for **`SORT`** (*see Ordering*).
+- Type **`S`**: attribute 2 = next dictionary id (look up again in **`DICT-<dataFile>`** then **`DICT`**).
 
 ## Ordering (`SORT`)
 
@@ -69,6 +75,7 @@ Full **Pick** list lifecycle beyond this (saved lists, `SSELECT`, correlated exp
 
 ## Tcl routing notes
 
+- The first Tcl token is **`V`** / **`X`** / **`Q`** resolved through **`VOC`**, then uppercased and dispatched to built-in handlers. **`LIST`**, **`SORT`**, **`COUNT`**, **`SELECT`** are real Tcl commands plus matching **`VOC`** entries on shipped accounts so dictionary discovery matches Pick-style catalogues (`gemini/accounts/.../VOC/`).
 - **`SORT`** ENGLISH detection follows the same style as **`LIST`**: enough tokens, clause keywords, **`SORT <existing-file>`** two-token form, or implicit active-list shapes. Other `SORT` lines are left for a future legacy Tcl implementation.
 - See [Developer shell (TCL)](tcl-shell.md) for the exact Tcl table text and session reset rules.
 
