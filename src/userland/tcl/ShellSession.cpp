@@ -21,6 +21,7 @@ namespace PickShell {
         fileSystem_.setRoot(filesystemRoot_);
         vocResolver_.invalidate();
         reloadMdDefaultDataFile();
+        clearActiveList();
     }
 
     bool ShellSession::programImageLoaded() const {
@@ -82,7 +83,7 @@ namespace PickShell {
         suspended_ = false;
         resumePastBreakpointIp_.reset();
         env_.clear();
-        activeList_.clear();
+        clearActiveList();
         runtime_.loadProgram({});
     }
 
@@ -105,6 +106,16 @@ namespace PickShell {
         sessionAccount_ = std::move(account);
     }
 
+    void ShellSession::setActiveList(std::vector<std::string> ids, std::string sourceFile) {
+        activeList_ = std::move(ids);
+        activeListSourceFile_ = std::move(sourceFile);
+    }
+
+    void ShellSession::clearActiveList() {
+        activeList_.clear();
+        activeListSourceFile_.reset();
+    }
+
     void ShellSession::clearLoginSession() {
         loggedIn_ = false;
         whoPort_ = 0;
@@ -112,7 +123,7 @@ namespace PickShell {
         sessionAccount_.clear();
         userNo_ = "0";
         defaultDataFile_.reset();
-        activeList_.clear();
+        clearActiveList();
     }
 
     void ShellSession::reloadMdDefaultDataFile() {

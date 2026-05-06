@@ -70,8 +70,12 @@ namespace PickShell {
         [[nodiscard]] const std::string &sessionAccount() const { return sessionAccount_; }
 
         [[nodiscard]] const std::vector<std::string> &activeList() const { return activeList_; }
-        void setActiveList(std::vector<std::string> ids) { activeList_ = std::move(ids); }
-        void clearActiveList() { activeList_.clear(); }
+
+        /// File that `SELECT` / active-list ids refer to (logical Pick file name).
+        [[nodiscard]] const std::optional<std::string> &activeListSourceFile() const { return activeListSourceFile_; }
+
+        void setActiveList(std::vector<std::string> ids, std::string sourceFile);
+        void clearActiveList();
 
         /// `@USERNO`, `@ACCOUNT`, `@LOGNAME`, `@DEFDATA` — read from session frame (not `TclEnvironment`).
         [[nodiscard]] std::optional<std::string> resolveSystemVariable(std::string_view name) const;
@@ -92,6 +96,7 @@ namespace PickShell {
         std::string userNo_{"0"};
         std::optional<std::string> defaultDataFile_;
         std::vector<std::string> activeList_;
+        std::optional<std::string> activeListSourceFile_;
         std::optional<PickVM::LoadedBytecode> lastLoaded_;
         bool trace_{false};
         std::unordered_set<std::size_t> breakpoints_;

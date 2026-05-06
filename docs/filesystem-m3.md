@@ -45,6 +45,17 @@ Active-list behavior for M3b is session-scoped in Tcl:
 - `CLEAR-LIST` clears it;
 - list state clears on session reset and `LOGOFF`.
 
+## M3c implementation status (ordering + list scope)
+
+Ordering and execution scope build on M3b:
+
+- **`SORT`** verb shares parser/projection/`DICT` resolution with **`LIST`**, adds stable ordering; **`WITH`** absorbed (selection deferred); **`BY`** / **`BY-DSND`** drive sort keys; no `BY` → sort by item-id.
+- Sort comparisons: **`D`** / **`MD`** / **`MC`** hints enable numeric compare after minimal parse when possible; otherwise string compare on the primary sub-value; deterministic tie-break on item-id.
+- **Active-list scope:** after **`SELECT`**, Tcl stores IDs plus **`activeListSourceFile`**; **`COUNT`**, **`LIST`**, and **`SORT`** honor implicit file + constrained IDs until a logical file name appears as an explicit leading token (**full-file scope** overrides). Clearing happens on **`CLEAR-LIST`**, **`LOGOFF`**, **`QUIT`** session reset, and **filesystem root** changes (**`ShellSession::setFileSystemRoot`**).
+- **`SORT`** that does not match ENGLISH-shaped Tcl patterns is explicitly reserved (**message** emitted); legacy Tcl `SORT` is not implemented.
+
+Full Pick list-management semantics remain future work.
+
 ## Scope and non-goals
 
 ### In scope (M3)

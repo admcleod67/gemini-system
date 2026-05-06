@@ -143,6 +143,9 @@ namespace PickShell {
         void cmdList(const std::vector<std::string> &tokens, std::ostream &out);
         void cmdCount(const std::vector<std::string> &tokens, std::ostream &out);
         void cmdSelect(const std::vector<std::string> &tokens, std::ostream &out);
+
+        void cmdSort(const std::vector<std::string> &tokens, std::ostream &out);
+
         void cmdListList(const std::vector<std::string> &tokens, std::ostream &out);
         void cmdClearList(const std::vector<std::string> &tokens, std::ostream &out);
 

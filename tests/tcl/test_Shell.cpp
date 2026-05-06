@@ -606,6 +606,68 @@ TEST_CASE("shell COUNT SELECT LIST-LIST CLEAR-LIST") {
     CHECK(out.str() == "No active list\n");
 }
 
+TEST_CASE("shell SORT ENGLISH sorts and legacy SORT reserved message") {
+    auto dir = uniqueTempDir();
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(dir);
+    std::ostringstream out;
+    bool quit = false;
+
+    PickFS::FileSystem fs(dir);
+    fs.createFile("DATA");
+    fs.createFile("DICT");
+    fs.write("DICT", PickFS::Record("NM", "A\n1\n"));
+    fs.write("DATA", PickFS::Record("RA", "Z\n"));
+    fs.write("DATA", PickFS::Record("RB", "A\n"));
+
+    out.str("");
+    sh.handleLine("SORT DATA NM BY NM", out, quit);
+    CHECK(out.str().find("RB A") != std::string::npos);
+    CHECK(out.str().find("RA Z") != std::string::npos);
+
+    sh.handleLine("CREATE-FILE NOPROJ", out, quit);
+    sh.handleLine("WRITE NOPROJ RXX val", out, quit);
+    out.str("");
+    sh.handleLine("SORT NOPROJ", out, quit);
+    CHECK(out.str() == "RXX\n");
+
+    out.str("");
+    sh.handleLine("SORT GARBAGE", out, quit);
+    CHECK(out.str() == "SORT: ENGLISH syntax not detected; legacy Tcl SORT is not implemented\n");
+}
+
+TEST_CASE("shell COUNT LIST SORT use active list when filename omitted") {
+    auto dir = uniqueTempDir();
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(dir);
+    std::ostringstream out;
+    bool quit = false;
+
+    PickFS::FileSystem fs(dir);
+    fs.createFile("DATA");
+    fs.createFile("DICT");
+    fs.write("DICT", PickFS::Record("NM", "A\n1\n"));
+    fs.write("DATA", PickFS::Record("R2", "B\n"));
+    fs.write("DATA", PickFS::Record("R1", "A\n"));
+
+    sh.handleLine("SELECT DATA", out, quit);
+
+    out.str("");
+    sh.handleLine("COUNT", out, quit);
+    CHECK(out.str() == "2\n");
+
+    out.str("");
+    sh.handleLine("LIST NM", out, quit);
+    CHECK(out.str().find("R1 A") != std::string::npos);
+    CHECK(out.str().find("R2 B") != std::string::npos);
+
+    out.str("");
+    sh.handleLine("SORT BY NM", out, quit);
+    CHECK(out.str() == "R1\nR2\n");
+}
+
 TEST_CASE("shell filesystem command arity and missing record") {
     PickVM::Runtime rt;
     PickShell::Shell sh(rt);

@@ -54,6 +54,116 @@ namespace PickShell {
             return o;
         }
 
+        bool kwEq(const std::string &a, std::string_view b) {
+            if (a.size() != b.size()) {
+                return false;
+            }
+            for (std::size_t i = 0; i < a.size(); ++i) {
+                if (std::toupper(static_cast<unsigned char>(a[i])) !=
+                    std::toupper(static_cast<unsigned char>(b[i]))) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        bool hasEnglishClauseKeywords(const std::vector<std::string> &tokens) {
+            for (std::size_t i = 1; i < tokens.size(); ++i) {
+                if (kwEq(tokens[i], "WITH") || kwEq(tokens[i], "BY") || kwEq(tokens[i], "BY-DSND")) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        bool activeListReady(const ShellSession &session) {
+            return !session.activeList().empty() && session.activeListSourceFile().has_value();
+        }
+
+        [[nodiscard]] bool logicalPickFileExists(const ShellSession &session, const std::string &name) {
+            try {
+                (void) session.fileSystem_.listRecordNames(name);
+                return true;
+            } catch (const PickFS::FileSystemError &) {
+                return false;
+            }
+        }
+
+        /// Returns empty optional on success, or error message when implicit scope is required but unavailable.
+        [[nodiscard]] std::optional<std::string> englishImplicitSetup(const ShellSession &session,
+                                                                     const std::vector<std::string> &tokens,
+                                                                     PickCore::English::ParseContext &pc,
+                                                                     PickCore::English::EnglishRunOptions &eo) {
+            if (tokens.empty()) {
+                return std::nullopt;
+            }
+            bool wantImplicit = false;
+            if (kwEq(tokens[0], "COUNT")) {
+                wantImplicit = tokens.size() == 1U;
+            } else if (kwEq(tokens[0], "LIST") || kwEq(tokens[0], "SORT")) {
+                if (tokens.size() >= 3U && (kwEq(tokens[1], "BY") || kwEq(tokens[1], "WITH"))) {
+                    wantImplicit = true;
+                } else if (tokens.size() == 2U && !logicalPickFileExists(session, tokens[1])) {
+                    wantImplicit = true;
+                }
+            }
+            if (!wantImplicit) {
+                return std::nullopt;
+            }
+            if (!activeListReady(session)) {
+                return std::string{"No active list for implicit ENGLISH scope"};
+            }
+            pc.implicitFile = true;
+            pc.imposedFileName = session.activeListSourceFile();
+            eo.constrainRecordIds = session.activeList();
+            return std::nullopt;
+        }
+
+        bool shellIsEnglishList(const std::vector<std::string> &t, ShellSession &session) {
+            if (t.empty() || !kwEq(t[0], "LIST")) {
+                return false;
+            }
+            if (hasEnglishClauseKeywords(t)) {
+                return true;
+            }
+            if (t.size() >= 3U) {
+                return true;
+            }
+            if (t.size() == 2U && !logicalPickFileExists(session, t[1]) && activeListReady(session)) {
+                return true;
+            }
+            return false;
+        }
+
+        bool shellIsEnglishCount(const std::vector<std::string> &t, ShellSession &session) {
+            if (t.empty() || !kwEq(t[0], "COUNT")) {
+                return false;
+            }
+            if (t.size() >= 2U) {
+                return true;
+            }
+            return activeListReady(session);
+        }
+
+        bool shellIsEnglishSort(const std::vector<std::string> &t, ShellSession &session) {
+            if (t.empty() || !kwEq(t[0], "SORT")) {
+                return false;
+            }
+            if (hasEnglishClauseKeywords(t)) {
+                return true;
+            }
+            if (t.size() >= 3U) {
+                return true;
+            }
+            if (t.size() == 2U && logicalPickFileExists(session, t[1])) {
+                return true;
+            }
+            if (t.size() == 2U && activeListReady(session) && !logicalPickFileExists(session, t[1])) {
+                return true;
+            }
+            return false;
+        }
+
         void expandSessionAtOperands(ShellSession &sess, std::vector<std::string> &tokens) {
             if (tokens.size() < 2) {
                 return;
@@ -236,6 +346,7 @@ namespace PickShell {
         tclCommands_["LIST"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdList(tokens, out); };
         tclCommands_["COUNT"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdCount(tokens, out); };
         tclCommands_["SELECT"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdSelect(tokens, out); };
+        tclCommands_["SORT"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdSort(tokens, out); };
         tclCommands_["LIST-LIST"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdListList(tokens, out); };
         tclCommands_["CLEAR-LIST"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdClearList(tokens, out); };
         tclCommands_["READ"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdRead(tokens, out); };
@@ -1002,8 +1113,9 @@ namespace PickShell {
         out << "  CREATE-FILE <name>\n";
         out << "  DELETE-FILE <name>\n";
         out << "  LIST-FILES\n";
-        out << "  LIST <file> [fields...]   ENGLISH LIST when fields are present; LIST <file> shows record names\n";
-        out << "  COUNT <file> [fields...]\n";
+        out << "  LIST <file> [fields... | WITH ...] [BY ... on SORT only]\n";
+        out << "  SORT <file> [...] BY ... — ENGLISH sort (same pipeline as LIST + ordering)\n";
+        out << "  COUNT <file> [fields...] | COUNT (active-list scope)\n";
         out << "  SELECT <file> [fields...]\n";
         out << "  LIST-LIST\n";
         out << "  CLEAR-LIST\n";
@@ -1107,9 +1219,16 @@ namespace PickShell {
     }
 
     void Shell::cmdList(const std::vector<std::string> &tokens, std::ostream &out) {
-        if (tokens.size() >= 3) {
+        if (shellIsEnglishList(tokens, session_)) {
+            PickCore::English::ParseContext pc;
+            PickCore::English::EnglishRunOptions eo;
+            if (const std::optional<std::string> impErr = englishImplicitSetup(session_, tokens, pc, eo)) {
+                out << "Error: " << *impErr << "\n";
+                return;
+            }
             std::string error;
-            const std::optional<PickCore::English::Result> result = englishService_.run(session_.fileSystem_, tokens, error);
+            const std::optional<PickCore::English::Result> result =
+                englishService_.run(session_.fileSystem_, tokens, pc, eo, error);
             if (!result.has_value()) {
                 out << "Error: " << error << "\n";
                 return;
@@ -1139,12 +1258,19 @@ namespace PickShell {
     }
 
     void Shell::cmdCount(const std::vector<std::string> &tokens, std::ostream &out) {
-        if (tokens.size() < 2) {
-            out << "COUNT requires a filename\n";
+        if (!shellIsEnglishCount(tokens, session_)) {
+            out << "COUNT requires a filename or active-list scope\n";
+            return;
+        }
+        PickCore::English::ParseContext pc;
+        PickCore::English::EnglishRunOptions eo;
+        if (const std::optional<std::string> impErr = englishImplicitSetup(session_, tokens, pc, eo)) {
+            out << "Error: " << *impErr << "\n";
             return;
         }
         std::string error;
-        const std::optional<PickCore::English::Result> result = englishService_.run(session_.fileSystem_, tokens, error);
+        const std::optional<PickCore::English::Result> result =
+            englishService_.run(session_.fileSystem_, tokens, pc, eo, error);
         if (!result.has_value()) {
             out << "Error: " << error << "\n";
             return;
@@ -1159,13 +1285,39 @@ namespace PickShell {
             out << "SELECT requires a filename\n";
             return;
         }
+        PickCore::English::ParseContext pc;
+        PickCore::English::EnglishRunOptions eo;
         std::string error;
-        const std::optional<PickCore::English::Result> result = englishService_.run(session_.fileSystem_, tokens, error);
+        const std::optional<PickCore::English::Result> result =
+            englishService_.run(session_.fileSystem_, tokens, pc, eo, error);
         if (!result.has_value()) {
             out << "Error: " << error << "\n";
             return;
         }
-        session_.setActiveList(result->selectedIds);
+        session_.setActiveList(result->selectedIds, tokens[1]);
+        for (const std::string &line: result->lines) {
+            out << line << '\n';
+        }
+    }
+
+    void Shell::cmdSort(const std::vector<std::string> &tokens, std::ostream &out) {
+        if (!shellIsEnglishSort(tokens, session_)) {
+            out << "SORT: ENGLISH syntax not detected; legacy Tcl SORT is not implemented\n";
+            return;
+        }
+        PickCore::English::ParseContext pc;
+        PickCore::English::EnglishRunOptions eo;
+        if (const std::optional<std::string> impErr = englishImplicitSetup(session_, tokens, pc, eo)) {
+            out << "Error: " << *impErr << "\n";
+            return;
+        }
+        std::string error;
+        const std::optional<PickCore::English::Result> result =
+            englishService_.run(session_.fileSystem_, tokens, pc, eo, error);
+        if (!result.has_value()) {
+            out << "Error: " << error << "\n";
+            return;
+        }
         for (const std::string &line: result->lines) {
             out << line << '\n';
         }

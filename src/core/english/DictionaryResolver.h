@@ -13,6 +13,9 @@ namespace PickCore::English {
         [[nodiscard]] std::vector<FieldRef> resolveFields(PickFS::FileSystem &fs,
                                                           const std::string &fileName,
                                                           const std::vector<std::string> &fields) const;
+
+        [[nodiscard]] FieldRef resolveField(PickFS::FileSystem &fs,
+                                            const std::string &token) const;
     };
 } // namespace PickCore::English
 

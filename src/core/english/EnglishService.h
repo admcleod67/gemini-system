@@ -11,6 +11,8 @@ namespace PickCore::English {
     public:
         [[nodiscard]] std::optional<Result> run(PickFS::FileSystem &fs,
                                                 const std::vector<std::string> &tokens,
+                                                const ParseContext &parseCtx,
+                                                const EnglishRunOptions &execOpts,
                                                 std::string &error) const;
 
     private:

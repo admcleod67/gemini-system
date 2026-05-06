@@ -12,6 +12,7 @@ namespace PickCore::English {
         [[nodiscard]] Result execute(PickFS::FileSystem &fs,
                                      const Plan &plan,
                                      const DictionaryResolver &dictResolver,
+                                     const EnglishRunOptions &opts,
                                      std::string &error) const;
     };
 } // namespace PickCore::English
