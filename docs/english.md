@@ -14,7 +14,7 @@ For the attribute record model, see [Filesystem M3 model](filesystem-m3.md).
 
 Session helpers: `LIST-LIST`, `CLEAR-LIST`.
 
-Tcl **`RESOLVE-FIELD`** *\<data-file\>* *\<token\>* prints how that token resolves (attribute number, conversion hint, and whether file-scoped `DICT-*` applies). See [Developer shell (TCL)](tcl-shell.md).
+Tcl **`RESOLVE-FIELD`** *\<data-file\>* *\<token\>* prints how that token resolves (attribute number, conversion hint, and whether file-scoped `DICT-*` applies). Tcl **`DEFINE-FIELD`** writes a minimal type **`A`** item into **`DICT`** or **`DICT-<file>`** (see below). Detail: [Developer shell (TCL)](tcl-shell.md).
 
 ## Grammar (whitespace-separated tokens)
 
@@ -51,9 +51,9 @@ Inside a dictionary record:
 
 ### Authoring `DICT` items from Tcl
 
-**`WRITE`** sets the **whole** record body from the remaining tokens **joined with spaces**—a **single line** of Pick text. A type-**`A`** dictionary item normally needs **multiple lines** (line 1 = `A`, line 2 = attribute number on the data file, …). Repeating **`WRITE DICT NAME …`** on the same id **replaces** the body; it does **not** append a second attribute.
+**`DEFINE-FIELD <dict-file> <field-name> <attribute-number>`** (four tokens—see [Developer shell (TCL)](tcl-shell.md)) creates or **replaces** a minimal type **`A`** record: attribute 1 = `A`, attribute 2 = the target column on the **data** file—no multi-line authoring on the Tcl line and no change to **`WRITE`** semantics (`WRITE` stays **single string, full replace**). Example: **`DEFINE-FIELD DICT NAME 1`** for global **`DICT`**; **`CREATE-FILE DICT-DATA`** then **`DEFINE-FIELD DICT-DATA NAME 1`** for file-scoped dictionary.
 
-Use **`EDIT DICT <record-id>`** (line editor, see [Developer shell (TCL)](tcl-shell.md)), or create the `.item` outside the shell, then confirm with **`RESOLVE-FIELD <data-file> <token>`**.
+**`WRITE`** cannot build that shape from normal tokens (**one** joined line); repeating **`WRITE DICT …`** **replaces** the whole record. For richer **`D` / `MD` / `MC`** rows beyond what **`DEFINE-FIELD`** emits, use **`EDIT DICT <record-id>`** (see [Developer shell (TCL)](tcl-shell.md)), host-side **`.item`** creation, then **`RESOLVE-FIELD`** to verify.
 
 ## Ordering (`SORT`)
 
@@ -87,7 +87,7 @@ Full **Pick** list lifecycle beyond this (saved lists, `SSELECT`, correlated exp
 
 ## Worked example
 
-This path uses **numeric field `1`**, which matches a one-line **`WRITE DATA <id> <value>`** (that value is attribute **1**). No **`DICT`** file is required.
+Same **`DATA`** rows for both halves: **numeric `1`** needs no **`DICT`**—one-line **`WRITE DATA <id> <value>`** puts values in attribute **1**. **Named `NAME`** needs a **`DICT`** **`A`** item (**`DEFINE-FIELD DICT NAME 1`**). The **`NAME`** segment uses **`LIST DATA NAME`** (explicit **`DATA`**, global **`DICT`** only—no **`DICT-DATA`** file here); **`SELECT DATA`** restores implicit **`COUNT`**, **`LIST NAME`**, and **`SORT BY NAME`** on the active list like the **`1`** segment.
 
 ```text
 CREATE-FILE DATA
@@ -99,10 +99,17 @@ SELECT DATA
 COUNT
 LIST 1
 SORT BY 1
+CREATE-FILE DICT
+DEFINE-FIELD DICT NAME 1
+RESOLVE-FIELD DATA NAME
+LIST DATA NAME
+SORT DATA NAME BY NAME
+SELECT DATA
+COUNT
+LIST NAME
+SORT BY NAME
 CLEAR-LIST
 ```
-
-**Optional — field name via `DICT`:** after **`CREATE-FILE DICT`**, run **`EDIT DICT NAME`**, put **`A`** on the first line and **`1`** on the second (mapping **`NAME`** → data attribute 1), save and quit the editor, then you can use **`LIST DATA NAME`**, **`SORT DATA NAME BY NAME`**, and the same implicit **`LIST NAME`** / **`SORT BY NAME`** after **`SELECT`** as in the grammar examples above.
 
 ## Non-goals (deferred)
 

@@ -52,6 +52,7 @@ TEST_CASE("shell HELP") {
     CHECK(out.str().find("LIST-VARS") != std::string::npos);
     CHECK(out.str().find("WHO") != std::string::npos);
     CHECK(out.str().find("RESOLVE-FIELD") != std::string::npos);
+    CHECK(out.str().find("DEFINE-FIELD") != std::string::npos);
 }
 
 TEST_CASE("shell WHO returns default port user account line") {
@@ -659,6 +660,60 @@ TEST_CASE("shell RESOLVE-FIELD arity and DICT resolution") {
     CHECK(out.str().find("DICT-DATA") != std::string::npos);
     CHECK(out.str().find("Resolved attribute: 1") != std::string::npos);
     CHECK(out.str().find("Conversion hint") != std::string::npos);
+}
+
+TEST_CASE("shell DEFINE-FIELD arity missing dict and ENGLISH LIST") {
+    auto dir = uniqueTempDir();
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(dir);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("DEFINE-FIELD", out, quit);
+    CHECK(out.str().find("DEFINE-FIELD takes") == 0);
+
+    out.str("");
+    sh.handleLine("DEFINE-FIELD DICT NM 1", out, quit);
+    CHECK(out.str().find("CREATE-FILE first") != std::string::npos);
+
+    sh.handleLine("CREATE-FILE DICT", out, quit);
+    out.str("");
+    sh.handleLine("DEFINE-FIELD DICT NM 0", out, quit);
+    CHECK(out.str().find("positive integer") != std::string::npos);
+
+    out.str("");
+    sh.handleLine("DEFINE-FIELD DICT NM 1", out, quit);
+    CHECK(out.str().empty());
+
+    sh.handleLine("CREATE-FILE DATA", out, quit);
+    sh.handleLine("WRITE DATA R1 ZEBRA", out, quit);
+    sh.handleLine("WRITE DATA R2 ADAM", out, quit);
+    out.str("");
+    sh.handleLine("LIST DATA NM", out, quit);
+    CHECK(out.str().find("ZEBRA") != std::string::npos);
+    CHECK(out.str().find("ADAM") != std::string::npos);
+}
+
+TEST_CASE("shell DEFINE-FIELD DICT-DATA overrides global DICT for ENGLISH") {
+    auto dir = uniqueTempDir();
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(dir);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("CREATE-FILE DATA", out, quit);
+    sh.handleLine("CREATE-FILE DICT", out, quit);
+    sh.handleLine("CREATE-FILE DICT-DATA", out, quit);
+    sh.handleLine("DEFINE-FIELD DICT NM 2", out, quit);
+    sh.handleLine("DEFINE-FIELD DICT-DATA NM 1", out, quit);
+    PickFS::FileSystem fs(dir);
+    fs.write("DATA", PickFS::Record("R1", "FIRST\nSECOND\n"));
+    out.str("");
+    sh.handleLine("LIST DATA NM", out, quit);
+    CHECK(out.str().find("FIRST") != std::string::npos);
+    CHECK(out.str().find("SECOND") == std::string::npos);
 }
 
 TEST_CASE("shell VOC verb alias routes ENGLISH LIST") {

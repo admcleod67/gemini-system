@@ -352,6 +352,9 @@ namespace PickShell {
         tclCommands_["RESOLVE-FIELD"] = [this](const Tokens &tokens, std::ostream &out, bool &) {
             cmdResolveField(tokens, out);
         };
+        tclCommands_["DEFINE-FIELD"] = [this](const Tokens &tokens, std::ostream &out, bool &) {
+            cmdDefineField(tokens, out);
+        };
         tclCommands_["READ"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdRead(tokens, out); };
         tclCommands_["WRITE"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdWrite(tokens, out); };
         tclCommands_["ASM"] = [this](const Tokens &tokens, std::ostream &out, bool &) {
@@ -1121,6 +1124,7 @@ namespace PickShell {
         out << "  COUNT <file> [fields...] | COUNT (active-list scope)\n";
         out << "  SELECT <file> [fields...]\n";
         out << "  RESOLVE-FIELD <data-file> <field-token>   ENGLISH DICT resolution (DICT-<file> then DICT)\n";
+        out << "  DEFINE-FIELD <dict-file> <field-name> <attribute-number>   minimal type-A DICT item (not R83 verb)\n";
         out << "  LIST-LIST\n";
         out << "  CLEAR-LIST\n";
         out << "  READ <file> <record-name>   (or READ <record> when MD DEFDATA names default file)\n";
@@ -1370,6 +1374,35 @@ namespace PickShell {
         }
         out << "Conversion hint (D/MD/MC): "
             << PickCore::English::DictionaryResolver::describeConversion(ref) << '\n';
+    }
+
+    void Shell::cmdDefineField(const std::vector<std::string> &tokens, std::ostream &out) {
+        if (tokens.size() != 4) {
+            out << "DEFINE-FIELD takes <dict-file> <field-name> <attribute-number>\n";
+            return;
+        }
+        const std::string &dictFile = tokens[1];
+        const std::string &fieldName = tokens[2];
+        const std::string &attrToken = tokens[3];
+        const std::optional<int> attrNo = parsePositiveInt(attrToken);
+        if (!attrNo.has_value()) {
+            out << "DEFINE-FIELD requires a positive integer attribute-number\n";
+            return;
+        }
+        try {
+            (void) session_.fileSystem_.openFile(dictFile);
+        } catch (const PickFS::FileSystemError &) {
+            out << "DEFINE-FIELD requires dictionary file " << dictFile << "; use CREATE-FILE first\n";
+            return;
+        }
+        const std::string body = std::string{"A\n"} + std::to_string(*attrNo) + '\n';
+        try {
+            session_.fileSystem_.write(dictFile, PickFS::Record(fieldName, body));
+        } catch (const PickFS::FileSystemError &e) {
+            out << "Error: " << e.what() << '\n';
+        } catch (const std::exception &e) {
+            out << "Error: " << e.what() << '\n';
+        }
     }
 
     void Shell::cmdRead(const std::vector<std::string> &tokens, std::ostream &out) {
