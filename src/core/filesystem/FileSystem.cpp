@@ -163,7 +163,8 @@ namespace PickFS {
             if (!out) {
                 throw FileSystemError("Cannot write record: " + record.name());
             }
-            out.write(record.value().data(), static_cast<std::streamsize>(record.value().size()));
+            const std::string canonicalRaw = StructuredRecord::fromRaw(record.value()).toRaw();
+            out.write(canonicalRaw.data(), static_cast<std::streamsize>(canonicalRaw.size()));
             if (!out) {
                 throw FileSystemError("Cannot write record: " + record.name());
             }

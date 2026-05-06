@@ -4,8 +4,10 @@
 #include <filesystem>
 #include <fstream>
 #include <string>
+#include <vector>
 
 #include "FileSystem.h"
+#include "StructuredRecord.h"
 
 static std::filesystem::path uniqueFsTempDir() {
     auto base = std::filesystem::temp_directory_path();
@@ -26,6 +28,15 @@ TEST_CASE("filesystem stores default records as .item and preserves newline attr
     const auto readBack = fs.readRecord(handle, "CUST1");
     REQUIRE(readBack.has_value());
     CHECK(readBack->value() == attributes);
+    REQUIRE(readBack->structured().hasAttribute(1));
+    REQUIRE(readBack->structured().hasAttribute(2));
+    REQUIRE(readBack->structured().hasAttribute(3));
+    REQUIRE(readBack->structured().hasAttribute(4));
+    CHECK(readBack->structured().attribute(1).raw() == "NAME");
+    CHECK(readBack->structured().attribute(2).raw() == "");
+    CHECK(readBack->structured().attribute(3).raw() == "CITY");
+    CHECK(readBack->structured().attribute(4).raw() == "");
+    CHECK(readBack->structured().attribute(10).raw() == "");
 }
 
 TEST_CASE("filesystem uses typed extensions but lists logical item IDs only") {
@@ -64,4 +75,28 @@ TEST_CASE("filesystem deleteRecord removes stored record via file handle") {
         missingThrown = std::string(e.what()).find("Record not found: ID1") != std::string::npos;
     }
     CHECK(missingThrown);
+}
+
+TEST_CASE("structured record round-trips newline attributes and missing lookups") {
+    const std::string raw = "A\n\nB\n";
+    const PickFS::StructuredRecord sr = PickFS::StructuredRecord::fromRaw(raw);
+    CHECK(sr.toRaw() == raw);
+    CHECK(sr.attribute(1).raw() == "A");
+    CHECK(sr.attribute(2).raw() == "");
+    CHECK(sr.attribute(3).raw() == "B");
+    CHECK(sr.attribute(4).raw() == "");
+    CHECK(sr.attribute(9).raw() == "");
+}
+
+TEST_CASE("record attribute value splitting uses value mark") {
+    const std::string withValues = std::string("A") + static_cast<char>(0xFD) + "B" + static_cast<char>(0xFD) + "C";
+    const PickFS::RecordAttribute attr(withValues);
+    const std::vector<std::string> values = attr.splitValues();
+    REQUIRE(values.size() == 3);
+    CHECK(values[0] == "A");
+    CHECK(values[1] == "B");
+    CHECK(values[2] == "C");
+    CHECK(attr.firstValue() == "A");
+    CHECK(attr.valueAt(2) == "B");
+    CHECK(attr.valueAt(9) == "");
 }

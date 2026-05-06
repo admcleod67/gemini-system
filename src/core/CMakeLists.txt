@@ -9,6 +9,10 @@ add_library(gemini-core
         vm/BytecodeText.h
         filesystem/Record.cpp
         filesystem/Record.h
+        filesystem/RecordAttribute.cpp
+        filesystem/RecordAttribute.h
+        filesystem/StructuredRecord.cpp
+        filesystem/StructuredRecord.h
         filesystem/Catalog.cpp
         filesystem/Catalog.h
         filesystem/FileSystem.cpp

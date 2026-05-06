@@ -19,6 +19,15 @@ Milestone 3 introduces the first semantically meaningful change to record handli
 This is the minimum structural step needed before formatting, correlatives, computed attributes,
 and report semantics.
 
+## M3a implementation status
+
+The current M3a implementation lands the internal model groundwork while preserving external Tcl
+contracts:
+
+- `READ` / `WRITE` still operate on raw Pick-style record text at command boundaries.
+- Core filesystem paths normalize raw payloads through shared parse/serialize helpers.
+- Record internals expose attribute-indexed access and centralized multivalue splitting primitives.
+
 ## Scope and non-goals
 
 ### In scope (M3)
@@ -38,10 +47,10 @@ and report semantics.
 
 ## `RecordAttribute`
 
-`RecordAttribute` starts as a thin wrapper around raw attribute text and provides centralized
-helpers for multi-value parsing.
+`RecordAttribute` is a thin wrapper around raw attribute text with centralized multivalue parsing
+helpers.
 
-Planned responsibilities:
+Current responsibilities:
 
 - store raw attribute text exactly as parsed;
 - return first value and value-by-index (Pick multivalue semantics);
@@ -85,7 +94,7 @@ For accepted input, parse + serialize should be stable under these rules:
 - ordering remains attribute-number order;
 - absent attributes remain absent (not auto-padded).
 
-Detailed newline-ending policy should be fixed in tests so consumers do not guess.
+Newline and empty-attribute round-trip behaviour is covered in core filesystem tests.
 
 ## API shape and compatibility
 
