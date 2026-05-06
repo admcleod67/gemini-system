@@ -49,6 +49,12 @@ Inside a dictionary record:
 - Type **`A`**: attribute 2 = attribute number on the **data** file. Attributes **7–10** on the dictionary item supply conversion hints (`D`, `MD`, `MC`) for **`SORT`** (*see Ordering*).
 - Type **`S`**: attribute 2 = next dictionary id (look up again in **`DICT-<dataFile>`** then **`DICT`**).
 
+### Authoring `DICT` items from Tcl
+
+**`WRITE`** sets the **whole** record body from the remaining tokens **joined with spaces**—a **single line** of Pick text. A type-**`A`** dictionary item normally needs **multiple lines** (line 1 = `A`, line 2 = attribute number on the data file, …). Repeating **`WRITE DICT NAME …`** on the same id **replaces** the body; it does **not** append a second attribute.
+
+Use **`EDIT DICT <record-id>`** (line editor, see [Developer shell (TCL)](tcl-shell.md)), or create the `.item` outside the shell, then confirm with **`RESOLVE-FIELD <data-file> <token>`**.
+
 ## Ordering (`SORT`)
 
 - `SORT` uses the **same** scan + projection path as `LIST`, then **stable_sort** on DICT-resolved keys.
@@ -81,21 +87,22 @@ Full **Pick** list lifecycle beyond this (saved lists, `SSELECT`, correlated exp
 
 ## Worked example
 
+This path uses **numeric field `1`**, which matches a one-line **`WRITE DATA <id> <value>`** (that value is attribute **1**). No **`DICT`** file is required.
+
 ```text
 CREATE-FILE DATA
-CREATE-FILE DICT
-WRITE DICT NAME A
-WRITE DICT NAME 1
 WRITE DATA CUST1 ALICE
 WRITE DATA CUST2 BOB
-LIST DATA NAME
-SORT DATA NAME BY NAME
+LIST DATA 1
+SORT DATA 1 BY 1
 SELECT DATA
 COUNT
-LIST NAME
-SORT BY NAME
+LIST 1
+SORT BY 1
 CLEAR-LIST
 ```
+
+**Optional — field name via `DICT`:** after **`CREATE-FILE DICT`**, run **`EDIT DICT NAME`**, put **`A`** on the first line and **`1`** on the second (mapping **`NAME`** → data attribute 1), save and quit the editor, then you can use **`LIST DATA NAME`**, **`SORT DATA NAME BY NAME`**, and the same implicit **`LIST NAME`** / **`SORT BY NAME`** after **`SELECT`** as in the grammar examples above.
 
 ## Non-goals (deferred)
 
