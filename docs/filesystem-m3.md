@@ -33,9 +33,9 @@ contracts:
 M3b now adds a minimal ENGLISH processor layer on top of the M3a structured model:
 
 - standalone core module at `src/core/english/` with parser, dictionary resolver, planner, executor, and service facade;
-- supported minimal grammar forms: `LIST <file> [field ...]`, `COUNT <file> [field ...]`, `SELECT <file> [field ...]`;
+- at M3b slice delivery, grammar covered `LIST <file> [field ...]`, `COUNT <file> [field ...]`, `SELECT <file> [field …]`; **`SORT`**, file-scoped **`DICT-<file>`** precedence, **`RESOLVE-FIELD`**, and unknown-field hard errors are recorded under **M3c** below;
 - executor scans records through filesystem APIs and reads projected fields through `Record::structured()`;
-- DICT baseline resolves numeric fields directly, plus `A` and simple `S` indirection from `DICT` records (minimal subset);
+- DICT baseline resolves numeric fields directly, plus `A` and simple `S` indirection from **`DICT`** / **`DICT-<file>`** records (see M3c for precedence);
 - Tcl integration uses contextual `LIST`: bare `LIST <file>` keeps legacy record-name listing, while field-bearing `LIST` routes to ENGLISH.
 
 Active-list behavior for M3b is session-scoped in Tcl:

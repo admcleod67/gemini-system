@@ -89,6 +89,8 @@ Invalid names fail with `Error: ...` messages from the shell.
 
 ## Tcl command behavior
 
+The Tcl shell also implements **ENGLISH** verbs (`LIST`, `SORT`, `COUNT`, `SELECT`, `RESOLVE-FIELD`) that read logical files through this API. Contextual dispatch (when a line is ENGLISH-shaped vs legacy two-token `LIST <file>`) is documented in [Developer shell (TCL)](tcl-shell.md) and [ENGLISH query core](english.md).
+
 ### `CREATE-FILE <name>`
 
 - Creates `<root>/<name>/`.

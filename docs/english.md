@@ -1,6 +1,6 @@
 # ENGLISH query core
 
-This page documents the implemented ENGLISH subset (Milestone **3b** projection + **3c** ordering / active-list scope rules).
+This page documents the implemented ENGLISH subset (**M3b** projection, **M3c** **`SORT`** / active-list scope, and **DICT-<file>** / **`DICT`** lookup precedence).
 
 For roadmap context, see [Project milestones](milestones.md).  
 For the attribute record model, see [Filesystem M3 model](filesystem-m3.md).

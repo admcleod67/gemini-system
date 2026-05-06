@@ -9,7 +9,7 @@ The **current implementation is intentionally minimal**: a small virtual machine
 a thin developer shell. The goal is to grow the system in **small, verifiable steps** (tests, clear boundaries) rather
 than landing a large stack at once.
 
-A phased **roadmap** (Milestone 1 onward) is summarized in **[`docs/milestones.md`](docs/milestones.md)**; Milestone 1 aligns with today’s codebase, and later milestones are subject to refinement.
+A phased **roadmap** (Milestone 1 onward) is summarized in **[`docs/milestones.md`](docs/milestones.md)**; **Milestones 1–3** match what is implemented today (core stack, multi-account session and VOC, and the ENGLISH + M3 filesystem layer), and **later milestones** remain subject to refinement.
 
 ## Building
 
@@ -21,7 +21,7 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
-Artifacts include **`gemini-system`** (minimal host entry point), **`pick-cli`** (interactive shell over the VM), and **`pick-tests`** (unit tests).
+Artifacts include **`gemini-system`** (minimal host entry point), **`gemini-cli`** (interactive shell over the VM), and **`pick-tests`** (unit tests).
 
 ## Documentation
 
@@ -30,7 +30,7 @@ More detail lives under **[`docs/`](docs/README.md)**:
 - **[Bytecode VM](docs/vm.md)** — `.tbc` format, opcodes, parser and runtime.
 - **[Developer shell (TCL)](docs/tcl-shell.md)** — host shell commands and mode entry (`BASIC`, `PROC`, `ASM`).
 - **[Assembler shell (ASM)](docs/assembler-shell.md)** — VM-level debugger workflow and command set.
-- **[ENGLISH query core](docs/english.md)** — implemented ENGLISH subset (`LIST`, `COUNT`, `SELECT`) with active-list commands.
+- **[ENGLISH query core](docs/english.md)** — `LIST`, `SORT`, `COUNT`, `SELECT`, file-scoped `DICT-*` lookup, **`RESOLVE-FIELD`**; active-list commands (`LIST-LIST`, `CLEAR-LIST`).
 - **[File system](docs/filesystem.md)** — Pick logical files/records backing Tcl and BASIC I/O.
 - **[Filesystem M3 model](docs/filesystem-m3.md)** — Milestone 3 attribute-aware record model and parse/serialize contract.
 - **[BASIC shell](docs/basic-shell.md)** — program buffer, SAVE/LOAD, COMPILE/`RUN`; `EDIT` uses the shared system line editor.

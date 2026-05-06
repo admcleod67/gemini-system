@@ -1,6 +1,6 @@
 # Gemini bootstrap layout (development)
 
-This tree supports **Milestone 2** work: a host-backed account layout and catalogue files used for **interactive login**, **`LOGTO`**, and **`LOGOFF`**. It also provides an optional **default Pick filesystem root** for `gemini-system` and `gemini-cli`.
+This tree supports catalogue-backed **account bootstrap** (Milestone **2** onward): a host-backed account layout and JSON catalogues used for **interactive login**, **`LOGTO`**, and **`LOGOFF`**. It also provides an optional **default Pick filesystem root** for `gemini-system` and `gemini-cli` (including **`SYSPROG/VOC`** entries used by ENGLISH/Tcl).
 
 ## Relationship to the Pick filesystem root
 

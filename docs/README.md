@@ -10,7 +10,7 @@ Technical reference for Gemini System. Paths below are relative to this director
 
 - **[Developer shell (TCL)](tcl-shell.md)** — system-level TCL commands (`BASIC`, `PROC`, `ASM`, filesystem, variables, VOC-backed `RUN`/`EDIT`, …).
 - **[Assembler shell (ASM)](assembler-shell.md)** — VM-level debugger workflow (`STEP`, `CONT`, breakpoints, trace, dumps).
-- **[ENGLISH query core](english.md)** — currently implemented ENGLISH subset (`LIST`, `COUNT`, `SELECT`, `SORT`) and active-list lifecycle.
+- **[ENGLISH query core](english.md)** — `LIST`, `SORT`, `COUNT`, `SELECT`; file-scoped **`DICT-<file>`** / global **`DICT`**; **`RESOLVE-FIELD`**; active-list lifecycle (`LIST-LIST`, `CLEAR-LIST`).
 
 ## BASIC
 
@@ -25,4 +25,4 @@ Technical reference for Gemini System. Paths below are relative to this director
 
 ## Roadmap
 
-- **[Project milestones](milestones.md)** — phased roadmap; Milestone 1 matches the core stack above; higher milestones evolve.
+- **[Project milestones](milestones.md)** — phased roadmap; **through Milestone 3** tracks what is implemented today; later milestones evolve.
