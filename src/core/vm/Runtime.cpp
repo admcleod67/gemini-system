@@ -163,17 +163,7 @@ namespace PickVM {
     }
 
     Runtime::Runtime()
-        : ip_(0),
-          fileExists_([](const std::string &) {
-              throw std::runtime_error("File backend not configured");
-              return false;
-          }),
-          readRecord_([](const std::string &, const std::string &) -> std::optional<std::string> {
-              throw std::runtime_error("File backend not configured");
-          }),
-          writeRecord_([](const std::string &, const std::string &, const std::string &) {
-              throw std::runtime_error("File backend not configured");
-          }) {
+        : ip_(0) {
     }
 
     void Runtime::loadProgram(const std::vector<Instruction> &program) {
@@ -215,34 +205,6 @@ namespace PickVM {
             throw std::out_of_range("Instruction pointer out of range");
         }
         ip_ = ip;
-    }
-
-    void Runtime::setFileExistsCallback(FileExistsFn fn) {
-        fileExists_ = fn ? std::move(fn) : FileExistsFn{};
-        if (!fileExists_) {
-            fileExists_ = [](const std::string &) {
-                throw std::runtime_error("File backend not configured");
-                return false;
-            };
-        }
-    }
-
-    void Runtime::setReadRecordCallback(ReadRecordFn fn) {
-        readRecord_ = fn ? std::move(fn) : ReadRecordFn{};
-        if (!readRecord_) {
-            readRecord_ = [](const std::string &, const std::string &) -> std::optional<std::string> {
-                throw std::runtime_error("File backend not configured");
-            };
-        }
-    }
-
-    void Runtime::setWriteRecordCallback(WriteRecordFn fn) {
-        writeRecord_ = fn ? std::move(fn) : WriteRecordFn{};
-        if (!writeRecord_) {
-            writeRecord_ = [](const std::string &, const std::string &, const std::string &) {
-                throw std::runtime_error("File backend not configured");
-            };
-        }
     }
 
     void Runtime::setFileSystem(PickFS::FileSystem *fileSystem) {
@@ -583,16 +545,15 @@ namespace PickVM {
             case OpCode::OpenFile: {
                 const std::string fileVar = canonicalVariableName(stringOperandAtIp(instr, ip_));
                 const std::string fileName = valueToString(pop());
+                if (!fileSystem_) {
+                    throw std::runtime_error("OPEN failed: filesystem backend not configured");
+                }
                 bool exists = false;
-                if (fileSystem_) {
-                    try {
-                        (void) fileSystem_->openFile(fileName);
-                        exists = true;
-                    } catch (const PickFS::FileSystemError &) {
-                        exists = false;
-                    }
-                } else {
-                    exists = fileExists_(fileName);
+                try {
+                    (void) fileSystem_->openFile(fileName);
+                    exists = true;
+                } catch (const PickFS::FileSystemError &) {
+                    exists = false;
                 }
                 if (!exists) {
                     throw std::runtime_error("OPEN failed: file not found: " + fileName);
@@ -604,16 +565,16 @@ namespace PickVM {
             case OpCode::OpenFileTry: {
                 const std::string fileVar = canonicalVariableName(stringOperandAtIp(instr, ip_));
                 const std::string fileName = valueToString(pop());
+                if (!fileSystem_) {
+                    push(0);
+                    break;
+                }
                 bool exists = false;
-                if (fileSystem_) {
-                    try {
-                        (void) fileSystem_->openFile(fileName);
-                        exists = true;
-                    } catch (const PickFS::FileSystemError &) {
-                        exists = false;
-                    }
-                } else {
-                    exists = fileExists_(fileName);
+                try {
+                    (void) fileSystem_->openFile(fileName);
+                    exists = true;
+                } catch (const PickFS::FileSystemError &) {
+                    exists = false;
                 }
                 if (!exists) {
                     push(0);
@@ -631,14 +592,13 @@ namespace PickVM {
                 if (fit == openFiles_.end()) {
                     throw std::runtime_error("READ failed: file variable not open: " + fileVar);
                 }
+                if (!fileSystem_) {
+                    throw std::runtime_error("READ failed: filesystem backend not configured");
+                }
                 std::optional<std::string> value;
-                if (fileSystem_) {
-                    const std::optional<PickFS::Record> rec = fileSystem_->read(fit->second.fileName, id);
-                    if (rec.has_value()) {
-                        value = rec->value();
-                    }
-                } else {
-                    value = readRecord_(fit->second.fileName, id);
+                const std::optional<PickFS::Record> rec = fileSystem_->read(fit->second.fileName, id);
+                if (rec.has_value()) {
+                    value = rec->value();
                 }
                 if (!value.has_value()) {
                     throw std::runtime_error("READ failed: record not found: " + id);
@@ -656,14 +616,15 @@ namespace PickVM {
                     push(0);
                     break;
                 }
+                if (!fileSystem_) {
+                    push(std::string{});
+                    push(0);
+                    break;
+                }
                 std::optional<std::string> value;
-                if (fileSystem_) {
-                    const std::optional<PickFS::Record> rec = fileSystem_->read(fit->second.fileName, id);
-                    if (rec.has_value()) {
-                        value = rec->value();
-                    }
-                } else {
-                    value = readRecord_(fit->second.fileName, id);
+                const std::optional<PickFS::Record> rec = fileSystem_->read(fit->second.fileName, id);
+                if (rec.has_value()) {
+                    value = rec->value();
                 }
                 if (!value.has_value()) {
                     push(std::string{});
@@ -683,11 +644,10 @@ namespace PickVM {
                 if (fit == openFiles_.end()) {
                     throw std::runtime_error("WRITE failed: file variable not open: " + fileVar);
                 }
-                if (fileSystem_) {
-                    fileSystem_->write(fit->second.fileName, PickFS::Record{id, value});
-                } else {
-                    writeRecord_(fit->second.fileName, id, value);
+                if (!fileSystem_) {
+                    throw std::runtime_error("WRITE failed: filesystem backend not configured");
                 }
+                fileSystem_->write(fit->second.fileName, PickFS::Record{id, value});
                 fit->second.cursorPrimed = false;
                 fit->second.cursorIndex = 0;
                 break;
@@ -702,12 +662,12 @@ namespace PickVM {
                     push(0);
                     break;
                 }
+                if (!fileSystem_) {
+                    push(0);
+                    break;
+                }
                 try {
-                    if (fileSystem_) {
-                        fileSystem_->write(fit->second.fileName, PickFS::Record{id, value});
-                    } else {
-                        writeRecord_(fit->second.fileName, id, value);
-                    }
+                    fileSystem_->write(fit->second.fileName, PickFS::Record{id, value});
                     fit->second.cursorPrimed = false;
                     fit->second.cursorIndex = 0;
                     push(1);

@@ -122,14 +122,6 @@ namespace PickVM {
         void interrupt() noexcept;
         void clearInterrupt() noexcept;
 
-        // File backend callbacks used by BASIC file statements.
-        using FileExistsFn = std::function<bool(const std::string &)>;
-        using ReadRecordFn = std::function<std::optional<std::string>(const std::string &, const std::string &)>;
-        using WriteRecordFn = std::function<void(const std::string &, const std::string &, const std::string &)>;
-
-        void setFileExistsCallback(FileExistsFn fn);
-        void setReadRecordCallback(ReadRecordFn fn);
-        void setWriteRecordCallback(WriteRecordFn fn);
         void setFileSystem(PickFS::FileSystem *fileSystem);
 
         /// Optional read-only `@USERNO` / `@ACCOUNT` / `@LOGNAME` / `@DEFDATA` (canonical names). Cleared with empty function.
@@ -161,9 +153,6 @@ namespace PickVM {
         std::atomic<bool> interrupted_{false};
         mutable std::ostream *outStream_{nullptr};
         mutable std::istream *inStream_{nullptr};
-        FileExistsFn fileExists_;
-        ReadRecordFn readRecord_;
-        WriteRecordFn writeRecord_;
         PickFS::FileSystem *fileSystem_{nullptr};
         SystemVarReaderFn systemVarReader_;
 

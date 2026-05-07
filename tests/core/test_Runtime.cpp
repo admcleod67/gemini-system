@@ -4,7 +4,6 @@
 #include <stdexcept>
 #include <string>
 #include <optional>
-#include <unordered_map>
 #include <variant>
 #include <vector>
 #include <filesystem>
@@ -1326,8 +1325,14 @@ TEST_CASE("runtime SeqStr stringifies integer operand") {
 }
 
 TEST_CASE("runtime OpenFile binds existing file handle") {
+    const std::filesystem::path root = std::filesystem::temp_directory_path() / "pick-runtime-openfile-test";
+    std::error_code ec;
+    std::filesystem::remove_all(root, ec);
+    PickFS::FileSystem fs(root);
+    fs.createFile("CUSTOMERS");
+
     Runtime rt;
-    rt.setFileExistsCallback([](const std::string &name) { return name == "CUSTOMERS"; });
+    rt.setFileSystem(&fs);
     std::vector<Instruction> prog = {
         {OpCode::PushStr, std::string{"CUSTOMERS"}},
         {OpCode::OpenFile, std::string{"FVAR"}},
@@ -1335,11 +1340,17 @@ TEST_CASE("runtime OpenFile binds existing file handle") {
     };
     rt.loadProgram(prog);
     CHECK_NOTHROW(rt.run());
+    std::filesystem::remove_all(root, ec);
 }
 
 TEST_CASE("runtime OpenFile throws for missing file") {
+    const std::filesystem::path root = std::filesystem::temp_directory_path() / "pick-runtime-openfile-missing-test";
+    std::error_code ec;
+    std::filesystem::remove_all(root, ec);
+    PickFS::FileSystem fs(root);
+
     Runtime rt;
-    rt.setFileExistsCallback([](const std::string &) { return false; });
+    rt.setFileSystem(&fs);
     std::vector<Instruction> prog = {
         {OpCode::PushStr, std::string{"MISSING"}},
         {OpCode::OpenFile, std::string{"FVAR"}},
@@ -1347,11 +1358,18 @@ TEST_CASE("runtime OpenFile throws for missing file") {
     };
     rt.loadProgram(prog);
     CHECK_THROWS_AS(rt.run(), std::runtime_error);
+    std::filesystem::remove_all(root, ec);
 }
 
 TEST_CASE("runtime OpenFileTry pushes success flag") {
+    const std::filesystem::path root = std::filesystem::temp_directory_path() / "pick-runtime-openfile-try-test";
+    std::error_code ec;
+    std::filesystem::remove_all(root, ec);
+    PickFS::FileSystem fs(root);
+    fs.createFile("CUSTOMERS");
+
     Runtime rt;
-    rt.setFileExistsCallback([](const std::string &name) { return name == "CUSTOMERS"; });
+    rt.setFileSystem(&fs);
     std::vector<Instruction> prog = {
         {OpCode::PushStr, std::string{"CUSTOMERS"}},
         {OpCode::OpenFileTry, std::string{"FVAR"}},
@@ -1361,22 +1379,18 @@ TEST_CASE("runtime OpenFileTry pushes success flag") {
     rt.run();
     REQUIRE(rt.stack().size() == 1);
     CHECK(std::get<int>(rt.stack()[0]) == 1);
+    std::filesystem::remove_all(root, ec);
 }
 
-TEST_CASE("runtime ReadRec and WriteRec use callbacks") {
+TEST_CASE("runtime ReadRec and WriteRec use filesystem backend") {
+    const std::filesystem::path root = std::filesystem::temp_directory_path() / "pick-runtime-readwrite-test";
+    std::error_code ec;
+    std::filesystem::remove_all(root, ec);
+    PickFS::FileSystem fs(root);
+    fs.createFile("CUST");
+
     Runtime rt;
-    std::unordered_map<std::string, std::string> data;
-    rt.setFileExistsCallback([](const std::string &) { return true; });
-    rt.setReadRecordCallback([&data](const std::string &, const std::string &id) -> std::optional<std::string> {
-        const auto it = data.find(id);
-        if (it == data.end()) {
-            return std::nullopt;
-        }
-        return it->second;
-    });
-    rt.setWriteRecordCallback([&data](const std::string &, const std::string &id, const std::string &value) {
-        data[id] = value;
-    });
+    rt.setFileSystem(&fs);
 
     std::vector<Instruction> prog = {
         {OpCode::PushStr, std::string{"CUST"}},
@@ -1392,6 +1406,7 @@ TEST_CASE("runtime ReadRec and WriteRec use callbacks") {
     rt.run();
     REQUIRE(rt.stack().size() == 1);
     CHECK(std::get<std::string>(rt.stack()[0]) == "VALUE");
+    std::filesystem::remove_all(root, ec);
 }
 
 TEST_CASE("runtime CloseFile is no-op for unopened handle") {
