@@ -487,6 +487,28 @@ TEST_CASE("basic bytecode emitter emits ReadRec + StoreVar without ELSE") {
     CHECK(emitted.program[2].op == OpCode::StoreVar);
 }
 
+TEST_CASE("basic bytecode emitter emits READNEXT READV WRITEV opcodes") {
+    BasicIr::NormalizedProgram program;
+    program.lines.push_back({10, BasicIr::ReadNextStmt{"ID", "FVAR", std::nullopt}});
+    program.lines.push_back({20, BasicIr::ReadVStmt{"NAME", "FVAR", makeVar("ID"), makeInt(1), nullptr, std::nullopt}});
+    program.lines.push_back({30, BasicIr::WriteVStmt{makeStr("NEW"), "FVAR", makeVar("ID"), makeInt(2), makeInt(1), std::nullopt}});
+
+    const BasicBytecodeEmissionResult emitted = BasicBytecodeEmitter::emit(program);
+    REQUIRE(emitted.success);
+
+    bool hasReadNext = false;
+    bool hasReadV = false;
+    bool hasWriteV = false;
+    for (const auto &ins : emitted.program) {
+        hasReadNext = hasReadNext || ins.op == OpCode::ReadNext;
+        hasReadV = hasReadV || ins.op == OpCode::ReadV;
+        hasWriteV = hasWriteV || ins.op == OpCode::WriteV;
+    }
+    CHECK(hasReadNext);
+    CHECK(hasReadV);
+    CHECK(hasWriteV);
+}
+
 TEST_CASE("basic bytecode emitter emits *_Try opcodes for file ELSE flow") {
     BasicIr::NormalizedProgram program;
     BasicIr::OpenStmt open{};

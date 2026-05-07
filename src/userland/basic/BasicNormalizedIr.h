@@ -107,11 +107,35 @@ namespace PickShell::BasicIr {
         std::optional<BranchArm> elseArm;
     };
 
+    struct ReadNextStmt {
+        std::string targetVar;
+        std::string fileVar;
+        std::optional<BranchArm> elseArm;
+    };
+
+    struct ReadVStmt {
+        std::string targetVar;
+        std::string fileVar;
+        std::unique_ptr<BasicAst::Expr> idExpr;
+        std::unique_ptr<BasicAst::Expr> attrExpr;
+        std::unique_ptr<BasicAst::Expr> valueIndexExpr; // nullptr means attribute-level read
+        std::optional<BranchArm> elseArm;
+    };
+
+    struct WriteVStmt {
+        std::unique_ptr<BasicAst::Expr> valueExpr;
+        std::string fileVar;
+        std::unique_ptr<BasicAst::Expr> idExpr;
+        std::unique_ptr<BasicAst::Expr> attrExpr;
+        std::unique_ptr<BasicAst::Expr> valueIndexExpr; // nullptr means attribute-level write
+        std::optional<BranchArm> elseArm;
+    };
+
     struct CloseStmt {
         std::string fileVar;
     };
 
-    using NormalizedStmt = std::variant<LetStmt, InputStmt, GotoStmt, GosubStmt, ReturnStmt, ForStmt, NextStmt, IfStmt, PrintStmt, RemStmt, StopStmt, EndStmt, DimStmt, LetArrayStmt, ClearStmt, OpenStmt, ReadStmt, WriteStmt, CloseStmt>;
+    using NormalizedStmt = std::variant<LetStmt, InputStmt, GotoStmt, GosubStmt, ReturnStmt, ForStmt, NextStmt, IfStmt, PrintStmt, RemStmt, StopStmt, EndStmt, DimStmt, LetArrayStmt, ClearStmt, OpenStmt, ReadStmt, WriteStmt, ReadNextStmt, ReadVStmt, WriteVStmt, CloseStmt>;
 
     struct InlineStatement {
         NormalizedStmt statement;

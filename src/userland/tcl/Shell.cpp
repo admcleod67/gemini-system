@@ -195,6 +195,7 @@ namespace PickShell {
         : session_(runtime),
           vmDebugService_(session_),
           assemblerShell_(vmDebugService_) {
+        session_.runtime_.setFileSystem(&session_.fileSystem_);
         session_.runtime_.setFileExistsCallback([this](const std::string &fileName) {
             try {
                 (void) session_.fileSystem_.listRecordNames(fileName);

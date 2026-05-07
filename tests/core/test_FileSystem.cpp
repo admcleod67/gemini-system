@@ -100,3 +100,35 @@ TEST_CASE("record attribute value splitting uses value mark") {
     CHECK(attr.valueAt(2) == "B");
     CHECK(attr.valueAt(9) == "");
 }
+
+TEST_CASE("filesystem attribute and subvalue helpers preserve surrounding data") {
+    const auto root = uniqueFsTempDir();
+    PickFS::FileSystem fs(root);
+    fs.createFile("DATA");
+    const std::string vm = std::string(1, static_cast<char>(0xFD));
+    fs.write("DATA", PickFS::Record("ID1", "NAME\nA" + vm + "B\nTAIL"));
+
+    const auto attr2 = fs.readAttributeValue("DATA", "ID1", 2);
+    REQUIRE(attr2.has_value());
+    CHECK(*attr2 == "A" + vm + "B");
+
+    const auto sub2 = fs.readSubvalue("DATA", "ID1", 2, 2);
+    REQUIRE(sub2.has_value());
+    CHECK(*sub2 == "B");
+
+    fs.writeSubvalue("DATA", "ID1", 2, 1, "Z");
+    const auto afterSub = fs.read("DATA", "ID1");
+    REQUIRE(afterSub.has_value());
+    const PickFS::StructuredRecord srSub = PickFS::StructuredRecord::fromRaw(afterSub->value());
+    CHECK(srSub.attribute(1).raw() == "NAME");
+    CHECK(srSub.attribute(2).raw() == "Z" + vm + "B");
+    CHECK(srSub.attribute(3).raw() == "TAIL");
+
+    fs.writeAttributeValue("DATA", "ID1", 3, "UPDATED");
+    const auto afterAttr = fs.read("DATA", "ID1");
+    REQUIRE(afterAttr.has_value());
+    const PickFS::StructuredRecord srAttr = PickFS::StructuredRecord::fromRaw(afterAttr->value());
+    CHECK(srAttr.attribute(1).raw() == "NAME");
+    CHECK(srAttr.attribute(2).raw() == "Z" + vm + "B");
+    CHECK(srAttr.attribute(3).raw() == "UPDATED");
+}

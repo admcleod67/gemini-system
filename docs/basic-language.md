@@ -23,6 +23,9 @@ Compiler internals are in an incremental refactor phase. Expression parsing and 
 - `OPEN <file-expr> TO <filevar> [ELSE <line-or-statement>]`
 - `READ <var> FROM <filevar>, <id-expr> [ELSE <line-or-statement>]`
 - `WRITE <expr> ON <filevar>, <id-expr> [ELSE <line-or-statement>]`
+- `READNEXT <var> FROM <filevar> [ELSE <line-or-statement>]`
+- `READV <var> FROM <filevar>, <id-expr>, <attr-expr>[, <value-index-expr>] [ELSE <line-or-statement>]`
+- `WRITEV <expr> ON <filevar>, <id-expr>, <attr-expr>[, <value-index-expr>] [ELSE <line-or-statement>]`
 - `CLOSE <filevar>`
 - `CLEAR`
 - `IF <cond> THEN <line-or-statement> [ELSE <line-or-statement>]`
@@ -221,13 +224,16 @@ Expression-related messages include categories such as:
   - `A(n)` — dynamic array; values are stored as-is and coerced to int in arithmetic contexts.
 - Arrays and scalar variables with the same base name are independent: `A` and `A(1)` are different storage locations.
 
-## File handling (MVP)
+## File handling (Stage 1)
 
 File handling uses the PickFS backend and file-variable handles:
 
 - `OPEN <file-expr> TO <filevar> [ELSE <line-or-statement>]`
 - `READ <var> FROM <filevar>, <id-expr> [ELSE <line-or-statement>]`
 - `WRITE <expr> ON <filevar>, <id-expr> [ELSE <line-or-statement>]`
+- `READNEXT <var> FROM <filevar> [ELSE <line-or-statement>]`
+- `READV <var> FROM <filevar>, <id-expr>, <attr-expr>[, <value-index-expr>] [ELSE <line-or-statement>]`
+- `WRITEV <expr> ON <filevar>, <id-expr>, <attr-expr>[, <value-index-expr>] [ELSE <line-or-statement>]`
 - `CLOSE <filevar>`
 
 Examples:
@@ -254,8 +260,12 @@ Inline `ELSE` statement examples:
 Rules:
 
 - `OPEN` succeeds only if the file already exists. There is no automatic file creation from BASIC.
-- `OPEN`, `READ`, and `WRITE` route failures to `ELSE` when provided.
+- `OPEN`, `READ`, `WRITE`, `READNEXT`, `READV`, and `WRITEV` route failures to `ELSE` when provided.
 - Without `ELSE`, failures raise runtime errors and stop execution.
+- `READNEXT` iterates record IDs in deterministic lexicographic order per open file handle.
+- `OPEN` resets `READNEXT` cursor state for that file handle.
+- `WRITE` and `WRITEV` invalidate the `READNEXT` cursor for the same file handle.
+- `READV`/`WRITEV` preserve unrelated attributes and sibling multi-values.
 - File `ELSE` accepts either a line target or one inline statement.
 - `CLOSE` on an unopened file variable is a no-op.
 - Open file handles are automatically released when the program ends.

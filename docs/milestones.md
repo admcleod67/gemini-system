@@ -136,6 +136,13 @@ Milestone 5.
 
 ### Scope
 
+### Stage 1 status
+
+- Implemented: `READNEXT`, `READV`, `WRITEV` statement/opcode/runtime paths.
+- Implemented: `READNEXT` cursor semantics (reset on `OPEN`, invalidated on `WRITE`/`WRITEV`, lexicographic record order).
+- Implemented: no BASIC file-creation opcode/statement; missing-file behavior follows `ELSE`/raise contract.
+- Implemented: filesystem helpers for attribute/subvalue mutation while preserving surrounding record data.
+
 #### 1. BASIC file semantics (Pick-authentic core)
 
 - **`READNEXT`**

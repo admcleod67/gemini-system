@@ -54,6 +54,12 @@ namespace PickVM {
             case OpCode::ReadRecTry: return "READ_REC_TRY";
             case OpCode::WriteRec: return "WRITE_REC";
             case OpCode::WriteRecTry: return "WRITE_REC_TRY";
+            case OpCode::ReadNext: return "READ_NEXT";
+            case OpCode::ReadNextTry: return "READ_NEXT_TRY";
+            case OpCode::ReadV: return "READ_V";
+            case OpCode::ReadVTry: return "READ_V_TRY";
+            case OpCode::WriteV: return "WRITE_V";
+            case OpCode::WriteVTry: return "WRITE_V_TRY";
             case OpCode::CloseFile: return "CLOSE_FILE";
             case OpCode::LoadVar: return "LOAD_VAR";
             case OpCode::StoreVar: return "STORE_VAR";
@@ -114,6 +120,12 @@ namespace PickVM {
             case OpCode::ReadRecTry:
             case OpCode::WriteRec:
             case OpCode::WriteRecTry:
+            case OpCode::ReadNext:
+            case OpCode::ReadNextTry:
+            case OpCode::ReadV:
+            case OpCode::ReadVTry:
+            case OpCode::WriteV:
+            case OpCode::WriteVTry:
             case OpCode::CloseFile:
                 oss << ' ' << stringOperandAtIp(instr, ip);
                 break;

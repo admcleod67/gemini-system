@@ -55,6 +55,26 @@ namespace PickFS {
 
         std::vector<std::string> listRecordNames(const std::string &fileName) const;
 
+        std::optional<std::string> readAttributeValue(const std::string &fileName,
+                                                      const std::string &recordName,
+                                                      int attributeNo) const;
+
+        std::optional<std::string> readSubvalue(const std::string &fileName,
+                                                const std::string &recordName,
+                                                int attributeNo,
+                                                int valueIndex) const;
+
+        void writeAttributeValue(const std::string &fileName,
+                                 const std::string &recordName,
+                                 int attributeNo,
+                                 const std::string &value);
+
+        void writeSubvalue(const std::string &fileName,
+                           const std::string &recordName,
+                           int attributeNo,
+                           int valueIndex,
+                           const std::string &value);
+
     private:
         Catalog catalog_;
 

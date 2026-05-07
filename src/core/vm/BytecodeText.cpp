@@ -64,6 +64,12 @@ namespace PickVM {
                 case OpCode::ReadRecTry:
                 case OpCode::WriteRec:
                 case OpCode::WriteRecTry:
+                case OpCode::ReadNext:
+                case OpCode::ReadNextTry:
+                case OpCode::ReadV:
+                case OpCode::ReadVTry:
+                case OpCode::WriteV:
+                case OpCode::WriteVTry:
                 case OpCode::CloseFile:
                     out << ' ' << std::get<std::string>(instr.operand);
                     break;

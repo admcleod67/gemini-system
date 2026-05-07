@@ -94,6 +94,18 @@ namespace PickShell {
                         if (stmt.elseArm.has_value()) {
                             validateBranchArm(*stmt.elseArm, ownerLine, knownLines, errors);
                         }
+                    } else if constexpr (std::is_same_v<StmtT, BasicAst::ReadNextStmt>) {
+                        if (stmt.elseArm.has_value()) {
+                            validateBranchArm(*stmt.elseArm, ownerLine, knownLines, errors);
+                        }
+                    } else if constexpr (std::is_same_v<StmtT, BasicAst::ReadVStmt>) {
+                        if (stmt.elseArm.has_value()) {
+                            validateBranchArm(*stmt.elseArm, ownerLine, knownLines, errors);
+                        }
+                    } else if constexpr (std::is_same_v<StmtT, BasicAst::WriteVStmt>) {
+                        if (stmt.elseArm.has_value()) {
+                            validateBranchArm(*stmt.elseArm, ownerLine, knownLines, errors);
+                        }
                     }
                 },
                 statement);
@@ -153,6 +165,30 @@ namespace PickShell {
                             std::move(stmt.valueExpr),
                             std::move(stmt.fileVar),
                             std::move(stmt.idExpr),
+                            toIrBranchArmOpt(std::move(stmt.elseArm))
+                        };
+                    } else if constexpr (std::is_same_v<StmtT, BasicAst::ReadNextStmt>) {
+                        return BasicIr::ReadNextStmt{
+                            std::move(stmt.targetVar),
+                            std::move(stmt.fileVar),
+                            toIrBranchArmOpt(std::move(stmt.elseArm))
+                        };
+                    } else if constexpr (std::is_same_v<StmtT, BasicAst::ReadVStmt>) {
+                        return BasicIr::ReadVStmt{
+                            std::move(stmt.targetVar),
+                            std::move(stmt.fileVar),
+                            std::move(stmt.idExpr),
+                            std::move(stmt.attrExpr),
+                            std::move(stmt.valueIndexExpr),
+                            toIrBranchArmOpt(std::move(stmt.elseArm))
+                        };
+                    } else if constexpr (std::is_same_v<StmtT, BasicAst::WriteVStmt>) {
+                        return BasicIr::WriteVStmt{
+                            std::move(stmt.valueExpr),
+                            std::move(stmt.fileVar),
+                            std::move(stmt.idExpr),
+                            std::move(stmt.attrExpr),
+                            std::move(stmt.valueIndexExpr),
                             toIrBranchArmOpt(std::move(stmt.elseArm))
                         };
                     } else if constexpr (std::is_same_v<StmtT, BasicAst::CloseStmt>) {

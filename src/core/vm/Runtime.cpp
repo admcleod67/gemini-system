@@ -4,6 +4,9 @@
 
 #include "Runtime.h"
 #include "InstructionPrint.h"
+#include "../filesystem/FileSystem.h"
+#include "../filesystem/StructuredRecord.h"
+#include "../filesystem/RecordAttribute.h"
 
 #include <algorithm>
 #include <cctype>
@@ -129,6 +132,18 @@ namespace PickVM {
             }
             return pos == trimmed.size();
         }
+
+        std::string joinValues(const std::vector<std::string> &values) {
+            constexpr char kValueMark = static_cast<char>(0xFD);
+            std::string out;
+            for (std::size_t i = 0; i < values.size(); ++i) {
+                if (i > 0) {
+                    out.push_back(kValueMark);
+                }
+                out += values[i];
+            }
+            return out;
+        }
     } // namespace
 
     std::ostream &Runtime::out() const {
@@ -228,6 +243,10 @@ namespace PickVM {
                 throw std::runtime_error("File backend not configured");
             };
         }
+    }
+
+    void Runtime::setFileSystem(PickFS::FileSystem *fileSystem) {
+        fileSystem_ = fileSystem;
     }
 
     void Runtime::setSystemVariableReader(SystemVarReaderFn fn) {
@@ -564,21 +583,43 @@ namespace PickVM {
             case OpCode::OpenFile: {
                 const std::string fileVar = canonicalVariableName(stringOperandAtIp(instr, ip_));
                 const std::string fileName = valueToString(pop());
-                if (!fileExists_(fileName)) {
+                bool exists = false;
+                if (fileSystem_) {
+                    try {
+                        (void) fileSystem_->openFile(fileName);
+                        exists = true;
+                    } catch (const PickFS::FileSystemError &) {
+                        exists = false;
+                    }
+                } else {
+                    exists = fileExists_(fileName);
+                }
+                if (!exists) {
                     throw std::runtime_error("OPEN failed: file not found: " + fileName);
                 }
-                openFiles_[fileVar] = fileName;
+                openFiles_[fileVar] = OpenFileState{fileName, {}, 0, false};
                 break;
             }
 
             case OpCode::OpenFileTry: {
                 const std::string fileVar = canonicalVariableName(stringOperandAtIp(instr, ip_));
                 const std::string fileName = valueToString(pop());
-                if (!fileExists_(fileName)) {
+                bool exists = false;
+                if (fileSystem_) {
+                    try {
+                        (void) fileSystem_->openFile(fileName);
+                        exists = true;
+                    } catch (const PickFS::FileSystemError &) {
+                        exists = false;
+                    }
+                } else {
+                    exists = fileExists_(fileName);
+                }
+                if (!exists) {
                     push(0);
                     break;
                 }
-                openFiles_[fileVar] = fileName;
+                openFiles_[fileVar] = OpenFileState{fileName, {}, 0, false};
                 push(1);
                 break;
             }
@@ -590,7 +631,15 @@ namespace PickVM {
                 if (fit == openFiles_.end()) {
                     throw std::runtime_error("READ failed: file variable not open: " + fileVar);
                 }
-                const std::optional<std::string> value = readRecord_(fit->second, id);
+                std::optional<std::string> value;
+                if (fileSystem_) {
+                    const std::optional<PickFS::Record> rec = fileSystem_->read(fit->second.fileName, id);
+                    if (rec.has_value()) {
+                        value = rec->value();
+                    }
+                } else {
+                    value = readRecord_(fit->second.fileName, id);
+                }
                 if (!value.has_value()) {
                     throw std::runtime_error("READ failed: record not found: " + id);
                 }
@@ -607,7 +656,15 @@ namespace PickVM {
                     push(0);
                     break;
                 }
-                const std::optional<std::string> value = readRecord_(fit->second, id);
+                std::optional<std::string> value;
+                if (fileSystem_) {
+                    const std::optional<PickFS::Record> rec = fileSystem_->read(fit->second.fileName, id);
+                    if (rec.has_value()) {
+                        value = rec->value();
+                    }
+                } else {
+                    value = readRecord_(fit->second.fileName, id);
+                }
                 if (!value.has_value()) {
                     push(std::string{});
                     push(0);
@@ -626,7 +683,13 @@ namespace PickVM {
                 if (fit == openFiles_.end()) {
                     throw std::runtime_error("WRITE failed: file variable not open: " + fileVar);
                 }
-                writeRecord_(fit->second, id, value);
+                if (fileSystem_) {
+                    fileSystem_->write(fit->second.fileName, PickFS::Record{id, value});
+                } else {
+                    writeRecord_(fit->second.fileName, id, value);
+                }
+                fit->second.cursorPrimed = false;
+                fit->second.cursorIndex = 0;
                 break;
             }
 
@@ -640,7 +703,182 @@ namespace PickVM {
                     break;
                 }
                 try {
-                    writeRecord_(fit->second, id, value);
+                    if (fileSystem_) {
+                        fileSystem_->write(fit->second.fileName, PickFS::Record{id, value});
+                    } else {
+                        writeRecord_(fit->second.fileName, id, value);
+                    }
+                    fit->second.cursorPrimed = false;
+                    fit->second.cursorIndex = 0;
+                    push(1);
+                } catch (const std::exception &) {
+                    push(0);
+                }
+                break;
+            }
+
+            case OpCode::ReadNext: {
+                const std::string fileVar = canonicalVariableName(stringOperandAtIp(instr, ip_));
+                const auto fit = openFiles_.find(fileVar);
+                if (fit == openFiles_.end()) {
+                    throw std::runtime_error("READNEXT failed: file variable not open: " + fileVar);
+                }
+                if (!fileSystem_) {
+                    throw std::runtime_error("READNEXT requires filesystem backend");
+                }
+                auto &state = fit->second;
+                if (!state.cursorPrimed) {
+                    state.recordIds = fileSystem_->listRecordNames(state.fileName);
+                    state.cursorIndex = 0;
+                    state.cursorPrimed = true;
+                }
+                if (state.cursorIndex >= state.recordIds.size()) {
+                    throw std::runtime_error("READNEXT failed: cursor exhausted");
+                }
+                push(state.recordIds[state.cursorIndex++]);
+                break;
+            }
+
+            case OpCode::ReadNextTry: {
+                const std::string fileVar = canonicalVariableName(stringOperandAtIp(instr, ip_));
+                const auto fit = openFiles_.find(fileVar);
+                if (fit == openFiles_.end() || !fileSystem_) {
+                    push(std::string{});
+                    push(0);
+                    break;
+                }
+                auto &state = fit->second;
+                if (!state.cursorPrimed) {
+                    state.recordIds = fileSystem_->listRecordNames(state.fileName);
+                    state.cursorIndex = 0;
+                    state.cursorPrimed = true;
+                }
+                if (state.cursorIndex >= state.recordIds.size()) {
+                    push(std::string{});
+                    push(0);
+                    break;
+                }
+                push(state.recordIds[state.cursorIndex++]);
+                push(1);
+                break;
+            }
+
+            case OpCode::ReadV: {
+                const std::string fileVar = canonicalVariableName(stringOperandAtIp(instr, ip_));
+                const int valueIndex = coerceToInt(pop());
+                const int attrNo = coerceToInt(pop());
+                const std::string id = valueToString(pop());
+                const auto fit = openFiles_.find(fileVar);
+                if (fit == openFiles_.end()) {
+                    throw std::runtime_error("READV failed: file variable not open: " + fileVar);
+                }
+                if (!fileSystem_) {
+                    throw std::runtime_error("READV requires filesystem backend");
+                }
+                const std::optional<PickFS::Record> rec = fileSystem_->read(fit->second.fileName, id);
+                if (!rec.has_value()) {
+                    throw std::runtime_error("READV failed: record not found: " + id);
+                }
+                const PickFS::StructuredRecord sr = PickFS::StructuredRecord::fromRaw(rec->value());
+                const PickFS::RecordAttribute attr = sr.attribute(attrNo);
+                push(valueIndex > 0 ? attr.valueAt(valueIndex) : attr.raw());
+                break;
+            }
+
+            case OpCode::ReadVTry: {
+                const std::string fileVar = canonicalVariableName(stringOperandAtIp(instr, ip_));
+                const int valueIndex = coerceToInt(pop());
+                const int attrNo = coerceToInt(pop());
+                const std::string id = valueToString(pop());
+                const auto fit = openFiles_.find(fileVar);
+                if (fit == openFiles_.end() || !fileSystem_) {
+                    push(std::string{});
+                    push(0);
+                    break;
+                }
+                const std::optional<PickFS::Record> rec = fileSystem_->read(fit->second.fileName, id);
+                if (!rec.has_value()) {
+                    push(std::string{});
+                    push(0);
+                    break;
+                }
+                const PickFS::StructuredRecord sr = PickFS::StructuredRecord::fromRaw(rec->value());
+                const PickFS::RecordAttribute attr = sr.attribute(attrNo);
+                push(valueIndex > 0 ? attr.valueAt(valueIndex) : attr.raw());
+                push(1);
+                break;
+            }
+
+            case OpCode::WriteV: {
+                const std::string fileVar = canonicalVariableName(stringOperandAtIp(instr, ip_));
+                const int valueIndex = coerceToInt(pop());
+                const int attrNo = coerceToInt(pop());
+                const std::string id = valueToString(pop());
+                const std::string value = valueToString(pop());
+                const auto fit = openFiles_.find(fileVar);
+                if (fit == openFiles_.end()) {
+                    throw std::runtime_error("WRITEV failed: file variable not open: " + fileVar);
+                }
+                if (!fileSystem_) {
+                    throw std::runtime_error("WRITEV requires filesystem backend");
+                }
+                PickFS::StructuredRecord sr{};
+                if (const std::optional<PickFS::Record> rec = fileSystem_->read(fit->second.fileName, id); rec.has_value()) {
+                    sr = PickFS::StructuredRecord::fromRaw(rec->value());
+                }
+                if (valueIndex > 0) {
+                    std::vector<std::string> values = sr.attribute(attrNo).splitValues();
+                    if (values.empty()) {
+                        values.push_back("");
+                    }
+                    if (static_cast<std::size_t>(valueIndex) > values.size()) {
+                        values.resize(static_cast<std::size_t>(valueIndex), "");
+                    }
+                    values[static_cast<std::size_t>(valueIndex - 1)] = value;
+                    sr.setAttribute(attrNo, PickFS::RecordAttribute{joinValues(values)});
+                } else {
+                    sr.setAttribute(attrNo, PickFS::RecordAttribute{value});
+                }
+                fileSystem_->write(fit->second.fileName, PickFS::Record{id, sr.toRaw()});
+                auto &state = fit->second;
+                state.cursorPrimed = false;
+                state.cursorIndex = 0;
+                break;
+            }
+
+            case OpCode::WriteVTry: {
+                const std::string fileVar = canonicalVariableName(stringOperandAtIp(instr, ip_));
+                const int valueIndex = coerceToInt(pop());
+                const int attrNo = coerceToInt(pop());
+                const std::string id = valueToString(pop());
+                const std::string value = valueToString(pop());
+                const auto fit = openFiles_.find(fileVar);
+                if (fit == openFiles_.end() || !fileSystem_) {
+                    push(0);
+                    break;
+                }
+                try {
+                    PickFS::StructuredRecord sr{};
+                    if (const std::optional<PickFS::Record> rec = fileSystem_->read(fit->second.fileName, id); rec.has_value()) {
+                        sr = PickFS::StructuredRecord::fromRaw(rec->value());
+                    }
+                    if (valueIndex > 0) {
+                        std::vector<std::string> values = sr.attribute(attrNo).splitValues();
+                        if (values.empty()) {
+                            values.push_back("");
+                        }
+                        if (static_cast<std::size_t>(valueIndex) > values.size()) {
+                            values.resize(static_cast<std::size_t>(valueIndex), "");
+                        }
+                        values[static_cast<std::size_t>(valueIndex - 1)] = value;
+                        sr.setAttribute(attrNo, PickFS::RecordAttribute{joinValues(values)});
+                    } else {
+                        sr.setAttribute(attrNo, PickFS::RecordAttribute{value});
+                    }
+                    fileSystem_->write(fit->second.fileName, PickFS::Record{id, sr.toRaw()});
+                    auto &state = fit->second;
+                    state.cursorPrimed = false;
+                    state.cursorIndex = 0;
                     push(1);
                 } catch (const std::exception &) {
                     push(0);

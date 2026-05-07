@@ -1,4 +1,5 @@
 #include "FileSystem.h"
+#include "StructuredRecord.h"
 
 #include <algorithm>
 #include <filesystem>
@@ -10,6 +11,18 @@ namespace PickFS {
         constexpr const char *kDefaultRecordExtension = ".item";
         constexpr const char *kBasicRecordExtension = ".bas";
         constexpr const char *kProcRecordExtension = ".proc";
+
+        std::string joinValues(const std::vector<std::string> &values) {
+            constexpr char kValueMark = static_cast<char>(0xFD);
+            std::string out;
+            for (std::size_t i = 0; i < values.size(); ++i) {
+                if (i > 0) {
+                    out.push_back(kValueMark);
+                }
+                out += values[i];
+            }
+            return out;
+        }
     } // namespace
 
     FileSystem::FileSystem(std::filesystem::path root)
@@ -233,6 +246,65 @@ namespace PickFS {
 
     std::vector<std::string> FileSystem::listRecordNames(const std::string &fileName) const {
         return listRecords(openFile(fileName));
+    }
+
+    std::optional<std::string> FileSystem::readAttributeValue(const std::string &fileName,
+                                                              const std::string &recordName,
+                                                              const int attributeNo) const {
+        const std::optional<Record> rec = read(fileName, recordName);
+        if (!rec.has_value()) {
+            return std::nullopt;
+        }
+        const StructuredRecord structured = StructuredRecord::fromRaw(rec->value());
+        return structured.attribute(attributeNo).raw();
+    }
+
+    std::optional<std::string> FileSystem::readSubvalue(const std::string &fileName,
+                                                        const std::string &recordName,
+                                                        const int attributeNo,
+                                                        const int valueIndex) const {
+        const std::optional<Record> rec = read(fileName, recordName);
+        if (!rec.has_value()) {
+            return std::nullopt;
+        }
+        const StructuredRecord structured = StructuredRecord::fromRaw(rec->value());
+        return structured.attribute(attributeNo).valueAt(valueIndex);
+    }
+
+    void FileSystem::writeAttributeValue(const std::string &fileName,
+                                         const std::string &recordName,
+                                         const int attributeNo,
+                                         const std::string &value) {
+        StructuredRecord structured{};
+        if (const std::optional<Record> existing = read(fileName, recordName); existing.has_value()) {
+            structured = StructuredRecord::fromRaw(existing->value());
+        }
+        structured.setAttribute(attributeNo, RecordAttribute{value});
+        write(fileName, Record{recordName, structured.toRaw()});
+    }
+
+    void FileSystem::writeSubvalue(const std::string &fileName,
+                                   const std::string &recordName,
+                                   const int attributeNo,
+                                   const int valueIndex,
+                                   const std::string &value) {
+        if (valueIndex <= 0) {
+            throw FileSystemError("Invalid subvalue index");
+        }
+        StructuredRecord structured{};
+        if (const std::optional<Record> existing = read(fileName, recordName); existing.has_value()) {
+            structured = StructuredRecord::fromRaw(existing->value());
+        }
+        std::vector<std::string> values = structured.attribute(attributeNo).splitValues();
+        if (values.empty()) {
+            values.push_back("");
+        }
+        if (static_cast<std::size_t>(valueIndex) > values.size()) {
+            values.resize(static_cast<std::size_t>(valueIndex), "");
+        }
+        values[static_cast<std::size_t>(valueIndex - 1)] = value;
+        structured.setAttribute(attributeNo, RecordAttribute{joinValues(values)});
+        write(fileName, Record{recordName, structured.toRaw()});
     }
 
     bool FileSystem::isValidRecordName(const std::string &name) {

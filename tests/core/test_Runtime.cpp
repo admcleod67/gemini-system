@@ -7,8 +7,10 @@
 #include <unordered_map>
 #include <variant>
 #include <vector>
+#include <filesystem>
 
 #include "Runtime.h"
+#include "FileSystem.h"
 
 using PickVM::Instruction;
 using PickVM::OpCode;
@@ -1427,4 +1429,70 @@ TEST_CASE("runtime system variable reader supplies LoadVar and StoreVar rejects 
     };
     rt.loadProgram(storeProg);
     CHECK_THROWS_AS(rt.run(), std::runtime_error);
+}
+
+TEST_CASE("runtime READNEXT iterates lexicographically and write invalidates cursor") {
+    const std::filesystem::path root = std::filesystem::temp_directory_path() / "pick-runtime-readnext-test";
+    std::error_code ec;
+    std::filesystem::remove_all(root, ec);
+    PickFS::FileSystem fs(root);
+    fs.createFile("DATA");
+    fs.write("DATA", PickFS::Record{"B", "2"});
+    fs.write("DATA", PickFS::Record{"A", "1"});
+
+    Runtime rt;
+    rt.setFileSystem(&fs);
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"DATA"}},
+        {OpCode::OpenFile, std::string{"F"}},
+        {OpCode::ReadNext, std::string{"F"}},
+        {OpCode::PushStr, std::string{"x"}},
+        {OpCode::PushStr, std::string{"C"}},
+        {OpCode::WriteRec, std::string{"F"}},
+        {OpCode::ReadNext, std::string{"F"}},
+        {OpCode::Halt, Value{}},
+    };
+
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 2);
+    CHECK(std::get<std::string>(rt.stack()[0]) == "A");
+    CHECK(std::get<std::string>(rt.stack()[1]) == "A");
+    std::filesystem::remove_all(root, ec);
+}
+
+TEST_CASE("runtime READV and WRITEV use structured attributes") {
+    const std::filesystem::path root = std::filesystem::temp_directory_path() / "pick-runtime-readv-test";
+    std::error_code ec;
+    std::filesystem::remove_all(root, ec);
+    PickFS::FileSystem fs(root);
+    fs.createFile("DATA");
+    fs.write("DATA", PickFS::Record{"ID1", std::string{"NAME\nA"} + static_cast<char>(0xFD) + "B"});
+
+    Runtime rt;
+    rt.setFileSystem(&fs);
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"DATA"}},
+        {OpCode::OpenFile, std::string{"F"}},
+        {OpCode::PushStr, std::string{"ID1"}},
+        {OpCode::PushInt, 2},
+        {OpCode::PushInt, 2},
+        {OpCode::ReadV, std::string{"F"}},
+        {OpCode::PushStr, std::string{"Z"}},
+        {OpCode::PushStr, std::string{"ID1"}},
+        {OpCode::PushInt, 2},
+        {OpCode::PushInt, 1},
+        {OpCode::WriteV, std::string{"F"}},
+        {OpCode::PushStr, std::string{"ID1"}},
+        {OpCode::PushInt, 2},
+        {OpCode::PushInt, 1},
+        {OpCode::ReadV, std::string{"F"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 2);
+    CHECK(std::get<std::string>(rt.stack()[0]) == "B");
+    CHECK(std::get<std::string>(rt.stack()[1]) == "Z");
+    std::filesystem::remove_all(root, ec);
 }

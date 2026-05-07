@@ -519,6 +519,248 @@ namespace PickShell {
                 continue;
             }
 
+            if (op == "READNEXT") {
+                std::string rest;
+                std::getline(iss, rest);
+                rest = trim(rest);
+                if (rest.empty()) {
+                    result.errors.push_back({lineNumber, "READNEXT requires <var> FROM <filevar>"});
+                    continue;
+                }
+
+                std::optional<BasicAst::BranchArm> elseArm;
+                std::string mainPart = rest;
+                const std::string restUpper = uppercase(rest);
+                const std::size_t elsePos = findKeywordToken(restUpper, "ELSE");
+                if (elsePos != std::string::npos) {
+                    mainPart = trim(rest.substr(0, elsePos));
+                    const std::string elseRaw = trim(rest.substr(elsePos + 4));
+                    BasicAst::BranchArm parsedElseArm{};
+                    std::string armError;
+                    if (!parseBranchArmSpec(elseRaw, "READNEXT ELSE", parsedElseArm, armError)) {
+                        result.errors.push_back({lineNumber, armError});
+                        continue;
+                    }
+                    elseArm = std::move(parsedElseArm);
+                }
+
+                const std::string mainUpper = uppercase(mainPart);
+                const std::size_t fromPos = findKeywordToken(mainUpper, "FROM");
+                if (fromPos == std::string::npos) {
+                    result.errors.push_back({lineNumber, "READNEXT requires FROM"});
+                    continue;
+                }
+
+                const std::string targetVar = trim(mainPart.substr(0, fromPos));
+                const std::string fileVar = trim(mainPart.substr(fromPos + 4));
+                if (!isValidVariableName(targetVar)) {
+                    result.errors.push_back({lineNumber, "READNEXT requires a valid target variable name"});
+                    continue;
+                }
+                if (!isValidVariableName(fileVar)) {
+                    result.errors.push_back({lineNumber, "READNEXT requires a valid file variable name"});
+                    continue;
+                }
+
+                BasicAst::ReadNextStmt stmt{};
+                stmt.targetVar = targetVar;
+                stmt.fileVar = fileVar;
+                stmt.elseArm = elseArm;
+                result.lines.push_back({lineNumber, std::move(stmt)});
+                continue;
+            }
+
+            if (op == "READV") {
+                std::string rest;
+                std::getline(iss, rest);
+                rest = trim(rest);
+                if (rest.empty()) {
+                    result.errors.push_back({lineNumber, "READV requires <var> FROM <filevar>, <id>, <attr>[, <value-index>]"});
+                    continue;
+                }
+
+                std::optional<BasicAst::BranchArm> elseArm;
+                std::string mainPart = rest;
+                const std::string restUpper = uppercase(rest);
+                const std::size_t elsePos = findKeywordToken(restUpper, "ELSE");
+                if (elsePos != std::string::npos) {
+                    mainPart = trim(rest.substr(0, elsePos));
+                    const std::string elseRaw = trim(rest.substr(elsePos + 4));
+                    BasicAst::BranchArm parsedElseArm{};
+                    std::string armError;
+                    if (!parseBranchArmSpec(elseRaw, "READV ELSE", parsedElseArm, armError)) {
+                        result.errors.push_back({lineNumber, armError});
+                        continue;
+                    }
+                    elseArm = std::move(parsedElseArm);
+                }
+
+                const std::string mainUpper = uppercase(mainPart);
+                const std::size_t fromPos = findKeywordToken(mainUpper, "FROM");
+                if (fromPos == std::string::npos) {
+                    result.errors.push_back({lineNumber, "READV requires FROM"});
+                    continue;
+                }
+                const std::string targetVar = trim(mainPart.substr(0, fromPos));
+                if (!isValidVariableName(targetVar)) {
+                    result.errors.push_back({lineNumber, "READV requires a valid target variable name"});
+                    continue;
+                }
+
+                const std::string afterFrom = trim(mainPart.substr(fromPos + 4));
+                std::stringstream argStream(afterFrom);
+                std::vector<std::string> args;
+                std::string arg;
+                while (std::getline(argStream, arg, ',')) {
+                    args.push_back(trim(arg));
+                }
+                if (args.size() != 3 && args.size() != 4) {
+                    result.errors.push_back({lineNumber, "READV requires <filevar>, <id>, <attr>[, <value-index>]"});
+                    continue;
+                }
+                if (!isValidVariableName(args[0])) {
+                    result.errors.push_back({lineNumber, "READV requires a valid file variable name"});
+                    continue;
+                }
+                if (args[1].empty() || args[2].empty()) {
+                    result.errors.push_back({lineNumber, "READV requires non-empty ID and attribute expressions"});
+                    continue;
+                }
+
+                BasicExpressionParseResult idExpr = BasicExpressionParser::parse(args[1]);
+                if (!idExpr.success || !idExpr.expression) {
+                    result.errors.push_back({lineNumber, "READV ID expression error: " + idExpr.error});
+                    continue;
+                }
+                BasicExpressionParseResult attrExpr = BasicExpressionParser::parse(args[2]);
+                if (!attrExpr.success || !attrExpr.expression) {
+                    result.errors.push_back({lineNumber, "READV attribute expression error: " + attrExpr.error});
+                    continue;
+                }
+
+                std::unique_ptr<BasicAst::Expr> valueIndexExpr;
+                if (args.size() == 4) {
+                    if (args[3].empty()) {
+                        result.errors.push_back({lineNumber, "READV value-index expression cannot be empty"});
+                        continue;
+                    }
+                    BasicExpressionParseResult valueIdx = BasicExpressionParser::parse(args[3]);
+                    if (!valueIdx.success || !valueIdx.expression) {
+                        result.errors.push_back({lineNumber, "READV value-index expression error: " + valueIdx.error});
+                        continue;
+                    }
+                    valueIndexExpr = std::move(valueIdx.expression);
+                }
+
+                BasicAst::ReadVStmt stmt{};
+                stmt.targetVar = targetVar;
+                stmt.fileVar = args[0];
+                stmt.idExpr = std::move(idExpr.expression);
+                stmt.attrExpr = std::move(attrExpr.expression);
+                stmt.valueIndexExpr = std::move(valueIndexExpr);
+                stmt.elseArm = elseArm;
+                result.lines.push_back({lineNumber, std::move(stmt)});
+                continue;
+            }
+
+            if (op == "WRITEV") {
+                std::string rest;
+                std::getline(iss, rest);
+                rest = trim(rest);
+                if (rest.empty()) {
+                    result.errors.push_back({lineNumber, "WRITEV requires <value> ON <filevar>, <id>, <attr>[, <value-index>]"});
+                    continue;
+                }
+
+                std::optional<BasicAst::BranchArm> elseArm;
+                std::string mainPart = rest;
+                const std::string restUpper = uppercase(rest);
+                const std::size_t elsePos = findKeywordToken(restUpper, "ELSE");
+                if (elsePos != std::string::npos) {
+                    mainPart = trim(rest.substr(0, elsePos));
+                    const std::string elseRaw = trim(rest.substr(elsePos + 4));
+                    BasicAst::BranchArm parsedElseArm{};
+                    std::string armError;
+                    if (!parseBranchArmSpec(elseRaw, "WRITEV ELSE", parsedElseArm, armError)) {
+                        result.errors.push_back({lineNumber, armError});
+                        continue;
+                    }
+                    elseArm = std::move(parsedElseArm);
+                }
+
+                const std::string mainUpper = uppercase(mainPart);
+                const std::size_t onPos = findKeywordToken(mainUpper, "ON");
+                if (onPos == std::string::npos) {
+                    result.errors.push_back({lineNumber, "WRITEV requires ON"});
+                    continue;
+                }
+                const std::string valueExprRaw = trim(mainPart.substr(0, onPos));
+                if (valueExprRaw.empty()) {
+                    result.errors.push_back({lineNumber, "WRITEV requires a value expression"});
+                    continue;
+                }
+                BasicExpressionParseResult valueExpr = BasicExpressionParser::parse(valueExprRaw);
+                if (!valueExpr.success || !valueExpr.expression) {
+                    result.errors.push_back({lineNumber, "WRITEV value expression error: " + valueExpr.error});
+                    continue;
+                }
+
+                const std::string afterOn = trim(mainPart.substr(onPos + 2));
+                std::stringstream argStream(afterOn);
+                std::vector<std::string> args;
+                std::string arg;
+                while (std::getline(argStream, arg, ',')) {
+                    args.push_back(trim(arg));
+                }
+                if (args.size() != 3 && args.size() != 4) {
+                    result.errors.push_back({lineNumber, "WRITEV requires <filevar>, <id>, <attr>[, <value-index>]"});
+                    continue;
+                }
+                if (!isValidVariableName(args[0])) {
+                    result.errors.push_back({lineNumber, "WRITEV requires a valid file variable name"});
+                    continue;
+                }
+                if (args[1].empty() || args[2].empty()) {
+                    result.errors.push_back({lineNumber, "WRITEV requires non-empty ID and attribute expressions"});
+                    continue;
+                }
+
+                BasicExpressionParseResult idExpr = BasicExpressionParser::parse(args[1]);
+                if (!idExpr.success || !idExpr.expression) {
+                    result.errors.push_back({lineNumber, "WRITEV ID expression error: " + idExpr.error});
+                    continue;
+                }
+                BasicExpressionParseResult attrExpr = BasicExpressionParser::parse(args[2]);
+                if (!attrExpr.success || !attrExpr.expression) {
+                    result.errors.push_back({lineNumber, "WRITEV attribute expression error: " + attrExpr.error});
+                    continue;
+                }
+
+                std::unique_ptr<BasicAst::Expr> valueIndexExpr;
+                if (args.size() == 4) {
+                    if (args[3].empty()) {
+                        result.errors.push_back({lineNumber, "WRITEV value-index expression cannot be empty"});
+                        continue;
+                    }
+                    BasicExpressionParseResult valueIdx = BasicExpressionParser::parse(args[3]);
+                    if (!valueIdx.success || !valueIdx.expression) {
+                        result.errors.push_back({lineNumber, "WRITEV value-index expression error: " + valueIdx.error});
+                        continue;
+                    }
+                    valueIndexExpr = std::move(valueIdx.expression);
+                }
+
+                BasicAst::WriteVStmt stmt{};
+                stmt.valueExpr = std::move(valueExpr.expression);
+                stmt.fileVar = args[0];
+                stmt.idExpr = std::move(idExpr.expression);
+                stmt.attrExpr = std::move(attrExpr.expression);
+                stmt.valueIndexExpr = std::move(valueIndexExpr);
+                stmt.elseArm = elseArm;
+                result.lines.push_back({lineNumber, std::move(stmt)});
+                continue;
+            }
+
             if (op == "CLOSE") {
                 std::string rest;
                 std::getline(iss, rest);

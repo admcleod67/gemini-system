@@ -378,6 +378,42 @@ namespace PickVM {
                     throw std::runtime_error("WRITE_REC_TRY requires a file variable at line " + std::to_string(pl.sourceLine));
                 }
                 inst.operand = parseQuotedString(pl.operand, pl.sourceLine);
+            } else if (pl.opcode == "READ_NEXT") {
+                inst.op = OpCode::ReadNext;
+                if (pl.operand.empty()) {
+                    throw std::runtime_error("READ_NEXT requires a file variable at line " + std::to_string(pl.sourceLine));
+                }
+                inst.operand = parseQuotedString(pl.operand, pl.sourceLine);
+            } else if (pl.opcode == "READ_NEXT_TRY") {
+                inst.op = OpCode::ReadNextTry;
+                if (pl.operand.empty()) {
+                    throw std::runtime_error("READ_NEXT_TRY requires a file variable at line " + std::to_string(pl.sourceLine));
+                }
+                inst.operand = parseQuotedString(pl.operand, pl.sourceLine);
+            } else if (pl.opcode == "READ_V") {
+                inst.op = OpCode::ReadV;
+                if (pl.operand.empty()) {
+                    throw std::runtime_error("READ_V requires a file variable at line " + std::to_string(pl.sourceLine));
+                }
+                inst.operand = parseQuotedString(pl.operand, pl.sourceLine);
+            } else if (pl.opcode == "READ_V_TRY") {
+                inst.op = OpCode::ReadVTry;
+                if (pl.operand.empty()) {
+                    throw std::runtime_error("READ_V_TRY requires a file variable at line " + std::to_string(pl.sourceLine));
+                }
+                inst.operand = parseQuotedString(pl.operand, pl.sourceLine);
+            } else if (pl.opcode == "WRITE_V") {
+                inst.op = OpCode::WriteV;
+                if (pl.operand.empty()) {
+                    throw std::runtime_error("WRITE_V requires a file variable at line " + std::to_string(pl.sourceLine));
+                }
+                inst.operand = parseQuotedString(pl.operand, pl.sourceLine);
+            } else if (pl.opcode == "WRITE_V_TRY") {
+                inst.op = OpCode::WriteVTry;
+                if (pl.operand.empty()) {
+                    throw std::runtime_error("WRITE_V_TRY requires a file variable at line " + std::to_string(pl.sourceLine));
+                }
+                inst.operand = parseQuotedString(pl.operand, pl.sourceLine);
             } else if (pl.opcode == "CLOSE_FILE") {
                 inst.op = OpCode::CloseFile;
                 if (pl.operand.empty()) {

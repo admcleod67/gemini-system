@@ -15,6 +15,10 @@
 #include <variant>
 #include <vector>
 
+namespace PickFS {
+    class FileSystem;
+}
+
 namespace PickVM {
     enum class OpCode {
         Halt,
@@ -59,6 +63,12 @@ namespace PickVM {
         ReadRecTry,
         WriteRec,
         WriteRecTry,
+        ReadNext,
+        ReadNextTry,
+        ReadV,
+        ReadVTry,
+        WriteV,
+        WriteVTry,
         CloseFile,
         LoadVar,
         StoreVar
@@ -120,6 +130,7 @@ namespace PickVM {
         void setFileExistsCallback(FileExistsFn fn);
         void setReadRecordCallback(ReadRecordFn fn);
         void setWriteRecordCallback(WriteRecordFn fn);
+        void setFileSystem(PickFS::FileSystem *fileSystem);
 
         /// Optional read-only `@USERNO` / `@ACCOUNT` / `@LOGNAME` / `@DEFDATA` (canonical names). Cleared with empty function.
         using SystemVarReaderFn = std::function<std::optional<Value>(std::string_view canonicalName)>;
@@ -139,7 +150,13 @@ namespace PickVM {
         std::vector<ForFrame> forStack_;     // Loop-frame stack for FOR/NEXT
         std::unordered_map<std::string, Value> variables_;
         std::unordered_map<std::string, std::vector<Value>> arrays_; // DIM arrays
-        std::unordered_map<std::string, std::string> openFiles_; // file var -> opened file name
+        struct OpenFileState {
+            std::string fileName;
+            std::vector<std::string> recordIds;
+            std::size_t cursorIndex{0};
+            bool cursorPrimed{false};
+        };
+        std::unordered_map<std::string, OpenFileState> openFiles_; // file var -> opened file state
         std::size_t ip_; // Instruction pointer
         std::atomic<bool> interrupted_{false};
         mutable std::ostream *outStream_{nullptr};
@@ -147,6 +164,7 @@ namespace PickVM {
         FileExistsFn fileExists_;
         ReadRecordFn readRecord_;
         WriteRecordFn writeRecord_;
+        PickFS::FileSystem *fileSystem_{nullptr};
         SystemVarReaderFn systemVarReader_;
 
         std::ostream &out() const;

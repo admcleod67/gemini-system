@@ -334,6 +334,43 @@ TEST_CASE("basic statement parser parses READ WRITE and CLOSE") {
     CHECK(std::holds_alternative<BasicAst::CloseStmt>(result.lines[2].statement));
 }
 
+TEST_CASE("basic statement parser parses READNEXT READV and WRITEV") {
+    BasicProgram program;
+    program.setLine(10, "READNEXT ID FROM FVAR ELSE 90");
+    program.setLine(20, "READV NAME FROM FVAR, ID, 1");
+    program.setLine(30, "READV PHONE FROM FVAR, ID, 2, 1 ELSE STOP");
+    program.setLine(40, "WRITEV \"NEW\" ON FVAR, ID, 2");
+    program.setLine(50, "WRITEV \"ALT\" ON FVAR, ID, 2, 2 ELSE 120");
+
+    const BasicAst::StatementParseResult result = BasicStatementParser::parse(program);
+    REQUIRE(result.success);
+    REQUIRE(result.lines.size() == 5);
+
+    REQUIRE(std::holds_alternative<BasicAst::ReadNextStmt>(result.lines[0].statement));
+    const auto &readNext = std::get<BasicAst::ReadNextStmt>(result.lines[0].statement);
+    CHECK(readNext.targetVar == "ID");
+    CHECK(readNext.fileVar == "FVAR");
+    REQUIRE(readNext.elseArm.has_value());
+
+    REQUIRE(std::holds_alternative<BasicAst::ReadVStmt>(result.lines[1].statement));
+    const auto &readVAttr = std::get<BasicAst::ReadVStmt>(result.lines[1].statement);
+    CHECK(readVAttr.valueIndexExpr == nullptr);
+
+    REQUIRE(std::holds_alternative<BasicAst::ReadVStmt>(result.lines[2].statement));
+    const auto &readVSubvalue = std::get<BasicAst::ReadVStmt>(result.lines[2].statement);
+    CHECK(readVSubvalue.valueIndexExpr != nullptr);
+    REQUIRE(readVSubvalue.elseArm.has_value());
+
+    REQUIRE(std::holds_alternative<BasicAst::WriteVStmt>(result.lines[3].statement));
+    const auto &writeVAttr = std::get<BasicAst::WriteVStmt>(result.lines[3].statement);
+    CHECK(writeVAttr.valueIndexExpr == nullptr);
+
+    REQUIRE(std::holds_alternative<BasicAst::WriteVStmt>(result.lines[4].statement));
+    const auto &writeVSubvalue = std::get<BasicAst::WriteVStmt>(result.lines[4].statement);
+    CHECK(writeVSubvalue.valueIndexExpr != nullptr);
+    REQUIRE(writeVSubvalue.elseArm.has_value());
+}
+
 TEST_CASE("basic statement parser accepts OPEN ELSE with single statement") {
     BasicProgram program;
     program.setLine(10, "OPEN \"CUSTOMERS\" TO FVAR ELSE STOP");
