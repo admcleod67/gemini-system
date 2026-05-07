@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <climits>
 #include <cstdlib>
 #include <iostream>
@@ -115,6 +116,47 @@ namespace PickVM {
                 return 0.0;
             }
             return n;
+        }
+
+        // True when strtod consumed a prefix number but the string continues with non-whitespace
+        // (e.g. "12ABC") so arithmetic must keep floating semantics for the result type.
+        bool stringHasTrailingNonNumericJunk(const std::string &s) {
+            if (s.empty()) {
+                return false;
+            }
+            char *endp = nullptr;
+            errno = 0;
+            (void) std::strtod(s.c_str(), &endp);
+            if (endp == s.c_str() || errno != 0) {
+                return false;
+            }
+            while (*endp != '\0' && std::isspace(static_cast<unsigned char>(*endp))) {
+                ++endp;
+            }
+            return *endp != '\0';
+        }
+
+        bool arithmeticOperandForcesDoubleResult(const Value &v) {
+            if (std::holds_alternative<double>(v)) {
+                return true;
+            }
+            if (std::holds_alternative<int>(v)) {
+                return false;
+            }
+            return stringHasTrailingNonNumericJunk(std::get<std::string>(v));
+        }
+
+        Value arithmeticResultValue(const Value &a, const Value &b, double result) {
+            const bool forceDouble =
+                arithmeticOperandForcesDoubleResult(a) || arithmeticOperandForcesDoubleResult(b);
+            if (!forceDouble) {
+                if (result >= static_cast<double>(std::numeric_limits<int>::min()) &&
+                    result <= static_cast<double>(std::numeric_limits<int>::max()) &&
+                    result == std::floor(result)) {
+                    return static_cast<int>(result);
+                }
+            }
+            return result;
         }
 
         int coerceToInt(const Value &v) {
@@ -289,7 +331,8 @@ namespace PickVM {
                 if (std::holds_alternative<int>(a) && std::holds_alternative<int>(b)) {
                     push(std::get<int>(a) + std::get<int>(b));
                 } else {
-                    push(coerceToDouble(a) + coerceToDouble(b));
+                    push(arithmeticResultValue(
+                        a, b, coerceToDouble(a) + coerceToDouble(b)));
                 }
                 break;
             }
@@ -300,7 +343,8 @@ namespace PickVM {
                 if (std::holds_alternative<int>(a) && std::holds_alternative<int>(b)) {
                     push(std::get<int>(a) - std::get<int>(b));
                 } else {
-                    push(coerceToDouble(a) - coerceToDouble(b));
+                    push(arithmeticResultValue(
+                        a, b, coerceToDouble(a) - coerceToDouble(b)));
                 }
                 break;
             }
@@ -311,7 +355,8 @@ namespace PickVM {
                 if (std::holds_alternative<int>(a) && std::holds_alternative<int>(b)) {
                     push(std::get<int>(a) * std::get<int>(b));
                 } else {
-                    push(coerceToDouble(a) * coerceToDouble(b));
+                    push(arithmeticResultValue(
+                        a, b, coerceToDouble(a) * coerceToDouble(b)));
                 }
                 break;
             }
