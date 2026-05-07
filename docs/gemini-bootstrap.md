@@ -1,6 +1,6 @@
 # Gemini bootstrap layout (development)
 
-This tree supports catalogue-backed **account bootstrap** (Milestone **2** onward): a host-backed account layout and JSON catalogues used for **interactive login**, **`LOGTO`**, and **`LOGOFF`**. It also provides an optional **default Pick filesystem root** for `gemini-system` and `gemini-cli` (including **`SYSPROG/VOC`** entries used by ENGLISH/Tcl).
+This tree supports catalogue-backed **account bootstrap** (Milestone **2** onward): a host-backed account layout and JSON catalogues used for **interactive login**, **`LOGTO`**, and **`LOGOFF`**. It also provides an optional **default Pick filesystem root** for `gemini-system` (including **`SYSPROG/VOC`** entries used by ENGLISH/Tcl).
 
 ## Relationship to the Pick filesystem root
 
@@ -59,7 +59,7 @@ After `Runtime` and default roots are prepared, **`PickCore::BootMonitor::runCol
 
 ## Interactive login (account-only, core boot stage)
 
-When a **catalogue root** is configured, **`gemini-system`** / **`gemini-cli`** call **`PickCore::LoginService::runCatalogLogin`** after **`SYSTEM READY`** and **before** the Tcl REPL. The boot monitor never starts Tcl — **`main`** does, only after **`runCatalogLogin`** returns a **`UserSession`**.
+When a **catalogue root** is configured, **`gemini-system`** calls **`PickCore::LoginService::runCatalogLogin`** after **`SYSTEM READY`** and **before** the Tcl REPL. The boot monitor never starts Tcl — **`main`** does, only after **`runCatalogLogin`** returns a **`UserSession`**.
 
 ### Login → Tcl **`stdout`** contract (Pick-style cadence)
 
@@ -98,7 +98,7 @@ The **smoke** test sets **`GEMINI_AUTO_LOGON=SYSPROG`** so `echo QUIT | gemini-s
 
 ## Default filesystem root in executables
 
-`gemini-system` and `gemini-cli` call `applyDefaultFileSystemRoot` (which uses **`PickCore::resolveDefaultHostPaths`**) before **`BootMonitor`** and the login / REPL loop. Pick root resolution order:
+`gemini-system` calls `applyDefaultFileSystemRoot` (which uses **`PickCore::resolveDefaultHostPaths`**) before **`BootMonitor`** and the login / REPL loop. Pick root resolution order:
 
 1. If **`GEMINI_FILESYSTEM_ROOT`** is set and non-empty, its value is used as the Pick filesystem root. If **`GEMINI_CATALOG_ROOT`** is also set, it becomes the catalogue root.
 2. Else if **`gemini/accounts/SYSPROG/VOC`** exists relative to **cwd**, the Pick root is **`gemini/accounts/SYSPROG`** and the catalogue root is **`gemini/`** (relative to cwd).
@@ -106,7 +106,7 @@ The **smoke** test sets **`GEMINI_AUTO_LOGON=SYSPROG`** so `echo QUIT | gemini-s
 
 ## CMake copy
 
-Building `gemini-system` or `gemini-cli` triggers a **`gemini-bootstrap-copy`** step that copies the entire `gemini/` tree from the source tree into **`CMAKE_CURRENT_BINARY_DIR`/gemini** (typically `<build>/src/gemini` when using the project’s `src/CMakeLists.txt`). That keeps `gemini/` next to the built binaries when the run **working directory** is set to that same directory (e.g. CLion default for targets defined under `src/`).
+Building `gemini-system` triggers a **`gemini-bootstrap-copy`** step that copies the entire `gemini/` tree from the source tree into **`CMAKE_CURRENT_BINARY_DIR`/gemini** (typically `<build>/src/gemini` when using the project’s `src/CMakeLists.txt`). That keeps `gemini/` next to the built binaries when the run **working directory** is set to that same directory (e.g. CLion default for targets defined under `src/`).
 
 ## VOC bootstrap records
 

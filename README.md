@@ -21,7 +21,7 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
-Artifacts include **`gemini-system`** (minimal host entry point), **`gemini-cli`** (interactive shell over the VM), and **`pick-tests`** (unit tests).
+Artifacts include **`gemini-system`** (host entry point with boot and Tcl REPL), and **`pick-tests`** (unit tests).
 
 ## Documentation
 

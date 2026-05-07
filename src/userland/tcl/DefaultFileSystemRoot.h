@@ -1,5 +1,5 @@
 //
-// Resolve default Pick filesystem root for gemini-system / gemini-cli.
+// Resolve default Pick filesystem root for gemini-system.
 //
 
 #ifndef PICK_SYSTEM_TCL_DEFAULTFILESYSTEMROOT_H
