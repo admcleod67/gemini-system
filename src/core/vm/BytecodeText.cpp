@@ -48,6 +48,9 @@ namespace PickVM {
                 case OpCode::Call:
                     out << ' ' << std::get<int>(instr.operand);
                     break;
+                case OpCode::PushFlt:
+                    out << ' ' << std::get<double>(instr.operand);
+                    break;
                 case OpCode::PushStr:
                     out << " \"" << escapeQuoted(std::get<std::string>(instr.operand)) << '"';
                     break;

@@ -23,6 +23,7 @@ namespace PickVM {
     enum class OpCode {
         Halt,
         PushInt,
+        PushFlt,
         PushStr,
         Add,
         Sub,
@@ -74,7 +75,7 @@ namespace PickVM {
         StoreVar
     };
 
-    using Value = std::variant<int, std::string>;
+    using Value = std::variant<int, double, std::string>;
 
     // Thrown by Runtime::run() when the interrupt flag is set (e.g. via Ctrl-C).
     struct UserInterrupt {};

@@ -143,6 +143,13 @@ Milestone 5.
 - Implemented: no BASIC file-creation opcode/statement; missing-file behavior follows `ELSE`/raise contract.
 - Implemented: filesystem helpers for attribute/subvalue mutation while preserving surrounding record data.
 
+### Stage 2 status
+
+- Implemented: floating-point literal parsing in BASIC expressions (decimal + scientific forms).
+- Implemented: VM value/opcode support for float constants and mixed int/float arithmetic.
+- Implemented: numeric-prefix string coercion for arithmetic (`\"\" -> 0`, `"12ABC" -> 12` style).
+- Implemented: clean float rendering through `PRINT` value output path.
+
 #### 1. BASIC file semantics (Pick-authentic core)
 
 - **`READNEXT`**

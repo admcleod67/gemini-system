@@ -26,6 +26,12 @@ namespace {
         return expr;
     }
 
+    std::unique_ptr<BasicAst::Expr> makeFloat(const double value) {
+        auto expr = std::make_unique<BasicAst::Expr>();
+        expr->node = BasicAst::FloatLiteralExpr{value, {}};
+        return expr;
+    }
+
     std::unique_ptr<BasicAst::Expr> makeVar(const std::string &name) {
         auto expr = std::make_unique<BasicAst::Expr>();
         expr->node = BasicAst::IdentifierExpr{name, {}};
@@ -68,6 +74,17 @@ TEST_CASE("basic bytecode emitter lowers let print and end") {
     CHECK(emitted.sourceLinePerInstr[3] == 20);
     CHECK(emitted.sourceLinePerInstr[4] == 20);
     CHECK(emitted.sourceLinePerInstr[5] == 30);
+}
+
+TEST_CASE("basic bytecode emitter emits PUSH_FLT for float literals") {
+    BasicIr::NormalizedProgram program;
+    program.lines.push_back({10, BasicIr::LetStmt{"A", makeFloat(3.5)}});
+
+    const BasicBytecodeEmissionResult emitted = BasicBytecodeEmitter::emit(program);
+    REQUIRE(emitted.success);
+    REQUIRE(emitted.program.size() >= 2);
+    CHECK(emitted.program[0].op == OpCode::PushFlt);
+    CHECK(std::get<double>(emitted.program[0].operand) == doctest::Approx(3.5));
 }
 
 TEST_CASE("basic bytecode emitter lowers if and goto control flow") {

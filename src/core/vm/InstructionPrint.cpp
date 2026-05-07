@@ -14,6 +14,7 @@ namespace PickVM {
         switch (op) {
             case OpCode::Halt: return "HALT";
             case OpCode::PushInt: return "PUSH_INT";
+            case OpCode::PushFlt: return "PUSH_FLT";
             case OpCode::PushStr: return "PUSH_STR";
             case OpCode::Add: return "ADD";
             case OpCode::Sub: return "SUB";
@@ -85,6 +86,15 @@ namespace PickVM {
             }
             return std::get<std::string>(instr.operand);
         }
+
+        double floatOperandAtIp(const Instruction &instr, std::size_t ip) {
+            if (!std::holds_alternative<double>(instr.operand)) {
+                std::ostringstream oss;
+                oss << "Instruction " << ip << " (" << opCodeName(instr.op) << "): expected float operand";
+                throw std::runtime_error(oss.str());
+            }
+            return std::get<double>(instr.operand);
+        }
     } // namespace
 
     std::string formatInstructionLine(std::size_t ip, const Instruction &instr, const LoadedBytecode *loaded) {
@@ -96,6 +106,9 @@ namespace PickVM {
                 break;
             case OpCode::PushInt:
                 oss << ' ' << intOperandAtIp(instr, ip);
+                break;
+            case OpCode::PushFlt:
+                oss << ' ' << floatOperandAtIp(instr, ip);
                 break;
             case OpCode::PushStr: {
                 const std::string s = stringOperandAtIp(instr, ip);

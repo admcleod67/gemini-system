@@ -81,6 +81,9 @@ namespace PickShell {
                         if constexpr (std::is_same_v<NodeT, BasicAst::IntLiteralExpr>) {
                             out_.push_back(PickVM::Instruction{PickVM::OpCode::PushInt, node.value});
                             return true;
+                        } else if constexpr (std::is_same_v<NodeT, BasicAst::FloatLiteralExpr>) {
+                            out_.push_back(PickVM::Instruction{PickVM::OpCode::PushFlt, node.value});
+                            return true;
                         } else if constexpr (std::is_same_v<NodeT, BasicAst::StringLiteralExpr>) {
                             out_.push_back(PickVM::Instruction{PickVM::OpCode::PushStr, node.value});
                             return true;

@@ -195,6 +195,19 @@ namespace PickVM {
                     throw std::runtime_error(
                         "Invalid PUSH_INT operand at line " + std::to_string(pl.sourceLine) + ": '" + pl.operand + "'");
                 }
+            } else if (pl.opcode == "PUSH_FLT") {
+                inst.op = OpCode::PushFlt;
+                try {
+                    std::size_t pos = 0;
+                    const double v = std::stod(pl.operand, &pos);
+                    if (pos != pl.operand.size()) {
+                        throw std::runtime_error("partial");
+                    }
+                    inst.operand = v;
+                } catch (const std::exception &) {
+                    throw std::runtime_error(
+                        "Invalid PUSH_FLT operand at line " + std::to_string(pl.sourceLine) + ": '" + pl.operand + "'");
+                }
             } else if (pl.opcode == "PUSH_STR") {
                 inst.op = OpCode::PushStr;
                 inst.operand = parseQuotedString(pl.operand, pl.sourceLine);

@@ -42,8 +42,8 @@ Pick BASIC variables are fundamentally typeless dynamic strings. The suffix on a
 | Suffix | Example | Meaning |
 |--------|---------|---------|
 | `$` | `A$`, `NAME$` | **Force string.** Any value is stored and printed as-is. Using a `$` variable as an arithmetic operand is a **compile-time error**. |
-| `%` | `A%`, `COUNT%` | **Force integer.** The value is coerced to int on assignment and on `INPUT` (`strtol`; non-numeric → 0). |
-| *(none)* | `A`, `TOTAL` | **Dynamic.** Any value is stored as-is. When used in an arithmetic expression the value is coerced to int at runtime; non-numeric strings yield 0. |
+| `%` | `A%`, `COUNT%` | **Force integer.** The value is coerced to int on assignment and on `INPUT` (numeric coercion, truncating toward zero). |
+| *(none)* | `A`, `TOTAL` | **Dynamic.** Any value is stored as-is. Arithmetic uses numeric coercion at runtime (`int`/`float` domain). |
 
 Additional naming rules:
 
@@ -57,6 +57,7 @@ Expressions are supported on the right-hand side of `LET`, as the argument to `P
 Supported expression features:
 
 - int literals (for example `42`)
+- float literals (for example `3.14`, `0.5`, `1E3`, `-2.5E-1`)
 - string literals (for example `"hello"`)
 - variable references (for example `A`, `A$`, `A%`, `@ACCOUNT`, `@DEFDATA`)
 - parentheses
@@ -75,10 +76,12 @@ Associativity for binary operators is left-to-right.
 
 ### Arithmetic type behaviour
 
-Arithmetic operators (`+`, `-`, `*`, `/`) coerce their operands to integers:
+Arithmetic operators (`+`, `-`, `*`, `/`) operate in a numeric domain:
 
-- An `int` value is used as-is.
-- A string value is parsed as a decimal integer (`strtol`); non-numeric strings (including empty) yield `0`.
+- `int` and `float` values interoperate naturally.
+- Strings are coerced using numeric-prefix rules (`strtod`-style): `"" -> 0`, `"12ABC" -> 12`.
+- Pure `int` arithmetic for `+`, `-`, `*` preserves integer results; mixed or float operands produce float results.
+- `/` keeps historical integer behavior for pure ints, and produces float for mixed/float operands.
 
 Examples:
 
@@ -88,6 +91,9 @@ PRINT A + 5       ; prints 5  ("hello" coerces to 0)
 
 LET B = "10"
 PRINT B + 20      ; prints 30 ("10" coerces to 10)
+
+LET C = "12ABC"
+PRINT C + 1       ; prints 13
 ```
 
 Using a `$`-suffix variable in an arithmetic expression is a **compile-time error**:

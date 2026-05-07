@@ -13,6 +13,7 @@
 #include <climits>
 #include <cstdlib>
 #include <iostream>
+#include <iomanip>
 #include <limits>
 #include <sstream>
 #include <stdexcept>
@@ -52,6 +53,15 @@ namespace PickVM {
             return std::get<std::string>(instr.operand);
         }
 
+        double floatOperandAtIp(const Instruction &instr, std::size_t ip) {
+            if (!std::holds_alternative<double>(instr.operand)) {
+                std::ostringstream oss;
+                oss << "Instruction " << ip << " (" << PickVM::opCodeName(instr.op) << "): expected float operand";
+                throw std::runtime_error(oss.str());
+            }
+            return std::get<double>(instr.operand);
+        }
+
         int intFromStackValue(const Value &v, const char *ctx) {
             if (!std::holds_alternative<int>(v)) {
                 throw std::runtime_error(std::string(ctx) + ": expected int on stack");
@@ -70,40 +80,61 @@ namespace PickVM {
             if (std::holds_alternative<std::string>(v)) {
                 return std::get<std::string>(v);
             }
+            if (std::holds_alternative<double>(v)) {
+                std::ostringstream oss;
+                oss << std::setprecision(15) << std::get<double>(v);
+                std::string out = oss.str();
+                if (out.find('.') != std::string::npos) {
+                    while (!out.empty() && out.back() == '0') {
+                        out.pop_back();
+                    }
+                    if (!out.empty() && out.back() == '.') {
+                        out.push_back('0');
+                    }
+                }
+                return out;
+            }
             return std::to_string(std::get<int>(v));
         }
 
-        // Coerce a Value to int following Pick semantics: ints pass through,
-        // strings are parsed as decimal integers; non-numeric strings yield 0.
-        int coerceToInt(const Value &v) {
+        double coerceToDouble(const Value &v) {
             if (std::holds_alternative<int>(v)) {
-                return std::get<int>(v);
+                return static_cast<double>(std::get<int>(v));
+            }
+            if (std::holds_alternative<double>(v)) {
+                return std::get<double>(v);
             }
             const std::string &s = std::get<std::string>(v);
             if (s.empty()) {
-                return 0;
+                return 0.0;
             }
             char *endp = nullptr;
             errno = 0;
-            const long n = std::strtol(s.c_str(), &endp, 10);
-            // skip trailing whitespace
-            while (*endp == ' ' || *endp == '\t') {
-                ++endp;
+            const double n = std::strtod(s.c_str(), &endp);
+            if (endp == s.c_str() || errno != 0) {
+                return 0.0;
             }
-            if (*endp != '\0' || errno != 0) {
-                return 0;
-            }
-            if (n < static_cast<long>(std::numeric_limits<int>::min()) ||
-                n > static_cast<long>(std::numeric_limits<int>::max())) {
+            return n;
+        }
+
+        int coerceToInt(const Value &v) {
+            const double n = coerceToDouble(v);
+            if (n < static_cast<double>(std::numeric_limits<int>::min()) ||
+                n > static_cast<double>(std::numeric_limits<int>::max())) {
                 return 0;
             }
             return static_cast<int>(n);
         }
 
+        bool isNumericValue(const Value &v) {
+            return std::holds_alternative<int>(v) || std::holds_alternative<double>(v);
+        }
+
         // Returns -1 / 0 / +1 for a < b / a == b / a > b, for matching types.
         int compareValues(const Value &a, const Value &b, const char *ctx) {
-            if (std::holds_alternative<int>(a) && std::holds_alternative<int>(b)) {
-                const int ia = std::get<int>(a), ib = std::get<int>(b);
+            if (isNumericValue(a) && isNumericValue(b)) {
+                const double ia = coerceToDouble(a);
+                const double ib = coerceToDouble(b);
                 if (ia < ib) return -1;
                 if (ia > ib) return 1;
                 return 0;
@@ -244,38 +275,60 @@ namespace PickVM {
                 push(intOperandAtIp(instr, ip_));
                 break;
 
+            case OpCode::PushFlt:
+                push(floatOperandAtIp(instr, ip_));
+                break;
+
             case OpCode::PushStr:
                 push(stringOperandAtIp(instr, ip_));
                 break;
 
             case OpCode::Add: {
-                int b = coerceToInt(pop());
-                int a = coerceToInt(pop());
-                push(a + b);
+                const Value b = pop();
+                const Value a = pop();
+                if (std::holds_alternative<int>(a) && std::holds_alternative<int>(b)) {
+                    push(std::get<int>(a) + std::get<int>(b));
+                } else {
+                    push(coerceToDouble(a) + coerceToDouble(b));
+                }
                 break;
             }
 
             case OpCode::Sub: {
-                int b = coerceToInt(pop());
-                int a = coerceToInt(pop());
-                push(a - b);
+                const Value b = pop();
+                const Value a = pop();
+                if (std::holds_alternative<int>(a) && std::holds_alternative<int>(b)) {
+                    push(std::get<int>(a) - std::get<int>(b));
+                } else {
+                    push(coerceToDouble(a) - coerceToDouble(b));
+                }
                 break;
             }
 
             case OpCode::Mul: {
-                int b = coerceToInt(pop());
-                int a = coerceToInt(pop());
-                push(a * b);
+                const Value b = pop();
+                const Value a = pop();
+                if (std::holds_alternative<int>(a) && std::holds_alternative<int>(b)) {
+                    push(std::get<int>(a) * std::get<int>(b));
+                } else {
+                    push(coerceToDouble(a) * coerceToDouble(b));
+                }
                 break;
             }
 
             case OpCode::Div: {
-                int b = coerceToInt(pop());
-                int a = coerceToInt(pop());
-                if (b == 0) {
+                const Value bVal = pop();
+                const Value aVal = pop();
+                const double b = coerceToDouble(bVal);
+                const double a = coerceToDouble(aVal);
+                if (b == 0.0) {
                     throw std::runtime_error("DIV: divide by zero");
                 }
-                push(a / b);
+                if (std::holds_alternative<int>(aVal) && std::holds_alternative<int>(bVal)) {
+                    push(static_cast<int>(a / b));
+                } else {
+                    push(a / b);
+                }
                 break;
             }
 
@@ -360,11 +413,7 @@ namespace PickVM {
 
             case OpCode::PrintVal: {
                 const Value v = pop();
-                if (std::holds_alternative<int>(v)) {
-                    out() << std::get<int>(v);
-                } else {
-                    out() << std::get<std::string>(v);
-                }
+                out() << valueToString(v);
                 break;
             }
 
@@ -535,9 +584,7 @@ namespace PickVM {
 
             case OpCode::SeqStr: {
                 const Value v = pop();
-                const std::string s = std::holds_alternative<std::string>(v)
-                    ? std::get<std::string>(v)
-                    : std::to_string(std::get<int>(v));
+                const std::string s = valueToString(v);
                 push(s.empty() ? 0 : static_cast<int>(static_cast<unsigned char>(s[0])));
                 break;
             }
@@ -907,10 +954,10 @@ namespace PickVM {
     void Runtime::dumpStack() const {
         out() << "Stack: [ ";
         for (const auto &v: stack_) {
-            if (std::holds_alternative<int>(v)) {
-                out() << std::get<int>(v) << " ";
-            } else {
+            if (std::holds_alternative<std::string>(v)) {
                 out() << "\"" << std::get<std::string>(v) << "\" ";
+            } else {
+                out() << valueToString(v) << " ";
             }
         }
         out() << "]\n";

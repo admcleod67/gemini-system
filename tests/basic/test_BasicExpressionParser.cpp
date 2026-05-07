@@ -77,6 +77,20 @@ TEST_CASE("basic expression parser parses string literal") {
     CHECK(std::get<BasicAst::StringLiteralExpr>(result.expression->node).value == "hello world");
 }
 
+TEST_CASE("basic expression parser parses float literals including scientific notation") {
+    const auto decimal = BasicExpressionParser::parse("3.14");
+    REQUIRE(decimal.success);
+    REQUIRE(decimal.expression != nullptr);
+    REQUIRE(std::holds_alternative<BasicAst::FloatLiteralExpr>(decimal.expression->node));
+    CHECK(std::get<BasicAst::FloatLiteralExpr>(decimal.expression->node).value == doctest::Approx(3.14));
+
+    const auto sci = BasicExpressionParser::parse("1E3");
+    REQUIRE(sci.success);
+    REQUIRE(sci.expression != nullptr);
+    REQUIRE(std::holds_alternative<BasicAst::FloatLiteralExpr>(sci.expression->node));
+    CHECK(std::get<BasicAst::FloatLiteralExpr>(sci.expression->node).value == doctest::Approx(1000.0));
+}
+
 TEST_CASE("basic expression parser parses string variable identifier") {
     const auto result = BasicExpressionParser::parse("A$");
     REQUIRE(result.success);

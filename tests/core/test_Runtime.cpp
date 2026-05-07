@@ -30,6 +30,21 @@ TEST_CASE("runtime push int add halt") {
     CHECK(std::get<int>(rt.stack()[0]) == 5);
 }
 
+TEST_CASE("runtime push float participates in arithmetic") {
+    std::vector<Instruction> prog = {
+        {OpCode::PushFlt, 2.5},
+        {OpCode::PushInt, 2},
+        {OpCode::Add, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    Runtime rt;
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    REQUIRE(std::holds_alternative<double>(rt.stack()[0]));
+    CHECK(std::get<double>(rt.stack()[0]) == doctest::Approx(4.5));
+}
+
 TEST_CASE("runtime step matches run for add program") {
     std::vector<Instruction> prog = {
         {OpCode::PushInt, 2},
@@ -208,6 +223,21 @@ TEST_CASE("runtime ADD non-numeric strings coerce to zero") {
     rt.run();
     REQUIRE(rt.stack().size() == 1);
     CHECK(std::get<int>(rt.stack()[0]) == 0);
+}
+
+TEST_CASE("runtime ADD uses numeric prefix coercion for strings") {
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"12ABC"}},
+        {OpCode::PushInt, 1},
+        {OpCode::Add, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    Runtime rt;
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    REQUIRE(std::holds_alternative<double>(rt.stack()[0]));
+    CHECK(std::get<double>(rt.stack()[0]) == doctest::Approx(13.0));
 }
 
 TEST_CASE("runtime CONCAT stack underflow") {

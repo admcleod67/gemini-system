@@ -14,6 +14,7 @@ namespace PickShell {
     namespace {
         enum class ExprTokenType {
             IntLiteral,
+            FloatLiteral,
             StringLiteral,
             Identifier,
             Plus,
@@ -37,6 +38,7 @@ namespace PickShell {
             int intValue{0};
             BasicAst::SourceRange range{};
             std::string strValue{}; // populated for StringLiteral tokens
+            double floatValue{0.0};
         };
 
         bool parseIntLiteral(const std::string &token, int &value) {
@@ -54,6 +56,20 @@ namespace PickShell {
                 return false;
             }
             value = static_cast<int>(v);
+            return true;
+        }
+
+        bool parseFloatLiteral(const std::string &token, double &value) {
+            if (token.empty()) {
+                return false;
+            }
+            char *end = nullptr;
+            errno = 0;
+            const double v = std::strtod(token.c_str(), &end);
+            if (errno != 0 || end == nullptr || *end != '\0') {
+                return false;
+            }
+            value = v;
             return true;
         }
 
@@ -91,18 +107,63 @@ namespace PickShell {
                     continue;
                 }
 
-                if (std::isdigit(static_cast<unsigned char>(c)) != 0) {                    const std::size_t start = i;
+                if (std::isdigit(static_cast<unsigned char>(c)) != 0) {
+                    const std::size_t start = i;
                     while (i < expressionText.size() &&
                            std::isdigit(static_cast<unsigned char>(expressionText[i])) != 0) {
                         ++i;
                     }
-                    const std::string literal = std::string(expressionText.substr(start, i - start));
-                    int parsed = 0;
-                    if (!parseIntLiteral(literal, parsed)) {
-                        error = "Invalid integer literal '" + literal + "'";
-                        return std::nullopt;
+                    bool isFloat = false;
+                    if (i < expressionText.size() && expressionText[i] == '.') {
+                        isFloat = true;
+                        ++i;
+                        while (i < expressionText.size() &&
+                               std::isdigit(static_cast<unsigned char>(expressionText[i])) != 0) {
+                            ++i;
+                        }
                     }
-                    tokens.push_back({ExprTokenType::IntLiteral, literal, parsed, {start, i}, {}});
+                    if (i < expressionText.size() && (expressionText[i] == 'E' || expressionText[i] == 'e')) {
+                        isFloat = true;
+                        ++i;
+                        if (i < expressionText.size() && (expressionText[i] == '+' || expressionText[i] == '-')) {
+                            ++i;
+                        }
+                        const std::size_t expStart = i;
+                        while (i < expressionText.size() &&
+                               std::isdigit(static_cast<unsigned char>(expressionText[i])) != 0) {
+                            ++i;
+                        }
+                        if (i == expStart) {
+                            error = "Invalid float literal";
+                            return std::nullopt;
+                        }
+                    }
+                    const std::string literal = std::string(expressionText.substr(start, i - start));
+                    if (isFloat) {
+                        double parsed = 0.0;
+                        if (!parseFloatLiteral(literal, parsed)) {
+                            error = "Invalid float literal '" + literal + "'";
+                            return std::nullopt;
+                        }
+                        ExprToken tok{};
+                        tok.type = ExprTokenType::FloatLiteral;
+                        tok.lexeme = literal;
+                        tok.floatValue = parsed;
+                        tok.range = {start, i};
+                        tokens.push_back(std::move(tok));
+                    } else {
+                        int parsed = 0;
+                        if (!parseIntLiteral(literal, parsed)) {
+                            error = "Invalid integer literal '" + literal + "'";
+                            return std::nullopt;
+                        }
+                        ExprToken tok{};
+                        tok.type = ExprTokenType::IntLiteral;
+                        tok.lexeme = literal;
+                        tok.intValue = parsed;
+                        tok.range = {start, i};
+                        tokens.push_back(std::move(tok));
+                    }
                     continue;
                 }
 
@@ -373,6 +434,12 @@ namespace PickShell {
                 if (current().type == ExprTokenType::IntLiteral) {
                     const ExprToken tok = advance();
                     BasicAst::IntLiteralExpr node{tok.intValue, tok.range};
+                    return makeExpr(std::move(node), tok.range);
+                }
+
+                if (current().type == ExprTokenType::FloatLiteral) {
+                    const ExprToken tok = advance();
+                    BasicAst::FloatLiteralExpr node{tok.floatValue, tok.range};
                     return makeExpr(std::move(node), tok.range);
                 }
 

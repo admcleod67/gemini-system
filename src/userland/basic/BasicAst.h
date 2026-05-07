@@ -41,6 +41,11 @@ namespace PickShell::BasicAst {
         SourceRange range{};
     };
 
+    struct FloatLiteralExpr {
+        double value{0.0};
+        SourceRange range{};
+    };
+
     struct StringLiteralExpr {
         std::string value;
         SourceRange range{};
@@ -81,7 +86,7 @@ namespace PickShell::BasicAst {
         SourceRange range{};
     };
 
-    using ExprNode = std::variant<IntLiteralExpr, StringLiteralExpr, IdentifierExpr, UnaryExpr, BinaryExpr, GroupedExpr, SubscriptExpr, FunctionCallExpr>;
+    using ExprNode = std::variant<IntLiteralExpr, FloatLiteralExpr, StringLiteralExpr, IdentifierExpr, UnaryExpr, BinaryExpr, GroupedExpr, SubscriptExpr, FunctionCallExpr>;
 
     struct Expr {
         ExprNode node;
