@@ -42,4 +42,13 @@ namespace PickFS {
         }
         return values[idx];
     }
+
+    bool RecordAttribute::hasValueAt(const int valueNo) const {
+        if (valueNo <= 0) {
+            return false;
+        }
+        const std::vector<std::string> values = splitValues();
+        const std::size_t idx = static_cast<std::size_t>(valueNo - 1);
+        return idx < values.size();
+    }
 } // namespace PickFS

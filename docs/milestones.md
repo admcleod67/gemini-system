@@ -157,6 +157,8 @@ Milestone 5.
 - Implemented: shared multi-value join helper reused by runtime write paths to keep BASIC/ENGLISH/DICT splitting consistent.
 - Implemented: documentation clarifying that `DIM` arrays and record multi-values are distinct models (no implicit aliasing).
 
+### Stage 4 status
+
 #### 1. BASIC file semantics (Pick-authentic core)
 
 - **`READNEXT`**
@@ -174,8 +176,8 @@ Milestone 5.
   - Inline statement or line target; single-statement rule preserved.
   - File creation remains available only via Tcl (for example, `CREATE-FILE`), not via BASIC statements/opcodes.
 - **Optional Pick-style angle-bracket syntax**
-  - `REC<attr>` and `REC<attr,value>` as syntactic sugar for `READV`.
-  - If implemented, must be compiler-level only (no runtime ambiguity).
+  - Implemented: `REC<attr>` and `REC<attr,value>` as syntactic sugar for multi-value reads (`READV`).
+  - Compiler disambiguation prevents collisions with `<` comparisons.
 
 #### 2. Numeric & string semantics
 
@@ -205,15 +207,17 @@ Milestone 5.
 #### 4. Filesystem enhancements (driven by BASIC)
 
 - **File cursor state**
-  - Add cursor tracking to `PickFS` file handles.
-  - Reset/advance semantics aligned with Pick.
+  - Implemented: cursor state is stored on `PickFS::FileSystem::FileHandle`.
+  - `OPEN` resets cursor state; `READNEXT` advances it; `WRITE`/`WRITEV` invalidate it by resetting the cursor.
 - **Attribute-level write API**
-  - Extend filesystem to update a single attribute without rewriting the entire record manually.
+  - Implemented: filesystem can update a single attribute while preserving the surrounding record data.
 - **Multi-value write API**
-  - Add helper to mutate a specific subvalue while preserving the rest of the attribute.
+  - Implemented: filesystem can update a specific subvalue (by value index) while preserving sibling multi-values.
 - **Improved error taxonomy**
-  - Distinguish: missing file, missing record, missing attribute, missing subvalue, cursor exhaustion.
-  - Ensure BASIC runtime errors match Pick wording where appropriate.
+  - Implemented: classified runtime IO failures (missing file/record/cursor exhaustion, plus attribute/subvalue presence).
+  - Presence-sensitive `READV`/`READV_TRY`:
+    - `READV` throws `ATTRIBUTE.NOT.FOUND` / `SUBVALUE.NOT.FOUND`
+    - `READV ... ELSE` treats missing attribute/subvalue as failure (`flag=0`) and routes to `ELSE`
 - **Optional DICT-aware helpers**
   - Allow BASIC to resolve attribute names via DICT (stretch goal).
 

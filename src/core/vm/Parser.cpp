@@ -415,6 +415,12 @@ namespace PickVM {
                     throw std::runtime_error("READ_V_TRY requires a file variable at line " + std::to_string(pl.sourceLine));
                 }
                 inst.operand = parseQuotedString(pl.operand, pl.sourceLine);
+            } else if (pl.opcode == "RESOLVE_DICT_ATTR") {
+                inst.op = OpCode::ResolveDictAttr;
+                if (pl.operand.empty()) {
+                    throw std::runtime_error("RESOLVE_DICT_ATTR requires a file variable at line " + std::to_string(pl.sourceLine));
+                }
+                inst.operand = parseQuotedString(pl.operand, pl.sourceLine);
             } else if (pl.opcode == "WRITE_V") {
                 inst.op = OpCode::WriteV;
                 if (pl.operand.empty()) {

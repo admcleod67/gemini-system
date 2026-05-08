@@ -371,6 +371,28 @@ TEST_CASE("basic statement parser parses READNEXT READV and WRITEV") {
     REQUIRE(writeVSubvalue.elseArm.has_value());
 }
 
+TEST_CASE("basic statement parser parses READV/WRITEV DICT<token> attributes") {
+    BasicProgram program;
+    program.setLine(10, "READV NAME FROM FVAR, ID, DICT<PHONE>");
+    program.setLine(20, "WRITEV \"NEW\" ON FVAR, ID, DICT<PHONE>");
+
+    const BasicAst::StatementParseResult result = BasicStatementParser::parse(program);
+    REQUIRE(result.success);
+    REQUIRE(result.lines.size() == 2);
+
+    REQUIRE(std::holds_alternative<BasicAst::ReadVStmt>(result.lines[0].statement));
+    const auto &readV = std::get<BasicAst::ReadVStmt>(result.lines[0].statement);
+    REQUIRE(readV.attrExpr != nullptr);
+    REQUIRE(std::holds_alternative<BasicAst::DictFieldExpr>(readV.attrExpr->node));
+    CHECK(std::get<BasicAst::DictFieldExpr>(readV.attrExpr->node).token == "PHONE");
+
+    REQUIRE(std::holds_alternative<BasicAst::WriteVStmt>(result.lines[1].statement));
+    const auto &writeV = std::get<BasicAst::WriteVStmt>(result.lines[1].statement);
+    REQUIRE(writeV.attrExpr != nullptr);
+    REQUIRE(std::holds_alternative<BasicAst::DictFieldExpr>(writeV.attrExpr->node));
+    CHECK(std::get<BasicAst::DictFieldExpr>(writeV.attrExpr->node).token == "PHONE");
+}
+
 TEST_CASE("basic statement parser accepts OPEN ELSE with single statement") {
     BasicProgram program;
     program.setLine(10, "OPEN \"CUSTOMERS\" TO FVAR ELSE STOP");

@@ -19,6 +19,9 @@ namespace PickFS {
     class FileSystem;
 }
 
+// Required because Runtime stores PickFS::FileSystem::FileHandle in an owning container.
+#include "../filesystem/FileSystem.h"
+
 namespace PickVM {
     enum class OpCode {
         Halt,
@@ -71,6 +74,7 @@ namespace PickVM {
         WriteV,
         WriteVTry,
         ExtractAttr,
+        ResolveDictAttr,
         CloseFile,
         LoadVar,
         StoreVar
@@ -144,13 +148,8 @@ namespace PickVM {
         std::vector<ForFrame> forStack_;     // Loop-frame stack for FOR/NEXT
         std::unordered_map<std::string, Value> variables_;
         std::unordered_map<std::string, std::vector<Value>> arrays_; // DIM arrays
-        struct OpenFileState {
-            std::string fileName;
-            std::vector<std::string> recordIds;
-            std::size_t cursorIndex{0};
-            bool cursorPrimed{false};
-        };
-        std::unordered_map<std::string, OpenFileState> openFiles_; // file var -> opened file state
+        // file var -> opened filesystem handle (cursor state lives in PickFS::FileHandle)
+        std::unordered_map<std::string, PickFS::FileSystem::FileHandle> openFiles_;
         std::size_t ip_; // Instruction pointer
         std::atomic<bool> interrupted_{false};
         mutable std::ostream *outStream_{nullptr};

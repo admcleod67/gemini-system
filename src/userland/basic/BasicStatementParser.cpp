@@ -100,6 +100,38 @@ namespace PickShell {
             outArm = BasicAst::BranchArm{std::nullopt, std::move(inlineStmt)};
             return true;
         }
+
+        bool tryParseDictFieldToken(const std::string &raw, std::string &outToken) {
+            const std::string trimmed = trim(raw);
+            if (trimmed.empty()) {
+                return false;
+            }
+            const std::string upper = uppercase(trimmed);
+            if (upper.rfind("DICT<", 0) != 0) {
+                return false;
+            }
+            if (trimmed.back() != '>') {
+                return false;
+            }
+            const std::size_t ltPos = upper.find('<');
+            if (ltPos == std::string::npos) {
+                return false;
+            }
+            std::string inner = trim(trimmed.substr(ltPos + 1, trimmed.size() - ltPos - 2));
+            if (inner.empty()) {
+                return false;
+            }
+            // Allow quoting the DICT token for readability.
+            if (inner.size() >= 2 &&
+                ((inner.front() == '"' && inner.back() == '"') || (inner.front() == '\'' && inner.back() == '\''))) {
+                inner = trim(inner.substr(1, inner.size() - 2));
+            }
+            if (inner.empty()) {
+                return false;
+            }
+            outToken = inner;
+            return true;
+        }
     } // namespace
 
     BasicAst::StatementParseResult BasicStatementParser::parse(const BasicProgram &program) {
@@ -632,10 +664,29 @@ namespace PickShell {
                     result.errors.push_back({lineNumber, "READV ID expression error: " + idExpr.error});
                     continue;
                 }
-                BasicExpressionParseResult attrExpr = BasicExpressionParser::parse(args[2]);
-                if (!attrExpr.success || !attrExpr.expression) {
-                    result.errors.push_back({lineNumber, "READV attribute expression error: " + attrExpr.error});
-                    continue;
+                std::unique_ptr<BasicAst::Expr> attrExprNode;
+                {
+                    const std::string trimmedAttr = trim(args[2]);
+                    const std::string upperAttr = uppercase(trimmedAttr);
+                    const bool dictPrefix = upperAttr.rfind("DICT<", 0) == 0;
+                    std::string dictToken;
+                    if (dictPrefix) {
+                        if (!tryParseDictFieldToken(args[2], dictToken)) {
+                            result.errors.push_back(
+                                {lineNumber, "READV attribute expression error: malformed DICT field; expected DICT<token>"});
+                            continue;
+                        }
+                        attrExprNode = std::make_unique<BasicAst::Expr>();
+                        attrExprNode->node = BasicAst::DictFieldExpr{dictToken, {}};
+                        attrExprNode->range = {};
+                    } else {
+                        BasicExpressionParseResult attrExpr = BasicExpressionParser::parse(args[2]);
+                        if (!attrExpr.success || !attrExpr.expression) {
+                            result.errors.push_back({lineNumber, "READV attribute expression error: " + attrExpr.error});
+                            continue;
+                        }
+                        attrExprNode = std::move(attrExpr.expression);
+                    }
                 }
 
                 std::unique_ptr<BasicAst::Expr> valueIndexExpr;
@@ -656,7 +707,7 @@ namespace PickShell {
                 stmt.targetVar = targetVar;
                 stmt.fileVar = args[0];
                 stmt.idExpr = std::move(idExpr.expression);
-                stmt.attrExpr = std::move(attrExpr.expression);
+                stmt.attrExpr = std::move(attrExprNode);
                 stmt.valueIndexExpr = std::move(valueIndexExpr);
                 stmt.elseArm = elseArm;
                 result.lines.push_back({lineNumber, std::move(stmt)});
@@ -730,10 +781,29 @@ namespace PickShell {
                     result.errors.push_back({lineNumber, "WRITEV ID expression error: " + idExpr.error});
                     continue;
                 }
-                BasicExpressionParseResult attrExpr = BasicExpressionParser::parse(args[2]);
-                if (!attrExpr.success || !attrExpr.expression) {
-                    result.errors.push_back({lineNumber, "WRITEV attribute expression error: " + attrExpr.error});
-                    continue;
+                std::unique_ptr<BasicAst::Expr> attrExprNode;
+                {
+                    const std::string trimmedAttr = trim(args[2]);
+                    const std::string upperAttr = uppercase(trimmedAttr);
+                    const bool dictPrefix = upperAttr.rfind("DICT<", 0) == 0;
+                    std::string dictToken;
+                    if (dictPrefix) {
+                        if (!tryParseDictFieldToken(args[2], dictToken)) {
+                            result.errors.push_back(
+                                {lineNumber, "WRITEV attribute expression error: malformed DICT field; expected DICT<token>"});
+                            continue;
+                        }
+                        attrExprNode = std::make_unique<BasicAst::Expr>();
+                        attrExprNode->node = BasicAst::DictFieldExpr{dictToken, {}};
+                        attrExprNode->range = {};
+                    } else {
+                        BasicExpressionParseResult attrExpr = BasicExpressionParser::parse(args[2]);
+                        if (!attrExpr.success || !attrExpr.expression) {
+                            result.errors.push_back({lineNumber, "WRITEV attribute expression error: " + attrExpr.error});
+                            continue;
+                        }
+                        attrExprNode = std::move(attrExpr.expression);
+                    }
                 }
 
                 std::unique_ptr<BasicAst::Expr> valueIndexExpr;
@@ -754,7 +824,7 @@ namespace PickShell {
                 stmt.valueExpr = std::move(valueExpr.expression);
                 stmt.fileVar = args[0];
                 stmt.idExpr = std::move(idExpr.expression);
-                stmt.attrExpr = std::move(attrExpr.expression);
+                stmt.attrExpr = std::move(attrExprNode);
                 stmt.valueIndexExpr = std::move(valueIndexExpr);
                 stmt.elseArm = elseArm;
                 result.lines.push_back({lineNumber, std::move(stmt)});

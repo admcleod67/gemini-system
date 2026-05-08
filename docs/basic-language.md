@@ -273,9 +273,12 @@ Rules:
 - `OPEN`, `READ`, `WRITE`, `READNEXT`, `READV`, and `WRITEV` route failures to `ELSE` when provided.
 - Without `ELSE`, failures raise runtime errors and stop execution.
 - `READNEXT` iterates record IDs in deterministic lexicographic order per open file handle.
-- `OPEN` resets `READNEXT` cursor state for that file handle.
-- `WRITE` and `WRITEV` invalidate the `READNEXT` cursor for the same file handle.
+- `OPEN` resets `READNEXT` cursor state for that file handle (`PickFS::FileSystem::FileHandle`).
+- `WRITE` and `WRITEV` invalidate (reset) the `READNEXT` cursor for the same file handle.
 - `READV`/`WRITEV` preserve unrelated attributes and sibling multi-values.
+- `READV` presence semantics: missing attribute/subvalue is a classified failure (`ATTRIBUTE.NOT.FOUND` / `SUBVALUE.NOT.FOUND`).
+  - With `ELSE` it routes to the `ELSE` clause (via the `READV_TRY` opcode path).
+  - Without `ELSE` it raises a runtime error.
 - File `ELSE` accepts either a line target or one inline statement.
 - `CLOSE` on an unopened file variable is a no-op.
 - Open file handles are automatically released when the program ends.

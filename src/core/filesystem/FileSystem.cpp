@@ -89,7 +89,7 @@ namespace PickFS {
             }
             throw FileSystemError("Invalid file storage for: " + name);
         }
-        return FileHandle{name, path};
+        return FileHandle{name, path, {}, 0, false};
     }
 
     std::vector<std::string> FileSystem::listRecords(const FileHandle &handle) const {
@@ -234,6 +234,25 @@ namespace PickFS {
 
     std::vector<std::string> FileSystem::listRecordNames(const std::string &fileName) const {
         return listRecords(openFile(fileName));
+    }
+
+    std::string FileSystem::readNextRecord(FileHandle &handle) const {
+        if (!handle.cursorPrimed) {
+            // listRecords sorts lexicographically.
+            handle.recordIds = listRecords(handle);
+            handle.cursorIndex = 0;
+            handle.cursorPrimed = true;
+        }
+        if (handle.cursorIndex >= handle.recordIds.size()) {
+            throw FileSystemError("cursor exhausted");
+        }
+        return handle.recordIds[handle.cursorIndex++];
+    }
+
+    void FileSystem::resetReadNextCursor(FileHandle &handle) const {
+        handle.cursorPrimed = false;
+        handle.cursorIndex = 0;
+        handle.recordIds.clear();
     }
 
     std::optional<std::string> FileSystem::readAttributeValue(const std::string &fileName,

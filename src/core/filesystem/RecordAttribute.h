@@ -27,6 +27,9 @@ namespace PickFS {
 
         [[nodiscard]] std::string firstValue() const { return valueAt(1); }
 
+        /// 1-indexed presence check. Missing index => false.
+        [[nodiscard]] bool hasValueAt(const int valueNo) const;
+
         [[nodiscard]] bool empty() const { return raw_.empty(); }
 
     private:

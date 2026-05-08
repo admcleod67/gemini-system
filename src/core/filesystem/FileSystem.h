@@ -25,6 +25,12 @@ namespace PickFS {
         struct FileHandle {
             std::string name;
             std::filesystem::path directoryPath;
+            // Cursor state for READNEXT iteration.
+            // Maintained by FileSystem and stored with the handle so cursor semantics
+            // live in the filesystem layer (PickFS).
+            std::vector<std::string> recordIds;
+            std::size_t cursorIndex{0};
+            bool cursorPrimed{false};
         };
 
         explicit FileSystem(std::filesystem::path root = "filesystem");
@@ -54,6 +60,12 @@ namespace PickFS {
         std::vector<std::string> listFiles() const;
 
         std::vector<std::string> listRecordNames(const std::string &fileName) const;
+
+        /// READNEXT cursor: returns next record id or throws FileSystemError("cursor exhausted").
+        std::string readNextRecord(FileHandle &handle) const;
+
+        /// Reset READNEXT cursor state for an open handle (e.g. after OPEN/WRITE/WRITEV).
+        void resetReadNextCursor(FileHandle &handle) const;
 
         std::optional<std::string> readAttributeValue(const std::string &fileName,
                                                       const std::string &recordName,

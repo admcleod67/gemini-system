@@ -26,6 +26,12 @@ namespace {
         return expr;
     }
 
+    std::unique_ptr<BasicAst::Expr> makeDict(const std::string &token) {
+        auto expr = std::make_unique<BasicAst::Expr>();
+        expr->node = BasicAst::DictFieldExpr{token, {}};
+        return expr;
+    }
+
     std::unique_ptr<BasicAst::Expr> makeFloat(const double value) {
         auto expr = std::make_unique<BasicAst::Expr>();
         expr->node = BasicAst::FloatLiteralExpr{value, {}};
@@ -547,6 +553,36 @@ TEST_CASE("basic bytecode emitter emits READNEXT READV WRITEV opcodes") {
     CHECK(hasReadNext);
     CHECK(hasReadV);
     CHECK(hasWriteV);
+}
+
+TEST_CASE("basic bytecode emitter emits ResolveDictAttr for DICT<token> in READV") {
+    BasicIr::NormalizedProgram program;
+    program.lines.push_back({10, BasicIr::ReadVStmt{"NAME", "FVAR", makeVar("ID"), makeDict("PHONE"), nullptr, std::nullopt}});
+
+    const BasicBytecodeEmissionResult emitted = BasicBytecodeEmitter::emit(program);
+    REQUIRE(emitted.success);
+
+    bool foundResolve = false;
+    std::size_t resolveIp = 0;
+    for (std::size_t i = 0; i < emitted.program.size(); ++i) {
+        if (emitted.program[i].op == OpCode::ResolveDictAttr) {
+            foundResolve = true;
+            resolveIp = i;
+            break;
+        }
+    }
+    REQUIRE(foundResolve);
+    REQUIRE(resolveIp > 0);
+    CHECK(emitted.program[resolveIp - 1].op == OpCode::PushStr);
+    CHECK(std::get<std::string>(emitted.program[resolveIp - 1].operand) == "PHONE");
+    CHECK(std::get<std::string>(emitted.program[resolveIp].operand) == "FVAR");
+    REQUIRE(resolveIp + 3 < emitted.program.size());
+    CHECK(emitted.program[resolveIp + 1].op == OpCode::PushInt);
+    CHECK(std::get<int>(emitted.program[resolveIp + 1].operand) == 0); // attribute-level read
+    CHECK(emitted.program[resolveIp + 2].op == OpCode::ReadV);
+    CHECK(std::get<std::string>(emitted.program[resolveIp + 2].operand) == "FVAR");
+    CHECK(emitted.program[resolveIp + 3].op == OpCode::StoreVar);
+    CHECK(std::get<std::string>(emitted.program[resolveIp + 3].operand) == "NAME");
 }
 
 TEST_CASE("basic bytecode emitter emits *_Try opcodes for file ELSE flow") {

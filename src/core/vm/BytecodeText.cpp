@@ -73,6 +73,7 @@ namespace PickVM {
                 case OpCode::ReadVTry:
                 case OpCode::WriteV:
                 case OpCode::WriteVTry:
+                case OpCode::ResolveDictAttr:
                 case OpCode::CloseFile:
                     out << ' ' << std::get<std::string>(instr.operand);
                     break;

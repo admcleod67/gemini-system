@@ -62,6 +62,7 @@ namespace PickVM {
             case OpCode::WriteV: return "WRITE_V";
             case OpCode::WriteVTry: return "WRITE_V_TRY";
             case OpCode::ExtractAttr: return "EXTRACT_ATTR";
+            case OpCode::ResolveDictAttr: return "RESOLVE_DICT_ATTR";
             case OpCode::CloseFile: return "CLOSE_FILE";
             case OpCode::LoadVar: return "LOAD_VAR";
             case OpCode::StoreVar: return "STORE_VAR";
@@ -140,6 +141,7 @@ namespace PickVM {
             case OpCode::ReadVTry:
             case OpCode::WriteV:
             case OpCode::WriteVTry:
+            case OpCode::ResolveDictAttr:
             case OpCode::CloseFile:
                 oss << ' ' << stringOperandAtIp(instr, ip);
                 break;

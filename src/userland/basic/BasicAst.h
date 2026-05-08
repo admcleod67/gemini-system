@@ -87,13 +87,20 @@ namespace PickShell::BasicAst {
         SourceRange range{};
     };
 
+    // Explicit DICT name → attribute-index resolution used by READV/WRITEV.
+    // Surface syntax: DICT<fieldToken>
+    struct DictFieldExpr {
+        std::string token;
+        SourceRange range{};
+    };
+
     struct FunctionCallExpr {
         std::string name;  // uppercased: "ABS", "SGN", "SEQ"
         std::unique_ptr<Expr> argument;
         SourceRange range{};
     };
 
-    using ExprNode = std::variant<IntLiteralExpr, FloatLiteralExpr, StringLiteralExpr, IdentifierExpr, UnaryExpr, BinaryExpr, GroupedExpr, SubscriptExpr, AttributeAccessExpr, FunctionCallExpr>;
+    using ExprNode = std::variant<IntLiteralExpr, FloatLiteralExpr, StringLiteralExpr, IdentifierExpr, UnaryExpr, BinaryExpr, GroupedExpr, SubscriptExpr, AttributeAccessExpr, DictFieldExpr, FunctionCallExpr>;
 
     struct Expr {
         ExprNode node;

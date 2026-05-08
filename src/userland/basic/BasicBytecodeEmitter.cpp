@@ -87,6 +87,18 @@ namespace PickShell {
                         } else if constexpr (std::is_same_v<NodeT, BasicAst::StringLiteralExpr>) {
                             out_.push_back(PickVM::Instruction{PickVM::OpCode::PushStr, node.value});
                             return true;
+                        } else if constexpr (std::is_same_v<NodeT, BasicAst::DictFieldExpr>) {
+                            // DICT field tokens resolve to an integer attribute index at runtime.
+                            if (inArithmetic) {
+                                error_ = "DICT field tokens cannot be used in an arithmetic expression";
+                                return false;
+                            }
+                            if (node.token.empty()) {
+                                error_ = "DICT field token cannot be empty";
+                                return false;
+                            }
+                            out_.push_back(PickVM::Instruction{PickVM::OpCode::PushStr, node.token});
+                            return true;
                         } else if constexpr (std::is_same_v<NodeT, BasicAst::IdentifierExpr>) {
                             if (!isValidVariableName(node.name)) {
                                 error_ = "Invalid variable name '" + node.name + "'";
@@ -872,6 +884,7 @@ namespace PickShell {
                         }
                         std::string error;
                         ExpressionAstEmitter emitter(result.program, error);
+                        const std::string fileVar = uppercase(stmt.fileVar);
                         if (!emitter.emit(*stmt.idExpr)) {
                             result.errors.push_back({line.lineNumber, "READV ID expression error: " + error});
                             return false;
@@ -879,6 +892,11 @@ namespace PickShell {
                         if (!emitter.emit(*stmt.attrExpr)) {
                             result.errors.push_back({line.lineNumber, "READV attribute expression error: " + error});
                             return false;
+                        }
+                        // DICT<token> in READV/WRITEV attribute position is resolved to an integer
+                        // attribute number just before the READV/WRITEV runtime opcodes.
+                        if (std::holds_alternative<BasicAst::DictFieldExpr>(stmt.attrExpr->node)) {
+                            result.program.push_back(PickVM::Instruction{PickVM::OpCode::ResolveDictAttr, fileVar});
                         }
                         if (stmt.valueIndexExpr) {
                             if (!emitter.emit(*stmt.valueIndexExpr)) {
@@ -888,7 +906,6 @@ namespace PickShell {
                         } else {
                             result.program.push_back(PickVM::Instruction{PickVM::OpCode::PushInt, 0});
                         }
-                        const std::string fileVar = uppercase(stmt.fileVar);
                         const std::string targetVar = uppercase(stmt.targetVar);
                         if (stmt.elseArm.has_value()) {
                             result.program.push_back(PickVM::Instruction{PickVM::OpCode::ReadVTry, fileVar});
@@ -916,6 +933,7 @@ namespace PickShell {
                         }
                         std::string error;
                         ExpressionAstEmitter emitter(result.program, error);
+                        const std::string fileVar = uppercase(stmt.fileVar);
                         if (!emitter.emit(*stmt.valueExpr)) {
                             result.errors.push_back({line.lineNumber, "WRITEV value expression error: " + error});
                             return false;
@@ -928,6 +946,9 @@ namespace PickShell {
                             result.errors.push_back({line.lineNumber, "WRITEV attribute expression error: " + error});
                             return false;
                         }
+                        if (std::holds_alternative<BasicAst::DictFieldExpr>(stmt.attrExpr->node)) {
+                            result.program.push_back(PickVM::Instruction{PickVM::OpCode::ResolveDictAttr, fileVar});
+                        }
                         if (stmt.valueIndexExpr) {
                             if (!emitter.emit(*stmt.valueIndexExpr)) {
                                 result.errors.push_back({line.lineNumber, "WRITEV value-index expression error: " + error});
@@ -936,7 +957,6 @@ namespace PickShell {
                         } else {
                             result.program.push_back(PickVM::Instruction{PickVM::OpCode::PushInt, 0});
                         }
-                        const std::string fileVar = uppercase(stmt.fileVar);
                         if (stmt.elseArm.has_value()) {
                             result.program.push_back(PickVM::Instruction{PickVM::OpCode::WriteVTry, fileVar});
                             const std::size_t jzIp = result.program.size();

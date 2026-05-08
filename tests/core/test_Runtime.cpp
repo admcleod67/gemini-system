@@ -1561,3 +1561,215 @@ TEST_CASE("runtime EXTRACT_ATTR reads attribute and subvalue from raw record var
     CHECK(std::get<std::string>(rt.stack()[0]) == "B");
     CHECK(std::get<std::string>(rt.stack()[1]) == std::string{"A"} + static_cast<char>(0xFD) + "B");
 }
+
+TEST_CASE("runtime READV missing attribute throws ATTRIBUTE.NOT.FOUND") {
+    const std::filesystem::path root = std::filesystem::temp_directory_path() / "pick-runtime-readv-missing-attr";
+    std::error_code ec;
+    std::filesystem::remove_all(root, ec);
+    PickFS::FileSystem fs(root);
+    fs.createFile("DATA");
+    // Only attribute 1 exists.
+    fs.write("DATA", PickFS::Record{"ID1", std::string{"NAME"}});
+
+    Runtime rt;
+    rt.setFileSystem(&fs);
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"DATA"}},
+        {OpCode::OpenFile, std::string{"F"}},
+        {OpCode::PushStr, std::string{"ID1"}},
+        {OpCode::PushInt, 2},   // attrNo (missing)
+        {OpCode::PushInt, 0},   // valueIndex == 0 → attribute-level read
+        {OpCode::ReadV, std::string{"F"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    try {
+        rt.run();
+        CHECK(false);
+    } catch (const std::runtime_error &e) {
+        CHECK(std::string{e.what()}.find("ATTRIBUTE.NOT.FOUND") != std::string::npos);
+    }
+    std::filesystem::remove_all(root, ec);
+}
+
+TEST_CASE("runtime READV missing subvalue throws SUBVALUE.NOT.FOUND") {
+    const std::filesystem::path root = std::filesystem::temp_directory_path() / "pick-runtime-readv-missing-subvalue";
+    std::error_code ec;
+    std::filesystem::remove_all(root, ec);
+    PickFS::FileSystem fs(root);
+    fs.createFile("DATA");
+    // Attribute 1 has subvalues: ["A", ""]. Missing subvalue #3.
+    const std::string raw = std::string{"A"} + static_cast<char>(0xFD);
+    fs.write("DATA", PickFS::Record{"ID1", raw});
+
+    Runtime rt;
+    rt.setFileSystem(&fs);
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"DATA"}},
+        {OpCode::OpenFile, std::string{"F"}},
+        {OpCode::PushStr, std::string{"ID1"}},
+        {OpCode::PushInt, 1},  // attrNo
+        {OpCode::PushInt, 3},  // valueIndex (missing)
+        {OpCode::ReadV, std::string{"F"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    try {
+        rt.run();
+        CHECK(false);
+    } catch (const std::runtime_error &e) {
+        CHECK(std::string{e.what()}.find("SUBVALUE.NOT.FOUND") != std::string::npos);
+    }
+    std::filesystem::remove_all(root, ec);
+}
+
+TEST_CASE("runtime READV_TRY missing attribute returns empty value and flag=0") {
+    const std::filesystem::path root = std::filesystem::temp_directory_path() / "pick-runtime-readvtry-missing-attr";
+    std::error_code ec;
+    std::filesystem::remove_all(root, ec);
+    PickFS::FileSystem fs(root);
+    fs.createFile("DATA");
+    fs.write("DATA", PickFS::Record{"ID1", std::string{"NAME"}});
+
+    Runtime rt;
+    rt.setFileSystem(&fs);
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"DATA"}},
+        {OpCode::OpenFile, std::string{"F"}},
+        {OpCode::PushStr, std::string{"ID1"}},
+        {OpCode::PushInt, 2}, // attrNo (missing)
+        {OpCode::PushInt, 0}, // valueIndex == 0 → attribute-level read
+        {OpCode::ReadVTry, std::string{"F"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 2);
+    CHECK(std::holds_alternative<std::string>(rt.stack()[0]));
+    CHECK(std::get<std::string>(rt.stack()[0]).empty());
+    CHECK(std::get<int>(rt.stack()[1]) == 0);
+    std::filesystem::remove_all(root, ec);
+}
+
+TEST_CASE("runtime READV_TRY missing subvalue returns empty value and flag=0") {
+    const std::filesystem::path root = std::filesystem::temp_directory_path() / "pick-runtime-readvtry-missing-subvalue";
+    std::error_code ec;
+    std::filesystem::remove_all(root, ec);
+    PickFS::FileSystem fs(root);
+    fs.createFile("DATA");
+    const std::string raw = std::string{"A"} + static_cast<char>(0xFD);
+    fs.write("DATA", PickFS::Record{"ID1", raw});
+
+    Runtime rt;
+    rt.setFileSystem(&fs);
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"DATA"}},
+        {OpCode::OpenFile, std::string{"F"}},
+        {OpCode::PushStr, std::string{"ID1"}},
+        {OpCode::PushInt, 1}, // attrNo
+        {OpCode::PushInt, 3}, // valueIndex (missing)
+        {OpCode::ReadVTry, std::string{"F"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 2);
+    CHECK(std::holds_alternative<std::string>(rt.stack()[0]));
+    CHECK(std::get<std::string>(rt.stack()[0]).empty());
+    CHECK(std::get<int>(rt.stack()[1]) == 0);
+    std::filesystem::remove_all(root, ec);
+}
+
+TEST_CASE("runtime ResolveDictAttr resolves DICT token to attribute index") {
+    const std::filesystem::path root = std::filesystem::temp_directory_path() / "pick-runtime-resolvedictattr";
+    std::error_code ec;
+    std::filesystem::remove_all(root, ec);
+
+    PickFS::FileSystem fs(root);
+    fs.createFile("DICT");
+    // Minimal type-A DICT row:
+    // - attr 1 = "A"
+    // - attr 2 = target attribute index ("2" in this test)
+    fs.write("DICT", PickFS::Record{"NAME", std::string{"A\n2"}});
+
+    fs.createFile("DATA");
+    fs.write("DATA", PickFS::Record{"ID1", std::string{"X\nB"}});
+
+    Runtime rt;
+    rt.setFileSystem(&fs);
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"DATA"}},
+        {OpCode::OpenFile, std::string{"F"}},
+        {OpCode::PushStr, std::string{"NAME"}},
+        {OpCode::ResolveDictAttr, std::string{"F"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<int>(rt.stack()[0]) == 2);
+    std::filesystem::remove_all(root, ec);
+}
+
+TEST_CASE("runtime READV can read via ResolveDictAttr-resolved attribute index") {
+    const std::filesystem::path root = std::filesystem::temp_directory_path() / "pick-runtime-readv-dict";
+    std::error_code ec;
+    std::filesystem::remove_all(root, ec);
+
+    PickFS::FileSystem fs(root);
+    fs.createFile("DICT");
+    fs.write("DICT", PickFS::Record{"NAME", std::string{"A\n2"}});
+
+    fs.createFile("DATA");
+    fs.write("DATA", PickFS::Record{"ID1", std::string{"X\nB"}});
+
+    Runtime rt;
+    rt.setFileSystem(&fs);
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"DATA"}},
+        {OpCode::OpenFile, std::string{"F"}},
+        {OpCode::PushStr, std::string{"ID1"}},   // record id
+        {OpCode::PushStr, std::string{"NAME"}},  // DICT token
+        {OpCode::ResolveDictAttr, std::string{"F"}}, // → attrNo = 2
+        {OpCode::PushInt, 0}, // valueIndex == 0 → attribute-level read
+        {OpCode::ReadV, std::string{"F"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<std::string>(rt.stack()[0]) == "B");
+    std::filesystem::remove_all(root, ec);
+}
+
+TEST_CASE("runtime READV_TRY treats unknown DICT token as missing attribute") {
+    const std::filesystem::path root = std::filesystem::temp_directory_path() / "pick-runtime-readvtry-dict-missing";
+    std::error_code ec;
+    std::filesystem::remove_all(root, ec);
+
+    PickFS::FileSystem fs(root);
+    fs.createFile("DICT");
+    fs.write("DICT", PickFS::Record{"NAME", std::string{"A\n2"}});
+
+    fs.createFile("DATA");
+    fs.write("DATA", PickFS::Record{"ID1", std::string{"X\nB"}});
+
+    Runtime rt;
+    rt.setFileSystem(&fs);
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"DATA"}},
+        {OpCode::OpenFile, std::string{"F"}},
+        {OpCode::PushStr, std::string{"ID1"}},       // record id
+        {OpCode::PushStr, std::string{"MISSING"}},   // unknown DICT token
+        {OpCode::ResolveDictAttr, std::string{"F"}},  // → attrNo = 0
+        {OpCode::PushInt, 0}, // valueIndex == 0 → attribute-level read
+        {OpCode::ReadVTry, std::string{"F"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 2);
+    CHECK(std::get<std::string>(rt.stack()[0]).empty());
+    CHECK(std::get<int>(rt.stack()[1]) == 0);
+    std::filesystem::remove_all(root, ec);
+}
