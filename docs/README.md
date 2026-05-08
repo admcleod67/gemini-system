@@ -25,4 +25,4 @@ Technical reference for Gemini System. Paths below are relative to this director
 
 ## Roadmap
 
-- **[Project milestones](milestones.md)** — phased roadmap; **through Milestone 3** tracks what is implemented today; later milestones evolve.
+- **[Project milestones](milestones.md)** — phased roadmap; **through Milestone 4** tracks what is implemented today; later milestones evolve.

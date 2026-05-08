@@ -5,11 +5,11 @@ in spirit and direction, but it is **not** a port or clone: the design evolves d
 beyond classic Pick—for example, **more direct interaction with the bytecode VM** (developer shell, stack inspection,
 test hooks) to support experimentation and teaching.
 
-The **current implementation is intentionally minimal**: a small virtual machine, a text bytecode format, a parser, and
-a thin developer shell. The goal is to grow the system in **small, verifiable steps** (tests, clear boundaries) rather
-than landing a large stack at once.
+The implementation remains intentionally incremental, but the platform is now broader: a mature bytecode VM/runtime,
+filesystem-backed Pick file semantics, BASIC compiler/shell workflows, and ENGLISH/DICT query foundations. The goal is
+still to grow the system in **small, verifiable steps** (tests, clear boundaries) rather than landing a large stack at once.
 
-A phased **roadmap** (Milestone 1 onward) is summarized in **[`docs/milestones.md`](docs/milestones.md)**; **Milestones 1–3** match what is implemented today (core stack, multi-account session and VOC, and the ENGLISH + M3 filesystem layer), and **later milestones** remain subject to refinement.
+A phased **roadmap** (Milestone 1 onward) is summarized in **[`docs/milestones.md`](docs/milestones.md)**; **Milestones 1–4** track what is implemented today (core stack, multi-account session and VOC, ENGLISH + filesystem maturation, and BASIC language fidelity stages), and later milestones remain subject to refinement.
 
 ## Building
 
