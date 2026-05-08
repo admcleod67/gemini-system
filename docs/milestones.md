@@ -150,6 +150,13 @@ Milestone 5.
 - Implemented: numeric-prefix string coercion for arithmetic (`\"\" -> 0`, `"12ABC" -> 12` style).
 - Implemented: clean float rendering through `PRINT` value output path.
 
+### Stage 3 status
+
+- Implemented: BASIC expression-level angle-bracket reads (`REC<attr>` / `REC<attr,valueIndex>`) with parser disambiguation from `<` comparison.
+- Implemented: dedicated VM extraction opcode path backed by `StructuredRecord` and `RecordAttribute` (no duplicate multi-value parsing rules).
+- Implemented: shared multi-value join helper reused by runtime write paths to keep BASIC/ENGLISH/DICT splitting consistent.
+- Implemented: documentation clarifying that `DIM` arrays and record multi-values are distinct models (no implicit aliasing).
+
 #### 1. BASIC file semantics (Pick-authentic core)
 
 - **`READNEXT`**

@@ -29,6 +29,7 @@ namespace PickShell {
             Ge,
             LParen,
             RParen,
+            Comma,
             End,
         };
 
@@ -215,8 +216,16 @@ namespace PickShell {
                     continue;
                 }
                 if (c == '<' && i + 1 < expressionText.size() && expressionText[i + 1] == '>') {
-                    tokens.push_back({ExprTokenType::Ne, "<>", 0, {i, i + 2}, {}});
-                    i += 2;
+                    const bool adjacentIdentifierBefore = !tokens.empty() &&
+                                                          tokens.back().type == ExprTokenType::Identifier &&
+                                                          tokens.back().range.end == i;
+                    if (adjacentIdentifierBefore) {
+                        tokens.push_back({ExprTokenType::Lt, "<", 0, {i, i + 1}, {}});
+                        ++i;
+                    } else {
+                        tokens.push_back({ExprTokenType::Ne, "<>", 0, {i, i + 2}, {}});
+                        i += 2;
+                    }
                     continue;
                 }
 
@@ -239,6 +248,8 @@ namespace PickShell {
                     case '(': type = ExprTokenType::LParen;
                         break;
                     case ')': type = ExprTokenType::RParen;
+                        break;
+                    case ',': type = ExprTokenType::Comma;
                         break;
                     default:
                         error = "Unexpected token '" + std::string(1, c) + "'";
@@ -484,6 +495,53 @@ namespace PickShell {
                         const ExprToken close = advance();
                         const BasicAst::SourceRange range{tok.range.begin, close.range.end};
                         BasicAst::SubscriptExpr node{tok.lexeme, std::move(idx), range};
+                        return makeExpr(std::move(node), range);
+                    }
+
+                    // Multi-value attribute read sugar: IDENT<attr[,valueIndex]>.
+                    // Only treat '<' as attribute access when immediately adjacent
+                    // to the identifier token (IDENT<...), keeping "IDENT < 1" as comparison.
+                    if (current().type == ExprTokenType::Lt && current().range.begin == tok.range.end) {
+                        advance(); // consume '<'
+                        if (current().type == ExprTokenType::Comma || current().type == ExprTokenType::Gt ||
+                            current().type == ExprTokenType::End) {
+                            error_ = "Attribute index cannot be empty";
+                            return nullptr;
+                        }
+                        std::unique_ptr<BasicAst::Expr> attrExpr = parseAddSub();
+                        if (!attrExpr) {
+                            if (error_.empty()) {
+                                error_ = "Attribute index cannot be empty";
+                            }
+                            return nullptr;
+                        }
+                        std::unique_ptr<BasicAst::Expr> valueIndexExpr;
+                        if (current().type == ExprTokenType::Comma) {
+                            advance(); // consume ','
+                            if (current().type == ExprTokenType::Gt || current().type == ExprTokenType::End) {
+                                error_ = "Value index cannot be empty";
+                                return nullptr;
+                            }
+                            valueIndexExpr = parseAddSub();
+                            if (!valueIndexExpr) {
+                                if (error_.empty()) {
+                                    error_ = "Value index cannot be empty";
+                                }
+                                return nullptr;
+                            }
+                        }
+                        if (current().type != ExprTokenType::Gt) {
+                            error_ = "Missing '>' in attribute access";
+                            return nullptr;
+                        }
+                        const ExprToken close = advance();
+                        const BasicAst::SourceRange range{tok.range.begin, close.range.end};
+                        BasicAst::AttributeAccessExpr node{
+                            tok.lexeme,
+                            std::move(attrExpr),
+                            std::move(valueIndexExpr),
+                            range
+                        };
                         return makeExpr(std::move(node), range);
                     }
                     BasicAst::IdentifierExpr node{tok.lexeme, tok.range};

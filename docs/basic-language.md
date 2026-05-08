@@ -230,6 +230,10 @@ Expression-related messages include categories such as:
   - `A(n)` — dynamic array; values are stored as-is and coerced to int in arithmetic contexts.
 - Arrays and scalar variables with the same base name are independent: `A` and `A(1)` are different storage locations.
 
+Arrays are distinct from record multi-values. `A(1)` indexes an in-memory `DIM` array cell, while
+`REC<attr,value>` (or `READV`/`WRITEV`) indexes a subvalue inside an attribute of a record-body string.
+There is no implicit mapping between array indexes and record attributes/subvalues.
+
 ## File handling (Stage 1)
 
 File handling uses the PickFS backend and file-variable handles:
@@ -275,6 +279,17 @@ Rules:
 - File `ELSE` accepts either a line target or one inline statement.
 - `CLOSE` on an unopened file variable is a no-op.
 - Open file handles are automatically released when the program ends.
+
+### Angle-bracket attribute access
+
+BASIC expressions support read-only multi-value extraction from a record-body variable:
+
+- `REC<attr>` returns the raw attribute text.
+- `REC<attr,valueIndex>` returns the 1-based subvalue from that attribute.
+
+This syntax uses the same `StructuredRecord`/value-mark splitting rules as `READV`/`WRITEV` and ENGLISH.
+To avoid ambiguity with comparisons, attribute access is recognized only when `<` is immediately adjacent
+to an identifier (`REC<2>`). `REC < 2` remains a less-than comparison.
 
 ## CLEAR
 

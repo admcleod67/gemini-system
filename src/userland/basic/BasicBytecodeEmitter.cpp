@@ -149,6 +149,28 @@ namespace PickShell {
                             }
                             out_.push_back(PickVM::Instruction{PickVM::OpCode::LoadArr, uppercase(node.varName)});
                             return true;
+                        } else if constexpr (std::is_same_v<NodeT, BasicAst::AttributeAccessExpr>) {
+                            if (!node.attrExpr) {
+                                error_ = "Attribute access requires an attribute expression";
+                                return false;
+                            }
+                            if (!isValidVariableName(node.varName)) {
+                                error_ = "Invalid variable name '" + node.varName + "'";
+                                return false;
+                            }
+                            out_.push_back(PickVM::Instruction{PickVM::OpCode::LoadVar, uppercase(node.varName)});
+                            if (!emitNode(*node.attrExpr, false)) {
+                                return false;
+                            }
+                            if (node.valueIndexExpr) {
+                                if (!emitNode(*node.valueIndexExpr, false)) {
+                                    return false;
+                                }
+                            } else {
+                                out_.push_back(PickVM::Instruction{PickVM::OpCode::PushInt, 0});
+                            }
+                            emitNoOperand(PickVM::OpCode::ExtractAttr);
+                            return true;
                         } else if constexpr (std::is_same_v<NodeT, BasicAst::FunctionCallExpr>) {
                             if (!node.argument) {
                                 error_ = node.name + ": missing argument";

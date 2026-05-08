@@ -205,3 +205,37 @@ TEST_CASE("basic expression parser rejects unknown @ identifier") {
     CHECK_FALSE(bad.success);
     CHECK(bad.error.find("Unknown system variable") != std::string::npos);
 }
+
+TEST_CASE("basic expression parser parses angle-bracket attribute access") {
+    const auto result = BasicExpressionParser::parse("REC<2,1>");
+    REQUIRE(result.success);
+    REQUIRE(result.expression != nullptr);
+    REQUIRE(std::holds_alternative<BasicAst::AttributeAccessExpr>(result.expression->node));
+    const auto &expr = std::get<BasicAst::AttributeAccessExpr>(result.expression->node);
+    CHECK(expr.varName == "REC");
+    REQUIRE(expr.attrExpr != nullptr);
+    REQUIRE(std::holds_alternative<BasicAst::IntLiteralExpr>(expr.attrExpr->node));
+    CHECK(std::get<BasicAst::IntLiteralExpr>(expr.attrExpr->node).value == 2);
+    REQUIRE(expr.valueIndexExpr != nullptr);
+    REQUIRE(std::holds_alternative<BasicAst::IntLiteralExpr>(expr.valueIndexExpr->node));
+    CHECK(std::get<BasicAst::IntLiteralExpr>(expr.valueIndexExpr->node).value == 1);
+}
+
+TEST_CASE("basic expression parser treats spaced less-than as comparison not attribute access") {
+    const auto result = BasicExpressionParser::parse("REC < 2");
+    REQUIRE(result.success);
+    REQUIRE(result.expression != nullptr);
+    REQUIRE(std::holds_alternative<BasicAst::BinaryExpr>(result.expression->node));
+    const auto &expr = std::get<BasicAst::BinaryExpr>(result.expression->node);
+    CHECK(expr.op == BasicAst::BinaryOp::LessThan);
+}
+
+TEST_CASE("basic expression parser reports malformed angle-bracket attribute access") {
+    const auto missingAttr = BasicExpressionParser::parse("REC<>");
+    CHECK_FALSE(missingAttr.success);
+    CHECK(missingAttr.error == "Attribute index cannot be empty");
+
+    const auto missingClose = BasicExpressionParser::parse("REC<2,1");
+    CHECK_FALSE(missingClose.success);
+    CHECK(missingClose.error == "Missing '>' in attribute access");
+}

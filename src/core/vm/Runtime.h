@@ -70,6 +70,7 @@ namespace PickVM {
         ReadVTry,
         WriteV,
         WriteVTry,
+        ExtractAttr,
         CloseFile,
         LoadVar,
         StoreVar

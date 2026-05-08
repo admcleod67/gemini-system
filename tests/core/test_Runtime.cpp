@@ -1541,3 +1541,23 @@ TEST_CASE("runtime READV and WRITEV use structured attributes") {
     CHECK(std::get<std::string>(rt.stack()[1]) == "Z");
     std::filesystem::remove_all(root, ec);
 }
+
+TEST_CASE("runtime EXTRACT_ATTR reads attribute and subvalue from raw record variable") {
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"NAME\nA"} + static_cast<char>(0xFD) + "B"},
+        {OpCode::PushInt, 2},
+        {OpCode::PushInt, 2},
+        {OpCode::ExtractAttr, Value{}},
+        {OpCode::PushStr, std::string{"NAME\nA"} + static_cast<char>(0xFD) + "B"},
+        {OpCode::PushInt, 2},
+        {OpCode::PushInt, 0},
+        {OpCode::ExtractAttr, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    Runtime rt;
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 2);
+    CHECK(std::get<std::string>(rt.stack()[0]) == "B");
+    CHECK(std::get<std::string>(rt.stack()[1]) == std::string{"A"} + static_cast<char>(0xFD) + "B");
+}

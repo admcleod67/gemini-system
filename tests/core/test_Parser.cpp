@@ -258,3 +258,11 @@ TEST_CASE("parser LOAD_VAR and STORE_VAR require names") {
     std::istringstream in2("STORE_VAR\nHALT\n");
     CHECK_THROWS_AS(parser.parse(in2), std::runtime_error);
 }
+
+TEST_CASE("parser EXTRACT_ATTR takes no operand") {
+    Parser parser;
+    std::istringstream in("EXTRACT_ATTR\nHALT\n");
+    LoadedBytecode lb = parser.parse(in);
+    REQUIRE(lb.program.size() == 2);
+    CHECK(lb.program[0].op == OpCode::ExtractAttr);
+}

@@ -61,6 +61,7 @@ namespace PickVM {
             case OpCode::ReadVTry: return "READ_V_TRY";
             case OpCode::WriteV: return "WRITE_V";
             case OpCode::WriteVTry: return "WRITE_V_TRY";
+            case OpCode::ExtractAttr: return "EXTRACT_ATTR";
             case OpCode::CloseFile: return "CLOSE_FILE";
             case OpCode::LoadVar: return "LOAD_VAR";
             case OpCode::StoreVar: return "STORE_VAR";
@@ -167,6 +168,7 @@ namespace PickVM {
             case OpCode::AbsInt:
             case OpCode::SgnInt:
             case OpCode::SeqStr:
+            case OpCode::ExtractAttr:
                 break;
         }
 

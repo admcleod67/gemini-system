@@ -5,6 +5,17 @@ namespace PickFS {
         constexpr char kValueMark = static_cast<char>(0xFD);
     }
 
+    std::string joinValues(const std::vector<std::string> &values) {
+        std::string out;
+        for (std::size_t i = 0; i < values.size(); ++i) {
+            if (i > 0) {
+                out.push_back(kValueMark);
+            }
+            out += values[i];
+        }
+        return out;
+    }
+
     std::vector<std::string> RecordAttribute::splitValues() const {
         std::vector<std::string> out;
         std::string current;

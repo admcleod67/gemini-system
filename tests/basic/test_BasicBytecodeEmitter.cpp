@@ -374,6 +374,29 @@ TEST_CASE("basic bytecode emitter emits LoadArr for SubscriptExpr in PRINT") {
     CHECK(emitted.program[4].op == OpCode::Halt);
 }
 
+TEST_CASE("basic bytecode emitter emits ExtractAttr for angle-bracket expression") {
+    BasicIr::NormalizedProgram program;
+    auto angle = std::make_unique<BasicAst::Expr>();
+    BasicAst::AttributeAccessExpr node{};
+    node.varName = "REC";
+    node.attrExpr = makeInt(2);
+    node.valueIndexExpr = makeInt(1);
+    angle->node = std::move(node);
+    program.lines.push_back({10, BasicIr::PrintStmt{std::move(angle), false}});
+
+    const BasicBytecodeEmissionResult emitted = BasicBytecodeEmitter::emit(program);
+    REQUIRE(emitted.success);
+    REQUIRE(emitted.program.size() == 7);
+    CHECK(emitted.program[0].op == OpCode::LoadVar);
+    CHECK(std::get<std::string>(emitted.program[0].operand) == "REC");
+    CHECK(emitted.program[1].op == OpCode::PushInt);
+    CHECK(emitted.program[2].op == OpCode::PushInt);
+    CHECK(emitted.program[3].op == OpCode::ExtractAttr);
+    CHECK(emitted.program[4].op == OpCode::PrintVal);
+    CHECK(emitted.program[5].op == OpCode::PrintEol);
+    CHECK(emitted.program[6].op == OpCode::Halt);
+}
+
 TEST_CASE("basic bytecode emitter emits ClearVars for ClearStmt") {
     BasicIr::NormalizedProgram program;
     program.lines.push_back({10, BasicIr::ClearStmt{}});

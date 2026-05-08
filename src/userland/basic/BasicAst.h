@@ -80,13 +80,20 @@ namespace PickShell::BasicAst {
         SourceRange range{};
     };
 
+    struct AttributeAccessExpr {
+        std::string varName;
+        std::unique_ptr<Expr> attrExpr;
+        std::unique_ptr<Expr> valueIndexExpr; // nullptr means attribute-level read
+        SourceRange range{};
+    };
+
     struct FunctionCallExpr {
         std::string name;  // uppercased: "ABS", "SGN", "SEQ"
         std::unique_ptr<Expr> argument;
         SourceRange range{};
     };
 
-    using ExprNode = std::variant<IntLiteralExpr, FloatLiteralExpr, StringLiteralExpr, IdentifierExpr, UnaryExpr, BinaryExpr, GroupedExpr, SubscriptExpr, FunctionCallExpr>;
+    using ExprNode = std::variant<IntLiteralExpr, FloatLiteralExpr, StringLiteralExpr, IdentifierExpr, UnaryExpr, BinaryExpr, GroupedExpr, SubscriptExpr, AttributeAccessExpr, FunctionCallExpr>;
 
     struct Expr {
         ExprNode node;

@@ -427,6 +427,9 @@ namespace PickVM {
                     throw std::runtime_error("WRITE_V_TRY requires a file variable at line " + std::to_string(pl.sourceLine));
                 }
                 inst.operand = parseQuotedString(pl.operand, pl.sourceLine);
+            } else if (pl.opcode == "EXTRACT_ATTR") {
+                inst.op = OpCode::ExtractAttr;
+                requireNoOperand(pl);
             } else if (pl.opcode == "CLOSE_FILE") {
                 inst.op = OpCode::CloseFile;
                 if (pl.operand.empty()) {

@@ -206,17 +206,6 @@ namespace PickVM {
             return pos == trimmed.size();
         }
 
-        std::string joinValues(const std::vector<std::string> &values) {
-            constexpr char kValueMark = static_cast<char>(0xFD);
-            std::string out;
-            for (std::size_t i = 0; i < values.size(); ++i) {
-                if (i > 0) {
-                    out.push_back(kValueMark);
-                }
-                out += values[i];
-            }
-            return out;
-        }
     } // namespace
 
     std::ostream &Runtime::out() const {
@@ -861,6 +850,16 @@ namespace PickVM {
                 break;
             }
 
+            case OpCode::ExtractAttr: {
+                const int valueIndex = coerceToInt(pop());
+                const int attrNo = coerceToInt(pop());
+                const std::string rawRecord = valueToString(pop());
+                const PickFS::StructuredRecord sr = PickFS::StructuredRecord::fromRaw(rawRecord);
+                const PickFS::RecordAttribute attr = sr.attribute(attrNo);
+                push(valueIndex > 0 ? attr.valueAt(valueIndex) : attr.raw());
+                break;
+            }
+
             case OpCode::WriteV: {
                 const std::string fileVar = canonicalVariableName(stringOperandAtIp(instr, ip_));
                 const int valueIndex = coerceToInt(pop());
@@ -887,7 +886,7 @@ namespace PickVM {
                         values.resize(static_cast<std::size_t>(valueIndex), "");
                     }
                     values[static_cast<std::size_t>(valueIndex - 1)] = value;
-                    sr.setAttribute(attrNo, PickFS::RecordAttribute{joinValues(values)});
+                    sr.setAttribute(attrNo, PickFS::RecordAttribute{PickFS::joinValues(values)});
                 } else {
                     sr.setAttribute(attrNo, PickFS::RecordAttribute{value});
                 }
@@ -923,7 +922,7 @@ namespace PickVM {
                             values.resize(static_cast<std::size_t>(valueIndex), "");
                         }
                         values[static_cast<std::size_t>(valueIndex - 1)] = value;
-                        sr.setAttribute(attrNo, PickFS::RecordAttribute{joinValues(values)});
+                        sr.setAttribute(attrNo, PickFS::RecordAttribute{PickFS::joinValues(values)});
                     } else {
                         sr.setAttribute(attrNo, PickFS::RecordAttribute{value});
                     }

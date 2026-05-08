@@ -9,6 +9,8 @@
 #include <vector>
 
 namespace PickFS {
+    std::string joinValues(const std::vector<std::string> &values);
+
     class RecordAttribute {
     public:
         RecordAttribute() = default;
