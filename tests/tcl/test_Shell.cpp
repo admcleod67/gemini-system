@@ -1519,6 +1519,23 @@ TEST_CASE("shell BASIC RUN supports PRINT semicolon prompt before INPUT") {
     CHECK(out.str() == "Enter value: 123\n");
 }
 
+TEST_CASE("shell BASIC RUN supports prompted INPUT syntax") {
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    std::istringstream in("123\n");
+    sh.setInputStream(&in);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("BASIC TEST", out, quit);
+    sh.handleLine("10 INPUT \"Enter value: \", A", out, quit);
+    sh.handleLine("20 PRINT A", out, quit);
+    out.str("");
+
+    sh.handleLine("RUN", out, quit);
+    CHECK(out.str() == "Enter value: 123\n");
+}
+
 TEST_CASE("shell BASIC COMPILE reports expression syntax errors") {
     PickVM::Runtime rt;
     PickShell::Shell sh(rt);
@@ -1545,6 +1562,20 @@ TEST_CASE("shell BASIC COMPILE reports malformed INPUT") {
 
     sh.handleLine("COMPILE", out, quit);
     CHECK(out.str() == "Error on line 10: INPUT requires a variable name\nCompilation failed.\n");
+}
+
+TEST_CASE("shell BASIC COMPILE reports malformed prompted INPUT") {
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("BASIC TEST", out, quit);
+    sh.handleLine("10 INPUT , A", out, quit);
+    out.str("");
+
+    sh.handleLine("COMPILE", out, quit);
+    CHECK(out.str() == "Error on line 10: INPUT prompt expression cannot be empty\nCompilation failed.\n");
 }
 
 TEST_CASE("shell BASIC RUN executes IF THEN ELSE and GOTO control flow") {
@@ -1849,6 +1880,39 @@ TEST_CASE("shell BASIC RUN executes OPEN ELSE inline statement on missing file")
 
     sh.handleLine("RUN", out, quit);
     CHECK(out.str() == "MISS\nAFTER\n");
+}
+
+TEST_CASE("shell BASIC RUN executes CHAIN to another BASIC program") {
+    auto progDir = uniqueTempDir();
+    auto fsDir = uniqueTempDir();
+    std::filesystem::create_directories(progDir);
+    std::filesystem::create_directories(fsDir);
+
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setProgramsRoot(progDir);
+    sh.setFileSystemRoot(fsDir);
+
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("BASIC NEXT", out, quit);
+    sh.handleLine("10 PRINT \"CHAINED\"", out, quit);
+    sh.handleLine("20 END", out, quit);
+    sh.handleLine("RUN (C", out, quit);
+    out.str("");
+
+    sh.handleLine("QUIT", out, quit);
+    out.str("");
+
+    sh.handleLine("BASIC MAIN", out, quit);
+    sh.handleLine("10 CHAIN \"NEXT\"", out, quit);
+    sh.handleLine("20 PRINT \"UNREACHED\"", out, quit);
+    sh.handleLine("30 END", out, quit);
+    out.str("");
+
+    sh.handleLine("RUN", out, quit);
+    CHECK(out.str() == "CHAINED\n");
 }
 
 TEST_CASE("shell EDIT file record INSERT SAVE QUIT then READ") {

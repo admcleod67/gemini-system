@@ -31,6 +31,8 @@ Compiler internals are in an incremental refactor phase. Expression parsing and 
 - `IF <cond> THEN <line-or-statement> [ELSE <line-or-statement>]`
 - `STOP`
 - `INPUT <var>`
+- `INPUT <prompt-expr>, <var>`
+- `CHAIN <program-expr>`
 - `END` (optional)
 
 If `END` is omitted, the compiler emits an implicit terminating `HALT`.
@@ -124,14 +126,24 @@ Comparison operators (`=`, `<>`, `<`, `<=`, `>`, `>=`) require both operands to 
 
 The semicolon form is useful for prompt-style interaction, for example printing a prompt before `INPUT`.
 
-## `INPUT <var>`
+## `INPUT`
 
 `INPUT` reads one line from runtime input as a raw string (leading/trailing whitespace trimmed) and stores it in the target variable.
 
 - `INPUT <var>` always emits `INPUT_STR` to read a raw string.
+- `INPUT <prompt-expr>, <var>` first emits prompt output (`PRINT` without newline), then `INPUT_STR`.
 - For `%`-suffix variables (for example `INPUT A%`), the compiler additionally emits `COERCE_INT`, which converts the raw string to an integer (non-numeric → 0) before storing.
-- `INPUT` currently supports exactly one variable argument.
+- Prompt expression can be any BASIC expression; malformed prompt expressions are compile-time errors.
 - End-of-input raises a runtime error.
+
+## `CHAIN <program-expr>`
+
+`CHAIN` evaluates `<program-expr>` to a target program name and transfers execution to that BASIC program.
+
+- Example: `CHAIN "NEXTPROG"`.
+- Target program is resolved using the same VOC/BP resolution as normal BASIC `RUN`.
+- No argument passing is supported in this milestone.
+- `CHAIN` with an empty program name raises a runtime error.
 
 ## Control flow
 

@@ -281,17 +281,40 @@ namespace PickShell {
                     result.errors.push_back({lineNumber, "INPUT requires a variable name"});
                     continue;
                 }
-                std::istringstream varIss(rest);
-                std::vector<std::string> inputTokens;
-                std::string inputTok;
-                while (varIss >> inputTok) {
-                    inputTokens.push_back(inputTok);
+
+                std::unique_ptr<BasicAst::Expr> promptExpr;
+                std::string varName = rest;
+                if (const std::size_t commaPos = rest.rfind(','); commaPos != std::string::npos) {
+                    const std::string promptRaw = trim(rest.substr(0, commaPos));
+                    const std::string varRaw = trim(rest.substr(commaPos + 1));
+                    if (promptRaw.empty()) {
+                        result.errors.push_back({lineNumber, "INPUT prompt expression cannot be empty"});
+                        continue;
+                    }
+                    if (varRaw.empty()) {
+                        result.errors.push_back({lineNumber, "INPUT requires a variable name"});
+                        continue;
+                    }
+                    BasicExpressionParseResult promptParsed = BasicExpressionParser::parse(promptRaw);
+                    if (!promptParsed.success || !promptParsed.expression) {
+                        result.errors.push_back({lineNumber, "INPUT prompt expression error: " + promptParsed.error});
+                        continue;
+                    }
+                    promptExpr = std::move(promptParsed.expression);
+                    varName = varRaw;
+                } else {
+                    std::istringstream varIss(rest);
+                    std::vector<std::string> inputTokens;
+                    std::string inputTok;
+                    while (varIss >> inputTok) {
+                        inputTokens.push_back(inputTok);
+                    }
+                    if (inputTokens.size() != 1) {
+                        result.errors.push_back({lineNumber, "INPUT requires a variable name"});
+                        continue;
+                    }
+                    varName = inputTokens[0];
                 }
-                if (inputTokens.size() != 1) {
-                    result.errors.push_back({lineNumber, "INPUT requires a variable name"});
-                    continue;
-                }
-                const std::string varName = inputTokens[0];
                 if (!isValidVariableName(varName)) {
                     result.errors.push_back({lineNumber, "Invalid variable name '" + varName + "'"});
                     continue;
@@ -301,7 +324,29 @@ namespace PickShell {
                     continue;
                 }
 
-                result.lines.push_back({lineNumber, BasicAst::InputStmt{varName}});
+                BasicAst::InputStmt stmt{};
+                stmt.promptExpr = std::move(promptExpr);
+                stmt.variableName = varName;
+                result.lines.push_back({lineNumber, std::move(stmt)});
+                continue;
+            }
+
+            if (op == "CHAIN") {
+                std::string rest;
+                std::getline(iss, rest);
+                rest = trim(rest);
+                if (rest.empty()) {
+                    result.errors.push_back({lineNumber, "CHAIN requires a program name expression"});
+                    continue;
+                }
+                BasicExpressionParseResult expr = BasicExpressionParser::parse(rest);
+                if (!expr.success || !expr.expression) {
+                    result.errors.push_back({lineNumber, "CHAIN program expression error: " + expr.error});
+                    continue;
+                }
+                BasicAst::ChainStmt stmt{};
+                stmt.programExpr = std::move(expr.expression);
+                result.lines.push_back({lineNumber, std::move(stmt)});
                 continue;
             }
 

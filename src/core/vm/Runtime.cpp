@@ -920,6 +920,14 @@ namespace PickVM {
                 break;
             }
 
+            case OpCode::Chain: {
+                const std::string programName = valueToString(pop());
+                if (programName.empty()) {
+                    throw std::runtime_error("CHAIN requires a program name");
+                }
+                throw ChainRequest{programName};
+            }
+
             case OpCode::WriteV: {
                 const std::string fileVar = canonicalVariableName(stringOperandAtIp(instr, ip_));
                 const int valueIndex = coerceToInt(pop());

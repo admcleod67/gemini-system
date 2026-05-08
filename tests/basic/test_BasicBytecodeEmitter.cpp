@@ -82,6 +82,44 @@ TEST_CASE("basic bytecode emitter lowers let print and end") {
     CHECK(emitted.sourceLinePerInstr[5] == 30);
 }
 
+TEST_CASE("basic bytecode emitter emits prompted INPUT as print then input") {
+    BasicIr::NormalizedProgram program;
+    BasicIr::InputStmt stmt{};
+    stmt.promptExpr = makeStr("Enter value: ");
+    stmt.variableName = "A";
+    program.lines.push_back({10, std::move(stmt)});
+    program.lines.push_back({20, BasicIr::EndStmt{}});
+
+    const BasicBytecodeEmissionResult emitted = BasicBytecodeEmitter::emit(program);
+    REQUIRE(emitted.success);
+    // PushStr, PrintVal, InputStr, StoreVar, Halt
+    REQUIRE(emitted.program.size() == 5);
+    CHECK(emitted.program[0].op == OpCode::PushStr);
+    CHECK(std::get<std::string>(emitted.program[0].operand) == "Enter value: ");
+    CHECK(emitted.program[1].op == OpCode::PrintVal);
+    CHECK(emitted.program[2].op == OpCode::InputStr);
+    CHECK(emitted.program[3].op == OpCode::StoreVar);
+    CHECK(std::get<std::string>(emitted.program[3].operand) == "A");
+    CHECK(emitted.program[4].op == OpCode::Halt);
+}
+
+TEST_CASE("basic bytecode emitter emits CHAIN opcode") {
+    BasicIr::NormalizedProgram program;
+    BasicIr::ChainStmt stmt{};
+    stmt.programExpr = makeStr("NEXT");
+    program.lines.push_back({10, std::move(stmt)});
+    program.lines.push_back({20, BasicIr::EndStmt{}});
+
+    const BasicBytecodeEmissionResult emitted = BasicBytecodeEmitter::emit(program);
+    REQUIRE(emitted.success);
+    // PushStr, Chain, Halt
+    REQUIRE(emitted.program.size() == 3);
+    CHECK(emitted.program[0].op == OpCode::PushStr);
+    CHECK(std::get<std::string>(emitted.program[0].operand) == "NEXT");
+    CHECK(emitted.program[1].op == OpCode::Chain);
+    CHECK(emitted.program[2].op == OpCode::Halt);
+}
+
 TEST_CASE("basic bytecode emitter emits PUSH_FLT for float literals") {
     BasicIr::NormalizedProgram program;
     program.lines.push_back({10, BasicIr::LetStmt{"A", makeFloat(3.5)}});

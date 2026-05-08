@@ -24,8 +24,15 @@ namespace PickShell::BasicIr {
     };
 
     struct InputStmt {
+        // Optional prompt expression for INPUT "Prompt", var lowering.
+        std::unique_ptr<BasicAst::Expr> promptExpr;
         // Required: non-empty variableName.
         std::string variableName;
+    };
+
+    struct ChainStmt {
+        // Required: program expression evaluating to program name.
+        std::unique_ptr<BasicAst::Expr> programExpr;
     };
 
     struct GotoStmt {
@@ -135,7 +142,7 @@ namespace PickShell::BasicIr {
         std::string fileVar;
     };
 
-    using NormalizedStmt = std::variant<LetStmt, InputStmt, GotoStmt, GosubStmt, ReturnStmt, ForStmt, NextStmt, IfStmt, PrintStmt, RemStmt, StopStmt, EndStmt, DimStmt, LetArrayStmt, ClearStmt, OpenStmt, ReadStmt, WriteStmt, ReadNextStmt, ReadVStmt, WriteVStmt, CloseStmt>;
+    using NormalizedStmt = std::variant<LetStmt, InputStmt, ChainStmt, GotoStmt, GosubStmt, ReturnStmt, ForStmt, NextStmt, IfStmt, PrintStmt, RemStmt, StopStmt, EndStmt, DimStmt, LetArrayStmt, ClearStmt, OpenStmt, ReadStmt, WriteStmt, ReadNextStmt, ReadVStmt, WriteVStmt, CloseStmt>;
 
     struct InlineStatement {
         NormalizedStmt statement;

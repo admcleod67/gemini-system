@@ -259,6 +259,57 @@ TEST_CASE("basic compiler compiles INPUT variable") {
     CHECK(result.program[5].op == OpCode::Halt);
 }
 
+TEST_CASE("basic compiler compiles prompted INPUT variable") {
+    BasicProgram program;
+    program.setLine(10, "INPUT \"Enter value: \", A");
+    program.setLine(20, "PRINT A");
+
+    BasicCompiler compiler;
+    const auto result = compiler.compile(program);
+
+    CHECK(result.success);
+    CHECK(result.errors.empty());
+    REQUIRE(result.program.size() == 8);
+    CHECK(result.program[0].op == OpCode::PushStr);
+    CHECK(std::get<std::string>(result.program[0].operand) == "Enter value: ");
+    CHECK(result.program[1].op == OpCode::PrintVal);
+    CHECK(result.program[2].op == OpCode::InputStr);
+    CHECK(result.program[3].op == OpCode::StoreVar);
+    CHECK(std::get<std::string>(result.program[3].operand) == "A");
+    CHECK(result.program[4].op == OpCode::LoadVar);
+    CHECK(result.program[5].op == OpCode::PrintVal);
+    CHECK(result.program[6].op == OpCode::PrintEol);
+    CHECK(result.program[7].op == OpCode::Halt);
+}
+
+TEST_CASE("basic compiler compiles CHAIN statement") {
+    BasicProgram program;
+    program.setLine(10, "CHAIN \"NEXT\"");
+
+    BasicCompiler compiler;
+    const auto result = compiler.compile(program);
+
+    CHECK(result.success);
+    CHECK(result.errors.empty());
+    REQUIRE(result.program.size() == 3);
+    CHECK(result.program[0].op == OpCode::PushStr);
+    CHECK(std::get<std::string>(result.program[0].operand) == "NEXT");
+    CHECK(result.program[1].op == OpCode::Chain);
+    CHECK(result.program[2].op == OpCode::Halt);
+}
+
+TEST_CASE("basic compiler CHAIN requires expression") {
+    BasicProgram program;
+    program.setLine(10, "CHAIN");
+
+    BasicCompiler compiler;
+    const auto result = compiler.compile(program);
+
+    CHECK_FALSE(result.success);
+    REQUIRE(result.errors.size() == 1);
+    CHECK(result.errors[0].message == "CHAIN requires a program name expression");
+}
+
 TEST_CASE("basic compiler REM produces no instructions") {
     BasicProgram program;
     program.setLine(10, "REM initialise counter");
@@ -324,6 +375,13 @@ TEST_CASE("basic compiler INPUT requires one valid variable name") {
     CHECK_FALSE(invalidVarResult.success);
     REQUIRE(invalidVarResult.errors.size() == 1);
     CHECK(invalidVarResult.errors[0].message == "Invalid variable name '1A'");
+
+    BasicProgram malformedPrompt;
+    malformedPrompt.setLine(10, "INPUT , A");
+    const auto malformedPromptResult = compiler.compile(malformedPrompt);
+    CHECK_FALSE(malformedPromptResult.success);
+    REQUIRE(malformedPromptResult.errors.size() == 1);
+    CHECK(malformedPromptResult.errors[0].message == "INPUT prompt expression cannot be empty");
 }
 
 TEST_CASE("basic compiler compiles string variable assignment and print") {

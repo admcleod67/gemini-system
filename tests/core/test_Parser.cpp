@@ -266,3 +266,11 @@ TEST_CASE("parser EXTRACT_ATTR takes no operand") {
     REQUIRE(lb.program.size() == 2);
     CHECK(lb.program[0].op == OpCode::ExtractAttr);
 }
+
+TEST_CASE("parser CHAIN takes no operand") {
+    Parser parser;
+    std::istringstream in("CHAIN\nHALT\n");
+    LoadedBytecode lb = parser.parse(in);
+    REQUIRE(lb.program.size() == 2);
+    CHECK(lb.program[0].op == OpCode::Chain);
+}

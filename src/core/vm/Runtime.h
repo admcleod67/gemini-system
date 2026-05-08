@@ -75,6 +75,7 @@ namespace PickVM {
         WriteVTry,
         ExtractAttr,
         ResolveDictAttr,
+        Chain,
         CloseFile,
         LoadVar,
         StoreVar
@@ -84,6 +85,11 @@ namespace PickVM {
 
     // Thrown by Runtime::run() when the interrupt flag is set (e.g. via Ctrl-C).
     struct UserInterrupt {};
+
+    // Thrown when a BASIC CHAIN requests transfer to another program.
+    struct ChainRequest {
+        std::string programName;
+    };
 
     struct ForFrame {
         std::string varName;

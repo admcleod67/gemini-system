@@ -224,18 +224,17 @@ Milestone 5.
 #### 5. BASIC language polish
 
 - Prompted `INPUT`
-  - `INPUT \"Prompt\", var`
-  - Compiler emits `PRINT` + `INPUT_STR` sequence.
+  - Implemented: `INPUT \"Prompt\", var` in addition to `INPUT var`.
+  - Implemented: compiler lowers prompted form to `PRINT` (no newline) + `INPUT_STR`.
 - `CHAIN` (minimal)
-  - Allow `CHAIN programName` to load and run another BASIC program.
-  - No parameter passing in this milestone.
+  - Implemented: `CHAIN <programExpr>` transfers control to another BASIC program.
+  - Implemented: no parameter passing in this milestone.
 - Improved diagnostics
-  - More precise compile-time messages for malformed file statements.
-  - Better runtime messages for file and numeric errors.
+  - Implemented: precise compile-time diagnostics for malformed file statements and prompted-INPUT/CHAIN forms.
+  - Implemented: classified runtime wording for file/control-flow failures remains stable under regression tests.
 - R83-authentic behaviour refinements
-  - Tighten `FOR`/`NEXT` mismatch messages.
-  - Improve `GOSUB`/`RETURN` error wording.
-  - Ensure `STOP`/`END` semantics match Pick.
+  - Implemented: tightened `FOR`/`NEXT` mismatch messaging and `GOSUB`/`RETURN` runtime wording.
+  - Implemented: `STOP`/`END` remain equivalent halt semantics, including implicit-end behavior.
 
 ### Non-goals (deferred)
 

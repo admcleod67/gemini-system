@@ -436,6 +436,9 @@ namespace PickVM {
             } else if (pl.opcode == "EXTRACT_ATTR") {
                 inst.op = OpCode::ExtractAttr;
                 requireNoOperand(pl);
+            } else if (pl.opcode == "CHAIN") {
+                inst.op = OpCode::Chain;
+                requireNoOperand(pl);
             } else if (pl.opcode == "CLOSE_FILE") {
                 inst.op = OpCode::CloseFile;
                 if (pl.operand.empty()) {

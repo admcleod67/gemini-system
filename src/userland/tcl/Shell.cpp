@@ -421,6 +421,60 @@ namespace PickShell {
 
         try {
             session_.runtime_.run();
+        } catch (const PickVM::ChainRequest &req) {
+            const std::string chainProgram = req.programName;
+            if (chainProgram.empty()) {
+                out << "\nRuntime error: CHAIN requires a program name\n";
+            } else if (chainProgram.find('.') != std::string::npos) {
+                out << "\nRuntime error: CHAIN expects a program name without extension\n";
+            } else if (!ensureProgramObjectExistsForRun(chainProgram, out)) {
+                // ensureProgramObjectExistsForRun writes concrete errors.
+            } else {
+                try {
+                    const PickVoc::VocResolver::ProgramLocation resolved = session_.vocResolver_.resolveProgramLocation(chainProgram);
+                    const BasicShell::ProgramLocation location{resolved.fileName, resolved.recordKey};
+                    const std::optional<std::string> objectText = readProgramRecord(location, true);
+                    if (!objectText.has_value()) {
+                        out << "\nRuntime error: CHAIN target has no object code: " << chainProgram << '\n';
+                    } else {
+                        PickVM::Parser parser;
+                        std::istringstream bytecodeStream(*objectText);
+                        PickVM::LoadedBytecode loaded = parser.parse(bytecodeStream);
+
+                        BasicProgram chainedSource;
+                        chainedSource.setName(chainProgram);
+                        if (const std::optional<std::string> sourceText = readProgramRecord(location, false); sourceText.has_value()) {
+                            std::istringstream in(*sourceText);
+                            std::string line;
+                            while (std::getline(in, line)) {
+                                std::istringstream iss(line);
+                                std::string lineNumberToken;
+                                if (!(iss >> lineNumberToken)) {
+                                    continue;
+                                }
+                                int lineNumber = 0;
+                                try {
+                                    lineNumber = std::stoi(lineNumberToken);
+                                } catch (const std::exception &) {
+                                    continue;
+                                }
+                                if (lineNumber <= 0) {
+                                    continue;
+                                }
+                                std::string text;
+                                std::getline(iss, text);
+                                if (!text.empty() && text.front() == ' ') {
+                                    text.erase(text.begin());
+                                }
+                                chainedSource.setLine(lineNumber, text);
+                            }
+                        }
+                        executeCompiledBasicProgram(loaded.program, loaded.sourceLinePerInstr, chainedSource, out);
+                    }
+                } catch (const std::exception &e) {
+                    out << "\nRuntime error: CHAIN failed: " << e.what() << '\n';
+                }
+            }
         } catch (const PickVM::UserInterrupt &) {
             out << "\nBreak\n";
             session_.runtime_.clearInterrupt();

@@ -113,7 +113,13 @@ namespace PickShell::BasicAst {
     };
 
     struct InputStmt {
+        // nullptr means plain INPUT var (no prompt expression).
+        std::unique_ptr<Expr> promptExpr;
         std::string variableName;
+    };
+
+    struct ChainStmt {
+        std::unique_ptr<Expr> programExpr;
     };
 
     struct GotoStmt {
@@ -220,7 +226,7 @@ namespace PickShell::BasicAst {
         std::string fileVar;
     };
 
-    using StatementNode = std::variant<LetStmt, InputStmt, GotoStmt, GosubStmt, ReturnStmt, ForStmt, NextStmt, IfStmt, PrintStmt, RemStmt, StopStmt, EndStmt, DimStmt, LetArrayStmt, ClearStmt, OpenStmt, ReadStmt, WriteStmt, ReadNextStmt, ReadVStmt, WriteVStmt, CloseStmt>;
+    using StatementNode = std::variant<LetStmt, InputStmt, ChainStmt, GotoStmt, GosubStmt, ReturnStmt, ForStmt, NextStmt, IfStmt, PrintStmt, RemStmt, StopStmt, EndStmt, DimStmt, LetArrayStmt, ClearStmt, OpenStmt, ReadStmt, WriteStmt, ReadNextStmt, ReadVStmt, WriteVStmt, CloseStmt>;
 
     struct InlineStatement {
         StatementNode statement;

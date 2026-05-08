@@ -1773,3 +1773,51 @@ TEST_CASE("runtime READV_TRY treats unknown DICT token as missing attribute") {
     CHECK(std::get<int>(rt.stack()[1]) == 0);
     std::filesystem::remove_all(root, ec);
 }
+
+TEST_CASE("runtime CHAIN throws ChainRequest with program name") {
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"NEXTPROG"}},
+        {OpCode::Chain, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    Runtime rt;
+    rt.loadProgram(prog);
+    bool threw = false;
+    try {
+        rt.run();
+    } catch (const PickVM::ChainRequest &req) {
+        threw = true;
+        CHECK(req.programName == "NEXTPROG");
+    }
+    CHECK(threw);
+}
+
+TEST_CASE("runtime file op taxonomy wording remains classified") {
+    Runtime rt;
+
+    {
+        std::vector<Instruction> prog = {
+            {OpCode::PushStr, std::string{"MISSING"}},
+            {OpCode::OpenFile, std::string{"F"}},
+            {OpCode::Halt, Value{}},
+        };
+        const std::filesystem::path root = std::filesystem::temp_directory_path() / "pick-runtime-taxonomy-open";
+        std::error_code ec;
+        std::filesystem::remove_all(root, ec);
+        PickFS::FileSystem fs(root);
+        rt.setFileSystem(&fs);
+        rt.loadProgram(prog);
+        CHECK_THROWS_WITH(rt.run(), doctest::Contains("OPEN: FILE.NOT.FOUND"));
+        std::filesystem::remove_all(root, ec);
+    }
+
+    {
+        std::vector<Instruction> prog = {
+            {OpCode::PushStr, std::string{"ID1"}},
+            {OpCode::ReadRec, std::string{"NOTOPEN"}},
+            {OpCode::Halt, Value{}},
+        };
+        rt.loadProgram(prog);
+        CHECK_THROWS_WITH(rt.run(), doctest::Contains("READ: FILE.VAR.NOT.OPEN"));
+    }
+}

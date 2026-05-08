@@ -20,11 +20,12 @@ TEST_CASE("basic statement parser parses each supported statement kind") {
     program.setLine(55, "REM this is a comment");
     program.setLine(60, "STOP");
     program.setLine(70, "END");
+    program.setLine(80, "CHAIN \"NEXT\"");
 
     const BasicAst::StatementParseResult result = BasicStatementParser::parse(program);
     CHECK(result.success);
     CHECK(result.errors.empty());
-    REQUIRE(result.lines.size() == 8);
+    REQUIRE(result.lines.size() == 9);
     CHECK(std::holds_alternative<BasicAst::LetStmt>(result.lines[0].statement));
     CHECK(std::holds_alternative<BasicAst::InputStmt>(result.lines[1].statement));
     CHECK(std::holds_alternative<BasicAst::GotoStmt>(result.lines[2].statement));
@@ -33,6 +34,7 @@ TEST_CASE("basic statement parser parses each supported statement kind") {
     CHECK(std::holds_alternative<BasicAst::RemStmt>(result.lines[5].statement));
     CHECK(std::holds_alternative<BasicAst::StopStmt>(result.lines[6].statement));
     CHECK(std::holds_alternative<BasicAst::EndStmt>(result.lines[7].statement));
+    CHECK(std::holds_alternative<BasicAst::ChainStmt>(result.lines[8].statement));
 }
 
 TEST_CASE("basic statement parser handles REM with and without comment text") {
@@ -109,6 +111,57 @@ TEST_CASE("basic statement parser preserves diagnostic messages") {
     CHECK(result.errors[7].message == "Unknown keyword 'MAT'");
 }
 
+TEST_CASE("basic statement parser supports prompted INPUT") {
+    BasicProgram program;
+    program.setLine(10, "INPUT \"Enter value: \", A");
+    program.setLine(20, "INPUT A$");
+
+    const BasicAst::StatementParseResult result = BasicStatementParser::parse(program);
+    CHECK(result.success);
+    REQUIRE(result.lines.size() == 2);
+
+    REQUIRE(std::holds_alternative<BasicAst::InputStmt>(result.lines[0].statement));
+    const auto &prompted = std::get<BasicAst::InputStmt>(result.lines[0].statement);
+    CHECK(prompted.promptExpr != nullptr);
+    CHECK(prompted.variableName == "A");
+    REQUIRE(std::holds_alternative<BasicAst::InputStmt>(result.lines[1].statement));
+    const auto &plain = std::get<BasicAst::InputStmt>(result.lines[1].statement);
+    CHECK(plain.promptExpr == nullptr);
+    CHECK(plain.variableName == "A$");
+}
+
+TEST_CASE("basic statement parser reports malformed prompted INPUT") {
+    BasicProgram program;
+    program.setLine(10, "INPUT , A");
+    program.setLine(20, "INPUT \"X\", ");
+
+    const BasicAst::StatementParseResult result = BasicStatementParser::parse(program);
+    CHECK_FALSE(result.success);
+    REQUIRE(result.errors.size() == 2);
+    CHECK(result.errors[0].message == "INPUT prompt expression cannot be empty");
+    CHECK(result.errors[1].message == "INPUT requires a variable name");
+}
+
+TEST_CASE("basic statement parser keeps precise malformed file-statement diagnostics") {
+    BasicProgram program;
+    program.setLine(10, "OPEN");
+    program.setLine(20, "READ REC F, ID");
+    program.setLine(30, "WRITE ON F, ID");
+    program.setLine(40, "READNEXT FROM F");
+    program.setLine(50, "READV X FROM F,");
+    program.setLine(60, "WRITEV \"A\" F, ID, 1");
+
+    const BasicAst::StatementParseResult result = BasicStatementParser::parse(program);
+    CHECK_FALSE(result.success);
+    REQUIRE(result.errors.size() == 6);
+    CHECK(result.errors[0].message == "OPEN requires a file expression and TO <filevar>");
+    CHECK(result.errors[1].message == "READ requires FROM");
+    CHECK(result.errors[2].message == "WRITE requires a value expression");
+    CHECK(result.errors[3].message == "READNEXT requires a valid target variable name");
+    CHECK(result.errors[4].message == "READV requires <filevar>, <id>, <attr>[, <value-index>]");
+    CHECK(result.errors[5].message == "WRITEV requires ON");
+}
+
 TEST_CASE("basic statement parser parses GOSUB") {
     BasicProgram program;
     program.setLine(10, "GOSUB 100");
@@ -128,6 +181,32 @@ TEST_CASE("basic statement parser parses RETURN") {
     REQUIRE(result.success);
     REQUIRE(result.lines.size() == 1);
     CHECK(std::holds_alternative<BasicAst::ReturnStmt>(result.lines[0].statement));
+}
+
+TEST_CASE("basic statement parser parses CHAIN") {
+    BasicProgram program;
+    program.setLine(10, "CHAIN \"NEXT\"");
+
+    const BasicAst::StatementParseResult result = BasicStatementParser::parse(program);
+    REQUIRE(result.success);
+    REQUIRE(result.lines.size() == 1);
+    REQUIRE(std::holds_alternative<BasicAst::ChainStmt>(result.lines[0].statement));
+}
+
+TEST_CASE("basic statement parser validates CHAIN expression") {
+    BasicProgram missing;
+    missing.setLine(10, "CHAIN");
+    const BasicAst::StatementParseResult missingResult = BasicStatementParser::parse(missing);
+    CHECK_FALSE(missingResult.success);
+    REQUIRE(missingResult.errors.size() == 1);
+    CHECK(missingResult.errors[0].message == "CHAIN requires a program name expression");
+
+    BasicProgram malformed;
+    malformed.setLine(10, "CHAIN \"A");
+    const BasicAst::StatementParseResult malformedResult = BasicStatementParser::parse(malformed);
+    CHECK_FALSE(malformedResult.success);
+    REQUIRE(malformedResult.errors.size() == 1);
+    CHECK(malformedResult.errors[0].message.find("CHAIN program expression error:") == 0);
 }
 
 TEST_CASE("basic statement parser rejects GOSUB without a line number") {

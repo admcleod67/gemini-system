@@ -244,11 +244,34 @@ namespace PickShell {
                         result.program.push_back(PickVM::Instruction{PickVM::OpCode::StoreVar, uppercase(stmt.variableName)});
                         return true;
                     } else if constexpr (std::is_same_v<StmtT, BasicIr::InputStmt>) {
+                        if (stmt.promptExpr) {
+                            std::string error;
+                            ExpressionAstEmitter emitter(result.program, error);
+                            if (!emitter.emit(*stmt.promptExpr)) {
+                                result.errors.push_back({sourceLine, "INPUT prompt expression error: " + error});
+                                return false;
+                            }
+                            // Prompted INPUT emits PRINT without newline, then INPUT.
+                            result.program.push_back(makeNoOperandInstruction(PickVM::OpCode::PrintVal));
+                        }
                         result.program.push_back(makeNoOperandInstruction(PickVM::OpCode::InputStr));
                         if (isIntVar(stmt.variableName)) {
                             result.program.push_back(makeNoOperandInstruction(PickVM::OpCode::CoerceInt));
                         }
                         result.program.push_back(PickVM::Instruction{PickVM::OpCode::StoreVar, uppercase(stmt.variableName)});
+                        return true;
+                    } else if constexpr (std::is_same_v<StmtT, BasicIr::ChainStmt>) {
+                        if (!stmt.programExpr) {
+                            result.errors.push_back({sourceLine, "CHAIN requires a program expression"});
+                            return false;
+                        }
+                        std::string error;
+                        ExpressionAstEmitter emitter(result.program, error);
+                        if (!emitter.emit(*stmt.programExpr)) {
+                            result.errors.push_back({sourceLine, "CHAIN program expression error: " + error});
+                            return false;
+                        }
+                        result.program.push_back(makeNoOperandInstruction(PickVM::OpCode::Chain));
                         return true;
                     } else if constexpr (std::is_same_v<StmtT, BasicIr::GotoStmt>) {
                         const std::size_t jumpIp = result.program.size();
@@ -581,12 +604,35 @@ namespace PickShell {
                         result.program.push_back(PickVM::Instruction{PickVM::OpCode::StoreVar, uppercase(stmt.variableName)});
                         return true;
                     } else if constexpr (std::is_same_v<StmtT, BasicIr::InputStmt>) {
+                        if (stmt.promptExpr) {
+                            std::string error;
+                            ExpressionAstEmitter emitter(result.program, error);
+                            if (!emitter.emit(*stmt.promptExpr)) {
+                                result.errors.push_back({line.lineNumber, "INPUT prompt expression error: " + error});
+                                return false;
+                            }
+                            // Prompted INPUT emits PRINT without newline, then INPUT.
+                            result.program.push_back(makeNoOperandInstruction(PickVM::OpCode::PrintVal));
+                        }
                         // All INPUT reads a raw string line; % variables additionally coerce to int.
                         result.program.push_back(makeNoOperandInstruction(PickVM::OpCode::InputStr));
                         if (isIntVar(stmt.variableName)) {
                             result.program.push_back(makeNoOperandInstruction(PickVM::OpCode::CoerceInt));
                         }
                         result.program.push_back(PickVM::Instruction{PickVM::OpCode::StoreVar, uppercase(stmt.variableName)});
+                        return true;
+                    } else if constexpr (std::is_same_v<StmtT, BasicIr::ChainStmt>) {
+                        if (!stmt.programExpr) {
+                            result.errors.push_back({line.lineNumber, "CHAIN requires a program expression"});
+                            return false;
+                        }
+                        std::string error;
+                        ExpressionAstEmitter emitter(result.program, error);
+                        if (!emitter.emit(*stmt.programExpr)) {
+                            result.errors.push_back({line.lineNumber, "CHAIN program expression error: " + error});
+                            return false;
+                        }
+                        result.program.push_back(makeNoOperandInstruction(PickVM::OpCode::Chain));
                         return true;
                     } else if constexpr (std::is_same_v<StmtT, BasicIr::GotoStmt>) {
                         const std::size_t jumpIp = result.program.size();
