@@ -932,6 +932,7 @@ namespace PickShell {
         for (std::size_t i = 2; i < tokens.size(); ++i) {
             params.push_back(tokens[i]);
         }
+        resetProcReadNextCursor();
 
         const ProcInterpreter::SessionAtFn sessionAt = [this](const std::string_view n) {
             return session_.resolveSystemVariable(n);
@@ -940,7 +941,43 @@ namespace PickShell {
                                           [this](const std::string &tclLine, std::ostream &procOut) {
                                               executeProcTclCommand(tclLine, procOut);
                                           },
-                                          sessionAt);
+                                          sessionAt,
+                                          [this](const std::string &fileName, std::string &error) {
+                                              return procSelect(fileName, error);
+                                          },
+                                          [this](std::string &error) {
+                                              return procReadNext(error);
+                                          });
+    }
+
+    bool Shell::procSelect(const std::string &fileName, std::string &error) {
+        std::vector<std::string> tokens{"SELECT", fileName};
+        PickCore::English::ParseContext pc;
+        PickCore::English::EnglishRunOptions eo;
+        const std::optional<PickCore::English::Result> result =
+            englishService_.run(session_.fileSystem_, tokens, pc, eo, error);
+        if (!result.has_value()) {
+            return false;
+        }
+        session_.setActiveList(result->selectedIds, fileName);
+        resetProcReadNextCursor();
+        return true;
+    }
+
+    std::optional<std::string> Shell::procReadNext(std::string &error) {
+        if (!session_.activeListSourceFile().has_value()) {
+            error = "No active list";
+            return std::nullopt;
+        }
+        if (procReadNextIndex_ >= session_.activeList().size()) {
+            error.clear();
+            return std::nullopt;
+        }
+        return session_.activeList()[procReadNextIndex_++];
+    }
+
+    void Shell::resetProcReadNextCursor() {
+        procReadNextIndex_ = 0;
     }
 
     void Shell::executeProcTclCommand(const std::string &line, std::ostream &out) {

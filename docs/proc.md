@@ -13,7 +13,7 @@
 Execution is two-pass:
 
 1. First pass records labels (`NAME:`) and validates duplicates.
-2. Second pass executes statements line-by-line with `GO` and `IF ... THEN GO ...` jumps.
+2. Second pass executes statements line-by-line with label jumps and loop/control frames.
 
 Scripts run through Tcl as:
 
@@ -48,21 +48,28 @@ Session `@` names in PROC:
 
 - `DISPLAY <tokens...>`: print substituted operands joined by spaces.
 - `INPUT <name>`: read one input line and assign to variable.
-- `IF <lhs> = <rhs> THEN GO <label>`: conditional branch (exact string equality after substitution).
+- `IF <lhs> = <rhs> THEN <statement> [ELSE <statement>]`: conditional execution (exact string equality after substitution).
 - `GO <label>`: unconditional jump.
+- `RETURN`: flat control transfer that exits the current PROC execution.
+- `LOOP` / `REPEAT`: minimal loop construct.
+- `EXIT`: leave the current loop.
+- `EXITIF <lhs> = <rhs>`: conditional loop exit.
+- `SELECT <file>`: populate session active list from file ids.
+- `READNEXT <name>`: read next active-list id into a variable (empty string when exhausted).
 - `TCL <command...>`: pass reconstructed, substituted operand string to Tcl dispatcher.
 - `<name> = <tokens...>`: string assignment.
 - `END`: terminate script successfully.
 
 ## R83 aliases and long-form canonical keywords
 
-PROC accepts both modern long-form statement keywords and R83-compatible short aliases. The long forms are canonical for documentation, diagnostics, and internal command identity; short forms are compatibility aliases only.
+PROC accepts both modern long-form statement keywords and R83-compatible short aliases. Long forms are canonical for documentation, diagnostics, and internal command identity; short forms are compatibility aliases only.
 
 Compatibility and parsing rules:
 
 - Alias and long-form variants execute identical behavior.
 - The first token is parsed as a structural command keyword (or assignment target shape) and is never substituted from variables.
 - Alias support does not imply dynamic command construction; PROC remains token-driven, not macro-driven.
+- Canonical examples: `DISPLAY`/`D`, `INPUT`/`I`, `GO`/`G`, `TCL`/`T`, `END`/`E`, `SELECT`/`S`, `READNEXT`/`RN`.
 
 Labels:
 
@@ -87,6 +94,8 @@ Representative runtime errors include:
 - `Error: IF requires IF <lhs> = <rhs> THEN GO <label>`
 - `Error: Read-only system variable`
 - `Error: Unknown PROC statement`
+- `Error: EXIT outside LOOP`
+- `Error: REPEAT without LOOP`
 
 ## Compatibility intent
 

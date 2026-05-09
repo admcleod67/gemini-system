@@ -6,6 +6,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace PickShell {
     namespace {
@@ -70,15 +71,290 @@ namespace PickShell {
         }
 
         std::vector<std::string> substituteTokens(const std::vector<std::string> &tokens,
-                                                    const std::size_t startIndex,
-                                                    const std::unordered_map<std::string, std::string> &variables,
-                                                    const ProcInterpreter::SessionAtFn *sessionAt) {
+                                                  const std::size_t startIndex,
+                                                  const std::unordered_map<std::string, std::string> &variables,
+                                                  const ProcInterpreter::SessionAtFn *sessionAt) {
             std::vector<std::string> out;
             out.reserve(tokens.size() - std::min(startIndex, tokens.size()));
             for (std::size_t i = startIndex; i < tokens.size(); ++i) {
                 out.push_back(substituteToken(tokens[i], variables, sessionAt));
             }
             return out;
+        }
+
+        enum class Command {
+            Display,
+            Input,
+            If,
+            Go,
+            Tcl,
+            End,
+            Return,
+            Loop,
+            Repeat,
+            Exit,
+            ExitIf,
+            Select,
+            ReadNext,
+            Assignment,
+            Unknown
+        };
+
+        struct ParsedStatement {
+            Command command{Command::Unknown};
+            std::vector<std::string> tokens;
+        };
+
+        struct IfParts {
+            std::vector<std::string> lhsTokens;
+            std::vector<std::string> rhsTokens;
+            std::vector<std::string> thenTokens;
+            std::vector<std::string> elseTokens;
+        };
+
+        struct LoopFrame {
+            int loopPc{-1};
+            int repeatPc{-1};
+        };
+
+        bool tokenEq(const std::string &token, const std::string_view target) {
+            if (token.size() != target.size()) {
+                return false;
+            }
+            for (std::size_t i = 0; i < token.size(); ++i) {
+                if (std::toupper(static_cast<unsigned char>(token[i])) !=
+                    std::toupper(static_cast<unsigned char>(target[i]))) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        std::string canonicalKeyword(const std::string &token) {
+            const std::string up = upperAscii(token);
+            if (up == "DISPLAY" || up == "D") {
+                return "DISPLAY";
+            }
+            if (up == "INPUT" || up == "I") {
+                return "INPUT";
+            }
+            if (up == "IF") {
+                return "IF";
+            }
+            if (up == "GO" || up == "G") {
+                return "GO";
+            }
+            if (up == "TCL" || up == "T") {
+                return "TCL";
+            }
+            if (up == "END" || up == "E") {
+                return "END";
+            }
+            if (up == "RETURN") {
+                return "RETURN";
+            }
+            if (up == "LOOP") {
+                return "LOOP";
+            }
+            if (up == "REPEAT") {
+                return "REPEAT";
+            }
+            if (up == "EXIT") {
+                return "EXIT";
+            }
+            if (up == "EXITIF") {
+                return "EXITIF";
+            }
+            if (up == "SELECT" || up == "S") {
+                return "SELECT";
+            }
+            if (up == "READNEXT" || up == "RN") {
+                return "READNEXT";
+            }
+            return up;
+        }
+
+        Command commandFromCanonical(const std::string &keyword) {
+            if (keyword == "DISPLAY") {
+                return Command::Display;
+            }
+            if (keyword == "INPUT") {
+                return Command::Input;
+            }
+            if (keyword == "IF") {
+                return Command::If;
+            }
+            if (keyword == "GO") {
+                return Command::Go;
+            }
+            if (keyword == "TCL") {
+                return Command::Tcl;
+            }
+            if (keyword == "END") {
+                return Command::End;
+            }
+            if (keyword == "RETURN") {
+                return Command::Return;
+            }
+            if (keyword == "LOOP") {
+                return Command::Loop;
+            }
+            if (keyword == "REPEAT") {
+                return Command::Repeat;
+            }
+            if (keyword == "EXIT") {
+                return Command::Exit;
+            }
+            if (keyword == "EXITIF") {
+                return Command::ExitIf;
+            }
+            if (keyword == "SELECT") {
+                return Command::Select;
+            }
+            if (keyword == "READNEXT") {
+                return Command::ReadNext;
+            }
+            return Command::Unknown;
+        }
+
+        ParsedStatement parseStatement(const std::vector<std::string> &tokens) {
+            ParsedStatement parsed;
+            parsed.tokens = tokens;
+            if (tokens.empty()) {
+                return parsed;
+            }
+            // Assignment disambiguation must happen before alias resolution.
+            if (tokens.size() >= 3 && tokens[1] == "=") {
+                parsed.command = Command::Assignment;
+                return parsed;
+            }
+            parsed.command = commandFromCanonical(canonicalKeyword(tokens[0]));
+            return parsed;
+        }
+
+        bool resolveLabelPc(const std::string &token,
+                            const std::unordered_map<std::string, int> &labels,
+                            std::ostream &out,
+                            int &pcOut) {
+            const auto labelIt = labels.find(upperAscii(token));
+            if (labelIt == labels.end()) {
+                out << "Error: Unknown label: " << token << "\n";
+                return false;
+            }
+            pcOut = labelIt->second;
+            return true;
+        }
+
+        bool parseIfParts(const std::vector<std::string> &tokens, IfParts &parts) {
+            if (tokens.size() < 6) {
+                return false;
+            }
+            if (canonicalKeyword(tokens[0]) != "IF") {
+                return false;
+            }
+            std::size_t eqPos = std::string::npos;
+            std::size_t thenPos = std::string::npos;
+            std::size_t elsePos = std::string::npos;
+            for (std::size_t i = 1; i < tokens.size(); ++i) {
+                if (tokens[i] == "=" && eqPos == std::string::npos) {
+                    eqPos = i;
+                    continue;
+                }
+                if (tokenEq(tokens[i], "THEN") && thenPos == std::string::npos) {
+                    thenPos = i;
+                    continue;
+                }
+                if (tokenEq(tokens[i], "ELSE") && elsePos == std::string::npos) {
+                    elsePos = i;
+                    continue;
+                }
+            }
+            if (eqPos == std::string::npos || thenPos == std::string::npos) {
+                return false;
+            }
+            if (eqPos <= 1 || thenPos <= eqPos + 1 || thenPos + 1 >= tokens.size()) {
+                return false;
+            }
+            if (elsePos != std::string::npos && elsePos <= thenPos + 1) {
+                return false;
+            }
+            parts.lhsTokens.assign(tokens.begin() + 1, tokens.begin() + static_cast<long>(eqPos));
+            parts.rhsTokens.assign(tokens.begin() + static_cast<long>(eqPos + 1), tokens.begin() + static_cast<long>(thenPos));
+            if (elsePos == std::string::npos) {
+                parts.thenTokens.assign(tokens.begin() + static_cast<long>(thenPos + 1), tokens.end());
+                parts.elseTokens.clear();
+            } else {
+                parts.thenTokens.assign(tokens.begin() + static_cast<long>(thenPos + 1), tokens.begin() + static_cast<long>(elsePos));
+                parts.elseTokens.assign(tokens.begin() + static_cast<long>(elsePos + 1), tokens.end());
+            }
+            return !parts.thenTokens.empty() && !parts.lhsTokens.empty() && !parts.rhsTokens.empty();
+        }
+
+        bool parseExitIfCondition(const std::vector<std::string> &tokens,
+                                  std::vector<std::string> &lhsTokens,
+                                  std::vector<std::string> &rhsTokens) {
+            if (tokens.size() < 3) {
+                return false;
+            }
+            std::size_t eqPos = std::string::npos;
+            for (std::size_t i = 1; i < tokens.size(); ++i) {
+                if (tokens[i] == "=") {
+                    eqPos = i;
+                    break;
+                }
+            }
+            if (eqPos == std::string::npos || eqPos <= 1) {
+                return false;
+            }
+            lhsTokens.assign(tokens.begin() + 1, tokens.begin() + static_cast<long>(eqPos));
+            rhsTokens.assign(tokens.begin() + static_cast<long>(eqPos + 1), tokens.end());
+            return !lhsTokens.empty();
+        }
+
+        std::string evalValue(const std::vector<std::string> &tokens,
+                              const std::unordered_map<std::string, std::string> &variables,
+                              const ProcInterpreter::SessionAtFn *sessionAt) {
+            if (tokens.empty()) {
+                return "";
+            }
+            if (tokens.size() == 1) {
+                return substituteToken(tokens[0], variables, sessionAt);
+            }
+            return joinTokens(substituteTokens(tokens, 0, variables, sessionAt), 0);
+        }
+
+        bool buildLoopPairs(const std::vector<std::vector<std::string>> &lineTokens,
+                            const std::vector<std::string> &rawLines,
+                            std::vector<int> &loopToRepeat,
+                            std::vector<int> &repeatToLoop,
+                            std::ostream &out) {
+            loopToRepeat.assign(lineTokens.size(), -1);
+            repeatToLoop.assign(lineTokens.size(), -1);
+            std::vector<int> loopStack;
+            for (std::size_t i = 0; i < lineTokens.size(); ++i) {
+                const std::string trimmed = trim(rawLines[i]);
+                if (trimmed.empty() || trimmed.back() == ':') {
+                    continue;
+                }
+                const ParsedStatement parsed = parseStatement(lineTokens[i]);
+                if (parsed.command == Command::Loop) {
+                    loopStack.push_back(static_cast<int>(i));
+                } else if (parsed.command == Command::Repeat) {
+                    if (loopStack.empty()) {
+                        out << "Error: REPEAT without LOOP\n";
+                        return false;
+                    }
+                    const int loopPc = loopStack.back();
+                    loopStack.pop_back();
+                    loopToRepeat[static_cast<std::size_t>(loopPc)] = static_cast<int>(i);
+                    repeatToLoop[i] = loopPc;
+                }
+            }
+            if (!loopStack.empty()) {
+                out << "Error: LOOP without REPEAT\n";
+                return false;
+            }
+            return true;
         }
     } // namespace
 
@@ -87,11 +363,20 @@ namespace PickShell {
                                     std::istream *inputStream,
                                     std::ostream &out,
                                     const TclBridgeFn &tclBridgeFn,
-                                    const SessionAtFn &sessionAt) const {
+                                    const SessionAtFn &sessionAt,
+                                    const SelectFn &selectFn,
+                                    const ReadNextFn &readNextFn) const {
         const SessionAtFn *const sessionPtr = static_cast<bool>(sessionAt) ? &sessionAt : nullptr;
+        const SelectFn *const selectPtr = static_cast<bool>(selectFn) ? &selectFn : nullptr;
+        const ReadNextFn *const readNextPtr = static_cast<bool>(readNextFn) ? &readNextFn : nullptr;
 
         std::unordered_map<std::string, int> labels;
         labels.reserve(lines.size());
+        std::vector<std::vector<std::string>> lineTokens;
+        lineTokens.reserve(lines.size());
+        for (const auto &line : lines) {
+            lineTokens.push_back(tokenize(trim(line)));
+        }
         for (int i = 0; i < static_cast<int>(lines.size()); ++i) {
             const std::string line = trim(lines[static_cast<std::size_t>(i)]);
             if (line.empty() || line.back() != ':') {
@@ -109,6 +394,11 @@ namespace PickShell {
             }
             labels[canon] = i;
         }
+        std::vector<int> loopToRepeat;
+        std::vector<int> repeatToLoop;
+        if (!buildLoopPairs(lineTokens, lines, loopToRepeat, repeatToLoop, out)) {
+            return false;
+        }
 
         std::unordered_map<std::string, std::string> variables;
         for (std::size_t i = 0; i < params.size(); ++i) {
@@ -117,26 +407,30 @@ namespace PickShell {
 
         std::istream &in = inputStream ? *inputStream : std::cin;
         int pc = 0;
-        while (pc >= 0 && pc < static_cast<int>(lines.size())) {
-            const std::string rawLine = trim(lines[static_cast<std::size_t>(pc)]);
-            if (rawLine.empty() || rawLine.back() == ':') {
-                ++pc;
-                continue;
-            }
+        std::vector<LoopFrame> loopFrames;
 
-            const std::vector<std::string> tokens = tokenize(rawLine);
-            if (tokens.empty()) {
-                ++pc;
-                continue;
-            }
+        const auto syncLoopFramesForPc = [&loopFrames](const int currentPc) {
+            loopFrames.erase(std::remove_if(loopFrames.begin(),
+                                            loopFrames.end(),
+                                            [currentPc](const LoopFrame &f) {
+                                                return currentPc <= f.loopPc || currentPc > f.repeatPc;
+                                            }),
+                             loopFrames.end());
+        };
 
-            const std::string keyword = upperAscii(tokens[0]);
-            if (keyword == "DISPLAY") {
+        std::function<bool(const std::vector<std::string> &, int &, bool)> execStatement;
+        execStatement = [&](const std::vector<std::string> &tokens, int &activePc, const bool inlineStmt) -> bool {
+            const ParsedStatement parsed = parseStatement(tokens);
+            const auto nextLine = [&activePc]() { ++activePc; };
+
+            if (parsed.command == Command::Display) {
                 out << joinTokens(substituteTokens(tokens, 1, variables, sessionPtr), 0) << "\n";
-                ++pc;
-                continue;
+                if (!inlineStmt) {
+                    nextLine();
+                }
+                return true;
             }
-            if (keyword == "INPUT") {
+            if (parsed.command == Command::Input) {
                 if (tokens.size() != 2) {
                     out << "Error: INPUT requires a variable name\n";
                     return false;
@@ -150,65 +444,197 @@ namespace PickShell {
                     value.clear();
                 }
                 variables[tokens[1]] = value;
-                ++pc;
-                continue;
+                if (!inlineStmt) {
+                    nextLine();
+                }
+                return true;
             }
-            if (keyword == "IF") {
-                if (tokens.size() != 7 || tokens[2] != "=" || upperAscii(tokens[4]) != "THEN" || upperAscii(tokens[5]) != "GO") {
+            if (parsed.command == Command::If) {
+                IfParts parts;
+                if (!parseIfParts(tokens, parts)) {
                     out << "Error: IF requires IF <lhs> = <rhs> THEN GO <label>\n";
                     return false;
                 }
-                const std::string lhsVal = substituteToken(tokens[1], variables, sessionPtr);
-                const std::string rhsVal = substituteToken(tokens[3], variables, sessionPtr);
-                if (lhsVal == rhsVal) {
-                    const std::string label = upperAscii(tokens[6]);
-                    const auto labelIt = labels.find(label);
-                    if (labelIt == labels.end()) {
-                        out << "Error: Unknown label: " << tokens[6] << "\n";
-                        return false;
+                const bool truthy = evalValue(parts.lhsTokens, variables, sessionPtr) ==
+                                    evalValue(parts.rhsTokens, variables, sessionPtr);
+                const std::vector<std::string> &branchTokens = truthy ? parts.thenTokens : parts.elseTokens;
+                if (branchTokens.empty()) {
+                    if (!inlineStmt) {
+                        nextLine();
                     }
-                    pc = labelIt->second;
-                } else {
-                    ++pc;
+                    return true;
                 }
-                continue;
+                int branchPc = activePc;
+                if (!execStatement(branchTokens, branchPc, true)) {
+                    return false;
+                }
+                if (!inlineStmt) {
+                    if (branchPc == activePc) {
+                        nextLine();
+                    } else {
+                        activePc = branchPc;
+                    }
+                } else {
+                    activePc = branchPc;
+                }
+                return true;
             }
-            if (keyword == "GO") {
+            if (parsed.command == Command::Go) {
                 if (tokens.size() != 2) {
                     out << "Error: GO requires a label\n";
                     return false;
                 }
-                const std::string label = upperAscii(tokens[1]);
-                const auto labelIt = labels.find(label);
-                if (labelIt == labels.end()) {
-                    out << "Error: Unknown label: " << tokens[1] << "\n";
-                    return false;
-                }
-                pc = labelIt->second;
-                continue;
+                return resolveLabelPc(tokens[1], labels, out, activePc);
             }
-            if (keyword == "TCL") {
+            if (parsed.command == Command::Tcl) {
                 const std::string cmd = joinTokens(substituteTokens(tokens, 1, variables, sessionPtr), 0);
                 tclBridgeFn(cmd, out);
-                ++pc;
-                continue;
-            }
-            if (keyword == "END") {
+                if (!inlineStmt) {
+                    nextLine();
+                }
                 return true;
             }
-
-            if (tokens.size() >= 3 && tokens[1] == "=") {
+            if (parsed.command == Command::End) {
+                activePc = static_cast<int>(lines.size());
+                return true;
+            }
+            if (parsed.command == Command::Return) {
+                activePc = static_cast<int>(lines.size());
+                return true;
+            }
+            if (parsed.command == Command::Loop) {
+                const int repeatPc = loopToRepeat[static_cast<std::size_t>(activePc)];
+                if (repeatPc < 0) {
+                    out << "Error: LOOP without REPEAT\n";
+                    return false;
+                }
+                if (loopFrames.empty() || loopFrames.back().loopPc != activePc) {
+                    loopFrames.push_back(LoopFrame{activePc, repeatPc});
+                }
+                if (!inlineStmt) {
+                    nextLine();
+                }
+                return true;
+            }
+            if (parsed.command == Command::Repeat) {
+                const int loopPc = repeatToLoop[static_cast<std::size_t>(activePc)];
+                if (loopPc < 0) {
+                    out << "Error: REPEAT without LOOP\n";
+                    return false;
+                }
+                activePc = loopPc + 1;
+                return true;
+            }
+            if (parsed.command == Command::Exit) {
+                syncLoopFramesForPc(activePc);
+                if (loopFrames.empty()) {
+                    out << "Error: EXIT outside LOOP\n";
+                    return false;
+                }
+                const LoopFrame frame = loopFrames.back();
+                loopFrames.pop_back();
+                activePc = frame.repeatPc + 1;
+                return true;
+            }
+            if (parsed.command == Command::ExitIf) {
+                std::vector<std::string> lhsTokens;
+                std::vector<std::string> rhsTokens;
+                if (!parseExitIfCondition(tokens, lhsTokens, rhsTokens)) {
+                    out << "Error: EXITIF requires EXITIF <lhs> = <rhs>\n";
+                    return false;
+                }
+                if (evalValue(lhsTokens, variables, sessionPtr) == evalValue(rhsTokens, variables, sessionPtr)) {
+                    syncLoopFramesForPc(activePc);
+                    if (loopFrames.empty()) {
+                        out << "Error: EXIT outside LOOP\n";
+                        return false;
+                    }
+                    const LoopFrame frame = loopFrames.back();
+                    loopFrames.pop_back();
+                    activePc = frame.repeatPc + 1;
+                } else if (!inlineStmt) {
+                    nextLine();
+                }
+                return true;
+            }
+            if (parsed.command == Command::Select) {
+                if (tokens.size() != 2) {
+                    out << "Error: SELECT requires a filename\n";
+                    return false;
+                }
+                if (selectPtr == nullptr) {
+                    out << "Error: SELECT not available in this PROC host\n";
+                    return false;
+                }
+                std::string error;
+                if (!(*selectPtr)(substituteToken(tokens[1], variables, sessionPtr), error)) {
+                    out << "Error: " << error << "\n";
+                    return false;
+                }
+                if (!inlineStmt) {
+                    nextLine();
+                }
+                return true;
+            }
+            if (parsed.command == Command::ReadNext) {
+                if (tokens.size() != 2) {
+                    out << "Error: READNEXT requires a variable name\n";
+                    return false;
+                }
+                if (isReadonlySessionAtTarget(tokens[1])) {
+                    out << "Error: Read-only system variable\n";
+                    return false;
+                }
+                if (readNextPtr == nullptr) {
+                    out << "Error: READNEXT not available in this PROC host\n";
+                    return false;
+                }
+                std::string error;
+                if (const std::optional<std::string> nextId = (*readNextPtr)(error)) {
+                    variables[tokens[1]] = *nextId;
+                } else {
+                    if (!error.empty()) {
+                        out << "Error: " << error << "\n";
+                        return false;
+                    }
+                    variables[tokens[1]].clear();
+                }
+                if (!inlineStmt) {
+                    nextLine();
+                }
+                return true;
+            }
+            if (parsed.command == Command::Assignment) {
                 if (isReadonlySessionAtTarget(tokens[0])) {
                     out << "Error: Read-only system variable\n";
                     return false;
                 }
                 variables[tokens[0]] = joinTokens(substituteTokens(tokens, 2, variables, sessionPtr), 0);
-                ++pc;
-                continue;
+                if (!inlineStmt) {
+                    nextLine();
+                }
+                return true;
             }
 
             out << "Error: Unknown PROC statement\n";
             return false;
+        };
+
+        while (pc >= 0 && pc < static_cast<int>(lines.size())) {
+            const std::string rawLine = trim(lines[static_cast<std::size_t>(pc)]);
+            if (rawLine.empty() || rawLine.back() == ':') {
+                ++pc;
+                continue;
+            }
+            syncLoopFramesForPc(pc);
+            const std::vector<std::string> tokens = lineTokens[static_cast<std::size_t>(pc)];
+            if (tokens.empty()) {
+                ++pc;
+                continue;
+            }
+            if (!execStatement(tokens, pc, false)) {
+                return false;
+            }
         }
         return true;
     }

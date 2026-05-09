@@ -127,7 +127,7 @@ TEST_CASE("shell PROC duplicate labels are rejected") {
 TEST_CASE("shell PROC malformed IF and unknown label errors") {
     auto fsDir = uniqueTempDir();
     seedVocAndProc(fsDir);
-    writeProcScriptRecord(fsDir, "BADIF", "IF A = B THEN DISPLAY X\nEND\n");
+    writeProcScriptRecord(fsDir, "BADIF", "IF A = B THEN\nEND\n");
     writeProcScriptRecord(fsDir, "BADGO", "GO MISSING\nEND\n");
 
     PickVM::Runtime rt;
@@ -143,6 +143,105 @@ TEST_CASE("shell PROC malformed IF and unknown label errors") {
     sh.handleLine("PROC BADGO", out, quit);
     CHECK_FALSE(quit);
     CHECK(out.str() == "Error: Unknown label: MISSING\n");
+}
+
+TEST_CASE("shell PROC long and short aliases normalize to same behavior") {
+    auto fsDir = uniqueTempDir();
+    seedVocAndProc(fsDir);
+    writeProcScriptRecord(fsDir, "ALIAS",
+                          "X = HELLO\n"
+                          "D X\n"
+                          "I NAME\n"
+                          "D NAME\n"
+                          "G DONE\n"
+                          "D FAIL\n"
+                          "DONE:\n"
+                          "E\n");
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(fsDir);
+    std::istringstream in("ALICE\n");
+    sh.setInputStream(&in);
+    std::ostringstream out;
+    bool quit = false;
+    sh.handleLine("PROC ALIAS", out, quit);
+    CHECK_FALSE(quit);
+    CHECK(out.str() == "HELLO\nALICE\n");
+}
+
+TEST_CASE("shell PROC IF THEN ELSE supports inline statements") {
+    auto fsDir = uniqueTempDir();
+    seedVocAndProc(fsDir);
+    writeProcScriptRecord(fsDir, "IFELSE",
+                          "X = YES\n"
+                          "IF X = YES THEN DISPLAY PASS ELSE DISPLAY FAIL\n"
+                          "IF X = NO THEN DISPLAY BAD ELSE DISPLAY GOOD\n"
+                          "END\n");
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(fsDir);
+    std::ostringstream out;
+    bool quit = false;
+    sh.handleLine("PROC IFELSE", out, quit);
+    CHECK_FALSE(quit);
+    CHECK(out.str() == "PASS\nGOOD\n");
+}
+
+TEST_CASE("shell PROC RETURN exits current script") {
+    auto fsDir = uniqueTempDir();
+    seedVocAndProc(fsDir);
+    writeProcScriptRecord(fsDir, "RET",
+                          "DISPLAY BEFORE\n"
+                          "RETURN\n"
+                          "DISPLAY AFTER\n"
+                          "END\n");
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(fsDir);
+    std::ostringstream out;
+    bool quit = false;
+    sh.handleLine("PROC RET", out, quit);
+    CHECK_FALSE(quit);
+    CHECK(out.str() == "BEFORE\n");
+}
+
+TEST_CASE("shell PROC LOOP REPEAT EXITIF iterates active list") {
+    auto fsDir = uniqueTempDir();
+    seedVocAndProc(fsDir);
+    PickFS::FileSystem fs(fsDir);
+    fs.createFile("DATA");
+    fs.write("DATA", PickFS::Record("R1", "A\n"));
+    fs.write("DATA", PickFS::Record("R2", "B\n"));
+    writeProcScriptRecord(fsDir, "ITER",
+                          "SELECT DATA\n"
+                          "LOOP\n"
+                          "READNEXT ID\n"
+                          "EXITIF ID = \n"
+                          "DISPLAY ID\n"
+                          "REPEAT\n"
+                          "END\n");
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(fsDir);
+    std::ostringstream out;
+    bool quit = false;
+    sh.handleLine("PROC ITER", out, quit);
+    CHECK_FALSE(quit);
+    CHECK(out.str() == "R1\nR2\n");
+}
+
+TEST_CASE("shell PROC EXIT outside loop errors") {
+    auto fsDir = uniqueTempDir();
+    seedVocAndProc(fsDir);
+    writeProcScriptRecord(fsDir, "BADEXIT", "EXIT\nEND\n");
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(fsDir);
+    std::ostringstream out;
+    bool quit = false;
+    sh.handleLine("PROC BADEXIT", out, quit);
+    CHECK_FALSE(quit);
+    CHECK(out.str() == "Error: EXIT outside LOOP\n");
 }
 
 TEST_CASE("shell PROC uses F mapping for script lookup outside PROC file") {

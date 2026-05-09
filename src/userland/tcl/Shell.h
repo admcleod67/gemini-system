@@ -117,6 +117,9 @@ namespace PickShell {
         void cmdRun(const std::vector<std::string> &tokens, std::ostream &out);
         void cmdProc(const std::vector<std::string> &tokens, std::ostream &out);
         void executeProcTclCommand(const std::string &line, std::ostream &out);
+        bool procSelect(const std::string &fileName, std::string &error);
+        std::optional<std::string> procReadNext(std::string &error);
+        void resetProcReadNextCursor();
         static std::string programObjectRecordKey(const std::string &recordKey);
         std::optional<std::string> readProgramRecord(const BasicShell::ProgramLocation &location, bool objectRecord);
         bool writeProgramRecord(const BasicShell::ProgramLocation &location,
@@ -179,6 +182,7 @@ namespace PickShell {
         std::unordered_set<int> basicBreakpoints_;
         std::optional<int> basicResumePastLine_;
         bool basicTrace_{false};
+        std::size_t procReadNextIndex_{0};
     };
 } // namespace PickShell
 

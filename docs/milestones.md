@@ -272,12 +272,13 @@ This milestone focuses on broadening the Gemini System by bringing the PROC lang
   - Support for inline and multi-token THEN/ELSE bodies.
 - **GO / RETURN / labels**
   - Label resolution improvements.
+  - `RETURN` is a flat control-transfer exit from the current PROC script.
   - Authentic error behaviour for missing labels and invalid jumps.
 - **LOOP / REPEAT**
   - Minimal loop construct with EXIT and conditional EXITIF.
 - **SELECT / READNEXT integration**
-  - Allow PROC to iterate over file records using the new filesystem cursor semantics from Milestone 4.
-  - Support SELECT and implicit active list iteration.
+  - Native PROC `SELECT`/`READNEXT` statements integrate with session active-list APIs.
+  - Stage 1 scope: simple `SELECT <file>` and record-id iteration; advanced selection expressions are deferred.
 - **TCL bridging improvements**
   - Multi-token TCL commands.
   - Better variable substitution rules.
