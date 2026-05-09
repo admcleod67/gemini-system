@@ -369,3 +369,123 @@ Bootstrap/login diagnostics now distinguish missing versus malformed catalogue s
 - Multi-user concurrency and record locking (READU, WRITEU, RELEASE).
 - TCL pipeline semantics or shell scripting extensions.
 - VM opcode expansion (beyond what PROC requires for control flow).
+
+## Milestone 6 — File‑Backed HELP System
+
+This milestone replaces the current built‑in HELP topic table with a Pick‑authentic, file‑backed HELP subsystem. HELP topics become ordinary Pick records stored in a logical file (**HELP**) within each account, with fallback to system‑level HELP topics in SYSPROG. This milestone introduces no VM or BASIC changes and requires no filesystem model changes beyond normal record I/O. It strengthens the TCL command layer and aligns Gemini with classic Pick documentation workflows.
+
+### Goals
+
+- Replace hardcoded HELP topics with record‑based HELP files.
+- Support account‑local HELP overrides with fallback to system HELP.
+- Provide a clean, extensible foundation for future documentation features.
+- Preserve Pick‑authentic behaviour: HELP is a TCL‑layer feature, not a BASIC or VM concern.
+- Avoid introducing new filesystem primitives; rely entirely on the M3 structured record model.
+
+---
+
+### Scope
+
+#### 1. HELP file model (Pick‑authentic)
+
+- Introduce a logical file named **HELP** in each account.
+- HELP topics stored as one record per topic; record ID = topic name (uppercase).
+- Topic body stored as newline‑delimited text (standard `.item` format).
+- No attribute semantics required; HELP records treated as raw text.
+
+#### 2. HELP lookup chain
+
+Implement a deterministic lookup order:
+
+1. Account‑local HELP file — `<current-account>/HELP/<topic>`
+2. System HELP file — `SYSPROG/HELP/<topic>`
+3. Built‑in fallback topics — minimal set for bootstrapping (e.g. `HELP`, `HELP HELP`, `HELP LIST`)
+
+This mirrors Pick behaviour: local overrides first, system defaults second.
+
+#### 3. HELP command enhancements
+
+- **`HELP <topic>`**: resolve topic via lookup chain; print record body verbatim; case‑insensitive topic matching.
+- **`HELP`** (no arguments): print short usage summary; optionally list available topics (stretch).
+- **Error behaviour**: unknown topic → `No help available for "<topic>".`
+
+#### 4. Optional authoring commands (Stage 1 minimal)
+
+- **`HELP-LIST`**: list available HELP topics in the current account.
+- **`HELP-EDIT <topic>`**: open the topic in the line editor (`ED>`); create the topic if missing.
+
+These commands are optional but strongly recommended for usability.
+
+#### 5. Account bootstrap integration
+
+- Ensure new accounts created via catalogue bootstrap include an empty HELP file.
+- SYSPROG account ships with a minimal set of HELP topics (simple `.item` files):
+  - `HELP`
+  - `HELP HELP`
+  - `HELP LIST`
+  - `HELP TCL`
+  - `HELP BASIC`
+  - `HELP PROC`
+  - `HELP ENGLISH`
+
+#### 6. TCL command layer adjustments
+
+- Replace built‑in HELP table with file‑backed lookup.
+- Improve quoting and tokenisation around HELP arguments (depends on Milestone 5).
+- Ensure HELP works identically inside PROC (`TCL HELP …`).
+
+#### 7. Documentation updates
+
+- Update `docs/tcl-shell.md` to describe file‑backed HELP behaviour.
+- Add `docs/help-system.md` describing topic format and lookup rules.
+- Update `docs/milestones.md` to reflect Milestone 6 scope (this section).
+
+---
+
+### Non‑Goals (Deferred)
+
+- No VM or BASIC changes.
+- No new filesystem primitives.
+- No formatting layer (bold, headings, pagination).
+- No hierarchical HELP topics.
+- No cross‑references or hyperlinks.
+- No automatic topic generation from command metadata.
+- No PROC‑level HELP enhancements beyond TCL bridging.
+
+These belong to later documentation/UX milestones.
+
+---
+
+### Rationale
+
+The HELP subsystem is currently the last major TCL‑layer feature still implemented as a static, compiled‑in table. Moving HELP to a file‑backed model:
+
+- aligns Gemini with Pick’s documentation conventions,
+- enables per‑account customisation,
+- removes hardcoded text from the binary,
+- allows HELP topics to evolve without code changes,
+- and prepares the system for richer documentation and onboarding features.
+
+Milestone 6 is intentionally narrow and vertical: it touches only the TCL command layer and the account bootstrap, without affecting BASIC, VM, ENGLISH, or the filesystem model. This keeps the milestone low‑risk and cleanly scoped.
+
+## Milestone 7 — BASIC Functions & MAT Operations
+
+Introduce the next layer of Pick BASIC language richness by adding core built‑in functions, enhanced string and numeric operations, and the first MAT‑family features. This milestone deepens the BASIC language without expanding the VM architecture, focusing on function calls, string utilities, numeric conversions, and minimal MAT READ/MAT WRITE support. It builds on the stable file and variable semantics delivered in Milestone 4.
+
+---
+
+## Milestone 8 — ENGLISH Formatting Layer
+
+Extend the ENGLISH processor with Pick‑authentic report‑formatting capabilities, including headings, breaks, totals, pagination, and controlled output layout. This milestone adds the first true reporting layer on top of the existing LIST/SORT/SELECT engine, enabling structured, human‑readable reports. No new filesystem or VM features are required; the work is confined to the ENGLISH planner/executor and output formatter.
+
+---
+
+## Milestone 9 — Correlatives & Computed Attributes
+
+Implement DICT‑level computed attributes (F‑ and I‑type items) and the supporting execution engine. This milestone enables attribute‑level transformations, conversions, and derived fields used by ENGLISH, BASIC, and TCL. It completes the DICT model begun in Milestones 2 and 3, allowing ENGLISH queries and BASIC file access to evaluate computed attributes consistently with classic Pick behaviour.
+
+---
+
+## Milestone 10 — Record Locking & Multi‑User Concurrency
+
+Introduce Pick‑authentic record‑locking semantics and foundational multi‑user behaviour across the system. This milestone adds READU, WRITEU, and RELEASE operations, enforces lock ownership rules, and ensures safe concurrent access to shared files. It establishes the session‑level locking table, integrates lock checks into BASIC, PROC, and TCL file operations, and provides clear error/reporting behaviour for lock conflicts. This milestone completes the core concurrency model required for multi‑user Pick environments and prepares the system for future work on transaction‑style operations and distributed sessions.
