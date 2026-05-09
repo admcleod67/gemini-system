@@ -57,8 +57,10 @@ For ENGLISH command forms and worked query examples, see [ENGLISH query core](en
 
 | Command | Description |
 |---------|-------------|
-| **`HELP`** | Short command list (same information as this table, in the binary). |
+| **`HELP`** [*command-or-topic*] | No-arg form prints the command list. One-arg form performs non-executing help lookup using command-token canonicalization rules. Resolution precedence is deterministic: built-in topics (`PROC`, `TCL`, `VOC`) first, then built-in command help. Unknown targets print `No help available`. |
 | **`VERSION`** | Title, project version string, and build date. |
+| **`SYSTEM`** | Gemini introspection extension: prints line-oriented system/environment summary (title, version, build date, session identity, Pick root/account context, catalogue root context). |
+| **`ABOUT`** | Literal alias of `SYSTEM`. |
 | **`WHO`** | Print `port username account` when logged in with a Gemini catalogue (account-only logon uses the same string for username and account until a user model exists); otherwise **`0 - -`**. |
 | **`QUIT`** | Exit the shell; clears loaded program state in the VM, shell-held bytecode metadata, and **shell variables**. |
 | **`ECHO`** … | Echo remaining tokens, **space-separated**. Known session tokens **`@USERNO`**, **`@ACCOUNT`**, **`@LOGNAME`**, and **`@DEFDATA`** (case-insensitive) expand from the session before **`$`** rules. Within each token, scan left to right: **`$$`** becomes a single **`$`**; **`$Name`** ( **`Name`** = letters, digits, underscore, **`@`**, at least one character) is replaced by that shell variable’s value, or—if **`Name`** is one of the four **`@`** system names—by the session value; otherwise nothing if unset; any other **`$`** is echoed literally. `$` substitution remains ECHO-scoped in this milestone. |
@@ -127,13 +129,13 @@ Variables are **string key/value** pairs held by the shell (not the VM stack). N
 
 **`ECHO`:** each argument token is scanned for **`$$`** (escaped dollar), **`$Name`** substitution, and literal **`$`**. There is **no** expression evaluation. Unset **`$Name`** expands to an empty segment.
 
-Arity errors: **`SET`** / **`GET`** / **`UNSET`** without a name print a **`… requires a variable name`** line. Extra tokens on **`LIST-VARS`** print **`LIST-VARS takes no arguments`**. Filesystem arity errors follow the same pattern (for example, **`LIST requires a filename`**, **`READ`** / **`WRITE`** messages that include the optional **`MD DEFDATA`** shorthand when the default is not set).
+Arity errors: **`SET`** / **`GET`** / **`UNSET`** without a name print a **`… requires a variable name`** line. Extra tokens on **`LIST-VARS`** print **`LIST-VARS takes no arguments`**. `HELP` accepts zero or one argument (`HELP takes at most one argument`). Filesystem arity errors follow the same pattern (for example, **`LIST requires a filename`**, **`READ`** / **`WRITE`** messages that include the optional **`MD DEFDATA`** shorthand when the default is not set).
 
 Instruction-level debugger controls (`STEP`, `CONT`, `TRACE`, breakpoint management, and program/label dumps) now live in [Assembler shell](assembler-shell.md).
 
 ## Errors
 
-Parse/runtime failures during **`RUN`** print **`Error:`** followed by the exception message. Filesystem command failures also print **`Error:`** with a specific reason (for example missing file or invalid record/file name). The VM’s output stream is cleared back to default after **`RUN`** attempts.
+Parse/runtime failures during **`RUN`** print **`Error:`** followed by the exception message. Filesystem command failures also print **`Error:`** with a specific reason (for example missing file or invalid record/file name). Login/bootstrap diagnostics now distinguish missing versus malformed catalogue states (`ACCOUNTS.json not found` vs `Invalid ACCOUNTS.json`) and surface account-root/VOC/MD attachment status in boot diagnostics. The VM’s output stream is cleared back to default after **`RUN`** attempts.
 
 ## See also
 

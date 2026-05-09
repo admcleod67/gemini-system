@@ -31,7 +31,7 @@ namespace PickCore {
                                                    "RUN",   "BASIC",  "PROC",    "ASM",     "ECHO",    "SET",
                                                    "GET",   "UNSET",  "WHO",     "LOGTO",   "LOGOFF",  "CREATE-FILE",
                                                    "DELETE-FILE", "LIST-FILES", "LIST", "READ", "WRITE", "LIST-PROGRAMS",
-                                                   "LIST-VARS", "DUMP-STACK"};
+                                                   "LIST-VARS", "DUMP-STACK", "SYSTEM", "ABOUT"};
 
         void trimTrailingAsciiWs(std::string &s) {
             while (!s.empty()) {
@@ -63,6 +63,18 @@ namespace PickCore {
                 }
             }
             return nullptr;
+        }
+
+        [[nodiscard]] std::optional<std::string> firstInvalidAccountRowReason(const std::vector<GeminiAccountRow> &accounts) {
+            for (std::size_t i = 0; i < accounts.size(); ++i) {
+                if (accounts[i].name.empty()) {
+                    return "Invalid ACCOUNTS.json: account row missing name (index " + std::to_string(i) + ").";
+                }
+                if (accounts[i].root.empty()) {
+                    return "Invalid ACCOUNTS.json: account row missing root (index " + std::to_string(i) + ").";
+                }
+            }
+            return std::nullopt;
         }
 
         bool reservedLogonTokenUpper(const std::string &upper) {
@@ -171,9 +183,17 @@ namespace PickCore {
                                                                  const std::string &password,
                                                                  std::ostream &err) {
         const std::filesystem::path accountsPath = catalogRoot / "ACCOUNTS.json";
+        if (!std::filesystem::exists(accountsPath)) {
+            err << "ACCOUNTS.json not found.\n";
+            return std::nullopt;
+        }
         const auto accounts = GeminiCatalog::loadAccounts(accountsPath);
         if (!accounts.has_value()) {
-            err << "Cannot read ACCOUNTS.json.\n";
+            err << "Invalid ACCOUNTS.json.\n";
+            return std::nullopt;
+        }
+        if (const std::optional<std::string> rowError = firstInvalidAccountRowReason(*accounts)) {
+            err << *rowError << '\n';
             return std::nullopt;
         }
 
@@ -202,6 +222,10 @@ namespace PickCore {
 
         std::error_code ec;
         const std::filesystem::path pickRoot = (catalogRoot / acct->root).lexically_normal();
+        if (!std::filesystem::is_directory(pickRoot, ec)) {
+            err << "Account path not found: " << pickRoot.string() << '\n';
+            return std::nullopt;
+        }
         if (!std::filesystem::is_directory(pickRoot / "VOC", ec)) {
             err << "Account path has no VOC: " << pickRoot.string() << '\n';
             return std::nullopt;

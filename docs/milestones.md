@@ -351,6 +351,14 @@ Stage 3 VOC delivery is implemented in-tree: `CREATE-VOC`, `DELETE-VOC`, and `LI
   - Better error messages for missing VOC, MD, or account directories.
   - More robust handling of malformed catalogue entries.
 
+### Milestone 5 Stage 4 delivery status (implemented)
+
+Stage 4 command-layer polish is implemented in-tree: `HELP` supports no-arg listing, per-command lookup, and topic help (`PROC`, `TCL`, `VOC`) with deterministic topic-first precedence and stable unknown-help diagnostics.
+
+`SYSTEM` is available as structured environment introspection with `ABOUT` as a literal alias, while `VERSION` output remains unchanged.
+
+Bootstrap/login diagnostics now distinguish missing versus malformed catalogue states and surface account root / `VOC` / `MD` attachment issues without changing intended login/REPL control flow.
+
 ---
 
 ### Non-Goals (Deferred)

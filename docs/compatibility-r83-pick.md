@@ -26,12 +26,24 @@ Status labels:
 
 - **VOC first-token verb resolution** — `Implemented`
   - `V`/`X` with `Q` chaining before built-in dispatch.
+- **HELP surface** — `Implemented`
+  - `HELP` supports no-arg listing, command lookup, and topic forms (`PROC`, `TCL`, `VOC`).
+  - Resolution precedence is topic-first, then command help; unknown lookups emit stable `No help available`.
+- **SYSTEM/ABOUT introspection** — `Intentional deviation`
+  - `SYSTEM`/`ABOUT` are Gemini extensions for structured environment introspection.
+  - `VERSION` remains the original short identity output.
 - **Tokenizer/quoting** — `Implemented`
   - Tcl command tokenization supports quoted strings, escaped characters, and preserved quoted empty tokens.
 - **Session `@` names** — `Implemented`
   - `@USERNO`, `@ACCOUNT`, `@LOGNAME`, `@DEFDATA` resolved from session state.
 - **`$` substitution scope** — `Intentional deviation`
   - `$` expansion is intentionally scoped to `ECHO` in current milestone delivery, not applied shell-wide.
+
+## Bootstrap/login diagnostics
+
+- **Catalogue/account diagnostics** — `Implemented`
+  - Login/boot diagnostics distinguish missing vs malformed `ACCOUNTS.json`.
+  - Boot/login now surface account root, `VOC`, and `MD` attachment issues with explicit diagnostics.
 
 ## VOC behavior
 

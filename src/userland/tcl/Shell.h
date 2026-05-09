@@ -133,8 +133,10 @@ namespace PickShell {
         bool ensureProgramObjectExistsForRun(const std::string &programName, std::ostream &out);
 
         void cmdHelp(std::ostream &out);
+        void cmdHelpLookup(const std::vector<std::string> &tokens, std::ostream &out);
 
         void cmdVersion(std::ostream &out);
+        void cmdSystem(std::ostream &out);
         void cmdWho(std::ostream &out);
 
         void cmdDumpStack(std::ostream &out);

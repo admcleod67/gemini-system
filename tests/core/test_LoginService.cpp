@@ -135,3 +135,48 @@ TEST_CASE("LoginService runCatalogLogin InteractiveOnly ignores MD AUTO-LOGON") 
     CHECK(out.str().find("LOGON PLEASE: TST") == std::string::npos);
     CHECK(out.str() == "LOGON PLEASE: \n");
 }
+
+TEST_CASE("LoginService authenticateAccount distinguishes missing and malformed ACCOUNTS.json") {
+    const auto root = uniqueTempDir();
+    const auto gem = root / "gemini";
+    std::filesystem::create_directories(gem);
+
+    std::ostringstream errMissing;
+    CHECK_FALSE(PickCore::LoginService::authenticateAccount(gem, "TST", "", errMissing).has_value());
+    CHECK(errMissing.str() == "ACCOUNTS.json not found.\n");
+
+    {
+        std::ofstream accounts(gem / "ACCOUNTS.json");
+        accounts << R"({"accounts":)";
+    }
+    std::ostringstream errMalformed;
+    CHECK_FALSE(PickCore::LoginService::authenticateAccount(gem, "TST", "", errMalformed).has_value());
+    CHECK(errMalformed.str() == "Invalid ACCOUNTS.json.\n");
+}
+
+TEST_CASE("LoginService authenticateAccount reports invalid account rows and root/VOC diagnostics") {
+    const auto root = uniqueTempDir();
+    const auto gem = root / "gemini";
+    std::filesystem::create_directories(gem);
+
+    {
+        std::ofstream accounts(gem / "ACCOUNTS.json");
+        accounts << R"({"accounts":[{"name":"","root":"accounts/TST"}]})";
+    }
+    std::ostringstream errInvalidRow;
+    CHECK_FALSE(PickCore::LoginService::authenticateAccount(gem, "TST", "", errInvalidRow).has_value());
+    CHECK(errInvalidRow.str().find("Invalid ACCOUNTS.json: account row missing name") != std::string::npos);
+
+    {
+        std::ofstream accounts(gem / "ACCOUNTS.json");
+        accounts << R"({"accounts":[{"name":"TST","root":"accounts/TST"}]})";
+    }
+    std::ostringstream errRootMissing;
+    CHECK_FALSE(PickCore::LoginService::authenticateAccount(gem, "TST", "", errRootMissing).has_value());
+    CHECK(errRootMissing.str().find("Account path not found:") != std::string::npos);
+
+    std::filesystem::create_directories(gem / "accounts" / "TST");
+    std::ostringstream errVocMissing;
+    CHECK_FALSE(PickCore::LoginService::authenticateAccount(gem, "TST", "", errVocMissing).has_value());
+    CHECK(errVocMissing.str().find("Account path has no VOC:") != std::string::npos);
+}

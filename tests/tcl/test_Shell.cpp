@@ -53,6 +53,58 @@ TEST_CASE("shell HELP") {
     CHECK(out.str().find("WHO") != std::string::npos);
     CHECK(out.str().find("RESOLVE-FIELD") != std::string::npos);
     CHECK(out.str().find("DEFINE-FIELD") != std::string::npos);
+    CHECK(out.str().find("SYSTEM") != std::string::npos);
+    CHECK(out.str().find("ABOUT") != std::string::npos);
+}
+
+TEST_CASE("shell HELP supports command lookup and topics") {
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("HELP GET", out, quit);
+    CHECK(out.str() == "GET <name>\n");
+
+    out.str("");
+    sh.handleLine("HELP PROC", out, quit);
+    CHECK(out.str().find("HELP PROC") != std::string::npos);
+    CHECK(out.str().find("PROC <name> [args...]") != std::string::npos);
+
+    out.str("");
+    sh.handleLine("HELP TCL", out, quit);
+    CHECK(out.str().find("HELP TCL") != std::string::npos);
+
+    out.str("");
+    sh.handleLine("HELP VOC", out, quit);
+    CHECK(out.str().find("CREATE-VOC") != std::string::npos);
+
+    out.str("");
+    sh.handleLine("HELP UNKNOWN", out, quit);
+    CHECK(out.str() == "No help available\n");
+}
+
+TEST_CASE("shell HELP precedence and non-executing lookup via VOC alias") {
+    const auto fsDir = uniqueTempDir();
+    std::filesystem::create_directories(fsDir);
+    PickFS::FileSystem fs(fsDir);
+    fs.createFile("VOC");
+    fs.write("VOC", PickFS::Record("HGET", "V\nGET\n"));
+    fs.write("VOC", PickFS::Record("HVOC", "V\nVOC\n"));
+
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(fsDir);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("HELP HGET", out, quit);
+    CHECK(out.str() == "GET <name>\n");
+
+    out.str("");
+    sh.handleLine("HELP HVOC", out, quit);
+    CHECK(out.str().find("HELP VOC") != std::string::npos);
+    CHECK(out.str().find("LIST-VOC") != std::string::npos);
 }
 
 TEST_CASE("shell WHO returns default port user account line") {
@@ -337,7 +389,11 @@ TEST_CASE("shell strict no-arg command arity checks") {
     bool quit = false;
 
     sh.handleLine("HELP extra", out, quit);
-    CHECK(out.str() == "HELP takes no arguments\n");
+    CHECK(out.str() == "No help available\n");
+
+    out.str("");
+    sh.handleLine("HELP A B", out, quit);
+    CHECK(out.str() == "HELP takes at most one argument\n");
 
     out.str("");
     sh.handleLine("VERSION extra", out, quit);
@@ -358,6 +414,32 @@ TEST_CASE("shell strict no-arg command arity checks") {
     out.str("");
     sh.handleLine("LOGOFF extra", out, quit);
     CHECK(out.str() == "LOGOFF takes no arguments\n");
+
+    out.str("");
+    sh.handleLine("SYSTEM extra", out, quit);
+    CHECK(out.str() == "SYSTEM takes no arguments\n");
+
+    out.str("");
+    sh.handleLine("ABOUT extra", out, quit);
+    CHECK(out.str() == "ABOUT takes no arguments\n");
+}
+
+TEST_CASE("shell SYSTEM and ABOUT introspection output") {
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("SYSTEM", out, quit);
+    CHECK(out.str().find("System:") != std::string::npos);
+    CHECK(out.str().find("Version:") != std::string::npos);
+    CHECK(out.str().find("Build:") != std::string::npos);
+    CHECK(out.str().find("Session: 0 - -") != std::string::npos);
+    const std::string systemOutput = out.str();
+
+    out.str("");
+    sh.handleLine("ABOUT", out, quit);
+    CHECK(out.str() == systemOutput);
 }
 
 TEST_CASE("shell QUIT clears variables") {
