@@ -60,6 +60,8 @@ Session `@` names in PROC:
 - `<name> = <tokens...>`: string assignment.
 - `END`: terminate script successfully.
 
+Stage 1 selection scope is intentionally minimal: simple `SELECT <file>` plus active-list iteration with `READNEXT`. Richer selection expressions are deferred to later milestone slices.
+
 ## R83 aliases and long-form canonical keywords
 
 PROC accepts both modern long-form statement keywords and R83-compatible short aliases. Long forms are canonical for documentation, diagnostics, and internal command identity; short forms are compatibility aliases only.
@@ -91,7 +93,7 @@ Representative runtime errors include:
 - `Error: Duplicate label: <LABEL>`
 - `Error: Unknown label: <label>`
 - `Error: INPUT requires a variable name`
-- `Error: IF requires IF <lhs> = <rhs> THEN GO <label>`
+- `Error: IF requires IF <lhs> = <rhs> THEN <statement>`
 - `Error: Read-only system variable`
 - `Error: Unknown PROC statement`
 - `Error: EXIT outside LOOP`

@@ -64,7 +64,7 @@ For ENGLISH command forms and worked query examples, see [ENGLISH query core](en
 | **`BASIC`** [*name*] | Enter BASIC mode. See [BASIC shell](basic-shell.md) for BASIC/ED commands and persistence rules. |
 | **`ASM`** [*programName*] | Enter ASM mode (instruction-level debugger shell). Optional name immediately executes `RUN <programName>` after entering ASM. See [Assembler shell](assembler-shell.md). |
 | **`RUN`** *programName* | Run by program name only (no extension). Tcl resolves `(file,key)` via VOC, prunes invalid breakpoints, and executes object record `<key>_OBJ`. If object is missing, Tcl compiles source record `<key>` and writes `<key>_OBJ` in the same resolved file before running. |
-| **`PROC`** *programName* [*args...*] | Resolve script via VOC/filesystem (`F/Q` with fallback to `PROC` file), then execute with the host PROC interpreter. Positional args map to `P1`, `P2`, ... . Full language semantics: [PROC language](proc.md). |
+| **`PROC`** *programName* [*args...*] | Resolve script via VOC/filesystem (`F/Q/D/A` with fallback to `PROC` file), then execute with the host PROC interpreter. Positional args map to `P1`, `P2`, ... . Full language semantics: [PROC language](proc.md). |
 | **`LIST-PROGRAMS`** | List logical program names from VOC-resolved program files (records in those files, excluding `_OBJ` records), deduplicated and sorted. |
 | **`CREATE-FILE`** *name* | Create a Pick file in the filesystem root. Creates logical file directory. |
 | **`DELETE-FILE`** *name* | Delete a Pick file from the filesystem root. |
