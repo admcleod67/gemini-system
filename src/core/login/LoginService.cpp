@@ -31,7 +31,8 @@ namespace PickCore {
                                                    "RUN",   "BASIC",  "PROC",    "ASM",     "ECHO",    "SET",
                                                    "GET",   "UNSET",  "WHO",     "LOGTO",   "LOGOFF",  "CREATE-FILE",
                                                    "DELETE-FILE", "LIST-FILES", "LIST", "READ", "WRITE", "LIST-PROGRAMS",
-                                                   "LIST-VARS", "DUMP-STACK", "SYSTEM", "ABOUT"};
+                                                   "LIST-VARS", "DUMP-STACK", "SYSTEM", "ABOUT",
+                                                   "HELP-LIST", "HELP-EDIT"};
 
         void trimTrailingAsciiWs(std::string &s) {
             while (!s.empty()) {

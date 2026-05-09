@@ -57,7 +57,9 @@ For ENGLISH command forms and worked query examples, see [ENGLISH query core](en
 
 | Command | Description |
 |---------|-------------|
-| **`HELP`** [*command-or-topic*] | No-arg form prints the command list. One-arg form performs non-executing help lookup using command-token canonicalization rules. Resolution precedence is deterministic: built-in topics (`PROC`, `TCL`, `VOC`) first, then built-in command help. Unknown targets print `No help available`. |
+| **`HELP`** [*topic-operands…*] | File-backed help: operands (if any) define a **topic**; see [HELP system](help-system.md). No-arg form resolves topic **`HELP`** from the `HELP` logical file (then SYSPROG, then builtins), else a short built-in usage line. **`HELP-LIST`** lists account-local topic names. **`HELP-EDIT`** *topic…* opens the line editor on that topic (creates **`HELP`** file if needed). Multi-word topics use underscores in the underlying record id (`HELP BASIC` ↔ `HELP_BASIC`). Unknown topics: `No help available for "<topic>".` |
+| **`HELP-LIST`** | Lists canonical HELP topic names from the current account’s logical file **`HELP`** (sorted), or `No HELP topics` when missing/empty. Takes no arguments. |
+| **`HELP-EDIT`** *topic-operands…* | Same topic rules as **`HELP`**; runs **`ED>`** on the resolved record in **`HELP`** (creates the logical file first if absent). |
 | **`VERSION`** | Title, project version string, and build date. |
 | **`SYSTEM`** | Gemini introspection extension: prints line-oriented system/environment summary (title, version, build date, session identity, Pick root/account context, catalogue root context). |
 | **`ABOUT`** | Literal alias of `SYSTEM`. |
@@ -129,7 +131,7 @@ Variables are **string key/value** pairs held by the shell (not the VM stack). N
 
 **`ECHO`:** each argument token is scanned for **`$$`** (escaped dollar), **`$Name`** substitution, and literal **`$`**. There is **no** expression evaluation. Unset **`$Name`** expands to an empty segment.
 
-Arity errors: **`SET`** / **`GET`** / **`UNSET`** without a name print a **`… requires a variable name`** line. Extra tokens on **`LIST-VARS`** print **`LIST-VARS takes no arguments`**. `HELP` accepts zero or one argument (`HELP takes at most one argument`). Filesystem arity errors follow the same pattern (for example, **`LIST requires a filename`**, **`READ`** / **`WRITE`** messages that include the optional **`MD DEFDATA`** shorthand when the default is not set).
+Arity errors: **`SET`** / **`GET`** / **`UNSET`** without a name print a **`… requires a variable name`** line. Extra tokens on **`LIST-VARS`** print **`LIST-VARS takes no arguments`**. **`HELP`** accepts zero or more topic operands (**`HELP`** *topic…*). **`HELP-LIST`**/**`HELP-EDIT`** follow the usual arity diagnostics (`HELP-LIST takes no arguments`, `HELP-EDIT requires a topic`, …). Filesystem arity errors follow the same pattern (for example, **`LIST requires a filename`**, **`READ`** / **`WRITE`** messages that include the optional **`MD DEFDATA`** shorthand when the default is not set).
 
 Instruction-level debugger controls (`STEP`, `CONT`, `TRACE`, breakpoint management, and program/label dumps) now live in [Assembler shell](assembler-shell.md).
 
@@ -139,5 +141,6 @@ Parse/runtime failures during **`RUN`** print **`Error:`** followed by the excep
 
 ## See also
 
+- [HELP system](help-system.md) — file-backed HELP topics, lookup chain, `HELP-LIST` / `HELP-EDIT`.
 - [Bytecode VM](vm.md) — opcode reference and parser/runtime details.
 - [Assembler shell](assembler-shell.md) — instruction-level debugger shell.

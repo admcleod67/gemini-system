@@ -3,6 +3,7 @@
 #include "BytecodeText.h"
 #include "Catalog.h"
 #include "GeminiCatalog.h"
+#include "HelpTopics.h"
 #include "LineRecordEditor.h"
 #include "LoginService.h"
 
@@ -190,45 +191,6 @@ namespace PickShell {
             }
         }
 
-        [[nodiscard]] std::optional<std::string> shellCommandHelpText(std::string_view commandUpper) {
-            if (commandUpper == "HELP") return "HELP [command|PROC|TCL|VOC]\n";
-            if (commandUpper == "VERSION") return "VERSION\n";
-            if (commandUpper == "SYSTEM") return "SYSTEM\n";
-            if (commandUpper == "ABOUT") return "ABOUT\n";
-            if (commandUpper == "WHO") return "WHO\n";
-            if (commandUpper == "ECHO") return "ECHO <text...>\n";
-            if (commandUpper == "SET") return "SET <name> <words...>\n";
-            if (commandUpper == "GET") return "GET <name>\n";
-            if (commandUpper == "LIST-VARS") return "LIST-VARS\n";
-            if (commandUpper == "UNSET") return "UNSET <name>\n";
-            if (commandUpper == "LOGTO") return "LOGTO <account>\n";
-            if (commandUpper == "LOGOFF") return "LOGOFF\n";
-            if (commandUpper == "BASIC") return "BASIC [name]\n";
-            if (commandUpper == "ASM") return "ASM [name]\n";
-            if (commandUpper == "RUN") return "RUN <name>\n";
-            if (commandUpper == "PROC") return "PROC <name> [args...]\n";
-            if (commandUpper == "LIST-PROGRAMS") return "LIST-PROGRAMS\n";
-            if (commandUpper == "CREATE-FILE") return "CREATE-FILE <name>\n";
-            if (commandUpper == "DELETE-FILE") return "DELETE-FILE <name>\n";
-            if (commandUpper == "LIST-FILES") return "LIST-FILES\n";
-            if (commandUpper == "LIST") return "LIST <file> [fields... | WITH ...]\n";
-            if (commandUpper == "COUNT") return "COUNT <file> [fields...] | COUNT\n";
-            if (commandUpper == "SELECT") return "SELECT <file> [fields...]\n";
-            if (commandUpper == "SORT") return "SORT <file> [...] BY ...\n";
-            if (commandUpper == "LIST-LIST") return "LIST-LIST\n";
-            if (commandUpper == "CLEAR-LIST") return "CLEAR-LIST\n";
-            if (commandUpper == "RESOLVE-FIELD") return "RESOLVE-FIELD <data-file> <field-token>\n";
-            if (commandUpper == "DEFINE-FIELD") return "DEFINE-FIELD <dict-file> <field-name> <attribute-number>\n";
-            if (commandUpper == "CREATE-VOC") return "CREATE-VOC <item-id> <type> <target...>\n";
-            if (commandUpper == "DELETE-VOC") return "DELETE-VOC <item-id>\n";
-            if (commandUpper == "LIST-VOC") return "LIST-VOC\n";
-            if (commandUpper == "READ") return "READ <file> <record-name>\n";
-            if (commandUpper == "WRITE") return "WRITE <file> <record-name> <value...>\n";
-            if (commandUpper == "EDIT") return "EDIT <file> <record> | EDIT <programName>\n";
-            if (commandUpper == "DUMP-STACK") return "DUMP-STACK\n";
-            if (commandUpper == "QUIT") return "QUIT\n";
-            return std::nullopt;
-        }
     } // namespace
 
     Shell::Shell(PickVM::Runtime &runtime)
@@ -336,7 +298,7 @@ namespace PickShell {
         std::ostream &out = std::cout;
         // First stdout bytes here are banner text — no leading `\n` (successful login emits one flushed `\n` first).
         static constexpr std::string_view kBanner = "Gemini/TCL Developer Shell\n"
-                                                    "Type HELP for commands\n";
+                                                    "Type HELP for usage; HELP-LIST lists HELP topics.\n";
         out.write(kBanner.data(), static_cast<std::streamsize>(kBanner.size()));
         for (;;) {
             out << prompt() << std::flush;
@@ -398,6 +360,12 @@ namespace PickShell {
             session_.resetForQuit();
         };
         tclCommands_["HELP"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdHelpLookup(tokens, out); };
+        tclCommands_["HELP-LIST"] = [this](const Tokens &tokens, std::ostream &out, bool &) {
+            cmdHelpList(tokens, out);
+        };
+        tclCommands_["HELP-EDIT"] = [this](const Tokens &tokens, std::ostream &out, bool &) {
+            cmdHelpEdit(tokens, out);
+        };
         tclCommands_["VERSION"] = [this](const Tokens &tokens, std::ostream &out, bool &) {
             if (tokens.size() != 1) {
                 out << "VERSION takes no arguments\n";
@@ -1309,86 +1277,70 @@ namespace PickShell {
         }
     }
 
-    void Shell::cmdHelp(std::ostream &out) {
-        out << "Commands:\n";
-        out << "  ECHO <text>   $Name expands; $$ -> $; other $ literal; unset -> empty\n";
-        out << "  SET <name> <words...>   set variable (names case-insensitive, stored uppercase)\n";
-        out << "  GET <name>\n";
-        out << "  LIST-VARS\n";
-        out << "  UNSET <name>\n";
-        out << "  WHO\n";
-        out << "  LOGTO <account>   switch account (reloads Pick root)\n";
-        out << "  LOGOFF            end session; host returns to core login\n";
-        out << "  BASIC [name]   enter BASIC editor mode\n";
-        out << "  ASM [name]     enter assembler debugger mode (optional program name)\n";
-        out << "  RUN <name>     resolve via VOC and run object record (auto-compiles source if needed)\n";
-        out << "  PROC <name> [args...]   run PROC script via VOC/filesystem resolution\n";
-        out << "  LIST-PROGRAMS  list VOC-resolved program records\n";
-        out << "  CREATE-FILE <name>\n";
-        out << "  DELETE-FILE <name>\n";
-        out << "  LIST-FILES\n";
-        out << "  LIST <file> [fields... | WITH ...] [BY ... on SORT only]\n";
-        out << "  SORT <file> [...] BY ... — ENGLISH sort (same pipeline as LIST + ordering)\n";
-        out << "  COUNT <file> [fields...] | COUNT (active-list scope)\n";
-        out << "  SELECT <file> [fields...]\n";
-        out << "  RESOLVE-FIELD <data-file> <field-token>   ENGLISH DICT resolution (DICT-<file> then DICT)\n";
-        out << "  DEFINE-FIELD <dict-file> <field-name> <attribute-number>   minimal type-A DICT item (not R83 verb)\n";
-        out << "  CREATE-VOC <item-id> <type> <target...>\n";
-        out << "  DELETE-VOC <item-id>\n";
-        out << "  LIST-VOC\n";
-        out << "  LIST-LIST\n";
-        out << "  CLEAR-LIST\n";
-        out << "  READ <file> <record-name>   (or READ <record> when MD DEFDATA names default file)\n";
-        out << "  WRITE <file> <record-name> <value...>   (or WRITE <record> <value> when MD DEFDATA is set)\n";
-        out << "  EDIT <file> <record> | EDIT <programName>   line editor (ED>); SAVE (FI), QUIT (Q)\n";
-        out << "  DUMP-STACK\n";
-        out << "  VERSION\n";
-        out << "  SYSTEM\n";
-        out << "  ABOUT\n";
-        out << "  QUIT\n";
-    }
-
     void Shell::cmdHelpLookup(const std::vector<std::string> &tokens, std::ostream &out) {
         if (tokens.size() == 1) {
-            cmdHelp(out);
-            return;
-        }
-        if (tokens.size() != 2) {
-            out << "HELP takes at most one argument\n";
-            return;
-        }
-
-        std::string lookup = session_.vocResolver_.resolveVerbName(tokens[1]);
-        asciiUpperInPlace(lookup);
-
-        // Stage 4 precedence: topics first, then command help.
-        if (lookup == "PROC") {
-            out << "HELP PROC\n";
-            out << "  PROC <name> [args...]\n";
-            out << "  Host PROC interpreter with R83 aliases and long-form command support.\n";
-            out << "  See docs/proc.md for full statement and substitution semantics.\n";
-            return;
-        }
-        if (lookup == "TCL") {
-            out << "HELP TCL\n";
-            out << "  Tcl host shell command surface and tokenization behavior.\n";
-            out << "  Use HELP <command> for specific command usage.\n";
-            out << "  See docs/tcl-shell.md for full shell semantics.\n";
-            return;
-        }
-        if (lookup == "VOC") {
-            out << "HELP VOC\n";
-            out << "  CREATE-VOC <item-id> <type> <target...>\n";
-            out << "  DELETE-VOC <item-id>\n";
-            out << "  LIST-VOC\n";
+            if (const std::optional<std::string> zero =
+                    HelpTopics::resolveHelpBody(session_.fileSystem_,
+                                                session_.geminiCatalogRoot(),
+                                                session_.fileSystemRoot(),
+                                                "HELP")) {
+                out << *zero;
+                return;
+            }
+            out << HelpTopics::helpZeroArgumentFallbackLine();
             return;
         }
 
-        if (const std::optional<std::string> help = shellCommandHelpText(lookup)) {
-            out << *help;
+        const std::string display = HelpTopics::joinOperandsDisplay(tokens, 1);
+        const std::string canonical =
+            HelpTopics::canonicalTopicKey(session_.vocResolver_, tokens, 1);
+        if (const std::optional<std::string> body = HelpTopics::resolveHelpBody(session_.fileSystem_,
+                                                                                  session_.geminiCatalogRoot(),
+                                                                                  session_.fileSystemRoot(),
+                                                                                  canonical)) {
+            out << *body;
             return;
         }
-        out << "No help available\n";
+        out << "No help available for \"" << display << "\".\n";
+    }
+
+    void Shell::cmdHelpList(const std::vector<std::string> &tokens, std::ostream &out) {
+        if (tokens.size() != 1) {
+            out << "HELP-LIST takes no arguments\n";
+            return;
+        }
+        const std::vector<std::string> topics = HelpTopics::listCanonicalHelpTopicsSorted(session_.fileSystem_);
+        if (topics.empty()) {
+            out << "No HELP topics\n";
+            return;
+        }
+        for (const std::string &t: topics) {
+            out << t << '\n';
+        }
+    }
+
+    void Shell::cmdHelpEdit(const std::vector<std::string> &tokens, std::ostream &out) {
+        if (tokens.size() < 2) {
+            out << "HELP-EDIT requires a topic\n";
+            return;
+        }
+        const std::string canonical =
+            HelpTopics::canonicalTopicKey(session_.vocResolver_, tokens, 1);
+        const std::string storage = HelpTopics::storageRecordIdFromCanonical(canonical);
+        try {
+            try {
+                (void) session_.fileSystem_.openFile("HELP");
+            } catch (const PickFS::FileSystemError &openError) {
+                const std::string msg = openError.what();
+                if (msg.find("File not found: ") != 0U) {
+                    throw;
+                }
+                session_.fileSystem_.createFile("HELP");
+            }
+            runLineRecordEditorForLocation("HELP", storage, std::nullopt, out);
+        } catch (const std::exception &e) {
+            out << "Error: " << e.what() << "\n";
+        }
     }
 
     void Shell::cmdVersion(std::ostream &out) {

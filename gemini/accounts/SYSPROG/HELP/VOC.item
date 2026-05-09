@@ -1,0 +1,4 @@
+HELP VOC
+  CREATE-VOC <item-id> <type> <target...>
+  DELETE-VOC <item-id>
+  LIST-VOC

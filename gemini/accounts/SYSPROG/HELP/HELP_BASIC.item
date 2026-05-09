@@ -1,0 +1,3 @@
+HELP BASIC topic (canonical key HELP BASIC).
+
+PickFS record IDs cannot contain spaces; HELP topics encode spaces as underscores in the record ID (HELP_BASIC).

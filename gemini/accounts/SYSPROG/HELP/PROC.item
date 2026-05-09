@@ -1,0 +1,4 @@
+HELP PROC
+  PROC <name> [args...]
+  Host PROC interpreter with R83 aliases and long-form command support.
+  See docs/proc.md for full statement and substitution semantics.

@@ -28,7 +28,7 @@ Paths are relative to the repository (or to a copy placed next to the executable
 |------|------|
 | `gemini/ACCOUNTS.json` | Account catalogue (host JSON). |
 | `gemini/USERS.json` | User catalogue (host JSON). |
-| `gemini/accounts/SYSPROG/` | Pick filesystem root for the **SYSPROG** account: `VOC/`, `MD/`, `BP/`, `PROC/`. |
+| `gemini/accounts/SYSPROG/` | Pick filesystem root for the **SYSPROG** account: `VOC/`, `MD/`, `BP/`, `PROC/`, **`HELP/`** (file-backed HELP topics; see [HELP system](help-system.md)). |
 
 `MD/`, `BP/`, and `PROC/` may be empty except for placeholder files so Git tracks the directories.
 

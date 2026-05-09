@@ -11,6 +11,7 @@
 
 #include "FileSystem.h"
 #include "LoginService.h"
+#include "HelpTopics.h"
 #include "Runtime.h"
 #include "Shell.h"
 #include "ShellTestFsUtil.h"
@@ -45,16 +46,8 @@ TEST_CASE("shell HELP") {
     bool quit = false;
     sh.handleLine("HELP", out, quit);
     CHECK_FALSE(quit);
-    CHECK(out.str().find("ECHO") != std::string::npos);
-    CHECK(out.str().find("RUN") != std::string::npos);
-    CHECK(out.str().find("ASM") != std::string::npos);
-    CHECK(out.str().find("SET") != std::string::npos);
-    CHECK(out.str().find("LIST-VARS") != std::string::npos);
-    CHECK(out.str().find("WHO") != std::string::npos);
-    CHECK(out.str().find("RESOLVE-FIELD") != std::string::npos);
-    CHECK(out.str().find("DEFINE-FIELD") != std::string::npos);
-    CHECK(out.str().find("SYSTEM") != std::string::npos);
-    CHECK(out.str().find("ABOUT") != std::string::npos);
+    CHECK(out.str() == PickShell::HelpTopics::helpZeroArgumentFallbackLine());
+    CHECK(out.str().find("HELP-LIST") != std::string::npos);
 }
 
 TEST_CASE("shell HELP supports command lookup and topics") {
@@ -81,7 +74,7 @@ TEST_CASE("shell HELP supports command lookup and topics") {
 
     out.str("");
     sh.handleLine("HELP UNKNOWN", out, quit);
-    CHECK(out.str() == "No help available\n");
+    CHECK(out.str() == "No help available for \"UNKNOWN\".\n");
 }
 
 TEST_CASE("shell HELP precedence and non-executing lookup via VOC alias") {
@@ -105,6 +98,103 @@ TEST_CASE("shell HELP precedence and non-executing lookup via VOC alias") {
     sh.handleLine("HELP HVOC", out, quit);
     CHECK(out.str().find("HELP VOC") != std::string::npos);
     CHECK(out.str().find("LIST-VOC") != std::string::npos);
+}
+
+TEST_CASE("shell HELP zero-arg uses HELP topic record when present") {
+    const auto fsDir = uniqueTempDir();
+    PickFS::FileSystem fs(fsDir);
+    fs.createFile("HELP");
+    fs.write("HELP", PickFS::Record("HELP", "zero arg body\n"));
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(fsDir);
+    std::ostringstream out;
+    bool quit = false;
+    sh.handleLine("HELP", out, quit);
+    CHECK(out.str() == "zero arg body\n");
+}
+
+TEST_CASE("shell HELP multi-word topic maps to underscore record id and HELP-LIST shows canonical id") {
+    const auto fsDir = uniqueTempDir();
+    PickFS::FileSystem fs(fsDir);
+    fs.createFile("HELP");
+    fs.write("HELP", PickFS::Record("HELP_BASIC", "multiword body\n"));
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(fsDir);
+    std::ostringstream out;
+    bool quit = false;
+    sh.handleLine("HELP HELP BASIC", out, quit);
+    CHECK(out.str() == "multiword body\n");
+    CHECK(std::filesystem::exists(fsDir / "HELP" / "HELP_BASIC.item"));
+    out.str("");
+    sh.handleLine("HELP-LIST", out, quit);
+    CHECK(out.str() == "HELP BASIC\n");
+}
+
+TEST_CASE("shell HELP resolves topic from SYSPROG when local account has no HELP file") {
+    const auto root = uniqueTempDir();
+    const auto gem = root / "gemini";
+    std::filesystem::create_directories(gem / "accounts" / "TST" / "VOC");
+    std::filesystem::create_directories(gem / "accounts" / "SYSPROG" / "VOC");
+    std::filesystem::create_directories(gem / "accounts" / "SYSPROG" / "HELP");
+    {
+        std::ofstream vocTst(gem / "accounts" / "TST" / "VOC" / "BP.item");
+        vocTst << "F\nBP\n";
+    }
+    {
+        std::ofstream vocSys(gem / "accounts" / "SYSPROG" / "VOC" / "BP.item");
+        vocSys << "F\nBP\n";
+    }
+    {
+        std::ofstream h(gem / "accounts" / "SYSPROG" / "HELP" / "REMOTEONLY.item");
+        h << "from system help\n";
+    }
+    {
+        std::ofstream accounts(gem / "ACCOUNTS.json");
+        accounts << R"({"accounts":[{"name":"TST","root":"accounts/TST"},{"name":"SYSPROG","root":"accounts/SYSPROG"}]})";
+    }
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setGeminiCatalogRoot(gem);
+    std::ostringstream err;
+    const auto session = PickCore::LoginService::authenticateAccount(gem, "TST", "", err);
+    REQUIRE(session.has_value());
+    sh.attachUserSession(*session);
+    std::ostringstream out;
+    bool quit = false;
+    sh.handleLine("HELP REMOTEONLY", out, quit);
+    CHECK(out.str() == "from system help\n");
+}
+
+TEST_CASE("shell HELP-LIST reports no topics when HELP file is missing") {
+    const auto fsDir = uniqueTempDir();
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(fsDir);
+    std::ostringstream out;
+    bool quit = false;
+    sh.handleLine("HELP-LIST", out, quit);
+    CHECK(out.str() == "No HELP topics\n");
+}
+
+#ifndef PICK_SYSTEM_GEMINI_SYSPROG_FIXTURE
+#define PICK_SYSTEM_GEMINI_SYSPROG_FIXTURE ""
+#endif
+
+TEST_CASE("shell HELP HELP BASIC maps to committed SYSPROG HELP_BASIC.item") {
+    if (std::string(PICK_SYSTEM_GEMINI_SYSPROG_FIXTURE).empty()) {
+        return;
+    }
+    const std::filesystem::path sp(PICK_SYSTEM_GEMINI_SYSPROG_FIXTURE);
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(sp);
+    REQUIRE(std::filesystem::exists(sp / "HELP" / "HELP_BASIC.item"));
+    std::ostringstream out;
+    bool quit = false;
+    sh.handleLine("HELP HELP BASIC", out, quit);
+    CHECK(out.str().find("underscore") != std::string::npos);
 }
 
 TEST_CASE("shell WHO returns default port user account line") {
@@ -389,11 +479,11 @@ TEST_CASE("shell strict no-arg command arity checks") {
     bool quit = false;
 
     sh.handleLine("HELP extra", out, quit);
-    CHECK(out.str() == "No help available\n");
+    CHECK(out.str() == "No help available for \"extra\".\n");
 
     out.str("");
     sh.handleLine("HELP A B", out, quit);
-    CHECK(out.str() == "HELP takes at most one argument\n");
+    CHECK(out.str() == "No help available for \"A B\".\n");
 
     out.str("");
     sh.handleLine("VERSION extra", out, quit);
@@ -2280,15 +2370,13 @@ TEST_CASE("shell EDIT arity errors") {
     CHECK(out.str().find("EDIT takes") != std::string::npos);
 }
 
-TEST_CASE("shell HELP lists EDIT") {
+TEST_CASE("shell HELP EDIT shows edit usage line") {
     PickVM::Runtime rt;
     PickShell::Shell sh(rt);
     std::ostringstream out;
     bool quit = false;
-    sh.handleLine("HELP", out, quit);
-    CHECK(out.str().find("EDIT") != std::string::npos);
-    CHECK(out.str().find("LOGTO") != std::string::npos);
-    CHECK(out.str().find("LOGOFF") != std::string::npos);
+    sh.handleLine("HELP EDIT", out, quit);
+    CHECK(out.str().find("EDIT <file> <record>") != std::string::npos);
 }
 
 TEST_CASE("shell WHO after attachUserSession shows session") {

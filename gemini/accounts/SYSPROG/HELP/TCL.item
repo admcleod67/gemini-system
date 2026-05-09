@@ -1,0 +1,3 @@
+HELP TCL
+  Tcl developer shell semantics, tokenisation, VOC resolution, ENGLISH bridging, BASIC/PROC invocation.
+  Use HELP <verb> or HELP HELP-LIST / HELP-EDIT. See docs/tcl-shell.md.

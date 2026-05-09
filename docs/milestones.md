@@ -440,6 +440,13 @@ These commands are optional but strongly recommended for usability.
 - Add `docs/help-system.md` describing topic format and lookup rules.
 - Update `docs/milestones.md` to reflect Milestone 6 scope (this section).
 
+### Milestone 6 delivery status (implemented)
+
+- **`HelpTopics`** resolver in `src/userland/tcl/HelpTopics.cpp`: local `HELP` → catalogue `accounts/SYSPROG/HELP` (when catalogue root is set and roots differ) → builtins; PickFS name rules force **space → underscore** mapping for multi-word canonical keys (`HELP_BASIC.item` for **`HELP BASIC`**).
+- **`HELP`**, **`HELP-LIST`**, **`HELP-EDIT`** on the Tcl surface; **`HELP`** no-args resolves topic **`HELP`** first, else a short static line; **`TCL HELP`** (PROC bridge) shares the same resolver.
+- Committed bootstrap topics under **`gemini/accounts/SYSPROG/HELP/`**; **[`docs/help-system.md`](help-system.md)** documents lookup, keys, and authoring; [`docs/tcl-shell.md`](tcl-shell.md) and [`docs/gemini-bootstrap.md`](gemini-bootstrap.md) updated.
+- **`LoginService`** rejects `HELP-LIST` / `HELP-EDIT` as catalogue account names alongside other reserved tokens.
+
 ---
 
 ### Non‑Goals (Deferred)

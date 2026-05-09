@@ -138,6 +138,25 @@ TEST_CASE("shell PROC TCL bridge surfaces Tcl tokenizer errors") {
     CHECK(out.str() == "Error: Unterminated quoted string\n");
 }
 
+TEST_CASE("shell PROC TCL HELP agrees with interactive HELP GET") {
+    auto fsDir = uniqueTempDir();
+    seedVocAndProc(fsDir);
+    writeProcScriptRecord(fsDir, "HELPOK", "TCL HELP GET\nEND\n");
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(fsDir);
+    std::ostringstream procOut;
+    bool quitProc = false;
+    sh.handleLine("PROC HELPOK", procOut, quitProc);
+    CHECK_FALSE(quitProc);
+    std::ostringstream tclOut;
+    bool quitTcl = false;
+    sh.handleLine("HELP GET", tclOut, quitTcl);
+    CHECK_FALSE(quitTcl);
+    CHECK(procOut.str() == tclOut.str());
+    CHECK(procOut.str() == "GET <name>\n");
+}
+
 TEST_CASE("shell PROC duplicate labels are rejected") {
     auto fsDir = uniqueTempDir();
     seedVocAndProc(fsDir);
