@@ -127,6 +127,42 @@ TEST_CASE("shell ECHO spacing") {
     CHECK(out.str() == "one two\n");
 }
 
+TEST_CASE("shell ECHO supports quoted tokens and escapes") {
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("ECHO \"hello world\" x", out, quit);
+    CHECK(out.str() == "hello world x\n");
+
+    out.str("");
+    sh.handleLine("ECHO \"\"", out, quit);
+    CHECK(out.str() == "\n");
+
+    out.str("");
+    sh.handleLine("ECHO \"\" x", out, quit);
+    CHECK(out.str() == " x\n");
+
+    out.str("");
+    sh.handleLine("ECHO \"a\\\"b\" c\\\\d", out, quit);
+    CHECK(out.str() == "a\"b c\\d\n");
+}
+
+TEST_CASE("shell tokenizer errors on malformed quote and escape") {
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("ECHO \"unterminated", out, quit);
+    CHECK(out.str() == "Error: Unterminated quoted string\n");
+
+    out.str("");
+    sh.handleLine("ECHO trailing\\", out, quit);
+    CHECK(out.str() == "Error: Invalid escape sequence\n");
+}
+
 TEST_CASE("shell ECHO variable substitution") {
     PickVM::Runtime rt;
     PickShell::Shell sh(rt);
@@ -240,6 +276,10 @@ TEST_CASE("shell GET missing and arity") {
     out.str("");
     sh.handleLine("GET nope", out, quit);
     CHECK(out.str() == "No such variable: nope\n");
+
+    out.str("");
+    sh.handleLine("GET nope extra", out, quit);
+    CHECK(out.str() == "GET requires a variable name\n");
 }
 
 TEST_CASE("shell LIST-VARS sorted and empty") {
@@ -284,6 +324,40 @@ TEST_CASE("shell UNSET") {
     out.str("");
     sh.handleLine("UNSET", out, quit);
     CHECK(out.str() == "UNSET requires a variable name\n");
+
+    out.str("");
+    sh.handleLine("UNSET x extra", out, quit);
+    CHECK(out.str() == "UNSET requires a variable name\n");
+}
+
+TEST_CASE("shell strict no-arg command arity checks") {
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("HELP extra", out, quit);
+    CHECK(out.str() == "HELP takes no arguments\n");
+
+    out.str("");
+    sh.handleLine("VERSION extra", out, quit);
+    CHECK(out.str() == "VERSION takes no arguments\n");
+
+    out.str("");
+    sh.handleLine("WHO extra", out, quit);
+    CHECK(out.str() == "WHO takes no arguments\n");
+
+    out.str("");
+    sh.handleLine("DUMP-STACK extra", out, quit);
+    CHECK(out.str() == "DUMP-STACK takes no arguments\n");
+
+    out.str("");
+    sh.handleLine("LIST-PROGRAMS extra", out, quit);
+    CHECK(out.str() == "LIST-PROGRAMS takes no arguments\n");
+
+    out.str("");
+    sh.handleLine("LOGOFF extra", out, quit);
+    CHECK(out.str() == "LOGOFF takes no arguments\n");
 }
 
 TEST_CASE("shell QUIT clears variables") {
@@ -776,7 +850,15 @@ TEST_CASE("shell filesystem command arity and missing record") {
     CHECK(out.str() == "CREATE-FILE requires a filename\n");
 
     out.str("");
+    sh.handleLine("CREATE-FILE BP extra", out, quit);
+    CHECK(out.str() == "CREATE-FILE requires a filename\n");
+
+    out.str("");
     sh.handleLine("DELETE-FILE", out, quit);
+    CHECK(out.str() == "DELETE-FILE requires a filename\n");
+
+    out.str("");
+    sh.handleLine("DELETE-FILE BP extra", out, quit);
     CHECK(out.str() == "DELETE-FILE requires a filename\n");
 
     out.str("");

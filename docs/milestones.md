@@ -314,6 +314,10 @@ This milestone focuses on broadening the Gemini System by bringing the PROC lang
   - More authentic Pick-style variable expansion.
   - Preserve existing session variable behaviour (@USERNO, @ACCOUNT, etc.).
 
+### Milestone 5 Stage 2 delivery status (implemented)
+
+Stage 2 Tcl delivery is implemented in-tree: quote/escape-aware tokenization (including preserved quoted empty tokens), shared tokenization behavior across interactive Tcl and PROC `TCL` bridge lines, and stricter command arity diagnostics. `$` substitution remains intentionally scoped to `ECHO` in this stage.
+
 ---
 
 #### 3. VOC Authoring & Introspection

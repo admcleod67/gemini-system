@@ -110,6 +110,34 @@ TEST_CASE("shell PROC positional parameters substitute into TCL command") {
     CHECK(out.str() == "HELLO WORLD\n");
 }
 
+TEST_CASE("shell PROC TCL bridge preserves quoted Tcl tokenization") {
+    auto fsDir = uniqueTempDir();
+    seedVocAndProc(fsDir);
+    writeProcScriptRecord(fsDir, "QTCL", "TCL ECHO \"HELLO WORLD\" P1\nEND\n");
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(fsDir);
+    std::ostringstream out;
+    bool quit = false;
+    sh.handleLine("PROC QTCL AGAIN", out, quit);
+    CHECK_FALSE(quit);
+    CHECK(out.str() == "HELLO WORLD AGAIN\n");
+}
+
+TEST_CASE("shell PROC TCL bridge surfaces Tcl tokenizer errors") {
+    auto fsDir = uniqueTempDir();
+    seedVocAndProc(fsDir);
+    writeProcScriptRecord(fsDir, "BADTCL", "TCL ECHO \"BROKEN\nEND\n");
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(fsDir);
+    std::ostringstream out;
+    bool quit = false;
+    sh.handleLine("PROC BADTCL", out, quit);
+    CHECK_FALSE(quit);
+    CHECK(out.str() == "Error: Unterminated quoted string\n");
+}
+
 TEST_CASE("shell PROC duplicate labels are rejected") {
     auto fsDir = uniqueTempDir();
     seedVocAndProc(fsDir);

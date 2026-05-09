@@ -6,7 +6,12 @@ When a **Gemini catalogue root** is configured, **`main`** runs **`PickCore::Boo
 
 - **Prompt:** `TCL> `
 
-Input is tokenized by whitespace (filenames with spaces are not supported by the tokenizer).
+Input uses Tcl shell tokenization with quoted strings and backslash escapes:
+
+- Double quotes group tokens that include spaces.
+- Quoted empty tokens (`""`) are preserved.
+- Backslash escapes the next character.
+- Malformed quoting/escaping yields an `Error: ...` line.
 
 ## Tcl command verb (first token)
 
@@ -56,8 +61,8 @@ For ENGLISH command forms and worked query examples, see [ENGLISH query core](en
 | **`VERSION`** | Title, project version string, and build date. |
 | **`WHO`** | Print `port username account` when logged in with a Gemini catalogue (account-only logon uses the same string for username and account until a user model exists); otherwise **`0 - -`**. |
 | **`QUIT`** | Exit the shell; clears loaded program state in the VM, shell-held bytecode metadata, and **shell variables**. |
-| **`ECHO`** … | Echo remaining tokens, **space-separated**. Known session tokens **`@USERNO`**, **`@ACCOUNT`**, **`@LOGNAME`**, and **`@DEFDATA`** (case-insensitive) expand from the session before **`$`** rules. Within each token, scan left to right: **`$$`** becomes a single **`$`**; **`$Name`** ( **`Name`** = letters, digits, underscore, **`@`**, at least one character) is replaced by that shell variable’s value, or—if **`Name`** is one of the four **`@`** system names—by the session value; otherwise nothing if unset; any other **`$`** is echoed literally. |
-| **`SET`** *name* *word…* | Set a **shell variable**. Names are **case-insensitive**; the canonical name is **ASCII uppercase** (what **`LIST-VARS`** shows). The value is the remaining tokens joined with single spaces; **`SET`** *name* alone sets an empty string. Variable names must be non-empty. Targets **`@USERNO`**, **`@ACCOUNT`**, **`@LOGNAME`**, and **`@DEFDATA`** are rejected (**`Read-only system variable`**). Value tokens may include those **`@`** names; they expand from the session when used as operands (not as the **`SET`** target name). |
+| **`ECHO`** … | Echo remaining tokens, **space-separated**. Known session tokens **`@USERNO`**, **`@ACCOUNT`**, **`@LOGNAME`**, and **`@DEFDATA`** (case-insensitive) expand from the session before **`$`** rules. Within each token, scan left to right: **`$$`** becomes a single **`$`**; **`$Name`** ( **`Name`** = letters, digits, underscore, **`@`**, at least one character) is replaced by that shell variable’s value, or—if **`Name`** is one of the four **`@`** system names—by the session value; otherwise nothing if unset; any other **`$`** is echoed literally. `$` substitution remains ECHO-scoped in this milestone. |
+| **`SET`** *name* *word…* | Set a **shell variable**. Names are **case-insensitive**; the canonical name is **ASCII uppercase** (what **`LIST-VARS`** shows). The value is the remaining tokens joined with single spaces; **`SET`** *name* alone sets an empty string. Quoted/escaped input participates in tokenization before this join step. Variable names must be non-empty. Targets **`@USERNO`**, **`@ACCOUNT`**, **`@LOGNAME`**, and **`@DEFDATA`** are rejected (**`Read-only system variable`**). Value tokens may include those **`@`** names; they expand from the session when used as operands (not as the **`SET`** target name). |
 | **`GET`** *name* | Print the variable’s value and a newline. **`@USERNO`**, **`@ACCOUNT`**, **`@LOGNAME`**, and **`@DEFDATA`** read from the session (not from the shell variable map). Other names use the shell map; if unset: **`No such variable:`** *name* (as you typed it). |
 | **`LIST-VARS`** | List shell variable names in **ASCII uppercase** (sorted), each on its own line under a **`Variables:`** header. When logged in with a Gemini session, **`@ACCOUNT`**, **`@LOGNAME`**, and **`@USERNO`** are included once (they are not stored as ordinary shell variables). When **`MD,DEFDATA`** defines a default data file, **`@DEFDATA`** is included once. If none: **`No variables`**. Takes no arguments. |
 | **`UNSET`** *name* | Remove *name* from the shell map. The four session **`@`** names cannot be unset (**`Read-only system variable`**). If it was not set: **`No such variable`**. |
@@ -111,7 +116,7 @@ Unknown first token: **`Unknown command: …`**.
 
 ## Shell variables
 
-Variables are **string key/value** pairs held by the shell (not the VM stack). Names are **case-insensitive**; the shell stores and lists them in **ASCII uppercase** (see **`LIST-VARS`**). Because input is whitespace-tokenized with no quoting, values **cannot contain spaces** unless you express them as multiple tokens (which are joined with single spaces), same idea as **`ECHO`**.
+Variables are **string key/value** pairs held by the shell (not the VM stack). Names are **case-insensitive**; the shell stores and lists them in **ASCII uppercase** (see **`LIST-VARS`**). Input tokenization supports quoted strings and escapes, and command handlers that join remaining tokens (for example `SET` and `WRITE`) still normalize joins to single spaces.
 
 ### Session **`@`** names (read-only)
 

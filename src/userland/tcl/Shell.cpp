@@ -240,13 +240,53 @@ namespace PickShell {
         session_.applyUserSession(session);
     }
 
-    std::vector<std::string> Shell::tokenize(const std::string &line) {
-        std::istringstream iss(line);
-        std::vector<std::string> out;
-        std::string tok;
-        while (iss >> tok)
-            out.push_back(tok);
-        return out;
+    Shell::TokenizeResult Shell::tokenize(const std::string &line) {
+        TokenizeResult result;
+        std::string current;
+        bool inQuotes = false;
+        bool sawQuoteInCurrent = false;
+        bool escaping = false;
+
+        const auto flushToken = [&]() {
+            if (!current.empty() || sawQuoteInCurrent) {
+                result.tokens.push_back(current);
+            }
+            current.clear();
+            sawQuoteInCurrent = false;
+        };
+
+        for (const char ch : line) {
+            if (escaping) {
+                current.push_back(ch);
+                escaping = false;
+                continue;
+            }
+            if (ch == '\\') {
+                escaping = true;
+                continue;
+            }
+            if (ch == '"') {
+                inQuotes = !inQuotes;
+                sawQuoteInCurrent = true;
+                continue;
+            }
+            if (!inQuotes && std::isspace(static_cast<unsigned char>(ch)) != 0) {
+                flushToken();
+                continue;
+            }
+            current.push_back(ch);
+        }
+
+        if (escaping) {
+            result.error = "Invalid escape sequence";
+            return result;
+        }
+        if (inQuotes) {
+            result.error = "Unterminated quoted string";
+            return result;
+        }
+        flushToken();
+        return result;
     }
 
     ShellRunResult Shell::runTclRepl() {
@@ -276,9 +316,20 @@ namespace PickShell {
     }
 
     void Shell::handleLine(const std::string &line, std::ostream &out, bool &quit) {
-        auto tokens = tokenize(line);
-        if (!tokens.empty()) {
-            dispatch(tokens, quit, out);
+        if (assemblerShell_.isActive() || basicShell_.isActive()) {
+            const std::vector<std::string> tokens = tokenizeDebuggerLine(line);
+            if (!tokens.empty()) {
+                dispatch(tokens, quit, out);
+            }
+            return;
+        }
+        const TokenizeResult parsed = tokenize(line);
+        if (parsed.error.has_value()) {
+            out << "Error: " << *parsed.error << "\n";
+            return;
+        }
+        if (!parsed.tokens.empty()) {
+            dispatch(parsed.tokens, quit, out);
         }
     }
 
@@ -306,14 +357,44 @@ namespace PickShell {
             quit = true;
             session_.resetForQuit();
         };
-        tclCommands_["HELP"] = [this](const Tokens &, std::ostream &out, bool &) { cmdHelp(out); };
-        tclCommands_["VERSION"] = [this](const Tokens &, std::ostream &out, bool &) { cmdVersion(out); };
-        tclCommands_["WHO"] = [this](const Tokens &, std::ostream &out, bool &) { cmdWho(out); };
+        tclCommands_["HELP"] = [this](const Tokens &tokens, std::ostream &out, bool &) {
+            if (tokens.size() != 1) {
+                out << "HELP takes no arguments\n";
+                return;
+            }
+            cmdHelp(out);
+        };
+        tclCommands_["VERSION"] = [this](const Tokens &tokens, std::ostream &out, bool &) {
+            if (tokens.size() != 1) {
+                out << "VERSION takes no arguments\n";
+                return;
+            }
+            cmdVersion(out);
+        };
+        tclCommands_["WHO"] = [this](const Tokens &tokens, std::ostream &out, bool &) {
+            if (tokens.size() != 1) {
+                out << "WHO takes no arguments\n";
+                return;
+            }
+            cmdWho(out);
+        };
         tclCommands_["ECHO"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdEcho(tokens, out); };
         tclCommands_["RUN"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdRun(tokens, out); };
         tclCommands_["PROC"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdProc(tokens, out); };
-        tclCommands_["DUMP-STACK"] = [this](const Tokens &, std::ostream &out, bool &) { cmdDumpStack(out); };
-        tclCommands_["LIST-PROGRAMS"] = [this](const Tokens &, std::ostream &out, bool &) { cmdListPrograms(out); };
+        tclCommands_["DUMP-STACK"] = [this](const Tokens &tokens, std::ostream &out, bool &) {
+            if (tokens.size() != 1) {
+                out << "DUMP-STACK takes no arguments\n";
+                return;
+            }
+            cmdDumpStack(out);
+        };
+        tclCommands_["LIST-PROGRAMS"] = [this](const Tokens &tokens, std::ostream &out, bool &) {
+            if (tokens.size() != 1) {
+                out << "LIST-PROGRAMS takes no arguments\n";
+                return;
+            }
+            cmdListPrograms(out);
+        };
         tclCommands_["CREATE-FILE"] = [this](const Tokens &tokens, std::ostream &out, bool &) {
             cmdCreateFile(tokens, out);
         };
@@ -981,7 +1062,12 @@ namespace PickShell {
     }
 
     void Shell::executeProcTclCommand(const std::string &line, std::ostream &out) {
-        Tokens tokens = tokenize(line);
+        const TokenizeResult parsed = tokenize(line);
+        if (parsed.error.has_value()) {
+            out << "Error: " << *parsed.error << "\n";
+            return;
+        }
+        Tokens tokens = parsed.tokens;
         if (tokens.empty()) {
             return;
         }
@@ -1116,7 +1202,7 @@ namespace PickShell {
     }
 
     void Shell::cmdGet(const std::vector<std::string> &tokens, std::ostream &out) {
-        if (tokens.size() < 2) {
+        if (tokens.size() != 2) {
             out << "GET requires a variable name\n";
             return;
         }
@@ -1159,7 +1245,7 @@ namespace PickShell {
     }
 
     void Shell::cmdUnset(const std::vector<std::string> &tokens, std::ostream &out) {
-        if (tokens.size() < 2) {
+        if (tokens.size() != 2) {
             out << "UNSET requires a variable name\n";
             return;
         }
@@ -1248,7 +1334,7 @@ namespace PickShell {
     }
 
     void Shell::cmdCreateFile(const std::vector<std::string> &tokens, std::ostream &out) {
-        if (tokens.size() < 2) {
+        if (tokens.size() != 2) {
             out << "CREATE-FILE requires a filename\n";
             return;
         }
@@ -1263,7 +1349,7 @@ namespace PickShell {
     }
 
     void Shell::cmdDeleteFile(const std::vector<std::string> &tokens, std::ostream &out) {
-        if (tokens.size() < 2) {
+        if (tokens.size() != 2) {
             out << "DELETE-FILE requires a filename\n";
             return;
         }
@@ -1656,7 +1742,10 @@ namespace PickShell {
     }
 
     void Shell::cmdLogoff(const std::vector<std::string> &tokens, std::ostream &out) {
-        (void) tokens;
+        if (tokens.size() != 1) {
+            out << "LOGOFF takes no arguments\n";
+            return;
+        }
         if (!session_.loggedIn()) {
             out << "Not logged in.\n";
             return;

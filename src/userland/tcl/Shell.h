@@ -65,6 +65,10 @@ namespace PickShell {
         using Tokens = std::vector<std::string>;
         using CommandFn = std::function<void(const Tokens &, std::ostream &, bool &)>;
         using CommandTable = std::unordered_map<std::string, CommandFn>;
+        struct TokenizeResult {
+            Tokens tokens;
+            std::optional<std::string> error;
+        };
 
         ShellSession session_;
         VmDebugService vmDebugService_;
@@ -76,7 +80,7 @@ namespace PickShell {
         std::istream *inputStream_{nullptr};
         bool sessionEndRequested_{false};
 
-        static std::vector<std::string> tokenize(const std::string &line);
+        static TokenizeResult tokenize(const std::string &line);
 
         void dispatch(const std::vector<std::string> &tokens, bool &quit, std::ostream &out);
 

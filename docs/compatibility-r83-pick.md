@@ -26,10 +26,12 @@ Status labels:
 
 - **VOC first-token verb resolution** — `Implemented`
   - `V`/`X` with `Q` chaining before built-in dispatch.
-- **Tokenizer/quoting** — `Partial`
-  - Current behavior is whitespace tokenization without full quoted-string shell semantics.
+- **Tokenizer/quoting** — `Implemented`
+  - Tcl command tokenization supports quoted strings, escaped characters, and preserved quoted empty tokens.
 - **Session `@` names** — `Implemented`
   - `@USERNO`, `@ACCOUNT`, `@LOGNAME`, `@DEFDATA` resolved from session state.
+- **`$` substitution scope** — `Intentional deviation`
+  - `$` expansion is intentionally scoped to `ECHO` in current milestone delivery, not applied shell-wide.
 
 ## VOC behavior
 
