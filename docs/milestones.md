@@ -282,11 +282,19 @@ This milestone focuses on broadening the Gemini System by bringing the PROC lang
   - Multi-token TCL commands.
   - Better variable substitution rules.
   - Support for multi-line TCL blocks (optional stretch).
+- **R83 compatibility aliases + canonical forms**
+  - PROC accepts both original one-letter R83 command forms and modern long-form synonyms.
+  - Long-form names are canonical for docs, diagnostics, and internal command identity; one-letter forms are aliases.
+- **Token/substitution contract (normative)**
+  - The first token is always parsed as the command keyword and is never variable-substituted.
+  - Substitution applies only to operand tokens, only on exact token-name matches, with no quoting/escaping/partial-match behavior.
+  - PROC does not support dynamic command construction from variable values.
 - **Argument handling**
   - Positional parameters P1, P2, ...
   - Defaulting behaviour and error messages aligned with Pick.
 - **Error handling**
   - Consistent runtime errors for undefined variables, missing labels, and malformed statements.
+  - Preserve assignment/keyword disambiguation under alias support (for example, one-letter command aliases must not change assignment parsing rules).
 
 ---
 

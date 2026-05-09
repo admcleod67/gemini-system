@@ -16,7 +16,7 @@ The first token of each interactive Tcl line is resolved through logical file **
 
 - Tcl host shell and filesystem command integration: `src/userland/tcl/` (VOC resolution lives in [`src/core/voc/`](../src/core/voc/), used by [`ShellSession`](../src/userland/tcl/ShellSession.h))
 - BASIC line buffer + BASIC command interpreter (`EDIT` delegates to the system line editor in `src/userland/tcl/LineRecordEditor.*`): `src/userland/basic/`
-- PROC interpreter (line-oriented Milestone 1 subset): `src/userland/proc/`
+- PROC interpreter (host token interpreter): `src/userland/proc/` (language semantics: [PROC language](proc.md))
 - BASIC compiler is implemented in `src/userland/basic/BasicCompiler.*`.
 - BASIC mode command semantics are documented in [BASIC shell](basic-shell.md); language/compiler semantics are documented in [BASIC language](basic-language.md).
 - ASM debugger mode command semantics are documented in [Assembler shell](assembler-shell.md).
@@ -64,7 +64,7 @@ For ENGLISH command forms and worked query examples, see [ENGLISH query core](en
 | **`BASIC`** [*name*] | Enter BASIC mode. See [BASIC shell](basic-shell.md) for BASIC/ED commands and persistence rules. |
 | **`ASM`** [*programName*] | Enter ASM mode (instruction-level debugger shell). Optional name immediately executes `RUN <programName>` after entering ASM. See [Assembler shell](assembler-shell.md). |
 | **`RUN`** *programName* | Run by program name only (no extension). Tcl resolves `(file,key)` via VOC, prunes invalid breakpoints, and executes object record `<key>_OBJ`. If object is missing, Tcl compiles source record `<key>` and writes `<key>_OBJ` in the same resolved file before running. |
-| **`PROC`** *programName* [*args...*] | Resolve script via VOC/filesystem (`F/Q` with fallback to `PROC` file), then execute with a minimal two-pass PROC interpreter (labels + line execution). Supports `DISPLAY`, `INPUT`, `GO`, `IF A = B THEN GO label`, assignment `NAME = value`, `TCL ...`, and `END`. Positional args map to `P1`, `P2`, ... |
+| **`PROC`** *programName* [*args...*] | Resolve script via VOC/filesystem (`F/Q` with fallback to `PROC` file), then execute with the host PROC interpreter. Positional args map to `P1`, `P2`, ... . Full language semantics: [PROC language](proc.md). |
 | **`LIST-PROGRAMS`** | List logical program names from VOC-resolved program files (records in those files, excluding `_OBJ` records), deduplicated and sorted. |
 | **`CREATE-FILE`** *name* | Create a Pick file in the filesystem root. Creates logical file directory. |
 | **`DELETE-FILE`** *name* | Delete a Pick file from the filesystem root. |
@@ -105,19 +105,9 @@ Unknown first token: **`Unknown command: …`**.
 - BASIC command set and persistence (including **`EDIT`** delegating to the TCL line editor) are documented in [BASIC shell](basic-shell.md).
 - BASIC compiler/language subset details are documented in [BASIC language](basic-language.md).
 
-## PROC mode (Milestone 1 subset)
+## PROC mode
 
-`PROC` scripts are plain text and run entirely in the TCL host (no VM bytecode, no PROC compiler). Execution is two-pass: first pass records labels (`NAME:`), second pass executes statements line-by-line with `GO`/`IF ... THEN GO ...` jumps.
-
-Variable handling is intentionally minimal and token-based:
-
-- Variables are strings only (including positional `P1`, `P2`, ... from `PROC` args).
-- Tokenization is whitespace-based (no quoting rules).
-- Only operand/payload tokens are substituted by exact variable-name match.
-- Statement keywords are not rewritten by substitution.
-- After PROC locals, tokens that are exactly **`@USERNO`**, **`@ACCOUNT`**, **`@LOGNAME`**, or **`@DEFDATA`** (any ASCII case) substitute from the same session snapshot as Tcl **`GET`** (read-only; assignments and **`INPUT`** to those names are errors).
-
-`TCL ...` executes the reconstructed command string through the TCL command dispatcher, allowing PROC variable values to flow into TCL command arguments without sharing variable stores. Tcl operand expansion for **`@`** session names applies again on the bridged line (so **`TCL ECHO @ACCOUNT`** behaves like interactive Tcl).
+`PROC` runs host-interpreted scripts (no VM bytecode) via `PROC <programName> [args...]`. Script lookup and Tcl-bridge behavior are documented here; the full PROC language contract (execution model, substitution rules, statements, and error behavior) lives in [PROC language](proc.md).
 
 ## Shell variables
 
