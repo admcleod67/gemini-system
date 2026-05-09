@@ -1292,16 +1292,51 @@ namespace PickShell {
         }
 
         const std::string display = HelpTopics::joinOperandsDisplay(tokens, 1);
-        const std::string canonical =
+        std::string canonical =
             HelpTopics::canonicalTopicKey(session_.vocResolver_, tokens, 1);
-        if (const std::optional<std::string> body = HelpTopics::resolveHelpBody(session_.fileSystem_,
-                                                                                  session_.geminiCatalogRoot(),
-                                                                                  session_.fileSystemRoot(),
-                                                                                  canonical)) {
+        if (tokens.size() == 2 && kwEq(tokens[1], "COMMANDS")) {
+            canonical = "HELP COMMANDS";
+        }
+        std::optional<std::string> body = HelpTopics::resolveHelpBody(session_.fileSystem_,
+                                                                      session_.geminiCatalogRoot(),
+                                                                      session_.fileSystemRoot(),
+                                                                      canonical);
+        if (!body && canonical == "HELP COMMANDS") {
+            body = generatedHelpCommandsBody();
+        }
+        if (body.has_value()) {
             out << *body;
             return;
         }
         out << "No help available for \"" << display << "\".\n";
+    }
+
+    std::string Shell::generatedHelpCommandsBody() {
+        static constexpr std::string_view kIntro =
+            "HELP COMMANDS lists the TCL command verbs available in this account.\n"
+            "It shows the command names only; use HELP <command> for usage and details.\n"
+            "This topic reflects the current VOC and command surface, and may differ\n"
+            "between accounts depending on local overrides or site configuration.\n";
+
+        std::set<std::string> names;
+        for (const auto &entry: tclCommands_) {
+            names.insert(entry.first);
+        }
+        for (const auto &vocPair: session_.vocResolver_.table()) {
+            const std::string &vocKey = vocPair.first;
+            std::string resolved = session_.vocResolver_.resolveVerbName(vocKey);
+            asciiUpperInPlace(resolved);
+            if (tclCommands_.find(resolved) != tclCommands_.end()) {
+                names.insert(vocKey);
+            }
+        }
+
+        std::string out{kIntro};
+        for (const std::string &n: names) {
+            out += n;
+            out += '\n';
+        }
+        return out;
     }
 
     void Shell::cmdHelpList(const std::vector<std::string> &tokens, std::ostream &out) {

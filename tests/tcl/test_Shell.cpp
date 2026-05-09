@@ -132,6 +132,65 @@ TEST_CASE("shell HELP multi-word topic maps to underscore record id and HELP-LIS
     CHECK(out.str() == "HELP BASIC\n");
 }
 
+TEST_CASE("shell HELP COMMANDS lists Tcl verbs with intro") {
+    const auto fsDir = uniqueTempDir();
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(fsDir);
+    std::ostringstream out;
+    bool quit = false;
+    sh.handleLine("HELP COMMANDS", out, quit);
+    CHECK(out.str().find("HELP COMMANDS lists the TCL command verbs") != std::string::npos);
+    CHECK(out.str().find("HELP <command>") != std::string::npos);
+    CHECK(out.str().find("\nGET\n") != std::string::npos);
+    CHECK(out.str().find("\nWHO\n") != std::string::npos);
+}
+
+TEST_CASE("shell HELP HELP COMMANDS matches HELP COMMANDS") {
+    const auto fsDir = uniqueTempDir();
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(fsDir);
+    std::ostringstream a;
+    std::ostringstream b;
+    bool qa = false;
+    bool qb = false;
+    sh.handleLine("HELP HELP COMMANDS", a, qa);
+    sh.handleLine("HELP COMMANDS", b, qb);
+    CHECK_FALSE(qa);
+    CHECK_FALSE(qb);
+    CHECK(a.str() == b.str());
+}
+
+TEST_CASE("shell HELP COMMANDS includes VOC aliases that dispatch to Tcl verbs") {
+    const auto fsDir = uniqueTempDir();
+    PickFS::FileSystem fs(fsDir);
+    fs.createFile("VOC");
+    fs.write("VOC", PickFS::Record("ZALT", "V\nBASIC\n"));
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(fsDir);
+    std::ostringstream out;
+    bool quit = false;
+    sh.handleLine("HELP COMMANDS", out, quit);
+    CHECK(out.str().find("\nZALT\n") != std::string::npos);
+    CHECK(out.str().find("\nBASIC\n") != std::string::npos);
+}
+
+TEST_CASE("shell HELP COMMANDS file record overrides dynamic listing") {
+    const auto fsDir = uniqueTempDir();
+    PickFS::FileSystem fs(fsDir);
+    fs.createFile("HELP");
+    fs.write("HELP", PickFS::Record("HELP_COMMANDS", "static override topic\n"));
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(fsDir);
+    std::ostringstream out;
+    bool quit = false;
+    sh.handleLine("HELP COMMANDS", out, quit);
+    CHECK(out.str() == "static override topic\n");
+}
+
 TEST_CASE("shell HELP resolves topic from SYSPROG when local account has no HELP file") {
     const auto root = uniqueTempDir();
     const auto gem = root / "gemini";

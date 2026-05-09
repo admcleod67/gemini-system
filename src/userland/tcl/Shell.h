@@ -136,6 +136,9 @@ namespace PickShell {
         void cmdHelpList(const std::vector<std::string> &tokens, std::ostream &out);
         void cmdHelpEdit(const std::vector<std::string> &tokens, std::ostream &out);
 
+        /// Dynamic HELP topic: sorted Tcl verbs plus VOC aliases that resolve to a Tcl verb.
+        [[nodiscard]] std::string generatedHelpCommandsBody();
+
         void cmdVersion(std::ostream &out);
         void cmdSystem(std::ostream &out);
         void cmdWho(std::ostream &out);

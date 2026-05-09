@@ -2,4 +2,6 @@ Gemini/Tcl HELP is file-backed: each topic is a record in logical file HELP unde
 
 Type HELP-LIST for topic names. Type HELP followed by words for a topic (e.g. HELP LIST, HELP BASIC).
 
+HELP COMMANDS prints the catalog of Tcl command verbs available in this account (built-ins plus VOC synonyms that dispatch to Tcl). Use HELP <verb> for usage.
+
 Full command semantics are documented in docs/tcl-shell.md.

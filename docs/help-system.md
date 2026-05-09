@@ -36,9 +36,20 @@ No help available for "<display>".
 
 Resolves canonical topic **`HELP`** through the **same chain** as other topics (`HELP` file local → SYSPROG → builtins). If still missing, the shell prints one short built-in summary line pointing at **`HELP-LIST`** / `docs/tcl-shell.md`.
 
+## `HELP COMMANDS` (dynamic catalogue)
+
+Canonical topic **`HELP COMMANDS`** (PickFS storage id **`HELP_COMMANDS`** when stored as an ordinary record) normally has **no static body**.
+
+- **`HELP COMMANDS`** (two tokens — second word case-insensitive **`COMMANDS`**) resolves to **`HELP COMMANDS`** even though a single VOC operand would usually be noun-resolved separately.
+- Alternatively: **`HELP HELP COMMANDS`** (multi-operand join → **`HELP COMMANDS`**).
+- Lookup order unchanged: **`HELP`**/HELP_COMMANDS **`HELP`** file (local → SYSPROG) overrides; if neither supplies a **`HELP_COMMANDS`** record, the shell **generates** a topic body: introductory lines from the milestone text, then sorted **canonical Tcl verb names** (every built-in Tcl command keyword) plus any **VOC item id** whose **`resolveVerbName`** chains to one of those Tcl verbs (synonyms shown as extra names).
+- Operators use **`HELP <verb>`** (or VOC spellings documented in VOC) for per-command usage detail.
+
+Because **`HELP COMMANDS`** is generated from **`tclCommands_` + VOC** for the active session, it differs by account VOC contents and Pick host build/version.
+
 ## Authoring commands
 
-- **`HELP-LIST`** — lists canonical topic names from the **account-local** logical file **`HELP`** only (sorted). If the **`HELP`** file does not exist or has no readable records: `No HELP topics`.
+- **`HELP-LIST`** — lists canonical topic names from the **account-local** logical file **`HELP`** only (sorted). If the **`HELP`** file does not exist or has no readable records: `No HELP topics`. Dynamic topics such as **`HELP COMMANDS`** are **not** HELP-file records and do not appear here.
 - **`HELP-EDIT`** *topic-operands…* — same canonicalisation as **`HELP`**; ensures logical file **`HELP`** exists; opens **`ED>`** line editor on the mapped record id.
 
 PROC uses the Tcl bridge (**`TCL HELP …`**); resolution is identical to interactive **`HELP`**.
