@@ -37,6 +37,10 @@ Status labels:
 
 - **Resolver types in active subset** — `Implemented`
   - `F`, `Q`, `V`, `D`, `A`, `X` handled for current command/program/script flows.
+- **VOC authoring/introspection commands** — `Implemented`
+  - `CREATE-VOC`, `DELETE-VOC`, and `LIST-VOC` are available in Tcl.
+  - `CREATE-VOC` enforces `A/D/F/Q/V/X` and writes canonical attribute-per-line records.
+  - `LIST-VOC` is deterministic and emits `<item-id> <type>` with `INVALID` for malformed entries.
 - **Full dictionary semantics parity** — `Partial`
   - Some classic Pick dictionary depth and execute-body behaviors are deferred by milestone.
 

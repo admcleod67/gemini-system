@@ -416,6 +416,9 @@ namespace PickShell {
         tclCommands_["DEFINE-FIELD"] = [this](const Tokens &tokens, std::ostream &out, bool &) {
             cmdDefineField(tokens, out);
         };
+        tclCommands_["CREATE-VOC"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdCreateVoc(tokens, out); };
+        tclCommands_["DELETE-VOC"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdDeleteVoc(tokens, out); };
+        tclCommands_["LIST-VOC"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdListVoc(tokens, out); };
         tclCommands_["READ"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdRead(tokens, out); };
         tclCommands_["WRITE"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdWrite(tokens, out); };
         tclCommands_["ASM"] = [this](const Tokens &tokens, std::ostream &out, bool &) {
@@ -1282,6 +1285,9 @@ namespace PickShell {
         out << "  SELECT <file> [fields...]\n";
         out << "  RESOLVE-FIELD <data-file> <field-token>   ENGLISH DICT resolution (DICT-<file> then DICT)\n";
         out << "  DEFINE-FIELD <dict-file> <field-name> <attribute-number>   minimal type-A DICT item (not R83 verb)\n";
+        out << "  CREATE-VOC <item-id> <type> <target...>\n";
+        out << "  DELETE-VOC <item-id>\n";
+        out << "  LIST-VOC\n";
         out << "  LIST-LIST\n";
         out << "  CLEAR-LIST\n";
         out << "  READ <file> <record-name>   (or READ <record> when MD DEFDATA names default file)\n";
@@ -1559,6 +1565,107 @@ namespace PickShell {
             out << "Error: " << e.what() << '\n';
         } catch (const std::exception &e) {
             out << "Error: " << e.what() << '\n';
+        }
+    }
+
+    namespace {
+        std::optional<char> canonicalVocType(const std::string &token) {
+            if (token.empty()) {
+                return std::nullopt;
+            }
+            const char c = static_cast<char>(std::toupper(static_cast<unsigned char>(token[0])));
+            if (token.size() == 1 && (c == 'A' || c == 'D' || c == 'F' || c == 'Q' || c == 'V' || c == 'X')) {
+                return c;
+            }
+            return std::nullopt;
+        }
+
+        std::string detectVocTypeOrInvalid(const std::string &raw) {
+            std::istringstream in(raw);
+            std::string first;
+            if (!std::getline(in, first)) {
+                return "INVALID";
+            }
+            while (!first.empty() && (first.back() == '\r' || first.back() == '\n')) {
+                first.pop_back();
+            }
+            std::istringstream firstIss(first);
+            std::string firstToken;
+            if (!(firstIss >> firstToken)) {
+                return "INVALID";
+            }
+            if (const std::optional<char> t = canonicalVocType(firstToken)) {
+                return std::string(1, *t);
+            }
+            if (firstToken.size() == 3 && std::isdigit(static_cast<unsigned char>(firstToken[0])) != 0 &&
+                std::isdigit(static_cast<unsigned char>(firstToken[1])) != 0 &&
+                std::isdigit(static_cast<unsigned char>(firstToken[2])) != 0) {
+                std::string secondToken;
+                if (firstIss >> secondToken) {
+                    if (const std::optional<char> t2 = canonicalVocType(secondToken)) {
+                        return std::string(1, *t2);
+                    }
+                }
+            }
+            return "INVALID";
+        }
+    } // namespace
+
+    void Shell::cmdCreateVoc(const std::vector<std::string> &tokens, std::ostream &out) {
+        if (tokens.size() < 4) {
+            out << "CREATE-VOC requires <item-id> <type> <target...>\n";
+            return;
+        }
+        const std::optional<char> type = canonicalVocType(tokens[2]);
+        if (!type.has_value()) {
+            out << "CREATE-VOC type must be one of A,D,F,Q,V,X\n";
+            return;
+        }
+        try {
+            const PickFS::FileSystem::FileHandle voc = session_.fileSystem_.openFile("VOC");
+            std::string value;
+            value += *type;
+            value += '\n';
+            for (std::size_t i = 3; i < tokens.size(); ++i) {
+                value += tokens[i];
+                value += '\n';
+            }
+            session_.fileSystem_.writeRecord(voc, PickFS::Record(tokens[1], value));
+            session_.vocResolver_.invalidate();
+        } catch (const std::exception &e) {
+            out << "Error: " << e.what() << "\n";
+        }
+    }
+
+    void Shell::cmdDeleteVoc(const std::vector<std::string> &tokens, std::ostream &out) {
+        if (tokens.size() != 2) {
+            out << "DELETE-VOC requires an item-id\n";
+            return;
+        }
+        try {
+            const PickFS::FileSystem::FileHandle voc = session_.fileSystem_.openFile("VOC");
+            session_.fileSystem_.deleteRecord(voc, tokens[1]);
+            session_.vocResolver_.invalidate();
+        } catch (const std::exception &e) {
+            out << "Error: " << e.what() << "\n";
+        }
+    }
+
+    void Shell::cmdListVoc(const std::vector<std::string> &tokens, std::ostream &out) {
+        if (tokens.size() != 1) {
+            out << "LIST-VOC takes no arguments\n";
+            return;
+        }
+        try {
+            const PickFS::FileSystem::FileHandle voc = session_.fileSystem_.openFile("VOC");
+            const std::vector<std::string> ids = session_.fileSystem_.listRecords(voc);
+            for (const std::string &id: ids) {
+                const std::optional<PickFS::Record> rec = session_.fileSystem_.readRecord(voc, id);
+                const std::string type = rec.has_value() ? detectVocTypeOrInvalid(rec->value()) : "INVALID";
+                out << id << ' ' << type << '\n';
+            }
+        } catch (const std::exception &e) {
+            out << "Error: " << e.what() << "\n";
         }
     }
 

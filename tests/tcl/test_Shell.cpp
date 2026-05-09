@@ -809,6 +809,100 @@ TEST_CASE("shell VOC verb alias routes ENGLISH LIST") {
     CHECK(out.str().find("R1 ALICE") != std::string::npos);
 }
 
+TEST_CASE("shell CREATE-VOC DELETE-VOC LIST-VOC arity and type checks") {
+    auto dir = uniqueTempDir();
+    PickFS::FileSystem fs(dir);
+    fs.createFile("VOC");
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(dir);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("CREATE-VOC", out, quit);
+    CHECK(out.str() == "CREATE-VOC requires <item-id> <type> <target...>\n");
+
+    out.str("");
+    sh.handleLine("CREATE-VOC A1 Z BP", out, quit);
+    CHECK(out.str() == "CREATE-VOC type must be one of A,D,F,Q,V,X\n");
+
+    out.str("");
+    sh.handleLine("DELETE-VOC", out, quit);
+    CHECK(out.str() == "DELETE-VOC requires an item-id\n");
+
+    out.str("");
+    sh.handleLine("DELETE-VOC A1 EXTRA", out, quit);
+    CHECK(out.str() == "DELETE-VOC requires an item-id\n");
+
+    out.str("");
+    sh.handleLine("LIST-VOC EXTRA", out, quit);
+    CHECK(out.str() == "LIST-VOC takes no arguments\n");
+}
+
+TEST_CASE("shell CREATE-VOC writes canonical type and target attributes") {
+    auto dir = uniqueTempDir();
+    PickFS::FileSystem fs(dir);
+    fs.createFile("VOC");
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(dir);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("CREATE-VOC BP f BP", out, quit);
+    CHECK(out.str().empty());
+    const std::optional<PickFS::Record> rec = fs.read("VOC", "BP");
+    REQUIRE(rec.has_value());
+    CHECK(rec->value() == "F\nBP\n");
+}
+
+TEST_CASE("shell CREATE-VOC and DELETE-VOC invalidate resolver cache") {
+    auto dir = uniqueTempDir();
+    PickFS::FileSystem fs(dir);
+    fs.createFile("VOC");
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(dir);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("HI", out, quit);
+    CHECK(out.str() == "Unknown command: HI\n");
+
+    out.str("");
+    sh.handleLine("CREATE-VOC HI V WHO", out, quit);
+    CHECK(out.str().empty());
+
+    out.str("");
+    sh.handleLine("HI", out, quit);
+    CHECK(out.str() == "0 - -\n");
+
+    out.str("");
+    sh.handleLine("DELETE-VOC HI", out, quit);
+    CHECK(out.str().empty());
+
+    out.str("");
+    sh.handleLine("HI", out, quit);
+    CHECK(out.str() == "Unknown command: HI\n");
+}
+
+TEST_CASE("shell LIST-VOC shows stable item and type output with INVALID marker") {
+    auto dir = uniqueTempDir();
+    PickFS::FileSystem fs(dir);
+    fs.createFile("VOC");
+    fs.write("VOC", PickFS::Record("ZREC", "V\nWHO\n"));
+    fs.write("VOC", PickFS::Record("AREC", "garbage\n"));
+    fs.write("VOC", PickFS::Record("MREC", "001 F\n002 BP\n"));
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(dir);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("LIST-VOC", out, quit);
+    CHECK(out.str() == "AREC INVALID\nMREC F\nZREC V\n");
+}
+
 TEST_CASE("shell COUNT LIST SORT use active list when filename omitted") {
     auto dir = uniqueTempDir();
     PickVM::Runtime rt;
