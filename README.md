@@ -9,7 +9,7 @@ The implementation remains intentionally incremental, but the platform is now br
 filesystem-backed Pick file semantics, BASIC compiler/shell workflows, and ENGLISH/DICT query foundations. The goal is
 still to grow the system in **small, verifiable steps** (tests, clear boundaries) rather than landing a large stack at once.
 
-A phased **roadmap** (Milestone 1 onward) is summarized in **[`docs/milestones.md`](docs/milestones.md)**; **Milestones 1–4** track what is implemented today (core stack, multi-account session and VOC, ENGLISH + filesystem maturation, and BASIC language fidelity stages), and later milestones remain subject to refinement.
+A phased **roadmap** (Milestone 1 onward) is summarized in **[`docs/milestones.md`](docs/milestones.md)** (hub); long-form text for each milestone lives under **[`docs/milestones/`](docs/milestones/)**. **Milestones 1–4** track what is implemented today (core stack, multi-account session and VOC, ENGLISH + filesystem maturation, and BASIC language fidelity stages), and later milestones remain subject to refinement.
 
 ## Building
 
@@ -36,7 +36,7 @@ More detail lives under **[`docs/`](docs/README.md)**:
 - **[BASIC shell](docs/basic-shell.md)** — program buffer, SAVE/LOAD, COMPILE/`RUN`; `EDIT` uses the shared system line editor.
 - **[BASIC language](docs/basic-language.md)** — supported BASIC compiler subset and expression semantics.
 - **[Compiler architecture](docs/compiler-architecture.md)** — parse/semantic/emit phase boundaries.
-- **[Project milestones](docs/milestones.md)** — phased roadmap / future direction.
+- **[Project milestones](docs/milestones.md)** — roadmap hub; **[per-milestone detail](docs/milestones/)** (`NN-slug.md`).
 
 ## Layout (high level)
 

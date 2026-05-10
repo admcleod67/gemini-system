@@ -26,5 +26,6 @@ Technical reference for Gemini System. Paths below are relative to this director
 
 ## Roadmap
 
-- **[Project milestones](milestones.md)** — phased roadmap; **through Milestone 4** tracks what is implemented today; later milestones evolve.
+- **[Project milestones](milestones.md)** — hub index and short overview; **through Milestone 4** tracks what is implemented today; later milestones evolve.
+- **[Milestone detail pages](milestones/)** — one file per milestone (`NN-slug.md` for sortable filenames).
 - **[Compatibility (R83/Pick)](compatibility-r83-pick.md)** — implemented/partial/deferred Gemini compatibility notes versus classic Pick behavior.
