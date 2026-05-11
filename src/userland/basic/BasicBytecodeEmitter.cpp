@@ -208,7 +208,8 @@ namespace PickShell {
                          std::to_string(node.arguments.size());
                 return false;
             }
-            const bool argInArithmetic = (node.name == "ABS" || node.name == "SGN");
+            const bool argInArithmetic =
+                (node.name == "ABS" || node.name == "SGN" || node.name == "SPACE");
             for (const auto &argPtr : node.arguments) {
                 if (!argPtr) {
                     error_ = node.name + ": missing argument";
@@ -218,16 +219,7 @@ namespace PickShell {
                     return false;
                 }
             }
-            if (node.name == "ABS") {
-                emitNoOperand(PickVM::OpCode::AbsInt);
-            } else if (node.name == "SGN") {
-                emitNoOperand(PickVM::OpCode::SgnInt);
-            } else if (node.name == "SEQ") {
-                emitNoOperand(PickVM::OpCode::SeqStr);
-            } else {
-                error_ = "Internal error: unknown builtin opcode for " + node.name;
-                return false;
-            }
+            out_.push_back(PickVM::Instruction{PickVM::OpCode::InvokeBuiltin, node.name});
             return true;
         }
 

@@ -61,6 +61,7 @@ namespace PickVM {
         AbsInt,
         SgnInt,
         SeqStr,
+        InvokeBuiltin,
         OpenFile,
         OpenFileTry,
         ReadRec,

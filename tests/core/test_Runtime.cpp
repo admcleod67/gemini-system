@@ -1354,6 +1354,87 @@ TEST_CASE("runtime SeqStr stringifies integer operand") {
     CHECK(std::get<int>(rt.stack()[0]) == 54); // '6'
 }
 
+TEST_CASE("runtime InvokeBuiltin ABS matches AbsInt") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, -7},
+        {OpCode::InvokeBuiltin, std::string{"ABS"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<int>(rt.stack()[0]) == 7);
+}
+
+TEST_CASE("runtime InvokeBuiltin LEN returns byte length") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"abc"}},
+        {OpCode::InvokeBuiltin, std::string{"LEN"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<int>(rt.stack()[0]) == 3);
+}
+
+TEST_CASE("runtime InvokeBuiltin TRIM strips whitespace") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"  hi  "}},
+        {OpCode::InvokeBuiltin, std::string{"TRIM"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<std::string>(rt.stack()[0]) == "hi");
+}
+
+TEST_CASE("runtime InvokeBuiltin SPACE with negative count yields empty string") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, -3},
+        {OpCode::InvokeBuiltin, std::string{"SPACE"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<std::string>(rt.stack()[0]).empty());
+}
+
+TEST_CASE("runtime InvokeBuiltin SPACE rejects count above limit") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, 65537},
+        {OpCode::InvokeBuiltin, std::string{"SPACE"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    CHECK_THROWS_AS(rt.run(), std::runtime_error);
+}
+
+TEST_CASE("runtime InvokeBuiltin unknown name throws with BUILTIN prefix") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, 1},
+        {OpCode::InvokeBuiltin, std::string{"NOT_A_BUILTIN"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    bool threw = false;
+    try {
+        rt.run();
+    } catch (const std::runtime_error &e) {
+        threw = true;
+        CHECK(std::string(e.what()).find("BUILTIN:") != std::string::npos);
+    }
+    CHECK(threw);
+}
+
 TEST_CASE("runtime OpenFile binds existing file handle") {
     const std::filesystem::path root = std::filesystem::temp_directory_path() / "pick-runtime-openfile-test";
     std::error_code ec;

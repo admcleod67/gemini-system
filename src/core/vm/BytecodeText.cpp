@@ -77,6 +77,9 @@ namespace PickVM {
                 case OpCode::CloseFile:
                     out << ' ' << std::get<std::string>(instr.operand);
                     break;
+                case OpCode::InvokeBuiltin:
+                    out << " \"" << escapeQuoted(std::get<std::string>(instr.operand)) << '"';
+                    break;
                 default:
                     break;
             }

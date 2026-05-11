@@ -196,6 +196,23 @@ TEST_CASE("basic expression parser rejects trailing comma in builtin argument li
     REQUIRE(result.error.find("Trailing comma") != std::string::npos);
 }
 
+TEST_CASE("basic expression parser parses LEN builtin call") {
+    const auto result = BasicExpressionParser::parse("LEN(\"ABC\")");
+    REQUIRE(result.success);
+    REQUIRE(result.expression != nullptr);
+    REQUIRE(std::holds_alternative<BasicAst::FunctionCallExpr>(result.expression->node));
+    const auto &call = std::get<BasicAst::FunctionCallExpr>(result.expression->node);
+    CHECK(call.name == "LEN");
+    REQUIRE(call.arguments.size() == 1);
+}
+
+TEST_CASE("basic expression parser parses SPACE builtin call") {
+    const auto result = BasicExpressionParser::parse("SPACE(3)");
+    REQUIRE(result.success);
+    REQUIRE(std::holds_alternative<BasicAst::FunctionCallExpr>(result.expression->node));
+    CHECK(std::get<BasicAst::FunctionCallExpr>(result.expression->node).name == "SPACE");
+}
+
 TEST_CASE("basic expression parser parses nested builtin calls") {
     const auto result = BasicExpressionParser::parse("ABS(SGN(-1))");
     REQUIRE(result.success);

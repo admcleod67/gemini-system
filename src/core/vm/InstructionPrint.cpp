@@ -49,6 +49,7 @@ namespace PickVM {
             case OpCode::AbsInt: return "ABS_INT";
             case OpCode::SgnInt: return "SGN_INT";
             case OpCode::SeqStr: return "SEQ_STR";
+            case OpCode::InvokeBuiltin: return "INVOKE_BUILTIN";
             case OpCode::OpenFile: return "OPEN_FILE";
             case OpCode::OpenFileTry: return "OPEN_FILE_TRY";
             case OpCode::ReadRec: return "READ_REC";
@@ -146,6 +147,11 @@ namespace PickVM {
             case OpCode::CloseFile:
                 oss << ' ' << stringOperandAtIp(instr, ip);
                 break;
+            case OpCode::InvokeBuiltin: {
+                const std::string s = stringOperandAtIp(instr, ip);
+                oss << " \"" << s << '"';
+                break;
+            }
             case OpCode::Add:
             case OpCode::Sub:
             case OpCode::Mul:

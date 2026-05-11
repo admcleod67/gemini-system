@@ -469,7 +469,7 @@ namespace {
     }
 } // namespace
 
-TEST_CASE("basic bytecode emitter emits argument + AbsInt for ABS") {
+TEST_CASE("basic bytecode emitter emits argument + InvokeBuiltin for ABS") {
     BasicIr::NormalizedProgram program;
     BasicIr::PrintStmt stmt{};
     stmt.expression = makeCall("ABS", makeInt(-5));
@@ -477,11 +477,10 @@ TEST_CASE("basic bytecode emitter emits argument + AbsInt for ABS") {
 
     const BasicBytecodeEmissionResult emitted = BasicBytecodeEmitter::emit(program);
     REQUIRE(emitted.success);
-    // PUSH_INT -5 → (emitted as PushInt 0, PushInt 5, Sub), ABS_INT, PRINT_VAL, PRINT_EOL, HALT
-    // ABS_INT should appear after the argument expression
     bool found = false;
-    for (std::size_t i = 0; i + 1 < emitted.program.size(); ++i) {
-        if (emitted.program[i].op == OpCode::AbsInt) {
+    for (const auto &instr : emitted.program) {
+        if (instr.op == OpCode::InvokeBuiltin && std::holds_alternative<std::string>(instr.operand) &&
+            std::get<std::string>(instr.operand) == "ABS") {
             found = true;
             break;
         }
@@ -489,7 +488,7 @@ TEST_CASE("basic bytecode emitter emits argument + AbsInt for ABS") {
     CHECK(found);
 }
 
-TEST_CASE("basic bytecode emitter emits argument + SgnInt for SGN") {
+TEST_CASE("basic bytecode emitter emits argument + InvokeBuiltin for SGN") {
     BasicIr::NormalizedProgram program;
     BasicIr::PrintStmt stmt{};
     stmt.expression = makeCall("SGN", makeInt(3));
@@ -497,17 +496,17 @@ TEST_CASE("basic bytecode emitter emits argument + SgnInt for SGN") {
 
     const BasicBytecodeEmissionResult emitted = BasicBytecodeEmitter::emit(program);
     REQUIRE(emitted.success);
-    // PUSH_INT 3, SGN_INT, PRINT_VAL, PRINT_EOL, HALT
     REQUIRE(emitted.program.size() == 5);
     CHECK(emitted.program[0].op == OpCode::PushInt);
     CHECK(std::get<int>(emitted.program[0].operand) == 3);
-    CHECK(emitted.program[1].op == OpCode::SgnInt);
+    CHECK(emitted.program[1].op == OpCode::InvokeBuiltin);
+    CHECK(std::get<std::string>(emitted.program[1].operand) == "SGN");
     CHECK(emitted.program[2].op == OpCode::PrintVal);
     CHECK(emitted.program[3].op == OpCode::PrintEol);
     CHECK(emitted.program[4].op == OpCode::Halt);
 }
 
-TEST_CASE("basic bytecode emitter emits argument + SeqStr for SEQ") {
+TEST_CASE("basic bytecode emitter emits argument + InvokeBuiltin for SEQ") {
     BasicIr::NormalizedProgram program;
     BasicIr::PrintStmt stmt{};
     stmt.expression = makeCall("SEQ", makeStr("A"));
@@ -515,11 +514,11 @@ TEST_CASE("basic bytecode emitter emits argument + SeqStr for SEQ") {
 
     const BasicBytecodeEmissionResult emitted = BasicBytecodeEmitter::emit(program);
     REQUIRE(emitted.success);
-    // PUSH_STR "A", SEQ_STR, PRINT_VAL, PRINT_EOL, HALT
     REQUIRE(emitted.program.size() == 5);
     CHECK(emitted.program[0].op == OpCode::PushStr);
     CHECK(std::get<std::string>(emitted.program[0].operand) == "A");
-    CHECK(emitted.program[1].op == OpCode::SeqStr);
+    CHECK(emitted.program[1].op == OpCode::InvokeBuiltin);
+    CHECK(std::get<std::string>(emitted.program[1].operand) == "SEQ");
     CHECK(emitted.program[2].op == OpCode::PrintVal);
     CHECK(emitted.program[3].op == OpCode::PrintEol);
     CHECK(emitted.program[4].op == OpCode::Halt);
@@ -543,10 +542,24 @@ TEST_CASE("basic bytecode emitter allows dollar variable in SEQ") {
 
     const BasicBytecodeEmissionResult emitted = BasicBytecodeEmitter::emit(program);
     CHECK(emitted.success);
-    // LOAD_VAR X$, SEQ_STR, PRINT_VAL, PRINT_EOL, HALT
     REQUIRE(emitted.program.size() == 5);
     CHECK(emitted.program[0].op == OpCode::LoadVar);
-    CHECK(emitted.program[1].op == OpCode::SeqStr);
+    CHECK(emitted.program[1].op == OpCode::InvokeBuiltin);
+    CHECK(std::get<std::string>(emitted.program[1].operand) == "SEQ");
+}
+
+TEST_CASE("basic bytecode emitter emits InvokeBuiltin for LEN") {
+    BasicIr::NormalizedProgram program;
+    BasicIr::PrintStmt stmt{};
+    stmt.expression = makeCall("LEN", makeStr("abc"));
+    program.lines.push_back({10, std::move(stmt)});
+
+    const BasicBytecodeEmissionResult emitted = BasicBytecodeEmitter::emit(program);
+    REQUIRE(emitted.success);
+    REQUIRE(emitted.program.size() >= 2);
+    CHECK(emitted.program[0].op == OpCode::PushStr);
+    CHECK(emitted.program[1].op == OpCode::InvokeBuiltin);
+    CHECK(std::get<std::string>(emitted.program[1].operand) == "LEN");
 }
 
 TEST_CASE("basic bytecode emitter rejects ABS with zero arguments") {

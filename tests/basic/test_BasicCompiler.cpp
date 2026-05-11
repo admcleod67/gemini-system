@@ -744,11 +744,13 @@ TEST_CASE("basic compiler compiles ABS function") {
     BasicCompiler compiler;
     const auto result = compiler.compile(program);
     REQUIRE(result.success);
-    // Argument -5 is: PushInt 0, PushInt 5, Sub
-    // Then: ABS_INT, PRINT_VAL, PRINT_EOL, HALT
     bool found = false;
     for (const auto &instr : result.program) {
-        if (instr.op == OpCode::AbsInt) { found = true; break; }
+        if (instr.op == OpCode::InvokeBuiltin && std::holds_alternative<std::string>(instr.operand) &&
+            std::get<std::string>(instr.operand) == "ABS") {
+            found = true;
+            break;
+        }
     }
     CHECK(found);
 }
@@ -763,7 +765,11 @@ TEST_CASE("basic compiler compiles SGN function") {
     REQUIRE(result.success);
     bool found = false;
     for (const auto &instr : result.program) {
-        if (instr.op == OpCode::SgnInt) { found = true; break; }
+        if (instr.op == OpCode::InvokeBuiltin && std::holds_alternative<std::string>(instr.operand) &&
+            std::get<std::string>(instr.operand) == "SGN") {
+            found = true;
+            break;
+        }
     }
     CHECK(found);
 }
@@ -778,7 +784,30 @@ TEST_CASE("basic compiler compiles SEQ function") {
     REQUIRE(result.success);
     bool found = false;
     for (const auto &instr : result.program) {
-        if (instr.op == OpCode::SeqStr) { found = true; break; }
+        if (instr.op == OpCode::InvokeBuiltin && std::holds_alternative<std::string>(instr.operand) &&
+            std::get<std::string>(instr.operand) == "SEQ") {
+            found = true;
+            break;
+        }
+    }
+    CHECK(found);
+}
+
+TEST_CASE("basic compiler compiles LEN function") {
+    BasicProgram program;
+    program.setLine(10, "PRINT LEN(\"XY\")");
+    program.setLine(20, "END");
+
+    BasicCompiler compiler;
+    const auto result = compiler.compile(program);
+    REQUIRE(result.success);
+    bool found = false;
+    for (const auto &instr : result.program) {
+        if (instr.op == OpCode::InvokeBuiltin && std::holds_alternative<std::string>(instr.operand) &&
+            std::get<std::string>(instr.operand) == "LEN") {
+            found = true;
+            break;
+        }
     }
     CHECK(found);
 }

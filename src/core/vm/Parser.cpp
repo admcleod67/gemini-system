@@ -355,6 +355,13 @@ namespace PickVM {
             } else if (pl.opcode == "SEQ_STR") {
                 inst.op = OpCode::SeqStr;
                 requireNoOperand(pl);
+            } else if (pl.opcode == "INVOKE_BUILTIN") {
+                inst.op = OpCode::InvokeBuiltin;
+                if (pl.operand.empty()) {
+                    throw std::runtime_error(
+                        "INVOKE_BUILTIN requires a quoted builtin name at line " + std::to_string(pl.sourceLine));
+                }
+                inst.operand = parseQuotedString(pl.operand, pl.sourceLine);
             } else if (pl.opcode == "OPEN_FILE") {
                 inst.op = OpCode::OpenFile;
                 if (pl.operand.empty()) {

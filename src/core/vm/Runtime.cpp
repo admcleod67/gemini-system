@@ -21,6 +21,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
 
 namespace PickVM {
@@ -234,6 +235,116 @@ namespace PickVM {
                 return false;
             }
             return pos == trimmed.size();
+        }
+
+        // --- BASIC InvokeBuiltin registry (Milestone 7 Stage 2) ---
+        // ICONV / OCONV: no conversion codes implemented yet; extend here when adding support.
+        constexpr int kBuiltinSpaceMaxCount = 65536;
+
+        using BuiltinStackFn = void (*)(std::vector<Value> &stack);
+
+        struct BuiltinEntry {
+            int arity;
+            BuiltinStackFn fn;
+        };
+
+        void builtinAbs(std::vector<Value> &stack) {
+            Value v = stack.back();
+            stack.pop_back();
+            stack.push_back(std::abs(coerceToInt(v)));
+        }
+
+        void builtinSgn(std::vector<Value> &stack) {
+            Value v = stack.back();
+            stack.pop_back();
+            const int x = coerceToInt(v);
+            stack.push_back(x > 0 ? 1 : x < 0 ? -1 : 0);
+        }
+
+        void builtinSeq(std::vector<Value> &stack) {
+            Value v = stack.back();
+            stack.pop_back();
+            const std::string s = valueToString(v);
+            stack.push_back(s.empty() ? 0 : static_cast<int>(static_cast<unsigned char>(s[0])));
+        }
+
+        void builtinLen(std::vector<Value> &stack) {
+            Value v = stack.back();
+            stack.pop_back();
+            stack.push_back(static_cast<int>(valueToString(v).size()));
+        }
+
+        void builtinTrim(std::vector<Value> &stack) {
+            Value v = stack.back();
+            stack.pop_back();
+            const std::string s = valueToString(v);
+            const std::size_t first = s.find_first_not_of(" \t\r\n");
+            if (first == std::string::npos) {
+                stack.push_back(std::string{});
+            } else {
+                const std::size_t last = s.find_last_not_of(" \t\r\n");
+                stack.push_back(s.substr(first, last - first + 1));
+            }
+        }
+
+        void builtinLcase(std::vector<Value> &stack) {
+            Value v = stack.back();
+            stack.pop_back();
+            std::string s = valueToString(v);
+            for (char &c : s) {
+                c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+            }
+            stack.push_back(std::move(s));
+        }
+
+        void builtinUcase(std::vector<Value> &stack) {
+            Value v = stack.back();
+            stack.pop_back();
+            std::string s = valueToString(v);
+            for (char &c : s) {
+                c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+            }
+            stack.push_back(std::move(s));
+        }
+
+        void builtinSpace(std::vector<Value> &stack) {
+            Value v = stack.back();
+            stack.pop_back();
+            int n = coerceToInt(v);
+            if (n < 0) {
+                n = 0;
+            }
+            if (n > kBuiltinSpaceMaxCount) {
+                throw std::runtime_error("BUILTIN: SPACE count exceeds limit");
+            }
+            stack.push_back(std::string(static_cast<std::size_t>(n), ' '));
+        }
+
+        const std::unordered_map<std::string, BuiltinEntry> &builtinRegistry() {
+            static const std::unordered_map<std::string, BuiltinEntry> kRegistry{
+                {"ABS", {1, builtinAbs}},
+                {"SGN", {1, builtinSgn}},
+                {"SEQ", {1, builtinSeq}},
+                {"LEN", {1, builtinLen}},
+                {"TRIM", {1, builtinTrim}},
+                {"LCASE", {1, builtinLcase}},
+                {"UCASE", {1, builtinUcase}},
+                {"SPACE", {1, builtinSpace}},
+            };
+            return kRegistry;
+        }
+
+        void invokeBuiltinOnStack(const std::string &name, std::vector<Value> &stack) {
+            const auto &reg = builtinRegistry();
+            const auto it = reg.find(name);
+            if (it == reg.end()) {
+                throw std::runtime_error(std::string("BUILTIN: unknown ") + name);
+            }
+            const int arity = it->second.arity;
+            if (static_cast<int>(stack.size()) < arity) {
+                throw std::runtime_error(std::string("BUILTIN: stack underflow for ") + name);
+            }
+            it->second.fn(stack);
         }
 
     } // namespace
@@ -650,6 +761,12 @@ namespace PickVM {
                 const Value v = pop();
                 const std::string s = valueToString(v);
                 push(s.empty() ? 0 : static_cast<int>(static_cast<unsigned char>(s[0])));
+                break;
+            }
+
+            case OpCode::InvokeBuiltin: {
+                const std::string name = stringOperandAtIp(instr, ip_);
+                invokeBuiltinOnStack(name, stack_);
                 break;
             }
 
