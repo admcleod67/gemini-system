@@ -143,9 +143,9 @@ TEST_CASE("basic expression parser parses ABS function call") {
     REQUIRE(std::holds_alternative<BasicAst::FunctionCallExpr>(result.expression->node));
     const auto &call = std::get<BasicAst::FunctionCallExpr>(result.expression->node);
     CHECK(call.name == "ABS");
-    REQUIRE(call.argument != nullptr);
-    REQUIRE(std::holds_alternative<BasicAst::IntLiteralExpr>(call.argument->node));
-    CHECK(std::get<BasicAst::IntLiteralExpr>(call.argument->node).value == 5);
+    REQUIRE(call.arguments.size() == 1);
+    REQUIRE(std::holds_alternative<BasicAst::IntLiteralExpr>(call.arguments[0]->node));
+    CHECK(std::get<BasicAst::IntLiteralExpr>(call.arguments[0]->node).value == 5);
 }
 
 TEST_CASE("basic expression parser parses SGN function call with negative argument") {
@@ -155,7 +155,7 @@ TEST_CASE("basic expression parser parses SGN function call with negative argume
     REQUIRE(std::holds_alternative<BasicAst::FunctionCallExpr>(result.expression->node));
     const auto &call = std::get<BasicAst::FunctionCallExpr>(result.expression->node);
     CHECK(call.name == "SGN");
-    REQUIRE(call.argument != nullptr);
+    REQUIRE(call.arguments.size() == 1);
 }
 
 TEST_CASE("basic expression parser parses SEQ function call with string argument") {
@@ -165,9 +165,9 @@ TEST_CASE("basic expression parser parses SEQ function call with string argument
     REQUIRE(std::holds_alternative<BasicAst::FunctionCallExpr>(result.expression->node));
     const auto &call = std::get<BasicAst::FunctionCallExpr>(result.expression->node);
     CHECK(call.name == "SEQ");
-    REQUIRE(call.argument != nullptr);
-    REQUIRE(std::holds_alternative<BasicAst::StringLiteralExpr>(call.argument->node));
-    CHECK(std::get<BasicAst::StringLiteralExpr>(call.argument->node).value == "A");
+    REQUIRE(call.arguments.size() == 1);
+    REQUIRE(std::holds_alternative<BasicAst::StringLiteralExpr>(call.arguments[0]->node));
+    CHECK(std::get<BasicAst::StringLiteralExpr>(call.arguments[0]->node).value == "A");
 }
 
 TEST_CASE("basic expression parser is case-insensitive for function names") {
@@ -176,6 +176,38 @@ TEST_CASE("basic expression parser is case-insensitive for function names") {
     REQUIRE(result.expression != nullptr);
     REQUIRE(std::holds_alternative<BasicAst::FunctionCallExpr>(result.expression->node));
     CHECK(std::get<BasicAst::FunctionCallExpr>(result.expression->node).name == "ABS");
+}
+
+TEST_CASE("basic expression parser rejects ABS with too many arguments") {
+    const auto result = BasicExpressionParser::parse("ABS(1,2)");
+    CHECK_FALSE(result.success);
+    REQUIRE(result.error.find("expects 1 argument") != std::string::npos);
+}
+
+TEST_CASE("basic expression parser rejects ABS with no arguments") {
+    const auto result = BasicExpressionParser::parse("ABS()");
+    CHECK_FALSE(result.success);
+    REQUIRE(result.error.find("requires an argument") != std::string::npos);
+}
+
+TEST_CASE("basic expression parser rejects trailing comma in builtin argument list") {
+    const auto result = BasicExpressionParser::parse("ABS(1,)");
+    CHECK_FALSE(result.success);
+    REQUIRE(result.error.find("Trailing comma") != std::string::npos);
+}
+
+TEST_CASE("basic expression parser parses nested builtin calls") {
+    const auto result = BasicExpressionParser::parse("ABS(SGN(-1))");
+    REQUIRE(result.success);
+    REQUIRE(result.expression != nullptr);
+    REQUIRE(std::holds_alternative<BasicAst::FunctionCallExpr>(result.expression->node));
+    const auto &outer = std::get<BasicAst::FunctionCallExpr>(result.expression->node);
+    CHECK(outer.name == "ABS");
+    REQUIRE(outer.arguments.size() == 1);
+    REQUIRE(std::holds_alternative<BasicAst::FunctionCallExpr>(outer.arguments[0]->node));
+    const auto &inner = std::get<BasicAst::FunctionCallExpr>(outer.arguments[0]->node);
+    CHECK(inner.name == "SGN");
+    REQUIRE(inner.arguments.size() == 1);
 }
 
 TEST_CASE("basic expression parser treats unknown name followed by paren as array subscript") {

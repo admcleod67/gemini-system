@@ -1,8 +1,10 @@
 #include "BasicBytecodeEmitter.h"
 
+#include "BasicBuiltinNames.h"
 #include "BasicCompileUtils.h"
 
 #include <functional>
+#include <optional>
 #include <string>
 #include <type_traits>
 #include <unordered_map>
@@ -51,6 +53,8 @@ namespace PickShell {
         private:
             std::vector<PickVM::Instruction> &out_;
             std::string &error_;
+
+            bool emitBuiltinCall(const BasicAst::FunctionCallExpr &node);
 
             void emitNoOperand(PickVM::OpCode op) const {
                 out_.push_back(makeNoOperandInstruction(op));
@@ -184,28 +188,48 @@ namespace PickShell {
                             emitNoOperand(PickVM::OpCode::ExtractAttr);
                             return true;
                         } else if constexpr (std::is_same_v<NodeT, BasicAst::FunctionCallExpr>) {
-                            if (!node.argument) {
-                                error_ = node.name + ": missing argument";
-                                return false;
-                            }
-                            const bool argInArithmetic = (node.name == "ABS" || node.name == "SGN");
-                            if (!emitNode(*node.argument, argInArithmetic)) {
-                                return false;
-                            }
-                            if (node.name == "ABS") {
-                                emitNoOperand(PickVM::OpCode::AbsInt);
-                            } else if (node.name == "SGN") {
-                                emitNoOperand(PickVM::OpCode::SgnInt);
-                            } else {
-                                emitNoOperand(PickVM::OpCode::SeqStr);
-                            }
-                            return true;
+                            (void) inArithmetic;
+                            return emitBuiltinCall(node);
                         }
                         return false;
                     },
                     expression.node);
             }
         };
+
+        bool ExpressionAstEmitter::emitBuiltinCall(const BasicAst::FunctionCallExpr &node) {
+            const std::optional<int> expected = BasicBuiltins::arityForBuiltinCall(node.name);
+            if (!expected.has_value()) {
+                error_ = "Internal error: unsupported builtin " + node.name;
+                return false;
+            }
+            if (static_cast<int>(node.arguments.size()) != *expected) {
+                error_ = node.name + " expects " + std::to_string(*expected) + " argument(s), got " +
+                         std::to_string(node.arguments.size());
+                return false;
+            }
+            const bool argInArithmetic = (node.name == "ABS" || node.name == "SGN");
+            for (const auto &argPtr : node.arguments) {
+                if (!argPtr) {
+                    error_ = node.name + ": missing argument";
+                    return false;
+                }
+                if (!emitNode(*argPtr, argInArithmetic)) {
+                    return false;
+                }
+            }
+            if (node.name == "ABS") {
+                emitNoOperand(PickVM::OpCode::AbsInt);
+            } else if (node.name == "SGN") {
+                emitNoOperand(PickVM::OpCode::SgnInt);
+            } else if (node.name == "SEQ") {
+                emitNoOperand(PickVM::OpCode::SeqStr);
+            } else {
+                error_ = "Internal error: unknown builtin opcode for " + node.name;
+                return false;
+            }
+            return true;
+        }
 
         struct JumpFixup {
             int sourceLine{0};

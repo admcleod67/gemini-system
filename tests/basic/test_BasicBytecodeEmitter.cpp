@@ -6,6 +6,8 @@
 
 #include <optional>
 #include <string>
+#include <utility>
+#include <vector>
 
 using PickShell::BasicBytecodeEmitter;
 using PickShell::BasicBytecodeEmissionResult;
@@ -454,10 +456,16 @@ TEST_CASE("basic bytecode emitter emits ClearVars for ClearStmt") {
 }
 
 namespace {
-    std::unique_ptr<BasicAst::Expr> makeCall(const std::string &name, std::unique_ptr<BasicAst::Expr> arg) {
+    std::unique_ptr<BasicAst::Expr> makeCall(const std::string &name, std::vector<std::unique_ptr<BasicAst::Expr>> args) {
         auto expr = std::make_unique<BasicAst::Expr>();
-        expr->node = BasicAst::FunctionCallExpr{name, std::move(arg), {}};
+        expr->node = BasicAst::FunctionCallExpr{name, std::move(args), {}};
         return expr;
+    }
+
+    std::unique_ptr<BasicAst::Expr> makeCall(const std::string &name, std::unique_ptr<BasicAst::Expr> arg) {
+        std::vector<std::unique_ptr<BasicAst::Expr>> args;
+        args.push_back(std::move(arg));
+        return makeCall(name, std::move(args));
     }
 } // namespace
 
@@ -539,6 +547,33 @@ TEST_CASE("basic bytecode emitter allows dollar variable in SEQ") {
     REQUIRE(emitted.program.size() == 5);
     CHECK(emitted.program[0].op == OpCode::LoadVar);
     CHECK(emitted.program[1].op == OpCode::SeqStr);
+}
+
+TEST_CASE("basic bytecode emitter rejects ABS with zero arguments") {
+    BasicIr::NormalizedProgram program;
+    BasicIr::PrintStmt stmt{};
+    stmt.expression = makeCall("ABS", std::vector<std::unique_ptr<BasicAst::Expr>>{});
+    program.lines.push_back({10, std::move(stmt)});
+
+    const BasicBytecodeEmissionResult emitted = BasicBytecodeEmitter::emit(program);
+    CHECK_FALSE(emitted.success);
+    REQUIRE(emitted.errors.size() >= 1);
+    CHECK(emitted.errors[0].message.find("expects 1 argument") != std::string::npos);
+}
+
+TEST_CASE("basic bytecode emitter rejects ABS with two arguments") {
+    BasicIr::NormalizedProgram program;
+    BasicIr::PrintStmt stmt{};
+    std::vector<std::unique_ptr<BasicAst::Expr>> args;
+    args.push_back(makeInt(1));
+    args.push_back(makeInt(2));
+    stmt.expression = makeCall("ABS", std::move(args));
+    program.lines.push_back({10, std::move(stmt)});
+
+    const BasicBytecodeEmissionResult emitted = BasicBytecodeEmitter::emit(program);
+    CHECK_FALSE(emitted.success);
+    REQUIRE(emitted.errors.size() >= 1);
+    CHECK(emitted.errors[0].message.find("expects 1 argument") != std::string::npos);
 }
 
 TEST_CASE("basic bytecode emitter emits OpenFile without ELSE") {

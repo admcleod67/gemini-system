@@ -1,5 +1,6 @@
 #include "BasicExpressionParser.h"
 
+#include "BasicBuiltinNames.h"
 #include "BasicCompileUtils.h"
 
 #include <cerrno>
@@ -7,6 +8,7 @@
 #include <cstdlib>
 #include <limits>
 #include <optional>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -468,17 +470,43 @@ namespace PickShell {
                         std::string upper = tok.lexeme;
                         for (char &c : upper) { c = static_cast<char>(std::toupper(static_cast<unsigned char>(c))); }
 
-                        if (upper == "ABS" || upper == "SGN" || upper == "SEQ") {
+                        if (BasicBuiltins::isBuiltinCallName(upper)) {
                             advance(); // consume '('
-                            auto arg = parseComparison();
-                            if (!arg) { return nullptr; }
+                            std::vector<std::unique_ptr<BasicAst::Expr>> args;
+                            if (current().type == ExprTokenType::RParen) {
+                                error_ = upper + " requires an argument";
+                                return nullptr;
+                            }
+                            for (;;) {
+                                std::unique_ptr<BasicAst::Expr> arg = parseComparison();
+                                if (!arg) {
+                                    return nullptr;
+                                }
+                                args.push_back(std::move(arg));
+                                if (current().type == ExprTokenType::Comma) {
+                                    advance();
+                                    if (current().type == ExprTokenType::RParen) {
+                                        error_ = "Trailing comma in " + upper + " argument list";
+                                        return nullptr;
+                                    }
+                                    continue;
+                                }
+                                break;
+                            }
                             if (current().type != ExprTokenType::RParen) {
                                 error_ = "Missing ')' after " + upper + " argument";
                                 return nullptr;
                             }
+                            const std::optional<int> expectedArity = BasicBuiltins::arityForBuiltinCall(upper);
+                            if (expectedArity.has_value() &&
+                                static_cast<int>(args.size()) != *expectedArity) {
+                                error_ = upper + " expects " + std::to_string(*expectedArity) + " argument(s), got " +
+                                         std::to_string(args.size());
+                                return nullptr;
+                            }
                             const ExprToken close = advance();
                             const BasicAst::SourceRange range{tok.range.begin, close.range.end};
-                            BasicAst::FunctionCallExpr node{upper, std::move(arg), range};
+                            BasicAst::FunctionCallExpr node{upper, std::move(args), range};
                             return makeExpr(std::move(node), range);
                         }
 

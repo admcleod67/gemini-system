@@ -96,7 +96,7 @@ namespace PickShell::BasicAst {
 
     struct FunctionCallExpr {
         std::string name;  // uppercased: "ABS", "SGN", "SEQ"
-        std::unique_ptr<Expr> argument;
+        std::vector<std::unique_ptr<Expr>> arguments;
         SourceRange range{};
     };
 
