@@ -181,7 +181,7 @@ TEST_CASE("basic expression parser is case-insensitive for function names") {
 TEST_CASE("basic expression parser rejects ABS with too many arguments") {
     const auto result = BasicExpressionParser::parse("ABS(1,2)");
     CHECK_FALSE(result.success);
-    REQUIRE(result.error.find("expects 1 argument") != std::string::npos);
+    REQUIRE(result.error.find("expects 1 to 1 argument") != std::string::npos);
 }
 
 TEST_CASE("basic expression parser rejects ABS with no arguments") {
@@ -211,6 +211,42 @@ TEST_CASE("basic expression parser parses SPACE builtin call") {
     REQUIRE(result.success);
     REQUIRE(std::holds_alternative<BasicAst::FunctionCallExpr>(result.expression->node));
     CHECK(std::get<BasicAst::FunctionCallExpr>(result.expression->node).name == "SPACE");
+}
+
+TEST_CASE("basic expression parser parses MOD with two arguments") {
+    const auto result = BasicExpressionParser::parse("MOD(7,3)");
+    REQUIRE(result.success);
+    REQUIRE(std::holds_alternative<BasicAst::FunctionCallExpr>(result.expression->node));
+    const auto &call = std::get<BasicAst::FunctionCallExpr>(result.expression->node);
+    CHECK(call.name == "MOD");
+    REQUIRE(call.arguments.size() == 2);
+}
+
+TEST_CASE("basic expression parser rejects MOD with one argument") {
+    const auto result = BasicExpressionParser::parse("MOD(5)");
+    CHECK_FALSE(result.success);
+    REQUIRE(result.error.find("expects 2 to 2 argument") != std::string::npos);
+}
+
+TEST_CASE("basic expression parser parses DATE and TIME with no arguments") {
+    const auto d = BasicExpressionParser::parse("DATE()");
+    REQUIRE(d.success);
+    REQUIRE(std::holds_alternative<BasicAst::FunctionCallExpr>(d.expression->node));
+    CHECK(std::get<BasicAst::FunctionCallExpr>(d.expression->node).arguments.empty());
+
+    const auto t = BasicExpressionParser::parse("TIME()");
+    REQUIRE(t.success);
+    CHECK(std::get<BasicAst::FunctionCallExpr>(t.expression->node).arguments.empty());
+}
+
+TEST_CASE("basic expression parser parses RND with zero or one argument") {
+    const auto z = BasicExpressionParser::parse("RND()");
+    REQUIRE(z.success);
+    CHECK(std::get<BasicAst::FunctionCallExpr>(z.expression->node).arguments.empty());
+
+    const auto o = BasicExpressionParser::parse("RND(42)");
+    REQUIRE(o.success);
+    CHECK(std::get<BasicAst::FunctionCallExpr>(o.expression->node).arguments.size() == 1);
 }
 
 TEST_CASE("basic expression parser parses nested builtin calls") {

@@ -548,6 +548,24 @@ TEST_CASE("basic bytecode emitter allows dollar variable in SEQ") {
     CHECK(std::get<std::string>(emitted.program[1].operand) == "SEQ");
 }
 
+TEST_CASE("basic bytecode emitter emits InvokeBuiltin for MOD with two arguments") {
+    BasicIr::NormalizedProgram program;
+    BasicIr::PrintStmt stmt{};
+    std::vector<std::unique_ptr<BasicAst::Expr>> args;
+    args.push_back(makeInt(10));
+    args.push_back(makeInt(4));
+    stmt.expression = makeCall("MOD", std::move(args));
+    program.lines.push_back({10, std::move(stmt)});
+
+    const BasicBytecodeEmissionResult emitted = BasicBytecodeEmitter::emit(program);
+    REQUIRE(emitted.success);
+    REQUIRE(emitted.program.size() >= 3);
+    CHECK(emitted.program[0].op == OpCode::PushInt);
+    CHECK(emitted.program[1].op == OpCode::PushInt);
+    CHECK(emitted.program[2].op == OpCode::InvokeBuiltin);
+    CHECK(std::get<std::string>(emitted.program[2].operand) == "MOD");
+}
+
 TEST_CASE("basic bytecode emitter emits InvokeBuiltin for LEN") {
     BasicIr::NormalizedProgram program;
     BasicIr::PrintStmt stmt{};
@@ -571,7 +589,7 @@ TEST_CASE("basic bytecode emitter rejects ABS with zero arguments") {
     const BasicBytecodeEmissionResult emitted = BasicBytecodeEmitter::emit(program);
     CHECK_FALSE(emitted.success);
     REQUIRE(emitted.errors.size() >= 1);
-    CHECK(emitted.errors[0].message.find("expects 1 argument") != std::string::npos);
+    CHECK(emitted.errors[0].message.find("expects 1 to 1 argument") != std::string::npos);
 }
 
 TEST_CASE("basic bytecode emitter rejects ABS with two arguments") {
@@ -586,7 +604,7 @@ TEST_CASE("basic bytecode emitter rejects ABS with two arguments") {
     const BasicBytecodeEmissionResult emitted = BasicBytecodeEmitter::emit(program);
     CHECK_FALSE(emitted.success);
     REQUIRE(emitted.errors.size() >= 1);
-    CHECK(emitted.errors[0].message.find("expects 1 argument") != std::string::npos);
+    CHECK(emitted.errors[0].message.find("expects 1 to 1 argument") != std::string::npos);
 }
 
 TEST_CASE("basic bytecode emitter emits OpenFile without ELSE") {

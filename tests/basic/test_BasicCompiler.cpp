@@ -793,6 +793,44 @@ TEST_CASE("basic compiler compiles SEQ function") {
     CHECK(found);
 }
 
+TEST_CASE("basic compiler compiles MOD function") {
+    BasicProgram program;
+    program.setLine(10, "PRINT MOD(7,3)");
+    program.setLine(20, "END");
+
+    BasicCompiler compiler;
+    const auto result = compiler.compile(program);
+    REQUIRE(result.success);
+    bool found = false;
+    for (const auto &instr : result.program) {
+        if (instr.op == OpCode::InvokeBuiltin && std::holds_alternative<std::string>(instr.operand) &&
+            std::get<std::string>(instr.operand) == "MOD") {
+            found = true;
+            break;
+        }
+    }
+    CHECK(found);
+}
+
+TEST_CASE("basic compiler compiles DATE function") {
+    BasicProgram program;
+    program.setLine(10, "PRINT DATE()");
+    program.setLine(20, "END");
+
+    BasicCompiler compiler;
+    const auto result = compiler.compile(program);
+    REQUIRE(result.success);
+    bool found = false;
+    for (const auto &instr : result.program) {
+        if (instr.op == OpCode::InvokeBuiltin && std::holds_alternative<std::string>(instr.operand) &&
+            std::get<std::string>(instr.operand) == "DATE") {
+            found = true;
+            break;
+        }
+    }
+    CHECK(found);
+}
+
 TEST_CASE("basic compiler compiles LEN function") {
     BasicProgram program;
     program.setLine(10, "PRINT LEN(\"XY\")");

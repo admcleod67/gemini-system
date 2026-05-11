@@ -14,9 +14,11 @@
 #include <cmath>
 #include <climits>
 #include <cstdlib>
+#include <ctime>
 #include <iostream>
 #include <iomanip>
 #include <limits>
+#include <random>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -237,44 +239,48 @@ namespace PickVM {
             return pos == trimmed.size();
         }
 
-        // --- BASIC InvokeBuiltin registry (Milestone 7 Stage 2) ---
+        // --- BASIC InvokeBuiltin registry (Milestone 7) ---
         // ICONV / OCONV: no conversion codes implemented yet; extend here when adding support.
+        // Trigonometry: arguments are radians (std::sin / cos / tan).
+        // DATE: internal day number (days since 1967-12-31, aligned so 1970-01-01 UTC = 732).
+        // RND(): uniform double in [0, 1); RND(n) reseeds the generator with unsigned n then returns one sample.
         constexpr int kBuiltinSpaceMaxCount = 65536;
+        constexpr int kPickInternalDateAtUnixEpoch = 732;
 
-        using BuiltinStackFn = void (*)(std::vector<Value> &stack);
+        using BuiltinStackFn = void (*)(std::vector<Value> &stack, Runtime *rt);
 
         struct BuiltinEntry {
-            int arity;
+            int arity; // >=0: exact pops; -1: RND accepts 0 or 1 value on stack before call
             BuiltinStackFn fn;
         };
 
-        void builtinAbs(std::vector<Value> &stack) {
+        void builtinAbs(std::vector<Value> &stack, Runtime *) {
             Value v = stack.back();
             stack.pop_back();
             stack.push_back(std::abs(coerceToInt(v)));
         }
 
-        void builtinSgn(std::vector<Value> &stack) {
+        void builtinSgn(std::vector<Value> &stack, Runtime *) {
             Value v = stack.back();
             stack.pop_back();
             const int x = coerceToInt(v);
             stack.push_back(x > 0 ? 1 : x < 0 ? -1 : 0);
         }
 
-        void builtinSeq(std::vector<Value> &stack) {
+        void builtinSeq(std::vector<Value> &stack, Runtime *) {
             Value v = stack.back();
             stack.pop_back();
             const std::string s = valueToString(v);
             stack.push_back(s.empty() ? 0 : static_cast<int>(static_cast<unsigned char>(s[0])));
         }
 
-        void builtinLen(std::vector<Value> &stack) {
+        void builtinLen(std::vector<Value> &stack, Runtime *) {
             Value v = stack.back();
             stack.pop_back();
             stack.push_back(static_cast<int>(valueToString(v).size()));
         }
 
-        void builtinTrim(std::vector<Value> &stack) {
+        void builtinTrim(std::vector<Value> &stack, Runtime *) {
             Value v = stack.back();
             stack.pop_back();
             const std::string s = valueToString(v);
@@ -287,7 +293,7 @@ namespace PickVM {
             }
         }
 
-        void builtinLcase(std::vector<Value> &stack) {
+        void builtinLcase(std::vector<Value> &stack, Runtime *) {
             Value v = stack.back();
             stack.pop_back();
             std::string s = valueToString(v);
@@ -297,7 +303,7 @@ namespace PickVM {
             stack.push_back(std::move(s));
         }
 
-        void builtinUcase(std::vector<Value> &stack) {
+        void builtinUcase(std::vector<Value> &stack, Runtime *) {
             Value v = stack.back();
             stack.pop_back();
             std::string s = valueToString(v);
@@ -307,7 +313,7 @@ namespace PickVM {
             stack.push_back(std::move(s));
         }
 
-        void builtinSpace(std::vector<Value> &stack) {
+        void builtinSpace(std::vector<Value> &stack, Runtime *) {
             Value v = stack.back();
             stack.pop_back();
             int n = coerceToInt(v);
@@ -320,6 +326,99 @@ namespace PickVM {
             stack.push_back(std::string(static_cast<std::size_t>(n), ' '));
         }
 
+        void builtinInt(std::vector<Value> &stack, Runtime *) {
+            Value v = stack.back();
+            stack.pop_back();
+            const double d = coerceToDouble(v);
+            stack.push_back(static_cast<int>(d));
+        }
+
+        void builtinMod(std::vector<Value> &stack, Runtime *) {
+            const Value bVal = stack.back();
+            stack.pop_back();
+            const Value aVal = stack.back();
+            stack.pop_back();
+            const double b = coerceToDouble(bVal);
+            const double a = coerceToDouble(aVal);
+            if (b == 0.0) {
+                throw std::runtime_error("BUILTIN: MOD division by zero");
+            }
+            stack.push_back(std::fmod(a, b));
+        }
+
+        void builtinRnd(std::vector<Value> &stack, Runtime *) {
+            thread_local std::mt19937 rng{std::random_device{}()};
+            if (!stack.empty()) {
+                rng.seed(static_cast<unsigned>(coerceToInt(stack.back())));
+                stack.pop_back();
+            }
+            std::uniform_real_distribution<double> dist(0.0, 1.0);
+            stack.push_back(dist(rng));
+        }
+
+        void builtinSin(std::vector<Value> &stack, Runtime *) {
+            Value v = stack.back();
+            stack.pop_back();
+            stack.push_back(std::sin(coerceToDouble(v)));
+        }
+
+        void builtinCos(std::vector<Value> &stack, Runtime *) {
+            Value v = stack.back();
+            stack.pop_back();
+            stack.push_back(std::cos(coerceToDouble(v)));
+        }
+
+        void builtinTan(std::vector<Value> &stack, Runtime *) {
+            Value v = stack.back();
+            stack.pop_back();
+            stack.push_back(std::tan(coerceToDouble(v)));
+        }
+
+        void builtinExp(std::vector<Value> &stack, Runtime *) {
+            Value v = stack.back();
+            stack.pop_back();
+            stack.push_back(std::exp(coerceToDouble(v)));
+        }
+
+        void builtinLog(std::vector<Value> &stack, Runtime *) {
+            Value v = stack.back();
+            stack.pop_back();
+            const double x = coerceToDouble(v);
+            if (x <= 0.0) {
+                throw std::runtime_error("BUILTIN: LOG domain");
+            }
+            stack.push_back(std::log(x));
+        }
+
+        void builtinDate(std::vector<Value> &stack, Runtime *) {
+            const std::time_t now = std::time(nullptr);
+            const auto dayUnix = static_cast<int>(now / 86400LL);
+            stack.push_back(dayUnix + kPickInternalDateAtUnixEpoch);
+        }
+
+        void builtinTime(std::vector<Value> &stack, Runtime *) {
+            const std::time_t now = std::time(nullptr);
+            std::tm tmBuf{};
+#if defined(_WIN32)
+            gmtime_s(&tmBuf, &now);
+#else
+            gmtime_r(&now, &tmBuf);
+#endif
+            char buf[16]{};
+            if (std::strftime(buf, sizeof buf, "%H:%M:%S", &tmBuf) == 0) {
+                stack.push_back(std::string{"00:00:00"});
+            } else {
+                stack.push_back(std::string{buf});
+            }
+        }
+
+        void builtinSystem(std::vector<Value> &stack, Runtime *rt) {
+            Value v = stack.back();
+            stack.pop_back();
+            const int n = coerceToInt(v);
+            stack.push_back(rt->evalBuiltinSystemCall(n));
+        }
+
         const std::unordered_map<std::string, BuiltinEntry> &builtinRegistry() {
             static const std::unordered_map<std::string, BuiltinEntry> kRegistry{
                 {"ABS", {1, builtinAbs}},
@@ -330,21 +429,38 @@ namespace PickVM {
                 {"LCASE", {1, builtinLcase}},
                 {"UCASE", {1, builtinUcase}},
                 {"SPACE", {1, builtinSpace}},
+                {"INT", {1, builtinInt}},
+                {"MOD", {2, builtinMod}},
+                {"RND", {-1, builtinRnd}},
+                {"SIN", {1, builtinSin}},
+                {"COS", {1, builtinCos}},
+                {"TAN", {1, builtinTan}},
+                {"EXP", {1, builtinExp}},
+                {"LOG", {1, builtinLog}},
+                {"DATE", {0, builtinDate}},
+                {"TIME", {0, builtinTime}},
+                {"SYSTEM", {1, builtinSystem}},
             };
             return kRegistry;
         }
 
-        void invokeBuiltinOnStack(const std::string &name, std::vector<Value> &stack) {
+        void invokeBuiltinOnStack(const std::string &name, std::vector<Value> &stack, Runtime *rt) {
             const auto &reg = builtinRegistry();
             const auto it = reg.find(name);
             if (it == reg.end()) {
                 throw std::runtime_error(std::string("BUILTIN: unknown ") + name);
             }
             const int arity = it->second.arity;
-            if (static_cast<int>(stack.size()) < arity) {
-                throw std::runtime_error(std::string("BUILTIN: stack underflow for ") + name);
+            if (arity >= 0) {
+                if (static_cast<int>(stack.size()) < arity) {
+                    throw std::runtime_error(std::string("BUILTIN: stack underflow for ") + name);
+                }
+            } else if (name == "RND") {
+                if (static_cast<int>(stack.size()) > 1) {
+                    throw std::runtime_error("BUILTIN: RND too many arguments");
+                }
             }
-            it->second.fn(stack);
+            it->second.fn(stack, rt);
         }
 
     } // namespace
@@ -416,6 +532,17 @@ namespace PickVM {
 
     void Runtime::setSystemVariableReader(SystemVarReaderFn fn) {
         systemVarReader_ = std::move(fn);
+    }
+
+    void Runtime::setBuiltinSystemCallHandler(BuiltinSystemCallFn fn) {
+        builtinSystemCallHandler_ = std::move(fn);
+    }
+
+    Value Runtime::evalBuiltinSystemCall(const int n) {
+        if (!builtinSystemCallHandler_) {
+            throw std::runtime_error("BUILTIN: SYSTEM not configured");
+        }
+        return builtinSystemCallHandler_(n);
     }
 
     void Runtime::push(const Value &v) {
@@ -766,7 +893,7 @@ namespace PickVM {
 
             case OpCode::InvokeBuiltin: {
                 const std::string name = stringOperandAtIp(instr, ip_);
-                invokeBuiltinOnStack(name, stack_);
+                invokeBuiltinOnStack(name, stack_, this);
                 break;
             }
 

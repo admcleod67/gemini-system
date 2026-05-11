@@ -1,5 +1,6 @@
 #include <doctest/doctest.h>
 
+#include <cmath>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -1433,6 +1434,140 @@ TEST_CASE("runtime InvokeBuiltin unknown name throws with BUILTIN prefix") {
         CHECK(std::string(e.what()).find("BUILTIN:") != std::string::npos);
     }
     CHECK(threw);
+}
+
+TEST_CASE("runtime InvokeBuiltin INT truncates toward zero") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushFlt, -2.7},
+        {OpCode::InvokeBuiltin, std::string{"INT"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<int>(rt.stack()[0]) == -2);
+}
+
+TEST_CASE("runtime InvokeBuiltin MOD uses fmod-style remainder") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, 7},
+        {OpCode::PushInt, 3},
+        {OpCode::InvokeBuiltin, std::string{"MOD"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::abs(std::get<double>(rt.stack()[0]) - 1.0) < 1e-9);
+}
+
+TEST_CASE("runtime InvokeBuiltin MOD division by zero throws") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, 1},
+        {OpCode::PushInt, 0},
+        {OpCode::InvokeBuiltin, std::string{"MOD"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    CHECK_THROWS_AS(rt.run(), std::runtime_error);
+}
+
+TEST_CASE("runtime InvokeBuiltin LOG rejects non positive") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, 0},
+        {OpCode::InvokeBuiltin, std::string{"LOG"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    CHECK_THROWS_AS(rt.run(), std::runtime_error);
+}
+
+TEST_CASE("runtime InvokeBuiltin RND with no arguments returns double in zero one") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::InvokeBuiltin, std::string{"RND"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    const double x = std::get<double>(rt.stack()[0]);
+    CHECK(x >= 0.0);
+    CHECK(x < 1.0);
+}
+
+TEST_CASE("runtime InvokeBuiltin SIN of pi over two is one radians") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushFlt, 1.5707963267948966},
+        {OpCode::InvokeBuiltin, std::string{"SIN"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::abs(std::get<double>(rt.stack()[0]) - 1.0) < 1e-6);
+}
+
+TEST_CASE("runtime InvokeBuiltin DATE returns int not less than pick epoch day") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::InvokeBuiltin, std::string{"DATE"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<int>(rt.stack()[0]) >= 732);
+}
+
+TEST_CASE("runtime InvokeBuiltin TIME returns eight character HH colon MM colon SS") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::InvokeBuiltin, std::string{"TIME"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    const std::string t = std::get<std::string>(rt.stack()[0]);
+    CHECK(t.size() == 8);
+    CHECK(t[2] == ':');
+    CHECK(t[5] == ':');
+}
+
+TEST_CASE("runtime InvokeBuiltin SYSTEM throws when handler not set") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, 1},
+        {OpCode::InvokeBuiltin, std::string{"SYSTEM"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    CHECK_THROWS_AS(rt.run(), std::runtime_error);
+}
+
+TEST_CASE("runtime InvokeBuiltin SYSTEM uses handler when set") {
+    Runtime rt;
+    rt.setBuiltinSystemCallHandler([](const int n) -> Value {
+        if (n == 42) {
+            return 99;
+        }
+        return 0;
+    });
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, 42},
+        {OpCode::InvokeBuiltin, std::string{"SYSTEM"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<int>(rt.stack()[0]) == 99);
 }
 
 TEST_CASE("runtime OpenFile binds existing file handle") {

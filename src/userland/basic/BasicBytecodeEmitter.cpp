@@ -197,25 +197,38 @@ namespace PickShell {
             }
         };
 
+        bool builtinArgInArithmetic(const std::string_view name, const int argIndex) {
+            (void) argIndex;
+            if (name == "SEQ" || name == "LEN" || name == "TRIM" || name == "LCASE" || name == "UCASE") {
+                return false;
+            }
+            if (name == "DATE" || name == "TIME") {
+                return false;
+            }
+            return true;
+        }
+
         bool ExpressionAstEmitter::emitBuiltinCall(const BasicAst::FunctionCallExpr &node) {
-            const std::optional<int> expected = BasicBuiltins::arityForBuiltinCall(node.name);
-            if (!expected.has_value()) {
+            const std::optional<std::pair<int, int>> bounds = BasicBuiltins::builtinArityBounds(node.name);
+            if (!bounds.has_value()) {
                 error_ = "Internal error: unsupported builtin " + node.name;
                 return false;
             }
-            if (static_cast<int>(node.arguments.size()) != *expected) {
-                error_ = node.name + " expects " + std::to_string(*expected) + " argument(s), got " +
-                         std::to_string(node.arguments.size());
+            const int minArgs = bounds->first;
+            const int maxArgs = bounds->second;
+            const int got = static_cast<int>(node.arguments.size());
+            if (got < minArgs || got > maxArgs) {
+                error_ = node.name + " expects " + std::to_string(minArgs) + " to " + std::to_string(maxArgs) +
+                         " argument(s), got " + std::to_string(got);
                 return false;
             }
-            const bool argInArithmetic =
-                (node.name == "ABS" || node.name == "SGN" || node.name == "SPACE");
-            for (const auto &argPtr : node.arguments) {
+            for (int i = 0; i < got; ++i) {
+                const auto &argPtr = node.arguments[static_cast<std::size_t>(i)];
                 if (!argPtr) {
                     error_ = node.name + ": missing argument";
                     return false;
                 }
-                if (!emitNode(*argPtr, argInArithmetic)) {
+                if (!emitNode(*argPtr, builtinArgInArithmetic(node.name, i))) {
                     return false;
                 }
             }

@@ -141,6 +141,13 @@ namespace PickVM {
         using SystemVarReaderFn = std::function<std::optional<Value>(std::string_view canonicalName)>;
         void setSystemVariableReader(SystemVarReaderFn fn);
 
+        /// Optional handler for BASIC `SYSTEM(n)` via `InvokeBuiltin` (Milestone 7 Stage 3). Cleared with empty function.
+        using BuiltinSystemCallFn = std::function<Value(int n)>;
+        void setBuiltinSystemCallHandler(BuiltinSystemCallFn fn);
+
+        /// Invoked from builtin dispatch for `SYSTEM`; throws if no handler was set.
+        [[nodiscard]] Value evalBuiltinSystemCall(int n);
+
         // Debug helper (optional)
         void dumpStack() const;
 
@@ -163,6 +170,7 @@ namespace PickVM {
         mutable std::istream *inStream_{nullptr};
         PickFS::FileSystem *fileSystem_{nullptr};
         SystemVarReaderFn systemVarReader_;
+        BuiltinSystemCallFn builtinSystemCallHandler_;
 
         std::ostream &out() const;
         std::istream &in() const;
