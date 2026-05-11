@@ -607,6 +607,79 @@ TEST_CASE("basic bytecode emitter rejects ABS with two arguments") {
     CHECK(emitted.errors[0].message.find("expects 1 to 1 argument") != std::string::npos);
 }
 
+TEST_CASE("basic bytecode emitter injects default occurrence for INDEX with two arguments") {
+    BasicIr::NormalizedProgram program;
+    BasicIr::PrintStmt stmt{};
+    std::vector<std::unique_ptr<BasicAst::Expr>> args;
+    args.push_back(makeStr("abc"));
+    args.push_back(makeStr("b"));
+    stmt.expression = makeCall("INDEX", std::move(args));
+    program.lines.push_back({10, std::move(stmt)});
+
+    const BasicBytecodeEmissionResult emitted = BasicBytecodeEmitter::emit(program);
+    REQUIRE(emitted.success);
+    std::size_t i = 0;
+    REQUIRE(emitted.program.size() >= 5);
+    CHECK(emitted.program[i++].op == OpCode::PushStr);
+    CHECK(emitted.program[i++].op == OpCode::PushStr);
+    CHECK(emitted.program[i].op == OpCode::PushInt);
+    CHECK(std::get<int>(emitted.program[i++].operand) == 1);
+    CHECK(emitted.program[i].op == OpCode::InvokeBuiltin);
+    CHECK(std::get<std::string>(emitted.program[i++].operand) == "INDEX");
+}
+
+TEST_CASE("basic bytecode emitter does not inject occurrence when INDEX has three arguments") {
+    BasicIr::NormalizedProgram program;
+    BasicIr::PrintStmt stmt{};
+    std::vector<std::unique_ptr<BasicAst::Expr>> args;
+    args.push_back(makeStr("x"));
+    args.push_back(makeStr("y"));
+    args.push_back(makeInt(2));
+    stmt.expression = makeCall("INDEX", std::move(args));
+    program.lines.push_back({10, std::move(stmt)});
+
+    const BasicBytecodeEmissionResult emitted = BasicBytecodeEmitter::emit(program);
+    REQUIRE(emitted.success);
+    std::size_t i = 0;
+    CHECK(emitted.program[i++].op == OpCode::PushStr);
+    CHECK(emitted.program[i++].op == OpCode::PushStr);
+    CHECK(emitted.program[i++].op == OpCode::PushInt);
+    CHECK(emitted.program[i++].op == OpCode::InvokeBuiltin);
+    CHECK(std::get<std::string>(emitted.program[i - 1].operand) == "INDEX");
+}
+
+TEST_CASE("basic bytecode emitter emits InvokeBuiltin for FIELD with three arguments") {
+    BasicIr::NormalizedProgram program;
+    BasicIr::PrintStmt stmt{};
+    std::vector<std::unique_ptr<BasicAst::Expr>> args;
+    args.push_back(makeStr("a,b"));
+    args.push_back(makeStr(","));
+    args.push_back(makeInt(1));
+    stmt.expression = makeCall("FIELD", std::move(args));
+    program.lines.push_back({10, std::move(stmt)});
+
+    const BasicBytecodeEmissionResult emitted = BasicBytecodeEmitter::emit(program);
+    REQUIRE(emitted.success);
+    CHECK(emitted.program[0].op == OpCode::PushStr);
+    CHECK(emitted.program[1].op == OpCode::PushStr);
+    CHECK(emitted.program[2].op == OpCode::PushInt);
+    CHECK(emitted.program[3].op == OpCode::InvokeBuiltin);
+    CHECK(std::get<std::string>(emitted.program[3].operand) == "FIELD");
+}
+
+TEST_CASE("basic bytecode emitter emits InvokeBuiltin for STR") {
+    BasicIr::NormalizedProgram program;
+    BasicIr::PrintStmt stmt{};
+    stmt.expression = makeCall("STR", makeInt(7));
+    program.lines.push_back({10, std::move(stmt)});
+
+    const BasicBytecodeEmissionResult emitted = BasicBytecodeEmitter::emit(program);
+    REQUIRE(emitted.success);
+    CHECK(emitted.program[0].op == OpCode::PushInt);
+    CHECK(emitted.program[1].op == OpCode::InvokeBuiltin);
+    CHECK(std::get<std::string>(emitted.program[1].operand) == "STR");
+}
+
 TEST_CASE("basic bytecode emitter emits OpenFile without ELSE") {
     BasicIr::NormalizedProgram program;
     BasicIr::OpenStmt stmt{};

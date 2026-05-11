@@ -324,3 +324,48 @@ TEST_CASE("basic expression parser reports malformed angle-bracket attribute acc
     CHECK_FALSE(missingClose.success);
     CHECK(missingClose.error == "Missing '>' in attribute access");
 }
+
+TEST_CASE("basic expression parser parses INDEX with two and three arguments") {
+    const auto threeArgs = BasicExpressionParser::parse("INDEX(A$, \"/\", 2)");
+    REQUIRE(threeArgs.success);
+    REQUIRE(std::holds_alternative<BasicAst::FunctionCallExpr>(threeArgs.expression->node));
+    const auto &c3 = std::get<BasicAst::FunctionCallExpr>(threeArgs.expression->node);
+    CHECK(c3.name == "INDEX");
+    REQUIRE(c3.arguments.size() == 3);
+
+    const auto twoArgs = BasicExpressionParser::parse("INDEX(\"ab\", \"a\")");
+    REQUIRE(twoArgs.success);
+    const auto &c2 = std::get<BasicAst::FunctionCallExpr>(twoArgs.expression->node);
+    CHECK(c2.name == "INDEX");
+    REQUIRE(c2.arguments.size() == 2);
+}
+
+TEST_CASE("basic expression parser rejects INDEX with wrong arity") {
+    const auto one = BasicExpressionParser::parse("INDEX(\"x\")");
+    CHECK_FALSE(one.success);
+    CHECK(one.error.find("expects 2 to 3 argument") != std::string::npos);
+
+    const auto four = BasicExpressionParser::parse("INDEX(\"a\",\"b\",1,2)");
+    CHECK_FALSE(four.success);
+    CHECK(four.error.find("expects 2 to 3 argument") != std::string::npos);
+}
+
+TEST_CASE("basic expression parser parses FIELD and STR builtins") {
+    const auto f = BasicExpressionParser::parse("FIELD(S$, \",\", 1)");
+    REQUIRE(f.success);
+    const auto &cf = std::get<BasicAst::FunctionCallExpr>(f.expression->node);
+    CHECK(cf.name == "FIELD");
+    REQUIRE(cf.arguments.size() == 3);
+
+    const auto s = BasicExpressionParser::parse("STR(42)");
+    REQUIRE(s.success);
+    const auto &cs = std::get<BasicAst::FunctionCallExpr>(s.expression->node);
+    CHECK(cs.name == "STR");
+    REQUIRE(cs.arguments.size() == 1);
+}
+
+TEST_CASE("basic expression parser rejects FIELD with two arguments") {
+    const auto bad = BasicExpressionParser::parse("FIELD(\"a,b\", \",\")");
+    CHECK_FALSE(bad.success);
+    CHECK(bad.error.find("expects 3 to 3 argument") != std::string::npos);
+}

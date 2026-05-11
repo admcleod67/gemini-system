@@ -198,7 +198,15 @@ namespace PickShell {
         };
 
         bool builtinArgInArithmetic(const std::string_view name, const int argIndex) {
-            (void) argIndex;
+            if (name == "INDEX") {
+                return argIndex == 2;
+            }
+            if (name == "FIELD") {
+                return argIndex == 2;
+            }
+            if (name == "STR") {
+                return true;
+            }
             if (name == "SEQ" || name == "LEN" || name == "TRIM" || name == "LCASE" || name == "UCASE") {
                 return false;
             }
@@ -231,6 +239,9 @@ namespace PickShell {
                 if (!emitNode(*argPtr, builtinArgInArithmetic(node.name, i))) {
                     return false;
                 }
+            }
+            if (node.name == "INDEX" && got == 2) {
+                out_.push_back(PickVM::Instruction{PickVM::OpCode::PushInt, 1});
             }
             out_.push_back(PickVM::Instruction{PickVM::OpCode::InvokeBuiltin, node.name});
             return true;

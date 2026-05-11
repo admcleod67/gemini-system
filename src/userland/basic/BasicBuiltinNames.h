@@ -13,7 +13,8 @@ namespace PickShell::BasicBuiltins {
         return upper == "ABS" || upper == "SGN" || upper == "SEQ" || upper == "LEN" || upper == "TRIM" ||
                upper == "LCASE" || upper == "UCASE" || upper == "SPACE" || upper == "INT" || upper == "MOD" ||
                upper == "RND" || upper == "SIN" || upper == "COS" || upper == "TAN" || upper == "EXP" ||
-               upper == "LOG" || upper == "DATE" || upper == "TIME" || upper == "SYSTEM";
+               upper == "LOG" || upper == "DATE" || upper == "TIME" || upper == "SYSTEM" || upper == "INDEX" ||
+               upper == "FIELD" || upper == "STR";
     }
 
     /// Inclusive (minArgs, maxArgs) for whitelisted builtin calls; std::nullopt if not a builtin call name.
@@ -27,9 +28,16 @@ namespace PickShell::BasicBuiltins {
         if (upper == "MOD") {
             return std::make_pair(2, 2);
         }
+        if (upper == "INDEX") {
+            return std::make_pair(2, 3);
+        }
+        if (upper == "FIELD") {
+            return std::make_pair(3, 3);
+        }
         if (upper == "ABS" || upper == "SGN" || upper == "SEQ" || upper == "LEN" || upper == "TRIM" ||
             upper == "LCASE" || upper == "UCASE" || upper == "SPACE" || upper == "INT" || upper == "SIN" ||
-            upper == "COS" || upper == "TAN" || upper == "EXP" || upper == "LOG" || upper == "SYSTEM") {
+            upper == "COS" || upper == "TAN" || upper == "EXP" || upper == "LOG" || upper == "SYSTEM" ||
+            upper == "STR") {
             return std::make_pair(1, 1);
         }
         return std::nullopt;

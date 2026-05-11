@@ -321,7 +321,7 @@ CLEAR
 
 ## Built-in Functions
 
-Built-in functions are called with a single argument enclosed in parentheses. Function names are case-insensitive.
+Built-in functions use the form `NAME(expr [, expr …])`. Arity is fixed per function (some accept zero arguments, e.g. `DATE()`). Function names are case-insensitive. Exact numeric/string rules for builtins that depend on coercion are documented in comments next to the **`InvokeBuiltin`** handlers in [`src/core/vm/Runtime.cpp`](src/core/vm/Runtime.cpp).
 
 ### ABS
 
@@ -363,3 +363,27 @@ Returns the ASCII (numeric) value of the first character of the string represent
 20 PRINT SEQ("Hello")   ;* prints 72  (ASCII of 'H')
 30 PRINT SEQ("")        ;* prints 0
 ```
+
+### INDEX
+
+```
+INDEX(<string-expr>, <substring-expr> [, <occurrence-expr>])
+```
+
+Returns the **1-based byte offset** of the start of the *n*th occurrence of `substring` in `string` (UTF-8 byte indices, consistent with `LEN`). Occurrence defaults to **1** when the third argument is omitted (the compiler supplies `1`). Returns **0** if there are fewer than *n* matches. Overlapping matches are allowed: the next search begins at the previous match start plus one byte. Empty `substring`, or an occurrence less than 1, is a runtime error (`BUILTIN: INDEX …`).
+
+### FIELD
+
+```
+FIELD(<string-expr>, <delimiter-expr>, <field-number-expr>)
+```
+
+Splits `string` on each non-overlapping occurrence of the delimiter substring (not a regular expression). `field-number` is **1-based**; field 1 is the substring before the first delimiter. If `field-number` is greater than the number of fields, `FIELD` returns an empty string. Empty delimiter, or a field number less than 1, is a runtime error (`BUILTIN: FIELD …`).
+
+### STR
+
+```
+STR(<expr>)
+```
+
+Returns the dynamic string form of `<expr>` using the same conversion rules as the VM’s internal `valueToString` helper (integers as decimal text, floats trimmed of trailing zeros, strings unchanged).

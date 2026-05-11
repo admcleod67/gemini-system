@@ -850,6 +850,39 @@ TEST_CASE("basic compiler compiles LEN function") {
     CHECK(found);
 }
 
+TEST_CASE("basic compiler compiles INDEX FIELD and STR functions") {
+    BasicProgram program;
+    program.setLine(10, "PRINT INDEX(\"ab\",\"a\")");
+    program.setLine(20, "PRINT FIELD(\"x,y\",\",\",2)");
+    program.setLine(30, "PRINT STR(3)");
+    program.setLine(40, "END");
+
+    BasicCompiler compiler;
+    const auto result = compiler.compile(program);
+    REQUIRE(result.success);
+    bool foundIndex = false;
+    bool foundField = false;
+    bool foundStr = false;
+    for (const auto &instr : result.program) {
+        if (instr.op != OpCode::InvokeBuiltin || !std::holds_alternative<std::string>(instr.operand)) {
+            continue;
+        }
+        const std::string &name = std::get<std::string>(instr.operand);
+        if (name == "INDEX") {
+            foundIndex = true;
+        }
+        if (name == "FIELD") {
+            foundField = true;
+        }
+        if (name == "STR") {
+            foundStr = true;
+        }
+    }
+    CHECK(foundIndex);
+    CHECK(foundField);
+    CHECK(foundStr);
+}
+
 TEST_CASE("basic compiler rejects dollar variable in ABS") {
     BasicProgram program;
     program.setLine(10, "PRINT ABS(X$)");

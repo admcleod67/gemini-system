@@ -1570,6 +1570,166 @@ TEST_CASE("runtime InvokeBuiltin SYSTEM uses handler when set") {
     CHECK(std::get<int>(rt.stack()[0]) == 99);
 }
 
+TEST_CASE("runtime InvokeBuiltin INDEX first occurrence 1 based") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"abcabc"}},
+        {OpCode::PushStr, std::string{"abc"}},
+        {OpCode::PushInt, 1},
+        {OpCode::InvokeBuiltin, std::string{"INDEX"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<int>(rt.stack()[0]) == 1);
+}
+
+TEST_CASE("runtime InvokeBuiltin INDEX second occurrence overlapping") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"abcabc"}},
+        {OpCode::PushStr, std::string{"abc"}},
+        {OpCode::PushInt, 2},
+        {OpCode::InvokeBuiltin, std::string{"INDEX"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<int>(rt.stack()[0]) == 4);
+}
+
+TEST_CASE("runtime InvokeBuiltin INDEX returns zero when not found") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"abc"}},
+        {OpCode::PushStr, std::string{"z"}},
+        {OpCode::PushInt, 1},
+        {OpCode::InvokeBuiltin, std::string{"INDEX"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<int>(rt.stack()[0]) == 0);
+}
+
+TEST_CASE("runtime InvokeBuiltin INDEX rejects empty substring") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"abc"}},
+        {OpCode::PushStr, std::string{""}},
+        {OpCode::PushInt, 1},
+        {OpCode::InvokeBuiltin, std::string{"INDEX"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    try {
+        rt.run();
+        FAIL("expected throw");
+    } catch (const std::runtime_error &e) {
+        CHECK(std::string(e.what()).find("BUILTIN: INDEX empty substring") != std::string::npos);
+    }
+}
+
+TEST_CASE("runtime InvokeBuiltin INDEX rejects occurrence less than one") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"abc"}},
+        {OpCode::PushStr, std::string{"a"}},
+        {OpCode::PushInt, 0},
+        {OpCode::InvokeBuiltin, std::string{"INDEX"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    try {
+        rt.run();
+        FAIL("expected throw");
+    } catch (const std::runtime_error &e) {
+        CHECK(std::string(e.what()).find("BUILTIN: INDEX occurrence") != std::string::npos);
+    }
+}
+
+TEST_CASE("runtime InvokeBuiltin FIELD extracts delimited fields") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"a,b,c"}},
+        {OpCode::PushStr, std::string{","}},
+        {OpCode::PushInt, 2},
+        {OpCode::InvokeBuiltin, std::string{"FIELD"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<std::string>(rt.stack()[0]) == "b");
+}
+
+TEST_CASE("runtime InvokeBuiltin FIELD returns empty past end") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"a,b"}},
+        {OpCode::PushStr, std::string{","}},
+        {OpCode::PushInt, 9},
+        {OpCode::InvokeBuiltin, std::string{"FIELD"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<std::string>(rt.stack()[0]).empty());
+}
+
+TEST_CASE("runtime InvokeBuiltin FIELD rejects empty delimiter") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"ab"}},
+        {OpCode::PushStr, std::string{""}},
+        {OpCode::PushInt, 1},
+        {OpCode::InvokeBuiltin, std::string{"FIELD"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    try {
+        rt.run();
+        FAIL("expected throw");
+    } catch (const std::runtime_error &e) {
+        CHECK(std::string(e.what()).find("BUILTIN: FIELD empty delimiter") != std::string::npos);
+    }
+}
+
+TEST_CASE("runtime InvokeBuiltin FIELD rejects field index less than one") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"a,b"}},
+        {OpCode::PushStr, std::string{","}},
+        {OpCode::PushInt, 0},
+        {OpCode::InvokeBuiltin, std::string{"FIELD"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    try {
+        rt.run();
+        FAIL("expected throw");
+    } catch (const std::runtime_error &e) {
+        CHECK(std::string(e.what()).find("BUILTIN: FIELD field index") != std::string::npos);
+    }
+}
+
+TEST_CASE("runtime InvokeBuiltin STR stringifies int") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, 42},
+        {OpCode::InvokeBuiltin, std::string{"STR"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<std::string>(rt.stack()[0]) == "42");
+}
+
 TEST_CASE("runtime OpenFile binds existing file handle") {
     const std::filesystem::path root = std::filesystem::temp_directory_path() / "pick-runtime-openfile-test";
     std::error_code ec;

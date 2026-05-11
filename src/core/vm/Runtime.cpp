@@ -25,6 +25,7 @@
 #include <string_view>
 #include <unordered_map>
 #include <utility>
+#include <vector>
 
 namespace PickVM {
     namespace {
@@ -419,6 +420,88 @@ namespace PickVM {
             stack.push_back(rt->evalBuiltinSystemCall(n));
         }
 
+        // INDEX(S, substring [, occurrence]) — 1-based byte offset into UTF-8 bytes (same as LEN).
+        // Omitted occurrence defaults to 1 at compile time (emitter pushes 1). Returns start
+        // position of the nth match using overlapping search (next scan starts at found+1).
+        // Returns 0 if fewer than n occurrences. Empty substring -> BUILTIN: INDEX empty substring;
+        // occurrence < 1 -> BUILTIN: INDEX occurrence.
+        void builtinIndex(std::vector<Value> &stack, Runtime *) {
+            const Value occVal = stack.back();
+            stack.pop_back();
+            const Value needleVal = stack.back();
+            stack.pop_back();
+            const Value hayVal = stack.back();
+            stack.pop_back();
+            const std::string hay = valueToString(hayVal);
+            const std::string needle = valueToString(needleVal);
+            if (needle.empty()) {
+                throw std::runtime_error("BUILTIN: INDEX empty substring");
+            }
+            const int occ = coerceToInt(occVal);
+            if (occ < 1) {
+                throw std::runtime_error("BUILTIN: INDEX occurrence");
+            }
+            std::size_t pos = 0;
+            for (int i = 1; i <= occ; ++i) {
+                const std::size_t found = hay.find(needle, pos);
+                if (found == std::string::npos) {
+                    stack.push_back(0);
+                    return;
+                }
+                if (i == occ) {
+                    stack.push_back(static_cast<int>(found + 1));
+                    return;
+                }
+                pos = found + 1;
+            }
+            stack.push_back(0);
+        }
+
+        // FIELD(S, delimiter, n) — delimiter is a literal substring (not a regex). Fields are
+        // split on each non-overlapping occurrence of delimiter; n is 1-based. n < 1 ->
+        // BUILTIN: FIELD field index; empty delimiter -> BUILTIN: FIELD empty delimiter.
+        // If n is past the last field, returns "".
+        void builtinField(std::vector<Value> &stack, Runtime *) {
+            const Value fieldIdxVal = stack.back();
+            stack.pop_back();
+            const Value delimVal = stack.back();
+            stack.pop_back();
+            const Value hayVal = stack.back();
+            stack.pop_back();
+            const std::string hay = valueToString(hayVal);
+            const std::string delim = valueToString(delimVal);
+            if (delim.empty()) {
+                throw std::runtime_error("BUILTIN: FIELD empty delimiter");
+            }
+            const int fieldNum = coerceToInt(fieldIdxVal);
+            if (fieldNum < 1) {
+                throw std::runtime_error("BUILTIN: FIELD field index");
+            }
+            std::vector<std::string> fields;
+            std::size_t start = 0;
+            for (;;) {
+                const std::size_t f = hay.find(delim, start);
+                if (f == std::string::npos) {
+                    fields.push_back(hay.substr(start));
+                    break;
+                }
+                fields.push_back(hay.substr(start, f - start));
+                start = f + delim.size();
+            }
+            if (static_cast<std::size_t>(fieldNum) > fields.size()) {
+                stack.push_back(std::string{});
+            } else {
+                stack.push_back(fields[static_cast<std::size_t>(fieldNum - 1)]);
+            }
+        }
+
+        // STR(x) — string form using the same rules as valueToString (int / double trimming / str).
+        void builtinStr(std::vector<Value> &stack, Runtime *) {
+            const Value v = stack.back();
+            stack.pop_back();
+            stack.push_back(valueToString(v));
+        }
+
         const std::unordered_map<std::string, BuiltinEntry> &builtinRegistry() {
             static const std::unordered_map<std::string, BuiltinEntry> kRegistry{
                 {"ABS", {1, builtinAbs}},
@@ -440,6 +523,9 @@ namespace PickVM {
                 {"DATE", {0, builtinDate}},
                 {"TIME", {0, builtinTime}},
                 {"SYSTEM", {1, builtinSystem}},
+                {"INDEX", {3, builtinIndex}},
+                {"FIELD", {3, builtinField}},
+                {"STR", {1, builtinStr}},
             };
             return kRegistry;
         }
