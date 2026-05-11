@@ -197,6 +197,9 @@ namespace PickShell {
             }
         };
 
+        // Per-argument "numeric context" for builtin operands: true -> emit as arithmetic (coerce strings
+        // with strtod rules at runtime); false -> string-shaped (valueToString in handler). Defaults to
+        // true for builtins not listed below. Keep in sync with InvokeBuiltin handlers in Runtime.cpp.
         bool builtinArgInArithmetic(const std::string_view name, const int argIndex) {
             if (name == "INDEX") {
                 return argIndex == 2;

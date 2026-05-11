@@ -132,6 +132,14 @@ namespace PickVM {
             return std::to_string(std::get<int>(v));
         }
 
+        // --- Value coercion contract (BASIC / InvokeBuiltin) ---
+        // Numeric contexts (arithmetic, most builtin args, CoerceInt opcode): coerceToDouble / coerceToInt
+        // use strtod-style prefix parsing; "" -> 0; "12ABC" parses as 12.0 (INT truncates toward zero).
+        // Comparisons: compareValues — both int/double treated as numeric; both string lexicographic;
+        // int vs string (etc.) -> type mismatch error.
+        // Display and STR(): valueToString (float trimming rules; int decimal; strings as-is).
+        // Implementations stay in this TU so builtins and opcodes stay consistent.
+
         double coerceToDouble(const Value &v) {
             if (std::holds_alternative<int>(v)) {
                 return static_cast<double>(std::get<int>(v));

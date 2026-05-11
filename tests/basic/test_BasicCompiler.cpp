@@ -2,6 +2,8 @@
 
 #include "BasicCompiler.h"
 
+#include <string>
+
 using PickShell::BasicCompiler;
 using PickShell::BasicProgram;
 using PickVM::OpCode;
@@ -485,6 +487,24 @@ TEST_CASE("basic compiler compiles LET for percent variable with CoerceInt") {
     // PushInt, CoerceInt, StoreVar, Halt
     REQUIRE(result.program.size() == 4);
     CHECK(result.program[0].op == OpCode::PushInt);
+    CHECK(result.program[1].op == OpCode::CoerceInt);
+    CHECK(result.program[2].op == OpCode::StoreVar);
+    CHECK(std::get<std::string>(result.program[2].operand) == "A%");
+    CHECK(result.program[3].op == OpCode::Halt);
+}
+
+TEST_CASE("basic compiler LET to percent from string literal emits PushStr CoerceInt") {
+    BasicProgram program;
+    program.setLine(10, "LET A% = \"12ABC\"");
+    program.setLine(20, "END");
+
+    BasicCompiler compiler;
+    const auto result = compiler.compile(program);
+
+    REQUIRE(result.success);
+    REQUIRE(result.program.size() == 4);
+    CHECK(result.program[0].op == OpCode::PushStr);
+    CHECK(std::get<std::string>(result.program[0].operand) == "12ABC");
     CHECK(result.program[1].op == OpCode::CoerceInt);
     CHECK(result.program[2].op == OpCode::StoreVar);
     CHECK(std::get<std::string>(result.program[2].operand) == "A%");

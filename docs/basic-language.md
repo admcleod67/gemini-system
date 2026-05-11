@@ -52,6 +52,22 @@ Additional naming rules:
 - Variable names are case-insensitive; the compiler and runtime canonicalize them to uppercase.
 - The base name (before the suffix) must begin with a letter and contain only letters and digits (for example `A`, `X9`, `TOTAL1`), **or** the whole identifier (no `$` / `%` suffix) is exactly **`@USERNO`**, **`@ACCOUNT`**, **`@LOGNAME`**, or **`@DEFDATA`** — **session system variables** (the last is the logical file name from **`MD,DEFDATA`** when configured). They are allowed in **expressions** only; **`LET`**, **`INPUT`**, **`FOR`**, **`NEXT`**, and **`DIM`** targets may not use these names (compile error: read-only system variable). Other **`@Something`** identifiers are invalid in expressions.
 
+## Coercion rules (runtime contract)
+
+All rules below are implemented in [`src/core/vm/Runtime.cpp`](src/core/vm/Runtime.cpp) (`coerceToDouble`, `coerceToInt`, `valueToString`, `compareValues`) and exercised through VM opcodes and **`InvokeBuiltin`**.
+
+| Context | Rule |
+|---------|------|
+| **Arithmetic** (`+`, `-`, `*`, `/`, unary `-`) | Operands use **numeric coercion**: empty string → `0`; numeric **prefix** via `strtod` (e.g. `"12ABC"` → `12`). Pure `int` paths preserve integers where possible; operands with non-numeric trailing junk can force a **float** result (see arithmetic implementation). |
+| **`%` / `COERCE_INT`** (`LET` / `INPUT` / `FOR` init into `%`, array store to `%`) | Same numeric input as arithmetic, then **truncate toward zero** to `int` (`coerceToInt`). Non-numeric prefix → `0`. This matches the **`INT`** builtin’s truncation step after reading a double. |
+| **Comparisons** (`=`, `<>`, `<`, …) | **Both** operands must be **numeric** (`int`/`double`, coerced as double) **or** **both** `string` (lexicographic). **Mixed types** → runtime error (by design; see Milestone 7). |
+| **`PRINT` / `PRINT_VAL`** | Uses **`valueToString`**: same string form as the **`STR`** builtin (int decimal, floats with trailing-zero trim, strings unchanged). |
+| **Built-in arguments** | Each argument is compiled in either **numeric** or **string** context per the builtin (see `builtinArgInArithmetic` in [`BasicBytecodeEmitter.cpp`](src/userland/basic/BasicBytecodeEmitter.cpp)); handlers use **`coerceToInt` / `coerceToDouble` / `valueToString`** accordingly. |
+
+**`IF` conditions:** the compiler emits **`JUMP_IF_ZERO`**, which expects an **`int`** on the stack. Comparison results are `int` (0/1). A bare floating-point condition (for example `IF 1.5 THEN …`) is not guaranteed to work until the condition pipeline is extended; use comparisons or integer expressions.
+
+**`INPUT`:** one trimmed line is read as a string; for `%` targets, **`COERCE_INT`** applies the same rules as **`LET A% = "<line>"`**.
+
 ## Expressions
 
 Expressions are supported on the right-hand side of `LET`, as the argument to `PRINT`, and as the condition in `IF`.
@@ -113,7 +129,7 @@ DIV: divide by zero
 
 ### Comparison type behaviour
 
-Comparison operators (`=`, `<>`, `<`, `<=`, `>`, `>=`) require both operands to be the same type (int/int or string/string). Mixed-type comparisons raise a runtime error.
+Comparison operators (`=`, `<>`, `<`, `<=`, `>`, `>=`) require both operands to be the same type (int/int or string/string). Mixed-type comparisons raise a runtime error. See **Coercion rules (runtime contract)** above for the full matrix.
 
 ## `PRINT <expr>`
 

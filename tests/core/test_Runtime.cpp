@@ -693,6 +693,59 @@ TEST_CASE("runtime CoerceInt passes through an existing int") {
     CHECK(std::get<int>(rt.stack()[0]) == 7);
 }
 
+TEST_CASE("runtime CoerceInt uses numeric prefix same as coerceToInt for 12ABC") {
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"12ABC"}},
+        {OpCode::CoerceInt, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    Runtime rt;
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<int>(rt.stack()[0]) == 12);
+}
+
+TEST_CASE("runtime INPUT_STR plus CoerceInt matches trimmed numeric line for percent INPUT") {
+    std::istringstream in("  99  \n");
+    std::vector<Instruction> prog = {
+        {OpCode::InputStr, Value{}},
+        {OpCode::CoerceInt, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    Runtime rt;
+    rt.setInputStream(&in);
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<int>(rt.stack()[0]) == 99);
+}
+
+TEST_CASE("runtime PrintVal output matches STR builtin string for int") {
+    std::ostringstream fromPrint;
+    Runtime rtPrint;
+    rtPrint.setOutputStream(&fromPrint);
+    std::vector<Instruction> progPrint = {
+        {OpCode::PushInt, 42},
+        {OpCode::PrintVal, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    rtPrint.loadProgram(progPrint);
+    rtPrint.run();
+
+    Runtime rtStr;
+    std::vector<Instruction> progStr = {
+        {OpCode::PushInt, 42},
+        {OpCode::InvokeBuiltin, std::string{"STR"}},
+        {OpCode::Halt, Value{}},
+    };
+    rtStr.loadProgram(progStr);
+    rtStr.run();
+    REQUIRE(rtStr.stack().size() == 1);
+    CHECK(fromPrint.str() == std::get<std::string>(rtStr.stack()[0]));
+    CHECK(fromPrint.str() == "42");
+}
+
 TEST_CASE("runtime ADD string plus int coerces string to zero") {
     std::vector<Instruction> prog = {
         {OpCode::PushStr, std::string{"hello"}},
