@@ -10,8 +10,12 @@ namespace PickCore::English {
     /// Inputs used by the formatter that would otherwise be read from the wall clock.
     /// Tests inject deterministic values; production calls `defaultFormatterContext()`.
     struct FormatterContext {
-        /// 1-based page number (Milestone 8 Stage 1 fixes this at 1; pagination arrives in Stage 2).
+        /// 1-based page number at the start of rendering. Incremented by the formatter
+        /// at each page boundary; `@PAGE` substitution reads the live counter.
         int pageNumber{1};
+        /// Lines per page for `HEADING` queries (Milestone 8 Stage 2). Values <= 0 disable
+        /// pagination entirely (useful as an escape hatch and for legacy callers).
+        int pageLength{24};
         /// Pick internal day count for `@DATE` substitution.
         int currentPickDay{0};
         /// Seconds since UTC midnight for `@TIME` substitution.

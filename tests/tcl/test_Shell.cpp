@@ -1,6 +1,7 @@
 #include <doctest/doctest.h>
 
 #include <chrono>
+#include <cstdio>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
@@ -903,6 +904,122 @@ TEST_CASE("shell LIST with HEADING emits the heading as the first line") {
     CHECK(s.substr(0, firstNewline) == "Customer Report");
     CHECK(s.find("R1 ALICE") != std::string::npos);
     CHECK(s.find("R2 BOB") != std::string::npos);
+}
+
+TEST_CASE("shell GET PAGE-LENGTH defaults to 24") {
+    auto dir = uniqueTempDir();
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(dir);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("GET PAGE-LENGTH", out, quit);
+    CHECK(out.str() == "24\n");
+}
+
+TEST_CASE("shell SET PAGE-LENGTH validates a positive integer") {
+    auto dir = uniqueTempDir();
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(dir);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("SET PAGE-LENGTH 30", out, quit);
+    CHECK(out.str().empty());
+
+    out.str("");
+    sh.handleLine("GET PAGE-LENGTH", out, quit);
+    CHECK(out.str() == "30\n");
+
+    out.str("");
+    sh.handleLine("SET PAGE-LENGTH 0", out, quit);
+    CHECK(out.str() == "SET PAGE-LENGTH requires a positive integer\n");
+
+    out.str("");
+    sh.handleLine("SET PAGE-LENGTH -5", out, quit);
+    CHECK(out.str() == "SET PAGE-LENGTH requires a positive integer\n");
+
+    out.str("");
+    sh.handleLine("SET PAGE-LENGTH abc", out, quit);
+    CHECK(out.str() == "SET PAGE-LENGTH requires a positive integer\n");
+
+    out.str("");
+    sh.handleLine("SET PAGE-LENGTH 12 extra", out, quit);
+    CHECK(out.str() == "SET PAGE-LENGTH requires a positive integer\n");
+
+    out.str("");
+    sh.handleLine("SET PAGE-LENGTH", out, quit);
+    CHECK(out.str() == "SET PAGE-LENGTH requires a positive integer\n");
+
+    // Earlier successful SET 30 should still be in effect.
+    out.str("");
+    sh.handleLine("GET PAGE-LENGTH", out, quit);
+    CHECK(out.str() == "30\n");
+}
+
+TEST_CASE("shell PAGE-LENGTH is not surfaced as a plain env variable") {
+    auto dir = uniqueTempDir();
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(dir);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("SET PAGE-LENGTH 17", out, quit);
+    out.str("");
+    sh.handleLine("LIST-VARS", out, quit);
+    // PAGE-LENGTH is a typed system setting, not a user variable.
+    CHECK(out.str().find("PAGE-LENGTH") == std::string::npos);
+}
+
+TEST_CASE("shell LIST with HEADING paginates per SET PAGE-LENGTH") {
+    auto dir = uniqueTempDir();
+    PickFS::FileSystem fs(dir);
+    fs.createFile("DATA");
+    fs.createFile("DICT");
+    fs.write("DICT", PickFS::Record("NAME", "A\n1\n"));
+    for (int i = 1; i <= 12; ++i) {
+        char id[8]{};
+        std::snprintf(id, sizeof id, "R%02d", i);
+        fs.write("DATA", PickFS::Record(id, "N"));
+    }
+
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(dir);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("SET PAGE-LENGTH 5", out, quit);
+    out.str("");
+    sh.handleLine("LIST DATA NAME HEADING \"Report\"", out, quit);
+
+    // Layout for 12 records with pageLength=5:
+    //   page 1 = heading + 4 rows                       (5 lines)
+    //   blank + page 2 = blank + heading + 4 rows       (6 lines)
+    //   blank + page 3 = blank + heading + 4 rows       (6 lines)
+    // Total = 17 lines (each terminated by \n) -> 17 newlines.
+    const std::string s = out.str();
+    const std::size_t headingHits = [&]() {
+        std::size_t n = 0;
+        std::size_t pos = 0;
+        while ((pos = s.find("Report", pos)) != std::string::npos) {
+            ++n;
+            pos += 6;
+        }
+        return n;
+    }();
+    CHECK(headingHits == 3);
+    // Two blank-line separators inside the output (between pages).
+    CHECK(s.find("\n\n") != std::string::npos);
+    // All 12 record ids appear in the output.
+    for (int i = 1; i <= 12; ++i) {
+        char id[8]{};
+        std::snprintf(id, sizeof id, "R%02d", i);
+        CHECK(s.find(id) != std::string::npos);
+    }
 }
 
 TEST_CASE("shell COUNT SELECT LIST-LIST CLEAR-LIST") {

@@ -59,15 +59,31 @@ namespace PickCore::English {
             const std::vector<std::string> &trailingLines_;
         };
 
-        /// Owns the current page number. Stage 1 is fixed; Stage 2 will track line counts and advance.
+        /// Tracks emitted-line count and the live page number. Pagination only fires when
+        /// the query has a HEADING (otherwise the page boundary would be invisible) and
+        /// `pageLength > 0` (escape hatch for callers that want to disable it).
         class PageManager {
         public:
-            explicit PageManager(const FormatterContext &ctx) : ctx_(ctx) {}
+            PageManager(const FormatterContext &ctx, bool hasHeading)
+                : pageLength_(ctx.pageLength), hasHeading_(hasHeading),
+                  pageNumber_(ctx.pageNumber), linesOnPage_(0) {}
 
-            [[nodiscard]] int pageNumber() const { return ctx_.pageNumber; }
+            [[nodiscard]] int pageNumber() const { return pageNumber_; }
+            [[nodiscard]] int pageLength() const { return pageLength_; }
+            [[nodiscard]] int linesOnPage() const { return linesOnPage_; }
+            [[nodiscard]] bool paginationActive() const { return hasHeading_ && pageLength_ > 0; }
+
+            void onLineEmitted() { ++linesOnPage_; }
+            void advancePage() {
+                ++pageNumber_;
+                linesOnPage_ = 0;
+            }
 
         private:
-            const FormatterContext &ctx_;
+            int pageLength_;
+            bool hasHeading_;
+            int pageNumber_;
+            int linesOnPage_;
         };
 
         bool ieqLower(char a, char b) {
@@ -164,26 +180,45 @@ namespace PickCore::English {
             return out;
         }
 
-        /// Stage 1 Renderer: walks the event stream and produces the line vector
-        /// that ultimately becomes `Result.lines`. No pagination yet.
+        /// Stage 2 Renderer: walks the event stream and produces the final line vector.
+        /// Before every Row/Trailing emission, asks PageManager whether the current page
+        /// has filled; on overflow it injects exactly one blank separator line and a
+        /// re-rendered heading (with the live `@PAGE`) before the next data line.
         class Renderer {
         public:
-            Renderer(const FormatterContext &ctx, const PageManager &pages) : ctx_(ctx), pages_(pages) {}
+            Renderer(const FormatterContext &ctx, PageManager &pages,
+                     const std::string *headingTemplate)
+                : ctx_(ctx), pages_(pages), headingTemplate_(headingTemplate) {}
 
             [[nodiscard]] std::vector<std::string> render(const std::vector<Event> &events) const {
                 std::vector<std::string> lines;
                 lines.reserve(events.size());
                 for (const Event &e: events) {
+                    if (e.kind == Event::Kind::Heading) {
+                        lines.push_back(renderHeading(*e.headingTemplate, ctx_, pages_));
+                        pages_.onLineEmitted();
+                        continue;
+                    }
+                    // Row or Trailing — check for page overflow first.
+                    if (pages_.paginationActive() && pages_.linesOnPage() >= pages_.pageLength()) {
+                        lines.emplace_back(); // single blank separator (not counted on new page)
+                        pages_.advancePage();
+                        if (headingTemplate_ != nullptr) {
+                            lines.push_back(renderHeading(*headingTemplate_, ctx_, pages_));
+                            pages_.onLineEmitted();
+                        }
+                    }
                     switch (e.kind) {
-                        case Event::Kind::Heading:
-                            lines.push_back(renderHeading(*e.headingTemplate, ctx_, pages_));
-                            break;
                         case Event::Kind::Row:
                             lines.push_back(renderProjection(*e.row));
+                            pages_.onLineEmitted();
                             break;
                         case Event::Kind::Trailing:
                             lines.push_back(*e.trailingText);
+                            pages_.onLineEmitted();
                             break;
+                        case Event::Kind::Heading:
+                            break; // handled above
                     }
                 }
                 return lines;
@@ -191,13 +226,15 @@ namespace PickCore::English {
 
         private:
             const FormatterContext &ctx_;
-            const PageManager &pages_;
+            PageManager &pages_;
+            const std::string *headingTemplate_;
         };
     } // namespace
 
     FormatterContext defaultFormatterContext() {
         FormatterContext ctx;
         ctx.pageNumber = 1;
+        ctx.pageLength = 24;
         ctx.currentPickDay = currentPickDay();
         ctx.currentSecondsOfDay = currentSecondsOfDay();
         return ctx;
@@ -209,8 +246,10 @@ namespace PickCore::English {
                   std::vector<std::string> selectedIds,
                   const FormatterContext &ctx) {
         const LayoutPlanner planner(plan, rows, trailingLines);
-        const PageManager pages(ctx);
-        const Renderer renderer(ctx, pages);
+        const bool hasHeading = plan.query.heading.has_value();
+        PageManager pages(ctx, hasHeading);
+        const std::string *headingTemplate = hasHeading ? &*plan.query.heading : nullptr;
+        const Renderer renderer(ctx, pages, headingTemplate);
         Result result;
         result.lines = renderer.render(planner.events());
         result.selectedIds = std::move(selectedIds);

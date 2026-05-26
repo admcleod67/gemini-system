@@ -15,12 +15,24 @@ namespace {
         return Plan{q};
     }
 
-    FormatterContext fixedCtx(int pickDay = 0, int secondsOfDay = 0, int page = 1) {
+    FormatterContext fixedCtx(int pickDay = 0, int secondsOfDay = 0, int page = 1, int pageLength = 24) {
         FormatterContext ctx;
         ctx.pageNumber = page;
+        ctx.pageLength = pageLength;
         ctx.currentPickDay = pickDay;
         ctx.currentSecondsOfDay = secondsOfDay;
         return ctx;
+    }
+
+    std::vector<Row> makeRows(int count, const std::string &prefix = "R") {
+        std::vector<Row> rows;
+        rows.reserve(static_cast<std::size_t>(count));
+        for (int i = 1; i <= count; ++i) {
+            Row r;
+            r.id = prefix + std::to_string(i);
+            rows.push_back(std::move(r));
+        }
+        return rows;
     }
 
     Row row(std::string id, std::vector<std::string> fields = {}) {
@@ -136,6 +148,117 @@ TEST_CASE("formatter appends trailing lines after rows") {
     REQUIRE(r.lines.size() == 2);
     CHECK(r.lines[0] == "Top");
     CHECK(r.lines[1] == "3 records selected");
+}
+
+// --- Milestone 8 Stage 2: pagination ---
+
+TEST_CASE("formatter pagination is inactive without HEADING") {
+    const Plan plan = makePlan(); // no HEADING
+    const Result r = format(plan, makeRows(30), {}, {}, fixedCtx(0, 0, 1, /*pageLength=*/10));
+    REQUIRE(r.lines.size() == 30);
+    CHECK(r.lines[0] == "R1");
+    CHECK(r.lines[29] == "R30");
+}
+
+TEST_CASE("formatter pagination: heading + 9 rows fits in one page at pageLength=10") {
+    const Plan plan = makePlan("X");
+    const Result r = format(plan, makeRows(9), {}, {}, fixedCtx(0, 0, 1, 10));
+    REQUIRE(r.lines.size() == 10);
+    CHECK(r.lines[0] == "X");
+    CHECK(r.lines[1] == "R1");
+    CHECK(r.lines[9] == "R9");
+}
+
+TEST_CASE("formatter pagination: heading + 10 rows overflows into a second page") {
+    const Plan plan = makePlan("X");
+    const Result r = format(plan, makeRows(10), {}, {}, fixedCtx(0, 0, 1, 10));
+    REQUIRE(r.lines.size() == 13);
+    CHECK(r.lines[0] == "X");
+    CHECK(r.lines[1] == "R1");
+    CHECK(r.lines[9] == "R9");
+    CHECK(r.lines[10] == "");     // blank separator
+    CHECK(r.lines[11] == "X");    // re-emitted heading on page 2
+    CHECK(r.lines[12] == "R10");
+}
+
+TEST_CASE("formatter pagination: 30 rows + pageLength=10 yields 4 pages") {
+    const Plan plan = makePlan("X");
+    const Result r = format(plan, makeRows(30), {}, {}, fixedCtx(0, 0, 1, 10));
+    REQUIRE(r.lines.size() == 37); // 10 + 11 + 11 + 5
+    // Heading repeats at predictable positions.
+    CHECK(r.lines[0] == "X");
+    CHECK(r.lines[10] == "");
+    CHECK(r.lines[11] == "X");
+    CHECK(r.lines[21] == "");
+    CHECK(r.lines[22] == "X");
+    CHECK(r.lines[32] == "");
+    CHECK(r.lines[33] == "X");
+    // Boundary rows.
+    CHECK(r.lines[9] == "R9");
+    CHECK(r.lines[12] == "R10");
+    CHECK(r.lines[20] == "R18");
+    CHECK(r.lines[23] == "R19");
+    CHECK(r.lines[31] == "R27");
+    CHECK(r.lines[34] == "R28");
+    CHECK(r.lines[36] == "R30");
+}
+
+TEST_CASE("formatter pagination: @PAGE is dynamic across pages") {
+    const Plan plan = makePlan("Page @PAGE");
+    const Result r = format(plan, makeRows(25), {}, {}, fixedCtx(0, 0, 1, 10));
+    REQUIRE(r.lines.size() == 30); // 10 + 11 + 9
+    CHECK(r.lines[0] == "Page 1");
+    CHECK(r.lines[10] == "");
+    CHECK(r.lines[11] == "Page 2");
+    CHECK(r.lines[21] == "");
+    CHECK(r.lines[22] == "Page 3");
+    CHECK(r.lines[29] == "R25");
+}
+
+TEST_CASE("formatter pagination: trailing line counts toward the page") {
+    Plan plan = makePlan("X");
+    plan.query.verb = Verb::COUNT;
+    // Heading (1) + trailing "5" (2) fits exactly into a pageLength=2 page.
+    const Result r = format(plan, {}, {"5"}, {}, fixedCtx(0, 0, 1, 2));
+    REQUIRE(r.lines.size() == 2);
+    CHECK(r.lines[0] == "X");
+    CHECK(r.lines[1] == "5");
+}
+
+TEST_CASE("formatter pagination: pageLength<=0 disables pagination as escape hatch") {
+    const Plan plan = makePlan("X");
+    const Result r = format(plan, makeRows(5), {}, {}, fixedCtx(0, 0, 1, /*pageLength=*/0));
+    REQUIRE(r.lines.size() == 6);
+    CHECK(r.lines[0] == "X");
+    CHECK(r.lines[5] == "R5");
+    // No blank separators and no repeat heading anywhere.
+    for (std::size_t i = 1; i < r.lines.size(); ++i) {
+        CHECK_FALSE(r.lines[i].empty());
+        CHECK(r.lines[i] != "X");
+    }
+}
+
+TEST_CASE("formatter pagination: pageLength=1 puts each row on its own page (degenerate)") {
+    const Plan plan = makePlan("X");
+    const Result r = format(plan, makeRows(2), {}, {}, fixedCtx(0, 0, 1, /*pageLength=*/1));
+    // Page 1: "X" (overflow before row 1)
+    // blank, "X", R1   (page 2; overflow before row 2)
+    // blank, "X", R2   (page 3)
+    REQUIRE(r.lines.size() == 7);
+    CHECK(r.lines[0] == "X");
+    CHECK(r.lines[1] == "");
+    CHECK(r.lines[2] == "X");
+    CHECK(r.lines[3] == "R1");
+    CHECK(r.lines[4] == "");
+    CHECK(r.lines[5] == "X");
+    CHECK(r.lines[6] == "R2");
+}
+
+TEST_CASE("formatter pagination: empty rows + HEADING stays on page 1") {
+    const Plan plan = makePlan("X");
+    const Result r = format(plan, {}, {}, {}, fixedCtx(0, 0, 1, 10));
+    REQUIRE(r.lines.size() == 1);
+    CHECK(r.lines[0] == "X");
 }
 
 TEST_CASE("FormatterDateTime parity with BASIC OCONV \"D\" on day 732") {

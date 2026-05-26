@@ -280,10 +280,14 @@ namespace PickCore::English {
         if (!error.empty()) {
             return Result{};
         }
+        FormatterContext ctx = defaultFormatterContext();
+        if (opts.pageLength.has_value()) {
+            ctx.pageLength = *opts.pageLength;
+        }
         return format(plan,
                       std::move(rows),
                       std::move(trailingLines),
                       std::move(selectedIds),
-                      defaultFormatterContext());
+                      ctx);
     }
 } // namespace PickCore::English

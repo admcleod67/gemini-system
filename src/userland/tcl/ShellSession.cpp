@@ -123,6 +123,7 @@ namespace PickShell {
         sessionAccount_.clear();
         userNo_ = "0";
         defaultDataFile_.reset();
+        reportPageLength_ = 24;
         clearActiveList();
     }
 

@@ -1204,6 +1204,28 @@ namespace PickShell {
             out << "SET requires a variable name\n";
             return;
         }
+        // Typed system setting (M8 Stage 2): `SET PAGE-LENGTH n` configures the ENGLISH
+        // report formatter's lines-per-page. Validated to a positive integer; stored on
+        // the session, not in the env_ string store, so it does not appear in LIST-VARS.
+        if (kwEq(tokens[1], "PAGE-LENGTH")) {
+            if (tokens.size() != 3) {
+                out << "SET PAGE-LENGTH requires a positive integer\n";
+                return;
+            }
+            int n = 0;
+            try {
+                std::size_t pos = 0;
+                n = std::stoi(tokens[2], &pos);
+                if (pos != tokens[2].size() || n < 1) {
+                    throw std::invalid_argument("");
+                }
+            } catch (...) {
+                out << "SET PAGE-LENGTH requires a positive integer\n";
+                return;
+            }
+            session_.setReportPageLength(n);
+            return;
+        }
         if (ShellSession::isSessionSystemVariableName(tokens[1])) {
             out << "Read-only system variable\n";
             return;
@@ -1223,6 +1245,10 @@ namespace PickShell {
     void Shell::cmdGet(const std::vector<std::string> &tokens, std::ostream &out) {
         if (tokens.size() != 2) {
             out << "GET requires a variable name\n";
+            return;
+        }
+        if (kwEq(tokens[1], "PAGE-LENGTH")) {
+            out << session_.reportPageLength() << '\n';
             return;
         }
         if (const std::optional<std::string> sys = session_.resolveSystemVariable(tokens[1])) {
@@ -1488,6 +1514,7 @@ namespace PickShell {
         if (shellIsEnglishList(tokens, session_)) {
             PickCore::English::ParseContext pc;
             PickCore::English::EnglishRunOptions eo;
+            eo.pageLength = session_.reportPageLength();
             if (const std::optional<std::string> impErr = englishImplicitSetup(session_, tokens, pc, eo)) {
                 out << "Error: " << *impErr << "\n";
                 return;
@@ -1530,6 +1557,7 @@ namespace PickShell {
         }
         PickCore::English::ParseContext pc;
         PickCore::English::EnglishRunOptions eo;
+        eo.pageLength = session_.reportPageLength();
         if (const std::optional<std::string> impErr = englishImplicitSetup(session_, tokens, pc, eo)) {
             out << "Error: " << *impErr << "\n";
             return;
@@ -1553,6 +1581,7 @@ namespace PickShell {
         }
         PickCore::English::ParseContext pc;
         PickCore::English::EnglishRunOptions eo;
+        eo.pageLength = session_.reportPageLength();
         std::string error;
         const std::optional<PickCore::English::Result> result =
             englishService_.run(session_.fileSystem_, tokens, pc, eo, error);
@@ -1573,6 +1602,7 @@ namespace PickShell {
         }
         PickCore::English::ParseContext pc;
         PickCore::English::EnglishRunOptions eo;
+        eo.pageLength = session_.reportPageLength();
         if (const std::optional<std::string> impErr = englishImplicitSetup(session_, tokens, pc, eo)) {
             out << "Error: " << *impErr << "\n";
             return;

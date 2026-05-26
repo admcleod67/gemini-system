@@ -1,6 +1,7 @@
 #include <doctest/doctest.h>
 
 #include <chrono>
+#include <cstdio>
 #include <filesystem>
 
 #include "EnglishParser.h"
@@ -329,6 +330,70 @@ TEST_CASE("english service COUNT with HEADING renders heading then count") {
     REQUIRE(res->lines.size() == 2);
     CHECK(res->lines[0] == "Summary");
     CHECK(res->lines[1] == "2");
+}
+
+TEST_CASE("english service LIST with HEADING paginates via EnglishRunOptions::pageLength") {
+    const auto root = uniqueEnglishTempDir();
+    PickFS::FileSystem fs(root);
+    fs.createFile("DATA");
+    fs.createFile("DICT");
+    fs.write("DICT", PickFS::Record("NAME", "A\n1\n"));
+    // Seed 15 records (ids R01..R15 for stable lexical order).
+    for (int i = 1; i <= 15; ++i) {
+        char id[8]{};
+        std::snprintf(id, sizeof id, "R%02d", i);
+        const std::string val = "N" + std::to_string(i) + "\n";
+        fs.write("DATA", PickFS::Record(id, val));
+    }
+
+    PickCore::English::EnglishService svc;
+    PickCore::English::ParseContext pc;
+    PickCore::English::EnglishRunOptions eo;
+    eo.pageLength = 5;
+    std::string error;
+    const auto res = svc.run(fs, {"LIST", "DATA", "NAME", "HEADING", "Customers"}, pc, eo, error);
+    REQUIRE(res.has_value());
+    CHECK(error.empty());
+
+    // Layout: page 1 = heading + 4 rows (5 lines); each subsequent page = blank + heading + 4 rows (6 lines).
+    // 15 rows -> 4 pages (1, 5, 9, 13 starting rows). Last page has 3 rows.
+    // 5 + 6 + 6 + 5 = 22 lines.
+    REQUIRE(res->lines.size() == 22);
+    CHECK(res->lines[0] == "Customers");      // page 1 heading
+    CHECK(res->lines[5] == "");                // separator
+    CHECK(res->lines[6] == "Customers");      // page 2 heading
+    CHECK(res->lines[11] == "");
+    CHECK(res->lines[12] == "Customers");
+    CHECK(res->lines[17] == "");
+    CHECK(res->lines[18] == "Customers");
+    // Last row of last page is row 15 -> ends with N15.
+    CHECK(res->lines.back().find("N15") != std::string::npos);
+}
+
+TEST_CASE("english service LIST without HEADING ignores EnglishRunOptions::pageLength") {
+    const auto root = uniqueEnglishTempDir();
+    PickFS::FileSystem fs(root);
+    fs.createFile("DATA");
+    fs.createFile("DICT");
+    fs.write("DICT", PickFS::Record("NAME", "A\n1\n"));
+    for (int i = 1; i <= 12; ++i) {
+        char id[8]{};
+        std::snprintf(id, sizeof id, "R%02d", i);
+        fs.write("DATA", PickFS::Record(id, "N\n"));
+    }
+
+    PickCore::English::EnglishService svc;
+    PickCore::English::ParseContext pc;
+    PickCore::English::EnglishRunOptions eo;
+    eo.pageLength = 3;
+    std::string error;
+    const auto res = svc.run(fs, {"LIST", "DATA", "NAME"}, pc, eo, error);
+    REQUIRE(res.has_value());
+    // 12 rows; pagination disabled because there is no HEADING -> 12 lines, no blanks.
+    REQUIRE(res->lines.size() == 12);
+    for (const std::string &line: res->lines) {
+        CHECK_FALSE(line.empty());
+    }
 }
 
 TEST_CASE("english service SELECT with HEADING renders heading then summary") {

@@ -77,6 +77,12 @@ namespace PickShell {
         void setActiveList(std::vector<std::string> ids, std::string sourceFile);
         void clearActiveList();
 
+        /// Page length used by the ENGLISH formatter for `HEADING` reports.
+        /// Configured via the Tcl `SET PAGE-LENGTH n` command (M8 Stage 2).
+        /// Default = 24 (Pick terminal-class); reset on `clearLoginSession`.
+        [[nodiscard]] int reportPageLength() const { return reportPageLength_; }
+        void setReportPageLength(int n) { reportPageLength_ = n < 1 ? 1 : n; }
+
         /// `@USERNO`, `@ACCOUNT`, `@LOGNAME`, `@DEFDATA` — read from session frame (not `TclEnvironment`).
         [[nodiscard]] std::optional<std::string> resolveSystemVariable(std::string_view name) const;
 
@@ -98,6 +104,7 @@ namespace PickShell {
         std::vector<std::string> activeList_;
         std::optional<std::string> activeListSourceFile_;
         std::optional<PickVM::LoadedBytecode> lastLoaded_;
+        int reportPageLength_{24};
         bool trace_{false};
         std::unordered_set<std::size_t> breakpoints_;
         bool suspended_{false};

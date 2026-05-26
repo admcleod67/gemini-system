@@ -62,6 +62,10 @@ namespace PickCore::English {
     struct EnglishRunOptions {
         /// When set, only these record ids are scanned (active-list scope).
         std::optional<std::vector<std::string>> constrainRecordIds;
+        /// Lines per page override for HEADING reports (Milestone 8 Stage 2). When
+        /// std::nullopt the formatter uses its default (24 lines). Set by the Tcl
+        /// shell from the session-level `SET PAGE-LENGTH n` value.
+        std::optional<int> pageLength;
     };
 } // namespace PickCore::English
 
