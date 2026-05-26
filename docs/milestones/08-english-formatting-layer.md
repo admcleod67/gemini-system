@@ -102,3 +102,16 @@ Add:
 ENGLISH today (post‑M3) provides a solid query engine but lacks the formatting features required for real‑world reporting. Milestone 8 fills this gap by adding a Pick‑authentic formatting layer without altering the VM, filesystem, or BASIC runtime. This milestone is intentionally narrow and vertical: it enhances ENGLISH output while keeping the underlying data and execution model stable.
 
 With Milestone 8 complete, Gemini gains its first operator‑grade reporting capability, enabling meaningful business‑style output and preparing the system for later printer/report writer milestones.
+
+### Delivery plan
+
+Implementation is sequenced into vertical stages, each one shippable end‑to‑end with tests locked in before the next stage starts. Detailed per‑stage plans live in `~/.cursor/plans/m8_stage_*.plan.md` during implementation; the status of each stage is summarised back into this section as it lands (matching the M4 / M5 precedent).
+
+- **Stage 1 — Formatter foundation + `HEADING`**: introduce the formatter module skeleton (Layout Planner, Page Manager, Renderer), wire a no‑op row pipeline through it, and ship `HEADING "text"` end‑to‑end including Pick‑style substitution tokens (date / time / page number). Establishes the test idiom (stable substrings, golden output) for later stages. *Status: pending.*
+- **Stage 2 — Pagination**: Page Manager goes from skeleton to active — line‑count tracking, configurable terminal height, page breaks that re‑emit `HEADING`. *Status: pending.*
+- **Stage 3 — `BREAK-ON <field>`**: Layout Planner gains break detection. Parser learns `BREAK-ON`. Break‑line shape and wording are locked. *Status: pending.*
+- **Stage 4 — `TOTAL <field>`**: Accumulator Engine goes from skeleton to active; totals emit at break boundaries (from Stage 3) and at end of report. *Status: pending.*
+- **Stage 5 — `ID-SUPP` + HELP integration**: small directive plus operator‑facing HELP updates for `LIST` / `SORT` / `SELECT` via the M6 file‑backed HELP. *Status: pending.*
+- **Stage 6 — `FOOTING` (stretch) + docs polish**: the spec's stretch directive, plus `docs/english.md`, `docs/tcl-shell.md`, and the new `docs/english-formatting.md`. *Status: pending.*
+
+Only Stage 6's exit criteria should claim "Closes Milestone 8".
