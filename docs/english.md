@@ -111,9 +111,13 @@ SORT BY NAME
 CLEAR-LIST
 ```
 
+## Report formatting
+
+The formatting layer (headings, breaks, totals, pagination) is staged in Milestone 8. Stage 1 ships the **`HEADING "<text>"`** clause with Pick‑classic `@`-token substitution (`@DATE`, `@TIME`, `@PAGE`, plus the `@@` escape). See [docs/english-formatting.md](english-formatting.md) for the syntax, token table, and behaviour. Queries without a `HEADING` clause are byte-identical to the pre‑M8 output.
+
 ## Non-goals (deferred)
 
-- Headings, breaks, totals, pagination, printer/report delivery.
+- Breaks, totals, pagination, printer/report delivery (deferred to later Milestone 8 stages and beyond).
 - Executed `WITH` predicates.
 - Full `MD` / date-mask / currency semantics and correlatives.
 - Legacy Tcl `SORT` for non-ENGLISH-shaped input.

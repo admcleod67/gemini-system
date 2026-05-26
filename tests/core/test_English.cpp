@@ -209,6 +209,146 @@ TEST_CASE("english LIST unknown field yields error") {
     CHECK(error.find("UNKNOWNFIELD") != std::string::npos);
 }
 
+TEST_CASE("english parser accepts HEADING clause") {
+    PickCore::English::EnglishParser parser;
+    std::string error;
+    const PickCore::English::ParseContext pc;
+
+    const auto withHeading = parser.parse({"LIST", "CUSTOMERS", "HEADING", "Hello"}, pc, error);
+    REQUIRE(withHeading.has_value());
+    CHECK(error.empty());
+    REQUIRE(withHeading->heading.has_value());
+    CHECK(*withHeading->heading == "Hello");
+
+    const auto noHeading = parser.parse({"LIST", "CUSTOMERS"}, pc, error);
+    REQUIRE(noHeading.has_value());
+    CHECK_FALSE(noHeading->heading.has_value());
+}
+
+TEST_CASE("english parser HEADING rejects missing literal") {
+    PickCore::English::EnglishParser parser;
+    std::string error;
+    const PickCore::English::ParseContext pc;
+    const auto q = parser.parse({"LIST", "CUSTOMERS", "HEADING"}, pc, error);
+    CHECK_FALSE(q.has_value());
+    CHECK(error == "HEADING requires a quoted string");
+}
+
+TEST_CASE("english parser HEADING rejects structural keyword as argument") {
+    PickCore::English::EnglishParser parser;
+    std::string error;
+    const PickCore::English::ParseContext pc;
+    const auto q = parser.parse({"LIST", "CUSTOMERS", "HEADING", "BY", "NAME"}, pc, error);
+    CHECK_FALSE(q.has_value());
+    CHECK(error == "HEADING requires a quoted string");
+}
+
+TEST_CASE("english parser HEADING rejects duplicates") {
+    PickCore::English::EnglishParser parser;
+    std::string error;
+    const PickCore::English::ParseContext pc;
+    const auto q = parser.parse({"LIST", "CUSTOMERS", "HEADING", "A", "HEADING", "B"}, pc, error);
+    CHECK_FALSE(q.has_value());
+    CHECK(error == "HEADING can only appear once");
+}
+
+TEST_CASE("english parser HEADING before BY clause works on SORT") {
+    PickCore::English::EnglishParser parser;
+    std::string error;
+    const PickCore::English::ParseContext pc;
+    const auto q = parser.parse({"SORT", "CUSTOMERS", "HEADING", "Report", "BY", "NAME"}, pc, error);
+    REQUIRE(q.has_value());
+    CHECK(error.empty());
+    REQUIRE(q->heading.has_value());
+    CHECK(*q->heading == "Report");
+    REQUIRE(q->sortKeys.size() == 1);
+    CHECK(q->sortKeys[0].fieldToken == "NAME");
+}
+
+TEST_CASE("english parser HEADING after BY clause also works (positional flexibility)") {
+    PickCore::English::EnglishParser parser;
+    std::string error;
+    const PickCore::English::ParseContext pc;
+    const auto q = parser.parse({"SORT", "CUSTOMERS", "BY", "NAME", "HEADING", "After"}, pc, error);
+    REQUIRE(q.has_value());
+    REQUIRE(q->heading.has_value());
+    CHECK(*q->heading == "After");
+    REQUIRE(q->sortKeys.size() == 1);
+    CHECK(q->sortKeys[0].fieldToken == "NAME");
+}
+
+TEST_CASE("english parser HEADING on bare COUNT preserves heading") {
+    PickCore::English::EnglishParser parser;
+    std::string error;
+    PickCore::English::ParseContext pc;
+    pc.implicitFile = true;
+    pc.imposedFileName = "DATA";
+    const auto q = parser.parse({"COUNT", "HEADING", "Summary"}, pc, error);
+    REQUIRE(q.has_value());
+    CHECK(q->verb == PickCore::English::Verb::COUNT);
+    CHECK(q->fileName == "DATA");
+    REQUIRE(q->heading.has_value());
+    CHECK(*q->heading == "Summary");
+}
+
+TEST_CASE("english service LIST with HEADING emits heading as first line") {
+    const auto root = uniqueEnglishTempDir();
+    PickFS::FileSystem fs(root);
+    fs.createFile("DATA");
+    fs.createFile("DICT");
+    fs.write("DICT", PickFS::Record("NAME", "A\n1\n"));
+    fs.write("DATA", PickFS::Record("R1", "ALICE\n"));
+    fs.write("DATA", PickFS::Record("R2", "BOB\n"));
+
+    PickCore::English::EnglishService svc;
+    PickCore::English::ParseContext pc;
+    PickCore::English::EnglishRunOptions eo;
+    std::string error;
+    const auto res = svc.run(fs, {"LIST", "DATA", "NAME", "HEADING", "Customers"}, pc, eo, error);
+    REQUIRE(res.has_value());
+    CHECK(error.empty());
+    REQUIRE(res->lines.size() == 3);
+    CHECK(res->lines[0] == "Customers");
+    CHECK(res->lines[1].find("ALICE") != std::string::npos);
+    CHECK(res->lines[2].find("BOB") != std::string::npos);
+}
+
+TEST_CASE("english service COUNT with HEADING renders heading then count") {
+    const auto root = uniqueEnglishTempDir();
+    PickFS::FileSystem fs(root);
+    fs.createFile("DATA");
+    fs.write("DATA", PickFS::Record("R1", "A\n"));
+    fs.write("DATA", PickFS::Record("R2", "B\n"));
+
+    PickCore::English::EnglishService svc;
+    PickCore::English::ParseContext pc;
+    PickCore::English::EnglishRunOptions eo;
+    std::string error;
+    const auto res = svc.run(fs, {"COUNT", "DATA", "HEADING", "Summary"}, pc, eo, error);
+    REQUIRE(res.has_value());
+    REQUIRE(res->lines.size() == 2);
+    CHECK(res->lines[0] == "Summary");
+    CHECK(res->lines[1] == "2");
+}
+
+TEST_CASE("english service SELECT with HEADING renders heading then summary") {
+    const auto root = uniqueEnglishTempDir();
+    PickFS::FileSystem fs(root);
+    fs.createFile("DATA");
+    fs.write("DATA", PickFS::Record("R1", "A\n"));
+
+    PickCore::English::EnglishService svc;
+    PickCore::English::ParseContext pc;
+    PickCore::English::EnglishRunOptions eo;
+    std::string error;
+    const auto res = svc.run(fs, {"SELECT", "DATA", "HEADING", "Pick"}, pc, eo, error);
+    REQUIRE(res.has_value());
+    REQUIRE(res->lines.size() == 2);
+    CHECK(res->lines[0] == "Pick");
+    CHECK(res->lines[1] == "1 records selected");
+    CHECK(res->selectedIds.size() == 1);
+}
+
 TEST_CASE("english SORT unknown BY field yields error") {
     const auto root = uniqueEnglishTempDir();
     PickFS::FileSystem fs(root);

@@ -41,6 +41,10 @@ add_library(gemini-core
         english/Executor.h
         english/EnglishService.cpp
         english/EnglishService.h
+        english/Formatter.cpp
+        english/Formatter.h
+        english/FormatterDateTime.cpp
+        english/FormatterDateTime.h
 )
 
 target_include_directories(

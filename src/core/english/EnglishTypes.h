@@ -32,6 +32,9 @@ namespace PickCore::English {
         std::vector<std::string> fields;
         /// Only used when verb == SORT; empty means sort by item-id only.
         std::vector<SortKeySpec> sortKeys;
+        /// Raw HEADING template (Milestone 8 Stage 1). std::nullopt when no HEADING clause.
+        /// `@`-token substitution is performed by the formatter at render time.
+        std::optional<std::string> heading;
     };
 
     struct Plan {
@@ -42,6 +45,13 @@ namespace PickCore::English {
         std::string token;
         std::optional<int> attributeNo;
         ConversionCode conversion{ConversionCode::None};
+    };
+
+    /// Internal handoff between Executor (row production) and Formatter (rendering) — Milestone 8.
+    /// Each Row represents one projected record before any layout/heading work.
+    struct Row {
+        std::string id;
+        std::vector<std::string> projectedFields;
     };
 
     struct Result {

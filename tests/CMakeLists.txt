@@ -25,6 +25,7 @@ add_executable(
         core/test_VocResolver.cpp
         core/test_MdDefaultDataFile.cpp
         core/test_English.cpp
+        core/test_EnglishFormatter.cpp
         basic/test_BasicBytecodeEmitter.cpp
         basic/test_BasicCompiler.cpp
         basic/test_BasicCompilerGolden.cpp

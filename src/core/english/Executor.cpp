@@ -4,7 +4,7 @@
 #include <cctype>
 #include <numeric>
 #include <optional>
-#include <sstream>
+#include <string>
 
 namespace PickCore::English {
     namespace {
@@ -93,20 +93,26 @@ namespace PickCore::English {
             return desc ? -c : c;
         }
 
-        std::string formatProjectLine(const std::string &id,
-                                      const std::optional<PickFS::Record> &rec,
-                                      const std::vector<FieldRef> &fields) {
-            std::ostringstream row;
-            row << id;
-            if (rec.has_value()) {
-                for (const FieldRef &field: fields) {
-                    row << ' ';
-                    if (field.attributeNo.has_value()) {
-                        row << rec->structured().attribute(*field.attributeNo).firstValue();
-                    }
+        /// Materialise the projected fields for one record. Mirrors the legacy
+        /// `formatProjectLine` exactly: when the record is absent the projection
+        /// list is empty (so the renderer emits only the id); when an attribute
+        /// is unresolved the entry is the empty string (so the renderer still
+        /// emits a placeholder space, byte-identical to the pre-formatter output).
+        std::vector<std::string> materializeProjection(const std::optional<PickFS::Record> &rec,
+                                                       const std::vector<FieldRef> &fields) {
+            std::vector<std::string> out;
+            if (!rec.has_value()) {
+                return out;
+            }
+            out.reserve(fields.size());
+            for (const FieldRef &field: fields) {
+                if (field.attributeNo.has_value()) {
+                    out.push_back(rec->structured().attribute(*field.attributeNo).firstValue());
+                } else {
+                    out.emplace_back();
                 }
             }
-            return row.str();
+            return out;
         }
 
         std::vector<KeyPart> materializeSortKeys(const PickFS::Record &rec, const std::vector<FieldRef> &refs) {
@@ -142,12 +148,18 @@ namespace PickCore::English {
         }
     } // namespace
 
-    Result Executor::execute(PickFS::FileSystem &fs,
-                             const Plan &plan,
-                             const DictionaryResolver &dictResolver,
-                             const EnglishRunOptions &opts,
-                             std::string &error) const {
-        Result result;
+    void Executor::produceRows(PickFS::FileSystem &fs,
+                               const Plan &plan,
+                               const DictionaryResolver &dictResolver,
+                               const EnglishRunOptions &opts,
+                               std::vector<Row> &rows,
+                               std::vector<std::string> &trailingLines,
+                               std::vector<std::string> &selectedIds,
+                               std::string &error) const {
+        rows.clear();
+        trailingLines.clear();
+        selectedIds.clear();
+
         std::vector<std::string> ids;
         const std::string &fn = plan.query.fileName;
 
@@ -158,13 +170,13 @@ namespace PickCore::English {
                 ids = fs.listRecordNames(fn);
             } catch (const std::exception &e) {
                 error = e.what();
-                return result;
+                return;
             }
         }
 
         if (plan.query.verb == Verb::COUNT) {
-            result.lines.push_back(std::to_string(ids.size()));
-            return result;
+            trailingLines.push_back(std::to_string(ids.size()));
+            return;
         }
 
         const std::vector<FieldRef> fields = dictResolver.resolveFields(fs, fn, plan.query.fields);
@@ -172,36 +184,38 @@ namespace PickCore::English {
         if (!plan.query.fields.empty()) {
             if (const std::optional<std::string> err = firstUnresolvedFieldError(fields, fn)) {
                 error = *err;
-                return Result{};
+                return;
             }
         }
 
-        std::vector<std::string> projectionLines;
+        rows.reserve(ids.size());
         std::vector<std::optional<PickFS::Record>> records;
-        projectionLines.reserve(ids.size());
         records.reserve(ids.size());
 
         for (const std::string &id: ids) {
-            result.selectedIds.push_back(id);
+            selectedIds.push_back(id);
             if (plan.query.verb == Verb::SELECT) {
                 continue;
             }
             try {
                 std::optional<PickFS::Record> rec = fs.read(fn, id);
-                projectionLines.push_back(formatProjectLine(id, rec, fields));
+                Row row;
+                row.id = id;
+                row.projectedFields = materializeProjection(rec, fields);
+                rows.push_back(std::move(row));
                 records.push_back(std::move(rec));
             } catch (const std::exception &e) {
                 error = e.what();
-                return Result{};
+                return;
             }
         }
 
         if (plan.query.verb == Verb::SELECT) {
-            result.lines.push_back(std::to_string(result.selectedIds.size()) + " records selected");
-            return result;
+            trailingLines.push_back(std::to_string(selectedIds.size()) + " records selected");
+            return;
         }
 
-        std::vector<std::size_t> order(projectionLines.size());
+        std::vector<std::size_t> order(rows.size());
         std::iota(order.begin(), order.end(), 0U);
 
         if (plan.query.verb == Verb::SORT) {
@@ -214,7 +228,7 @@ namespace PickCore::English {
 
             if (const std::optional<std::string> err = firstUnresolvedFieldError(sortRefs, fn)) {
                 error = *err;
-                return Result{};
+                return;
             }
 
             std::vector<std::vector<KeyPart>> rowKeys;
@@ -244,10 +258,32 @@ namespace PickCore::English {
             std::stable_sort(order.begin(), order.end(), cmpRows);
         }
 
-        for (const std::size_t idx: order) {
-            result.lines.push_back(projectionLines[idx]);
+        if (order.size() != rows.size() || !std::is_sorted(order.begin(), order.end())) {
+            std::vector<Row> reordered;
+            reordered.reserve(order.size());
+            for (const std::size_t idx: order) {
+                reordered.push_back(std::move(rows[idx]));
+            }
+            rows = std::move(reordered);
         }
+    }
 
-        return result;
+    Result Executor::execute(PickFS::FileSystem &fs,
+                             const Plan &plan,
+                             const DictionaryResolver &dictResolver,
+                             const EnglishRunOptions &opts,
+                             std::string &error) const {
+        std::vector<Row> rows;
+        std::vector<std::string> trailingLines;
+        std::vector<std::string> selectedIds;
+        produceRows(fs, plan, dictResolver, opts, rows, trailingLines, selectedIds, error);
+        if (!error.empty()) {
+            return Result{};
+        }
+        return format(plan,
+                      std::move(rows),
+                      std::move(trailingLines),
+                      std::move(selectedIds),
+                      defaultFormatterContext());
     }
 } // namespace PickCore::English

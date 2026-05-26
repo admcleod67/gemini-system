@@ -29,6 +29,16 @@ namespace PickCore::English {
             return ieq(t, "WITH");
         }
 
+        bool isHeading(const std::string &t) {
+            return ieq(t, "HEADING");
+        }
+
+        /// True if the token is one of the ENGLISH structural keywords; used to reject
+        /// `HEADING BY ...` and similar typos where the user clearly forgot the literal.
+        bool isStructuralKeyword(const std::string &t) {
+            return isBy(t) || isByDsnd(t) || isWith(t) || isHeading(t);
+        }
+
         std::optional<Verb> verbFrom(const std::string &t) {
             if (ieq(t, "LIST")) {
                 return Verb::LIST;
@@ -86,31 +96,57 @@ namespace PickCore::English {
         }
     } // namespace
 
-    std::optional<Query> EnglishParser::parse(const std::vector<std::string> &tokens,
+    std::optional<Query> EnglishParser::parse(const std::vector<std::string> &rawTokens,
                                                const ParseContext &ctx,
                                                std::string &error) const {
         error.clear();
-        if (tokens.empty()) {
+        if (rawTokens.empty()) {
             error = "Empty query";
             return std::nullopt;
         }
-        const std::optional<Verb> verbOpt = verbFrom(tokens[0]);
+        const std::optional<Verb> verbOpt = verbFrom(rawTokens[0]);
         if (!verbOpt.has_value()) {
             error = "Unsupported ENGLISH verb";
             return std::nullopt;
         }
         const Verb verb = *verbOpt;
 
+        // Strip out the `HEADING "<text>"` clause first so the rest of the parser
+        // (which has no notion of HEADING) keeps working on a verb-and-fields token stream.
+        // The clause can appear anywhere after the verb; only one occurrence is allowed.
+        std::vector<std::string> tokens;
+        tokens.reserve(rawTokens.size());
+        std::optional<std::string> heading;
+        for (std::size_t k = 0; k < rawTokens.size(); ++k) {
+            if (k > 0U && isHeading(rawTokens[k])) {
+                if (heading.has_value()) {
+                    error = "HEADING can only appear once";
+                    return std::nullopt;
+                }
+                if (k + 1U >= rawTokens.size() || isStructuralKeyword(rawTokens[k + 1U])) {
+                    error = "HEADING requires a quoted string";
+                    return std::nullopt;
+                }
+                heading = rawTokens[k + 1U];
+                ++k; // also skip the heading argument
+                continue;
+            }
+            tokens.push_back(rawTokens[k]);
+        }
+
         if (verb == Verb::COUNT && tokens.size() == 1U) {
             if (!ctx.implicitFile || !ctx.imposedFileName.has_value() || ctx.imposedFileName->empty()) {
                 error = "COUNT requires filename or active-list scope";
                 return std::nullopt;
             }
-            return Query{verb, *ctx.imposedFileName, {}, {}};
+            Query countQuery{verb, *ctx.imposedFileName, {}, {}, std::nullopt};
+            countQuery.heading = std::move(heading);
+            return countQuery;
         }
 
         Query q{};
         q.verb = verb;
+        q.heading = std::move(heading);
         std::size_t i = 1U;
         if (ctx.implicitFile) {
             if (!ctx.imposedFileName.has_value() || ctx.imposedFileName->empty()) {

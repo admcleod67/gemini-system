@@ -880,6 +880,31 @@ TEST_CASE("shell LIST with fields routes to ENGLISH while LIST file stays legacy
     CHECK(out.str().find("R2 BOB") != std::string::npos);
 }
 
+TEST_CASE("shell LIST with HEADING emits the heading as the first line") {
+    auto dir = uniqueTempDir();
+    PickFS::FileSystem fs(dir);
+    fs.createFile("DATA");
+    fs.createFile("DICT");
+    fs.write("DICT", PickFS::Record("NAME", "A\n1\n"));
+    fs.write("DATA", PickFS::Record("R1", "ALICE"));
+    fs.write("DATA", PickFS::Record("R2", "BOB"));
+
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(dir);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("LIST DATA NAME HEADING \"Customer Report\"", out, quit);
+    const std::string s = out.str();
+    // First line should be the heading; the rows follow in some order.
+    const auto firstNewline = s.find('\n');
+    REQUIRE(firstNewline != std::string::npos);
+    CHECK(s.substr(0, firstNewline) == "Customer Report");
+    CHECK(s.find("R1 ALICE") != std::string::npos);
+    CHECK(s.find("R2 BOB") != std::string::npos);
+}
+
 TEST_CASE("shell COUNT SELECT LIST-LIST CLEAR-LIST") {
     auto dir = uniqueTempDir();
     PickVM::Runtime rt;
