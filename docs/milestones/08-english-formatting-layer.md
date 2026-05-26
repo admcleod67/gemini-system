@@ -2,5 +2,103 @@
 
 ## Milestone 8 — ENGLISH Formatting Layer
 
-Extend the ENGLISH processor with Pick‑authentic report‑formatting capabilities, including headings, breaks, totals, pagination, and controlled output layout. This milestone adds the first true reporting layer on top of the existing LIST/SORT/SELECT engine, enabling structured, human‑readable reports. No new filesystem or VM features are required; the work is confined to the ENGLISH planner/executor and output formatter.
+Milestone 8 extends the ENGLISH processor with Pick‑authentic report‑formatting capabilities: headings, breaks, totals, pagination, and controlled output layout. This milestone introduces the first true reporting layer on top of the existing LIST/SORT/SELECT engine delivered in Milestone 3. No VM or filesystem changes are required; all work is confined to the ENGLISH planner/executor and a new formatting subsystem.
 
+The goal is to make ENGLISH suitable for operator‑facing reports, not just raw data extraction.
+
+### Goals
+
+- Add a Pick‑authentic formatting layer to ENGLISH, including headings, breaks, totals, and pagination.
+- Preserve the existing ENGLISH parser and executor; formatting is layered on top of the M3 engine.
+- Maintain strict separation between:
+  - query semantics (selection, sorting, field resolution)
+  - formatting semantics (layout, grouping, totals)
+- Avoid VM, BASIC, or filesystem changes; formatting is a pure ENGLISH concern.
+- Produce stable, predictable output suitable for terminal display and later printer/report subsystems.
+
+### Scope
+
+#### 1. Formatting directives (Pick‑authentic core)
+
+Implement the following ENGLISH clauses:
+
+- **`HEADING`** — Static or dynamic heading text printed at the top of each page. Support Pick‑style substitution tokens (e.g., date/time, page number).
+- **`FOOTING`** (optional stretch) — Footer text printed at the bottom of each page.
+- **`BREAK-ON <field>`** — Group records by the specified field. Emit a break line when the field value changes.
+- **`TOTAL <field>`** — Accumulate numeric totals for the specified field. Emit totals at break boundaries and/or at end of report.
+- **`ID-SUPP`** — Suppress record IDs in output.
+- **`PAGE` / pagination** — Page length defaults to a fixed terminal height (configurable). Emit headings on each new page.
+
+Formatting directives are parsed as part of the ENGLISH command but executed by the new formatting layer.
+
+#### 2. Formatting subsystem architecture
+
+Introduce a dedicated ENGLISH Formatter module with the following components:
+
+- **Layout Planner** — Consumes the executor’s row stream and formatting directives. Determines break boundaries, totals, and page boundaries.
+- **Accumulator Engine** — Maintains running totals for fields declared in **`TOTAL`**.
+- **Page Manager** — Tracks line counts, triggers page breaks, and re‑emits headings.
+- **Renderer** — Emits final formatted lines to the terminal. No printer semantics yet (deferred to later milestones).
+
+This subsystem is strictly layered on top of the existing ENGLISH executor.
+
+#### 3. Parser extensions
+
+Extend the ENGLISH parser to recognise:
+
+- **`HEADING "text"`**
+- **`BREAK-ON <field>`**
+- **`TOTAL <field>`**
+- **`ID-SUPP`**
+- **`PAGE`**
+- **`FOOTING "text"`** (stretch)
+
+Parser changes are additive and do not modify existing M3 grammar.
+
+#### 4. Output behaviour
+
+- Deterministic, stable formatting across runs.
+- Consistent spacing, indentation, and alignment.
+- Break lines include the break field and its value.
+- Totals appear at:
+  - each break boundary
+  - end of report
+- Page breaks re‑emit headings.
+- No printer control codes; plain text only.
+
+#### 5. TCL integration
+
+- Formatting directives are available through the existing ENGLISH entry points (**`LIST`**, **`SORT`**, **`SELECT`**).
+- No new TCL commands required.
+- **`HELP LIST`**, **`HELP SORT`**, and **`HELP SELECT`** updated to include formatting clauses (file‑backed HELP from M6).
+
+#### 6. Documentation
+
+Update:
+
+- [docs/english.md](../english.md) — formatting syntax, examples, and behaviour.
+- [docs/tcl-shell.md](../tcl-shell.md) — ENGLISH usage examples with formatting.
+- [docs/milestones.md](../milestones.md) — milestone index entry.
+
+Add:
+
+- `docs/english-formatting.md` — detailed formatting subsystem description.
+
+### Non‑Goals (Deferred)
+
+- Printer/report writer subsystem (printer control codes, spooler integration).
+- Advanced formatting:
+  - **`DET-SUPP`**
+  - **`COL-HDR-SUPP`**
+  - multi‑column layouts
+  - computed break expressions
+- SQL‑like extensions.
+- Dynamic processor registration (Milestone 11+).
+- Multi‑user or locking semantics (Milestone 10).
+- Correlative execution (Milestone 9).
+
+### Rationale
+
+ENGLISH today (post‑M3) provides a solid query engine but lacks the formatting features required for real‑world reporting. Milestone 8 fills this gap by adding a Pick‑authentic formatting layer without altering the VM, filesystem, or BASIC runtime. This milestone is intentionally narrow and vertical: it enhances ENGLISH output while keeping the underlying data and execution model stable.
+
+With Milestone 8 complete, Gemini gains its first operator‑grade reporting capability, enabling meaningful business‑style output and preparing the system for later printer/report writer milestones.
