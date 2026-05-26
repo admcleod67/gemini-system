@@ -249,10 +249,20 @@ namespace PickVM {
         }
 
         // --- BASIC InvokeBuiltin registry (Milestone 7) ---
-        // ICONV / OCONV: no conversion codes implemented yet; extend here when adding support.
         // Trigonometry: arguments are radians (std::sin / cos / tan).
         // DATE: internal day number (days since 1967-12-31, aligned so 1970-01-01 UTC = 732).
         // RND(): uniform double in [0, 1); RND(n) reseeds the generator with unsigned n then returns one sample.
+        // OCONV / ICONV (Stage 6): supported codes are
+        //   D    : date <-> "dd MMM yyyy" (UTC, Pick internal day, case-insensitive month parse).
+        //   MT   : seconds since midnight <-> "HH:MM".
+        //   MTS  : seconds since midnight <-> "HH:MM:SS".
+        //   MCU  : uppercase (byte-level; idempotent — same direction either way).
+        //   MCL  : lowercase (byte-level; idempotent).
+        //   MD   : integer display (no implicit decimal).
+        //   MD2  : implicit 2 decimal scale: 1234 <-> "12.34" (round half-away-from-zero on parse).
+        // Unknown codes throw BUILTIN: OCONV unsupported code "<code>" (ICONV ditto).
+        // NUM(v): 1 if value is fully numeric (empty -> 0).
+        // CONVERT(s, from, to): per-character map; chars in `from` past len(to) drop.
         constexpr int kBuiltinSpaceMaxCount = 65536;
         constexpr int kPickInternalDateAtUnixEpoch = 732;
 
@@ -510,6 +520,337 @@ namespace PickVM {
             stack.push_back(valueToString(v));
         }
 
+        // --- Stage 6: ICONV / OCONV / NUM / CONVERT helpers ---
+
+        // Howard Hinnant's days-from-civil algorithm (proleptic Gregorian).
+        // Returns days since 1970-01-01 UTC. Portable; matches gmtime_r used by builtinDate.
+        int daysFromCivil(int y, int m, int d) {
+            y -= (m <= 2 ? 1 : 0);
+            const int era = (y >= 0 ? y : y - 399) / 400;
+            const unsigned yoe = static_cast<unsigned>(y - era * 400);
+            const unsigned doy =
+                (153u * static_cast<unsigned>(m > 2 ? m - 3 : m + 9) + 2u) / 5u + static_cast<unsigned>(d) - 1u;
+            const unsigned doe = yoe * 365u + yoe / 4u - yoe / 100u + doy;
+            return era * 146097 + static_cast<int>(doe) - 719468;
+        }
+
+        std::string dateStringFromPickDay(int day) {
+            const long long unixDay = static_cast<long long>(day) - kPickInternalDateAtUnixEpoch;
+            const std::time_t t = static_cast<std::time_t>(unixDay * 86400LL);
+            std::tm tmBuf{};
+#if defined(_WIN32)
+            gmtime_s(&tmBuf, &t);
+#else
+            gmtime_r(&t, &tmBuf);
+#endif
+            char buf[32]{};
+            if (std::strftime(buf, sizeof buf, "%d %b %Y", &tmBuf) == 0) {
+                return std::string{};
+            }
+            return std::string{buf};
+        }
+
+        int pickDayFromDateString(const std::string &s, bool &ok) {
+            ok = false;
+            std::istringstream iss(s);
+            int day = 0;
+            std::string monStr;
+            int year = 0;
+            if (!(iss >> day >> monStr >> year)) {
+                return 0;
+            }
+            std::string extra;
+            if (iss >> extra) {
+                return 0;
+            }
+            if (day < 1 || day > 31 || year < 1 || year > 9999) {
+                return 0;
+            }
+            static const char *months[12] = {"jan", "feb", "mar", "apr", "may", "jun",
+                                             "jul", "aug", "sep", "oct", "nov", "dec"};
+            std::string monLower;
+            monLower.reserve(monStr.size());
+            for (char c : monStr) {
+                monLower += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+            }
+            int monthIdx = -1;
+            if (monLower.size() >= 3) {
+                const std::string head = monLower.substr(0, 3);
+                for (int i = 0; i < 12; ++i) {
+                    if (head == months[i]) {
+                        monthIdx = i;
+                        break;
+                    }
+                }
+            }
+            if (monthIdx < 0) {
+                return 0;
+            }
+            ok = true;
+            return daysFromCivil(year, monthIdx + 1, day) + kPickInternalDateAtUnixEpoch;
+        }
+
+        std::string timeStringFromSeconds(int n, bool wantSeconds) {
+            n %= 86400;
+            if (n < 0) {
+                n += 86400;
+            }
+            const int h = n / 3600;
+            const int m = (n / 60) % 60;
+            const int s = n % 60;
+            char buf[16]{};
+            if (wantSeconds) {
+                std::snprintf(buf, sizeof buf, "%02d:%02d:%02d", h, m, s);
+            } else {
+                std::snprintf(buf, sizeof buf, "%02d:%02d", h, m);
+            }
+            return std::string{buf};
+        }
+
+        int secondsFromTimeString(const std::string &s, bool wantSeconds, bool &ok) {
+            ok = false;
+            int h = 0, m = 0, sec = 0;
+            char c1 = 0, c2 = 0;
+            std::istringstream iss(s);
+            if (wantSeconds) {
+                if (!(iss >> h >> c1 >> m >> c2 >> sec)) {
+                    return 0;
+                }
+                if (c1 != ':' || c2 != ':') {
+                    return 0;
+                }
+            } else {
+                if (!(iss >> h >> c1 >> m)) {
+                    return 0;
+                }
+                if (c1 != ':') {
+                    return 0;
+                }
+            }
+            std::string extra;
+            if (iss >> extra) {
+                return 0;
+            }
+            if (h < 0 || h > 23 || m < 0 || m > 59 || sec < 0 || sec > 59) {
+                return 0;
+            }
+            ok = true;
+            return h * 3600 + m * 60 + sec;
+        }
+
+        std::string formatMdScaled(long long intVal, int decimals) {
+            if (decimals == 0) {
+                return std::to_string(intVal);
+            }
+            const bool negative = intVal < 0;
+            unsigned long long absVal =
+                negative ? static_cast<unsigned long long>(-(intVal + 1)) + 1ULL
+                         : static_cast<unsigned long long>(intVal);
+            unsigned long long divisor = 1;
+            for (int i = 0; i < decimals; ++i) {
+                divisor *= 10ULL;
+            }
+            const unsigned long long intPart = absVal / divisor;
+            const unsigned long long fracPart = absVal % divisor;
+            char buf[64]{};
+            std::snprintf(buf, sizeof buf, "%s%llu.%0*llu",
+                          negative ? "-" : "",
+                          intPart,
+                          decimals,
+                          fracPart);
+            return std::string{buf};
+        }
+
+        // Strict signed decimal parse with implicit scale: "[+-]?digits[.digits]?".
+        // Empty / extra characters / no digits -> ok=false. Rounds half-away-from-zero when
+        // input has more fractional digits than `decimals` (MD2: "12.345" -> 1235).
+        long long parseMdScaled(const std::string &s, int decimals, bool &ok) {
+            ok = false;
+            if (s.empty()) {
+                return 0;
+            }
+            std::size_t i = 0;
+            bool negative = false;
+            if (s[i] == '+' || s[i] == '-') {
+                negative = (s[i] == '-');
+                ++i;
+            }
+            long long intPart = 0;
+            bool sawDigit = false;
+            while (i < s.size() && std::isdigit(static_cast<unsigned char>(s[i]))) {
+                intPart = intPart * 10 + (s[i] - '0');
+                sawDigit = true;
+                ++i;
+            }
+            long long fracPart = 0;
+            int fracDigits = 0;
+            int roundDigit = -1;
+            if (i < s.size() && s[i] == '.') {
+                ++i;
+                while (i < s.size() && std::isdigit(static_cast<unsigned char>(s[i]))) {
+                    const int d = s[i] - '0';
+                    if (fracDigits < decimals) {
+                        fracPart = fracPart * 10 + d;
+                        ++fracDigits;
+                    } else if (roundDigit < 0) {
+                        roundDigit = d;
+                    }
+                    sawDigit = true;
+                    ++i;
+                }
+            }
+            if (i != s.size() || !sawDigit) {
+                return 0;
+            }
+            while (fracDigits < decimals) {
+                fracPart *= 10;
+                ++fracDigits;
+            }
+            long long divisor = 1;
+            for (int k = 0; k < decimals; ++k) {
+                divisor *= 10;
+            }
+            long long val = intPart * divisor + fracPart;
+            if (roundDigit >= 5) {
+                val += 1;
+            }
+            if (negative) {
+                val = -val;
+            }
+            ok = true;
+            return val;
+        }
+
+        bool isFullyNumeric(const std::string &s) {
+            if (s.empty()) {
+                return false;
+            }
+            char *endp = nullptr;
+            errno = 0;
+            (void) std::strtod(s.c_str(), &endp);
+            if (endp == s.c_str() || errno != 0) {
+                return false;
+            }
+            while (*endp != '\0' && std::isspace(static_cast<unsigned char>(*endp))) {
+                ++endp;
+            }
+            return *endp == '\0';
+        }
+
+        enum class ConvertDirection { Output, Input };
+
+        std::string upperCopy(const std::string &s) {
+            std::string r;
+            r.reserve(s.size());
+            for (char c : s) {
+                r += static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+            }
+            return r;
+        }
+
+        Value dispatchConvertCode(ConvertDirection dir, const Value &value, const std::string &codeRaw) {
+            const std::string code = upperCopy(codeRaw);
+            const char *direction = (dir == ConvertDirection::Output) ? "OCONV" : "ICONV";
+
+            if (code == "D") {
+                if (dir == ConvertDirection::Output) {
+                    return dateStringFromPickDay(coerceToInt(value));
+                }
+                bool ok = false;
+                const int day = pickDayFromDateString(valueToString(value), ok);
+                if (!ok) {
+                    throw std::runtime_error("BUILTIN: ICONV invalid \"D\" input");
+                }
+                return day;
+            }
+            if (code == "MT" || code == "MTS") {
+                const bool wantSeconds = (code == "MTS");
+                if (dir == ConvertDirection::Output) {
+                    return timeStringFromSeconds(coerceToInt(value), wantSeconds);
+                }
+                bool ok = false;
+                const int n = secondsFromTimeString(valueToString(value), wantSeconds, ok);
+                if (!ok) {
+                    throw std::runtime_error(std::string("BUILTIN: ICONV invalid \"") + code + "\" input");
+                }
+                return n;
+            }
+            if (code == "MCU" || code == "MCL") {
+                const bool toUpper = (code == "MCU");
+                std::string s = valueToString(value);
+                for (char &c : s) {
+                    c = static_cast<char>(toUpper ? std::toupper(static_cast<unsigned char>(c))
+                                                  : std::tolower(static_cast<unsigned char>(c)));
+                }
+                return s;
+            }
+            if (code == "MD" || code == "MD2") {
+                const int decimals = (code == "MD2") ? 2 : 0;
+                if (dir == ConvertDirection::Output) {
+                    return formatMdScaled(static_cast<long long>(coerceToInt(value)), decimals);
+                }
+                bool ok = false;
+                const long long n = parseMdScaled(valueToString(value), decimals, ok);
+                if (!ok || n < std::numeric_limits<int>::min() || n > std::numeric_limits<int>::max()) {
+                    throw std::runtime_error(std::string("BUILTIN: ICONV invalid \"") + code + "\" input");
+                }
+                return static_cast<int>(n);
+            }
+
+            throw std::runtime_error(std::string("BUILTIN: ") + direction + " unsupported code \"" + codeRaw + "\"");
+        }
+
+        void builtinOconv(std::vector<Value> &stack, Runtime *) {
+            const Value codeVal = stack.back();
+            stack.pop_back();
+            const Value val = stack.back();
+            stack.pop_back();
+            stack.push_back(dispatchConvertCode(ConvertDirection::Output, val, valueToString(codeVal)));
+        }
+
+        void builtinIconv(std::vector<Value> &stack, Runtime *) {
+            const Value codeVal = stack.back();
+            stack.pop_back();
+            const Value val = stack.back();
+            stack.pop_back();
+            stack.push_back(dispatchConvertCode(ConvertDirection::Input, val, valueToString(codeVal)));
+        }
+
+        void builtinNum(std::vector<Value> &stack, Runtime *) {
+            const Value v = stack.back();
+            stack.pop_back();
+            bool numeric = false;
+            if (std::holds_alternative<int>(v) || std::holds_alternative<double>(v)) {
+                numeric = true;
+            } else {
+                numeric = isFullyNumeric(std::get<std::string>(v));
+            }
+            stack.push_back(numeric ? 1 : 0);
+        }
+
+        void builtinConvert(std::vector<Value> &stack, Runtime *) {
+            const Value toVal = stack.back();
+            stack.pop_back();
+            const Value fromVal = stack.back();
+            stack.pop_back();
+            const Value srcVal = stack.back();
+            stack.pop_back();
+            const std::string src = valueToString(srcVal);
+            const std::string from = valueToString(fromVal);
+            const std::string to = valueToString(toVal);
+            std::string out;
+            out.reserve(src.size());
+            for (char c : src) {
+                const std::size_t pos = from.find(c);
+                if (pos == std::string::npos) {
+                    out += c;
+                } else if (pos < to.size()) {
+                    out += to[pos];
+                }
+            }
+            stack.push_back(std::move(out));
+        }
+
         const std::unordered_map<std::string, BuiltinEntry> &builtinRegistry() {
             static const std::unordered_map<std::string, BuiltinEntry> kRegistry{
                 {"ABS", {1, builtinAbs}},
@@ -534,6 +875,10 @@ namespace PickVM {
                 {"INDEX", {3, builtinIndex}},
                 {"FIELD", {3, builtinField}},
                 {"STR", {1, builtinStr}},
+                {"OCONV", {2, builtinOconv}},
+                {"ICONV", {2, builtinIconv}},
+                {"NUM", {1, builtinNum}},
+                {"CONVERT", {3, builtinConvert}},
             };
             return kRegistry;
         }

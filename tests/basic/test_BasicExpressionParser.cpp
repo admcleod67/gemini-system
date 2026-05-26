@@ -369,3 +369,47 @@ TEST_CASE("basic expression parser rejects FIELD with two arguments") {
     CHECK_FALSE(bad.success);
     CHECK(bad.error.find("expects 3 to 3 argument") != std::string::npos);
 }
+
+TEST_CASE("basic expression parser parses OCONV ICONV NUM CONVERT builtins") {
+    const auto o = BasicExpressionParser::parse("OCONV(DAY, \"D\")");
+    REQUIRE(o.success);
+    const auto &co = std::get<BasicAst::FunctionCallExpr>(o.expression->node);
+    CHECK(co.name == "OCONV");
+    REQUIRE(co.arguments.size() == 2);
+
+    const auto i = BasicExpressionParser::parse("ICONV(\"01 Jan 1970\", \"D\")");
+    REQUIRE(i.success);
+    const auto &ci = std::get<BasicAst::FunctionCallExpr>(i.expression->node);
+    CHECK(ci.name == "ICONV");
+    REQUIRE(ci.arguments.size() == 2);
+
+    const auto n = BasicExpressionParser::parse("NUM(\"123\")");
+    REQUIRE(n.success);
+    const auto &cn = std::get<BasicAst::FunctionCallExpr>(n.expression->node);
+    CHECK(cn.name == "NUM");
+    REQUIRE(cn.arguments.size() == 1);
+
+    const auto c = BasicExpressionParser::parse("CONVERT(S$, \"el\", \"ip\")");
+    REQUIRE(c.success);
+    const auto &cc = std::get<BasicAst::FunctionCallExpr>(c.expression->node);
+    CHECK(cc.name == "CONVERT");
+    REQUIRE(cc.arguments.size() == 3);
+}
+
+TEST_CASE("basic expression parser rejects OCONV ICONV CONVERT NUM with wrong arity") {
+    const auto badOconv = BasicExpressionParser::parse("OCONV(0)");
+    CHECK_FALSE(badOconv.success);
+    CHECK(badOconv.error.find("expects 2 to 2 argument") != std::string::npos);
+
+    const auto badIconv = BasicExpressionParser::parse("ICONV(\"x\")");
+    CHECK_FALSE(badIconv.success);
+    CHECK(badIconv.error.find("expects 2 to 2 argument") != std::string::npos);
+
+    const auto badConvert = BasicExpressionParser::parse("CONVERT(\"a\", \"b\")");
+    CHECK_FALSE(badConvert.success);
+    CHECK(badConvert.error.find("expects 3 to 3 argument") != std::string::npos);
+
+    const auto badNum = BasicExpressionParser::parse("NUM(\"a\", \"b\")");
+    CHECK_FALSE(badNum.success);
+    CHECK(badNum.error.find("expects 1 to 1 argument") != std::string::npos);
+}

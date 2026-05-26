@@ -403,3 +403,75 @@ STR(<expr>)
 ```
 
 Returns the dynamic string form of `<expr>` using the same conversion rules as the VM’s internal `valueToString` helper (integers as decimal text, floats trimmed of trailing zeros, strings unchanged).
+
+### OCONV
+
+```
+OCONV(<value-expr>, <code-expr>)
+```
+
+Converts an **internal** value to its **display** form using a Pick conversion code. The supported codes are listed in the **Supported conversion codes** table below. Unknown codes raise a runtime error containing `BUILTIN: OCONV unsupported code "<code>"`. Codes are matched case-insensitively.
+
+```
+10 PRINT OCONV(DATE(), "D")    ;* e.g. "26 May 2026"
+20 PRINT OCONV(3661, "MTS")    ;* "01:01:01"
+30 PRINT OCONV(1234, "MD2")    ;* "12.34"
+40 PRINT OCONV("hello", "MCU") ;* "HELLO"
+```
+
+### ICONV
+
+```
+ICONV(<string-expr>, <code-expr>)
+```
+
+The inverse of `OCONV`: parses a display string back into an internal value using the same code set. A parseable input for a known code returns the internal value (an integer for `D`, `MT`, `MTS`, `MD`, `MD2`; a string for `MCU` / `MCL`). Unparseable input raises `BUILTIN: ICONV invalid "<code>" input`; unknown codes raise `BUILTIN: ICONV unsupported code "<code>"`.
+
+```
+10 DAY = ICONV("01 Jan 1970", "D")  ;* 732 (Pick internal day)
+20 SEC = ICONV("12:30", "MT")       ;* 45000
+30 N   = ICONV("12.34", "MD2")      ;* 1234 (rounds half-away-from-zero)
+```
+
+### NUM
+
+```
+NUM(<expr>)
+```
+
+Returns `1` if `<expr>` is **fully numeric** (numeric value, or a string that `strtod` consumes in full with no trailing non-whitespace), otherwise `0`. The empty string is **not** numeric (returns `0`), matching Pick semantics.
+
+```
+10 PRINT NUM("123")    ;* 1
+20 PRINT NUM("-3.14")  ;* 1
+30 PRINT NUM("12ABC")  ;* 0
+40 PRINT NUM("")       ;* 0
+```
+
+### CONVERT
+
+```
+CONVERT(<string-expr>, <from-expr>, <to-expr>)
+```
+
+Returns a copy of `string` with each character also present in `from` replaced by the character at the same byte index in `to`. Characters in `from` whose index is past `len(to)` are **deleted**. Characters not in `from` pass through unchanged. An empty `from` returns the input unchanged.
+
+```
+10 PRINT CONVERT("hello", "el", "ip")   ;* "hippo" (e→i, l→p)
+20 PRINT CONVERT("abc", "b", "")        ;* "ac"    (b is dropped)
+30 PRINT CONVERT("hello", "", "X")      ;* "hello" (empty from)
+```
+
+#### Supported conversion codes
+
+The first-pass conversion table is intentionally small; codes not in the table raise `BUILTIN: OCONV unsupported code "<code>"` (or `ICONV` for the inverse). Future milestones can extend the table without breaking these stable error substrings.
+
+| Code | OCONV (internal → display) | ICONV (display → internal) |
+|------|----------------------------|----------------------------|
+| `D`   | Pick internal day (`int`) → `"dd MMM yyyy"` (UTC, English month abbreviation). | `"dd MMM yyyy"` (case-insensitive month) → Pick internal day. |
+| `MT`  | Seconds since midnight (`int`) → `"HH:MM"`. | `"HH:MM"` → seconds since midnight. |
+| `MTS` | Seconds since midnight (`int`) → `"HH:MM:SS"`. | `"HH:MM:SS"` → seconds since midnight. |
+| `MCU` | String → byte-level uppercase (idempotent; identical for OCONV / ICONV). | Same as OCONV (byte-level uppercase). |
+| `MCL` | String → byte-level lowercase (idempotent; identical for OCONV / ICONV). | Same as OCONV (byte-level lowercase). |
+| `MD`  | Integer (`int`) → decimal text (no implicit decimal point). | Signed decimal text → `int` (rejects non-numeric input). |
+| `MD2` | Integer (`int`) → text with implicit two decimal places (`1234` → `"12.34"`, `-5` → `"-0.05"`). | `"12.34"` → `1234` (rounds half-away-from-zero on extra fractional digits). |

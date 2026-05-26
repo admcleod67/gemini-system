@@ -1783,6 +1783,434 @@ TEST_CASE("runtime InvokeBuiltin STR stringifies int") {
     CHECK(std::get<std::string>(rt.stack()[0]) == "42");
 }
 
+TEST_CASE("runtime InvokeBuiltin OCONV D formats Pick day 732 as 01 Jan 1970") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, 732},
+        {OpCode::PushStr, std::string{"D"}},
+        {OpCode::InvokeBuiltin, std::string{"OCONV"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<std::string>(rt.stack()[0]) == "01 Jan 1970");
+}
+
+TEST_CASE("runtime InvokeBuiltin OCONV D formats Pick day 0 as 31 Dec 1967") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, 0},
+        {OpCode::PushStr, std::string{"D"}},
+        {OpCode::InvokeBuiltin, std::string{"OCONV"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<std::string>(rt.stack()[0]) == "31 Dec 1967");
+}
+
+TEST_CASE("runtime InvokeBuiltin ICONV D parses dd MMM yyyy back to Pick day") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"01 Jan 1970"}},
+        {OpCode::PushStr, std::string{"D"}},
+        {OpCode::InvokeBuiltin, std::string{"ICONV"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<int>(rt.stack()[0]) == 732);
+}
+
+TEST_CASE("runtime InvokeBuiltin ICONV D accepts case-insensitive month name") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"26 may 2026"}},
+        {OpCode::PushStr, std::string{"D"}},
+        {OpCode::InvokeBuiltin, std::string{"ICONV"}},
+        {OpCode::PushStr, std::string{"D"}},
+        {OpCode::InvokeBuiltin, std::string{"OCONV"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<std::string>(rt.stack()[0]) == "26 May 2026");
+}
+
+TEST_CASE("runtime InvokeBuiltin ICONV D rejects garbage with stable error substring") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"not a date"}},
+        {OpCode::PushStr, std::string{"D"}},
+        {OpCode::InvokeBuiltin, std::string{"ICONV"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    try {
+        rt.run();
+        FAIL("expected runtime_error");
+    } catch (const std::runtime_error &e) {
+        const std::string msg = e.what();
+        CHECK(msg.find("BUILTIN: ICONV invalid \"D\" input") != std::string::npos);
+    }
+}
+
+TEST_CASE("runtime InvokeBuiltin OCONV MT formats seconds since midnight as HH:MM") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, 3600},
+        {OpCode::PushStr, std::string{"MT"}},
+        {OpCode::InvokeBuiltin, std::string{"OCONV"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<std::string>(rt.stack()[0]) == "01:00");
+}
+
+TEST_CASE("runtime InvokeBuiltin OCONV MTS formats seconds since midnight with seconds") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, 3661},
+        {OpCode::PushStr, std::string{"MTS"}},
+        {OpCode::InvokeBuiltin, std::string{"OCONV"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<std::string>(rt.stack()[0]) == "01:01:01");
+}
+
+TEST_CASE("runtime InvokeBuiltin ICONV MT round-trips MT format") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"09:30"}},
+        {OpCode::PushStr, std::string{"MT"}},
+        {OpCode::InvokeBuiltin, std::string{"ICONV"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<int>(rt.stack()[0]) == 9 * 3600 + 30 * 60);
+}
+
+TEST_CASE("runtime InvokeBuiltin ICONV MTS round-trips MTS format") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"23:59:59"}},
+        {OpCode::PushStr, std::string{"MTS"}},
+        {OpCode::InvokeBuiltin, std::string{"ICONV"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<int>(rt.stack()[0]) == 86399);
+}
+
+TEST_CASE("runtime InvokeBuiltin ICONV MT rejects malformed time") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"99:99"}},
+        {OpCode::PushStr, std::string{"MT"}},
+        {OpCode::InvokeBuiltin, std::string{"ICONV"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    try {
+        rt.run();
+        FAIL("expected runtime_error");
+    } catch (const std::runtime_error &e) {
+        const std::string msg = e.what();
+        CHECK(msg.find("BUILTIN: ICONV invalid \"MT\" input") != std::string::npos);
+    }
+}
+
+TEST_CASE("runtime InvokeBuiltin OCONV MCU uppercases the string") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"hello"}},
+        {OpCode::PushStr, std::string{"MCU"}},
+        {OpCode::InvokeBuiltin, std::string{"OCONV"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<std::string>(rt.stack()[0]) == "HELLO");
+}
+
+TEST_CASE("runtime InvokeBuiltin OCONV MCL lowercases the string") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"WORLD"}},
+        {OpCode::PushStr, std::string{"MCL"}},
+        {OpCode::InvokeBuiltin, std::string{"OCONV"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<std::string>(rt.stack()[0]) == "world");
+}
+
+TEST_CASE("runtime InvokeBuiltin OCONV MD2 inserts implicit two decimal places") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, 1234},
+        {OpCode::PushStr, std::string{"MD2"}},
+        {OpCode::InvokeBuiltin, std::string{"OCONV"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<std::string>(rt.stack()[0]) == "12.34");
+}
+
+TEST_CASE("runtime InvokeBuiltin OCONV MD2 keeps leading zeros for small negative") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, -5},
+        {OpCode::PushStr, std::string{"MD2"}},
+        {OpCode::InvokeBuiltin, std::string{"OCONV"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<std::string>(rt.stack()[0]) == "-0.05");
+}
+
+TEST_CASE("runtime InvokeBuiltin OCONV MD prints integer without decimal") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, 7},
+        {OpCode::PushStr, std::string{"MD"}},
+        {OpCode::InvokeBuiltin, std::string{"OCONV"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<std::string>(rt.stack()[0]) == "7");
+}
+
+TEST_CASE("runtime InvokeBuiltin ICONV MD2 scales decimal back to integer") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"12.34"}},
+        {OpCode::PushStr, std::string{"MD2"}},
+        {OpCode::InvokeBuiltin, std::string{"ICONV"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<int>(rt.stack()[0]) == 1234);
+}
+
+TEST_CASE("runtime InvokeBuiltin ICONV MD2 rounds half away from zero") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"1.005"}},
+        {OpCode::PushStr, std::string{"MD2"}},
+        {OpCode::InvokeBuiltin, std::string{"ICONV"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<int>(rt.stack()[0]) == 101);
+}
+
+TEST_CASE("runtime InvokeBuiltin ICONV MD parses plain integer") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"12"}},
+        {OpCode::PushStr, std::string{"MD"}},
+        {OpCode::InvokeBuiltin, std::string{"ICONV"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<int>(rt.stack()[0]) == 12);
+}
+
+TEST_CASE("runtime InvokeBuiltin ICONV MD2 rejects non numeric junk") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"12abc"}},
+        {OpCode::PushStr, std::string{"MD2"}},
+        {OpCode::InvokeBuiltin, std::string{"ICONV"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    try {
+        rt.run();
+        FAIL("expected runtime_error");
+    } catch (const std::runtime_error &e) {
+        const std::string msg = e.what();
+        CHECK(msg.find("BUILTIN: ICONV invalid \"MD2\" input") != std::string::npos);
+    }
+}
+
+TEST_CASE("runtime InvokeBuiltin OCONV rejects unknown code with stable substring") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, 0},
+        {OpCode::PushStr, std::string{"D2"}},
+        {OpCode::InvokeBuiltin, std::string{"OCONV"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    try {
+        rt.run();
+        FAIL("expected runtime_error");
+    } catch (const std::runtime_error &e) {
+        const std::string msg = e.what();
+        CHECK(msg.find("BUILTIN: OCONV unsupported code") != std::string::npos);
+        CHECK(msg.find("\"D2\"") != std::string::npos);
+    }
+}
+
+TEST_CASE("runtime InvokeBuiltin ICONV rejects unknown code with stable substring") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"x"}},
+        {OpCode::PushStr, std::string{"WTF"}},
+        {OpCode::InvokeBuiltin, std::string{"ICONV"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    try {
+        rt.run();
+        FAIL("expected runtime_error");
+    } catch (const std::runtime_error &e) {
+        const std::string msg = e.what();
+        CHECK(msg.find("BUILTIN: ICONV unsupported code") != std::string::npos);
+        CHECK(msg.find("\"WTF\"") != std::string::npos);
+    }
+}
+
+TEST_CASE("runtime InvokeBuiltin NUM returns 1 for fully numeric string") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"123"}},
+        {OpCode::InvokeBuiltin, std::string{"NUM"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<int>(rt.stack()[0]) == 1);
+}
+
+TEST_CASE("runtime InvokeBuiltin NUM returns 0 for trailing junk") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"12ABC"}},
+        {OpCode::InvokeBuiltin, std::string{"NUM"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<int>(rt.stack()[0]) == 0);
+}
+
+TEST_CASE("runtime InvokeBuiltin NUM returns 0 for empty string") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{}},
+        {OpCode::InvokeBuiltin, std::string{"NUM"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<int>(rt.stack()[0]) == 0);
+}
+
+TEST_CASE("runtime InvokeBuiltin NUM returns 1 for signed decimal") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"-3.14"}},
+        {OpCode::InvokeBuiltin, std::string{"NUM"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<int>(rt.stack()[0]) == 1);
+}
+
+TEST_CASE("runtime InvokeBuiltin NUM returns 1 for int values") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, 42},
+        {OpCode::InvokeBuiltin, std::string{"NUM"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<int>(rt.stack()[0]) == 1);
+}
+
+TEST_CASE("runtime InvokeBuiltin CONVERT maps chars per position") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"hello"}},
+        {OpCode::PushStr, std::string{"el"}},
+        {OpCode::PushStr, std::string{"ip"}},
+        {OpCode::InvokeBuiltin, std::string{"CONVERT"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<std::string>(rt.stack()[0]) == "hippo");
+}
+
+TEST_CASE("runtime InvokeBuiltin CONVERT drops chars when to is shorter") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"abc"}},
+        {OpCode::PushStr, std::string{"b"}},
+        {OpCode::PushStr, std::string{}},
+        {OpCode::InvokeBuiltin, std::string{"CONVERT"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<std::string>(rt.stack()[0]) == "ac");
+}
+
+TEST_CASE("runtime InvokeBuiltin CONVERT leaves input unchanged when from is empty") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"abc"}},
+        {OpCode::PushStr, std::string{}},
+        {OpCode::PushStr, std::string{"XYZ"}},
+        {OpCode::InvokeBuiltin, std::string{"CONVERT"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<std::string>(rt.stack()[0]) == "abc");
+}
+
 TEST_CASE("runtime OpenFile binds existing file handle") {
     const std::filesystem::path root = std::filesystem::temp_directory_path() / "pick-runtime-openfile-test";
     std::error_code ec;

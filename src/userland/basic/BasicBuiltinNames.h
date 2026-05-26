@@ -14,7 +14,8 @@ namespace PickShell::BasicBuiltins {
                upper == "LCASE" || upper == "UCASE" || upper == "SPACE" || upper == "INT" || upper == "MOD" ||
                upper == "RND" || upper == "SIN" || upper == "COS" || upper == "TAN" || upper == "EXP" ||
                upper == "LOG" || upper == "DATE" || upper == "TIME" || upper == "SYSTEM" || upper == "INDEX" ||
-               upper == "FIELD" || upper == "STR";
+               upper == "FIELD" || upper == "STR" || upper == "OCONV" || upper == "ICONV" ||
+               upper == "NUM" || upper == "CONVERT";
     }
 
     /// Inclusive (minArgs, maxArgs) for whitelisted builtin calls; std::nullopt if not a builtin call name.
@@ -34,10 +35,16 @@ namespace PickShell::BasicBuiltins {
         if (upper == "FIELD") {
             return std::make_pair(3, 3);
         }
+        if (upper == "OCONV" || upper == "ICONV") {
+            return std::make_pair(2, 2);
+        }
+        if (upper == "CONVERT") {
+            return std::make_pair(3, 3);
+        }
         if (upper == "ABS" || upper == "SGN" || upper == "SEQ" || upper == "LEN" || upper == "TRIM" ||
             upper == "LCASE" || upper == "UCASE" || upper == "SPACE" || upper == "INT" || upper == "SIN" ||
             upper == "COS" || upper == "TAN" || upper == "EXP" || upper == "LOG" || upper == "SYSTEM" ||
-            upper == "STR") {
+            upper == "STR" || upper == "NUM") {
             return std::make_pair(1, 1);
         }
         return std::nullopt;

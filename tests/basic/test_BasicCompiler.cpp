@@ -903,6 +903,40 @@ TEST_CASE("basic compiler compiles INDEX FIELD and STR functions") {
     CHECK(foundStr);
 }
 
+TEST_CASE("basic compiler compiles OCONV ICONV NUM CONVERT functions") {
+    BasicProgram program;
+    program.setLine(10, "PRINT OCONV(DATE(),\"D\")");
+    program.setLine(20, "PRINT ICONV(\"01 Jan 1970\",\"D\")");
+    program.setLine(30, "PRINT NUM(\"123\")");
+    program.setLine(40, "PRINT CONVERT(\"hello\",\"el\",\"ip\")");
+    program.setLine(50, "END");
+
+    BasicCompiler compiler;
+    const auto result = compiler.compile(program);
+    REQUIRE(result.success);
+    bool foundOconv = false;
+    bool foundIconv = false;
+    bool foundNum = false;
+    bool foundConvert = false;
+    bool foundDate = false;
+    for (const auto &instr : result.program) {
+        if (instr.op != OpCode::InvokeBuiltin || !std::holds_alternative<std::string>(instr.operand)) {
+            continue;
+        }
+        const std::string &name = std::get<std::string>(instr.operand);
+        if (name == "OCONV") foundOconv = true;
+        if (name == "ICONV") foundIconv = true;
+        if (name == "NUM") foundNum = true;
+        if (name == "CONVERT") foundConvert = true;
+        if (name == "DATE") foundDate = true;
+    }
+    CHECK(foundOconv);
+    CHECK(foundIconv);
+    CHECK(foundNum);
+    CHECK(foundConvert);
+    CHECK(foundDate);
+}
+
 TEST_CASE("basic compiler rejects dollar variable in ABS") {
     BasicProgram program;
     program.setLine(10, "PRINT ABS(X$)");

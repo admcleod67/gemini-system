@@ -680,6 +680,72 @@ TEST_CASE("basic bytecode emitter emits InvokeBuiltin for STR") {
     CHECK(std::get<std::string>(emitted.program[1].operand) == "STR");
 }
 
+TEST_CASE("basic bytecode emitter emits InvokeBuiltin for OCONV with two arguments") {
+    BasicIr::NormalizedProgram program;
+    BasicIr::PrintStmt stmt{};
+    std::vector<std::unique_ptr<BasicAst::Expr>> args;
+    args.push_back(makeInt(732));
+    args.push_back(makeStr("D"));
+    stmt.expression = makeCall("OCONV", std::move(args));
+    program.lines.push_back({10, std::move(stmt)});
+
+    const BasicBytecodeEmissionResult emitted = BasicBytecodeEmitter::emit(program);
+    REQUIRE(emitted.success);
+    CHECK(emitted.program[0].op == OpCode::PushInt);
+    CHECK(emitted.program[1].op == OpCode::PushStr);
+    CHECK(emitted.program[2].op == OpCode::InvokeBuiltin);
+    CHECK(std::get<std::string>(emitted.program[2].operand) == "OCONV");
+}
+
+TEST_CASE("basic bytecode emitter emits InvokeBuiltin for ICONV with two arguments") {
+    BasicIr::NormalizedProgram program;
+    BasicIr::PrintStmt stmt{};
+    std::vector<std::unique_ptr<BasicAst::Expr>> args;
+    args.push_back(makeStr("01 Jan 1970"));
+    args.push_back(makeStr("D"));
+    stmt.expression = makeCall("ICONV", std::move(args));
+    program.lines.push_back({10, std::move(stmt)});
+
+    const BasicBytecodeEmissionResult emitted = BasicBytecodeEmitter::emit(program);
+    REQUIRE(emitted.success);
+    CHECK(emitted.program[0].op == OpCode::PushStr);
+    CHECK(emitted.program[1].op == OpCode::PushStr);
+    CHECK(emitted.program[2].op == OpCode::InvokeBuiltin);
+    CHECK(std::get<std::string>(emitted.program[2].operand) == "ICONV");
+}
+
+TEST_CASE("basic bytecode emitter emits InvokeBuiltin for NUM") {
+    BasicIr::NormalizedProgram program;
+    BasicIr::PrintStmt stmt{};
+    stmt.expression = makeCall("NUM", makeStr("123"));
+    program.lines.push_back({10, std::move(stmt)});
+
+    const BasicBytecodeEmissionResult emitted = BasicBytecodeEmitter::emit(program);
+    REQUIRE(emitted.success);
+    CHECK(emitted.program[0].op == OpCode::PushStr);
+    CHECK(emitted.program[1].op == OpCode::InvokeBuiltin);
+    CHECK(std::get<std::string>(emitted.program[1].operand) == "NUM");
+}
+
+TEST_CASE("basic bytecode emitter emits InvokeBuiltin for CONVERT with three arguments") {
+    BasicIr::NormalizedProgram program;
+    BasicIr::PrintStmt stmt{};
+    std::vector<std::unique_ptr<BasicAst::Expr>> args;
+    args.push_back(makeStr("hello"));
+    args.push_back(makeStr("el"));
+    args.push_back(makeStr("ip"));
+    stmt.expression = makeCall("CONVERT", std::move(args));
+    program.lines.push_back({10, std::move(stmt)});
+
+    const BasicBytecodeEmissionResult emitted = BasicBytecodeEmitter::emit(program);
+    REQUIRE(emitted.success);
+    CHECK(emitted.program[0].op == OpCode::PushStr);
+    CHECK(emitted.program[1].op == OpCode::PushStr);
+    CHECK(emitted.program[2].op == OpCode::PushStr);
+    CHECK(emitted.program[3].op == OpCode::InvokeBuiltin);
+    CHECK(std::get<std::string>(emitted.program[3].operand) == "CONVERT");
+}
+
 TEST_CASE("basic bytecode emitter emits OpenFile without ELSE") {
     BasicIr::NormalizedProgram program;
     BasicIr::OpenStmt stmt{};

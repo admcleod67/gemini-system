@@ -210,6 +210,14 @@ namespace PickShell {
             if (name == "STR") {
                 return true;
             }
+            if (name == "OCONV") {
+                // value can be int (D, MT*, MD*) or string (MCU/MCL); leave string-shaped and let the
+                // handler coerce on demand per code. The code argument is always a string.
+                return false;
+            }
+            if (name == "ICONV" || name == "CONVERT" || name == "NUM") {
+                return false;
+            }
             if (name == "SEQ" || name == "LEN" || name == "TRIM" || name == "LCASE" || name == "UCASE") {
                 return false;
             }
