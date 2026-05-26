@@ -1104,6 +1104,196 @@ namespace PickShell {
                 continue;
             }
 
+            if (op == "MAT") {
+                std::string rest;
+                std::getline(iss, rest);
+                rest = trim(rest);
+                if (rest.empty()) {
+                    result.errors.push_back({lineNumber, "MAT requires READ, WRITE, or '<arr> ='"});
+                    continue;
+                }
+
+                std::istringstream matIss(rest);
+                std::string subKeyword;
+                matIss >> subKeyword;
+                const std::string subUpper = uppercase(subKeyword);
+
+                if (subUpper == "READ" || subUpper == "WRITE") {
+                    const bool isRead = (subUpper == "READ");
+                    std::string body;
+                    std::getline(matIss, body);
+                    body = trim(body);
+                    if (body.empty()) {
+                        result.errors.push_back({
+                            lineNumber,
+                            isRead ? std::string{"MAT READ requires <arr> FROM FVAR, ID"}
+                                   : std::string{"MAT WRITE requires <arr> ON FVAR, ID"}
+                        });
+                        continue;
+                    }
+
+                    std::optional<BasicAst::BranchArm> elseArm;
+                    std::string mainPart = body;
+                    const std::string bodyUpper = uppercase(body);
+                    const std::size_t elsePos = findKeywordToken(bodyUpper, "ELSE");
+                    if (elsePos != std::string::npos) {
+                        mainPart = trim(body.substr(0, elsePos));
+                        const std::string elseRaw = trim(body.substr(elsePos + 4));
+                        BasicAst::BranchArm parsedElseArm{};
+                        std::string armError;
+                        const char *armContext = isRead ? "MAT READ ELSE" : "MAT WRITE ELSE";
+                        if (!parseBranchArmSpec(elseRaw, armContext, parsedElseArm, armError)) {
+                            result.errors.push_back({lineNumber, armError});
+                            continue;
+                        }
+                        elseArm = std::move(parsedElseArm);
+                    }
+
+                    const std::string mainUpper = uppercase(mainPart);
+                    const char *connector = isRead ? "FROM" : "ON";
+                    const std::size_t connectorPos = findKeywordToken(mainUpper, connector);
+                    if (connectorPos == std::string::npos) {
+                        result.errors.push_back({
+                            lineNumber,
+                            isRead ? std::string{"MAT READ requires FROM"}
+                                   : std::string{"MAT WRITE requires ON"}
+                        });
+                        continue;
+                    }
+                    const std::string arrayName = trim(mainPart.substr(0, connectorPos));
+                    if (!isValidVariableName(arrayName)) {
+                        result.errors.push_back({
+                            lineNumber,
+                            isRead ? std::string{"MAT READ requires a valid array name"}
+                                   : std::string{"MAT WRITE requires a valid array name"}
+                        });
+                        continue;
+                    }
+                    if (isReadonlySessionSystemVariable(arrayName)) {
+                        result.errors.push_back({lineNumber, "Read-only system variable '" + arrayName + "'"});
+                        continue;
+                    }
+                    const std::size_t connectorLen = isRead ? 4 : 2;
+                    const std::string afterConnector = trim(mainPart.substr(connectorPos + connectorLen));
+                    const std::size_t commaPos = afterConnector.find(',');
+                    if (commaPos == std::string::npos) {
+                        result.errors.push_back({
+                            lineNumber,
+                            isRead ? std::string{"MAT READ requires FVAR, ID"}
+                                   : std::string{"MAT WRITE requires FVAR, ID"}
+                        });
+                        continue;
+                    }
+                    const std::string fileVar = trim(afterConnector.substr(0, commaPos));
+                    const std::string idExprRaw = trim(afterConnector.substr(commaPos + 1));
+                    if (!isValidVariableName(fileVar)) {
+                        result.errors.push_back({
+                            lineNumber,
+                            isRead ? std::string{"MAT READ requires a valid file variable name"}
+                                   : std::string{"MAT WRITE requires a valid file variable name"}
+                        });
+                        continue;
+                    }
+                    if (idExprRaw.empty()) {
+                        result.errors.push_back({
+                            lineNumber,
+                            isRead ? std::string{"MAT READ requires an ID expression"}
+                                   : std::string{"MAT WRITE requires an ID expression"}
+                        });
+                        continue;
+                    }
+                    BasicExpressionParseResult idExpr = BasicExpressionParser::parse(idExprRaw);
+                    if (!idExpr.success || !idExpr.expression) {
+                        result.errors.push_back({
+                            lineNumber,
+                            std::string{isRead ? "MAT READ" : "MAT WRITE"} + " ID expression error: " + idExpr.error
+                        });
+                        continue;
+                    }
+
+                    if (isRead) {
+                        BasicAst::MatReadStmt stmt{};
+                        stmt.targetArray = arrayName;
+                        stmt.fileVar = fileVar;
+                        stmt.idExpr = std::move(idExpr.expression);
+                        stmt.elseArm = elseArm;
+                        result.lines.push_back({lineNumber, std::move(stmt)});
+                    } else {
+                        BasicAst::MatWriteStmt stmt{};
+                        stmt.sourceArray = arrayName;
+                        stmt.fileVar = fileVar;
+                        stmt.idExpr = std::move(idExpr.expression);
+                        stmt.elseArm = elseArm;
+                        result.lines.push_back({lineNumber, std::move(stmt)});
+                    }
+                    continue;
+                }
+
+                // MAT <arr> = <scalar-expr>  |  MAT <arr> = MAT <arr-src>
+                const std::size_t eqPos = rest.find('=');
+                if (eqPos == std::string::npos) {
+                    result.errors.push_back({lineNumber, "MAT requires READ, WRITE, or '<arr> ='"});
+                    continue;
+                }
+                const std::string targetName = trim(rest.substr(0, eqPos));
+                const std::string rhsRaw = trim(rest.substr(eqPos + 1));
+                if (!isValidVariableName(targetName)) {
+                    result.errors.push_back({lineNumber, "MAT requires a valid array name"});
+                    continue;
+                }
+                if (isReadonlySessionSystemVariable(targetName)) {
+                    result.errors.push_back({lineNumber, "Read-only system variable '" + targetName + "'"});
+                    continue;
+                }
+                if (rhsRaw.empty()) {
+                    result.errors.push_back({lineNumber, "MAT assignment requires an expression"});
+                    continue;
+                }
+
+                // Check whether RHS begins with the MAT keyword (followed by an identifier only).
+                std::istringstream rhsIss(rhsRaw);
+                std::string rhsFirst;
+                rhsIss >> rhsFirst;
+                if (uppercase(rhsFirst) == "MAT") {
+                    std::string srcRaw;
+                    std::getline(rhsIss, srcRaw);
+                    srcRaw = trim(srcRaw);
+                    if (srcRaw.empty()) {
+                        result.errors.push_back({lineNumber, "MAT copy requires a source array name"});
+                        continue;
+                    }
+                    // The source must be a bare identifier; reject expressions/operators.
+                    std::istringstream srcIss(srcRaw);
+                    std::string srcName;
+                    srcIss >> srcName;
+                    std::string trailing;
+                    if (srcIss >> trailing) {
+                        result.errors.push_back({lineNumber, "MAT copy source must be a bare array name"});
+                        continue;
+                    }
+                    if (!isValidVariableName(srcName)) {
+                        result.errors.push_back({lineNumber, "MAT copy requires a valid source array name"});
+                        continue;
+                    }
+                    BasicAst::MatAssignStmt stmt{};
+                    stmt.targetArray = targetName;
+                    stmt.rhsSourceArray = srcName;
+                    result.lines.push_back({lineNumber, std::move(stmt)});
+                    continue;
+                }
+
+                BasicExpressionParseResult scalar = BasicExpressionParser::parse(rhsRaw);
+                if (!scalar.success || !scalar.expression) {
+                    result.errors.push_back({lineNumber, "MAT scalar expression error: " + scalar.error});
+                    continue;
+                }
+                BasicAst::MatAssignStmt stmt{};
+                stmt.targetArray = targetName;
+                stmt.rhsExpr = std::move(scalar.expression);
+                result.lines.push_back({lineNumber, std::move(stmt)});
+                continue;
+            }
+
             result.errors.push_back({lineNumber, "Unknown keyword '" + op + "'"});
         }
 

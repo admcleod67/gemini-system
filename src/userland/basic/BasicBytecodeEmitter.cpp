@@ -1076,6 +1076,88 @@ namespace PickShell {
                     } else if constexpr (std::is_same_v<StmtT, BasicIr::ClearStmt>) {
                         result.program.push_back(makeNoOperandInstruction(PickVM::OpCode::ClearVars));
                         return true;
+                    } else if constexpr (std::is_same_v<StmtT, BasicIr::MatAssignStmt>) {
+                        const std::string dst = uppercase(stmt.targetArray);
+                        if (!stmt.rhsSourceArray.empty()) {
+                            const std::string src = uppercase(stmt.rhsSourceArray);
+                            result.program.push_back(PickVM::Instruction{PickVM::OpCode::MatCopy, dst + "|" + src});
+                            return true;
+                        }
+                        if (!stmt.rhsExpr) {
+                            result.errors.push_back({line.lineNumber, "MAT requires a scalar expression or 'MAT <arr>'"});
+                            return false;
+                        }
+                        std::string error;
+                        ExpressionAstEmitter emitter(result.program, error);
+                        if (!emitter.emit(*stmt.rhsExpr)) {
+                            result.errors.push_back({line.lineNumber, "MAT scalar expression error: " + error});
+                            return false;
+                        }
+                        result.program.push_back(PickVM::Instruction{PickVM::OpCode::MatInit, dst});
+                        return true;
+                    } else if constexpr (std::is_same_v<StmtT, BasicIr::MatReadStmt>) {
+                        if (!stmt.idExpr) {
+                            result.errors.push_back({line.lineNumber, "MAT READ requires an ID expression"});
+                            return false;
+                        }
+                        std::string error;
+                        ExpressionAstEmitter emitter(result.program, error);
+                        if (!emitter.emit(*stmt.idExpr)) {
+                            result.errors.push_back({line.lineNumber, "MAT READ ID expression error: " + error});
+                            return false;
+                        }
+                        const std::string fileVar = uppercase(stmt.fileVar);
+                        const std::string arrName = uppercase(stmt.targetArray);
+                        if (stmt.elseArm.has_value()) {
+                            result.program.push_back(PickVM::Instruction{PickVM::OpCode::ReadRecTry, fileVar});
+                            const std::size_t jzIp = result.program.size();
+                            result.program.push_back(PickVM::Instruction{PickVM::OpCode::JumpIfZero, 0});
+                            result.program.push_back(PickVM::Instruction{PickVM::OpCode::MatLoadFromRec, arrName});
+                            const std::size_t skipElseJumpIp = result.program.size();
+                            result.program.push_back(PickVM::Instruction{PickVM::OpCode::Jump, 0});
+                            const std::size_t failPathIp = result.program.size();
+                            result.program.push_back(makeNoOperandInstruction(PickVM::OpCode::Drop)); // drop placeholder raw
+                            result.program[jzIp].operand = static_cast<int>(failPathIp);
+                            if (!emitBranchArm(*stmt.elseArm, line.lineNumber)) {
+                                return false;
+                            }
+                            result.program[skipElseJumpIp].operand = static_cast<int>(result.program.size());
+                        } else {
+                            result.program.push_back(PickVM::Instruction{PickVM::OpCode::ReadRec, fileVar});
+                            result.program.push_back(PickVM::Instruction{PickVM::OpCode::MatLoadFromRec, arrName});
+                        }
+                        return true;
+                    } else if constexpr (std::is_same_v<StmtT, BasicIr::MatWriteStmt>) {
+                        if (!stmt.idExpr) {
+                            result.errors.push_back({line.lineNumber, "MAT WRITE requires an ID expression"});
+                            return false;
+                        }
+                        const std::string fileVar = uppercase(stmt.fileVar);
+                        const std::string arrName = uppercase(stmt.sourceArray);
+                        // MatStoreToRec pushes the packed raw record onto the stack as the value to write.
+                        result.program.push_back(PickVM::Instruction{PickVM::OpCode::MatStoreToRec, arrName});
+                        std::string error;
+                        ExpressionAstEmitter emitter(result.program, error);
+                        if (!emitter.emit(*stmt.idExpr)) {
+                            result.errors.push_back({line.lineNumber, "MAT WRITE ID expression error: " + error});
+                            return false;
+                        }
+                        if (stmt.elseArm.has_value()) {
+                            result.program.push_back(PickVM::Instruction{PickVM::OpCode::WriteRecTry, fileVar});
+                            const std::size_t jzIp = result.program.size();
+                            result.program.push_back(PickVM::Instruction{PickVM::OpCode::JumpIfZero, 0});
+                            const std::size_t skipElseJumpIp = result.program.size();
+                            result.program.push_back(PickVM::Instruction{PickVM::OpCode::Jump, 0});
+                            const std::size_t elseStartIp = result.program.size();
+                            if (!emitBranchArm(*stmt.elseArm, line.lineNumber)) {
+                                return false;
+                            }
+                            result.program[jzIp].operand = static_cast<int>(elseStartIp);
+                            result.program[skipElseJumpIp].operand = static_cast<int>(result.program.size());
+                        } else {
+                            result.program.push_back(PickVM::Instruction{PickVM::OpCode::WriteRec, fileVar});
+                        }
+                        return true;
                     }
                     return false;
                 },

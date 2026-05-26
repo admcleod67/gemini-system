@@ -343,6 +343,30 @@ namespace PickVM {
                     throw std::runtime_error("STORE_ARR requires a variable name at line " + std::to_string(pl.sourceLine));
                 }
                 inst.operand = parseQuotedString(pl.operand, pl.sourceLine);
+            } else if (pl.opcode == "MAT_INIT") {
+                inst.op = OpCode::MatInit;
+                if (pl.operand.empty()) {
+                    throw std::runtime_error("MAT_INIT requires an array name at line " + std::to_string(pl.sourceLine));
+                }
+                inst.operand = parseQuotedString(pl.operand, pl.sourceLine);
+            } else if (pl.opcode == "MAT_COPY") {
+                inst.op = OpCode::MatCopy;
+                if (pl.operand.empty()) {
+                    throw std::runtime_error("MAT_COPY requires a DST|SRC operand at line " + std::to_string(pl.sourceLine));
+                }
+                inst.operand = parseQuotedString(pl.operand, pl.sourceLine);
+            } else if (pl.opcode == "MAT_LOAD_FROM_REC") {
+                inst.op = OpCode::MatLoadFromRec;
+                if (pl.operand.empty()) {
+                    throw std::runtime_error("MAT_LOAD_FROM_REC requires an array name at line " + std::to_string(pl.sourceLine));
+                }
+                inst.operand = parseQuotedString(pl.operand, pl.sourceLine);
+            } else if (pl.opcode == "MAT_STORE_TO_REC") {
+                inst.op = OpCode::MatStoreToRec;
+                if (pl.operand.empty()) {
+                    throw std::runtime_error("MAT_STORE_TO_REC requires an array name at line " + std::to_string(pl.sourceLine));
+                }
+                inst.operand = parseQuotedString(pl.operand, pl.sourceLine);
             } else if (pl.opcode == "CLEAR_VARS") {
                 inst.op = OpCode::ClearVars;
                 requireNoOperand(pl);

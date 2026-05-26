@@ -139,7 +139,7 @@ TEST_CASE("basic compiler supports PRINT trailing semicolon to suppress EOL") {
 
 TEST_CASE("basic compiler reports unknown keyword with line") {
     BasicProgram program;
-    program.setLine(30, "MAT A = 1");
+    program.setLine(30, "ZAP A = 1");
 
     BasicCompiler compiler;
     const auto result = compiler.compile(program);
@@ -147,7 +147,7 @@ TEST_CASE("basic compiler reports unknown keyword with line") {
     CHECK_FALSE(result.success);
     REQUIRE(result.errors.size() == 1);
     CHECK(result.errors[0].line == 30);
-    CHECK(result.errors[0].message == "Unknown keyword 'MAT'");
+    CHECK(result.errors[0].message == "Unknown keyword 'ZAP'");
 }
 
 TEST_CASE("basic compiler accepts any expression in LET for dynamic variables") {
@@ -945,6 +945,37 @@ TEST_CASE("basic compiler rejects dollar variable in ABS") {
     BasicCompiler compiler;
     const auto result = compiler.compile(program);
     CHECK_FALSE(result.success);
+}
+
+TEST_CASE("basic compiler compiles all four MAT statement shapes") {
+    BasicProgram program;
+    program.setLine(10, "DIM A(3)");
+    program.setLine(20, "DIM B(3)");
+    program.setLine(30, "MAT A = 0");
+    program.setLine(40, "MAT B = MAT A");
+    program.setLine(50, "OPEN \"CUSTOMERS\" TO FVAR");
+    program.setLine(60, "MAT WRITE A ON FVAR, \"KEY\"");
+    program.setLine(70, "MAT READ B FROM FVAR, \"KEY\"");
+    program.setLine(80, "END");
+
+    BasicCompiler compiler;
+    const auto result = compiler.compile(program);
+    REQUIRE(result.success);
+
+    bool hasMatInit = false;
+    bool hasMatCopy = false;
+    bool hasMatLoad = false;
+    bool hasMatStore = false;
+    for (const auto &ins : result.program) {
+        if (ins.op == OpCode::MatInit) hasMatInit = true;
+        if (ins.op == OpCode::MatCopy) hasMatCopy = true;
+        if (ins.op == OpCode::MatLoadFromRec) hasMatLoad = true;
+        if (ins.op == OpCode::MatStoreToRec) hasMatStore = true;
+    }
+    CHECK(hasMatInit);
+    CHECK(hasMatCopy);
+    CHECK(hasMatLoad);
+    CHECK(hasMatStore);
 }
 
 TEST_CASE("basic compiler compiles OPEN READ WRITE CLOSE") {

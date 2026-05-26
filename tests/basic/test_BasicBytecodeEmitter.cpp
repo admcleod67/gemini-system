@@ -746,6 +746,76 @@ TEST_CASE("basic bytecode emitter emits InvokeBuiltin for CONVERT with three arg
     CHECK(std::get<std::string>(emitted.program[3].operand) == "CONVERT");
 }
 
+TEST_CASE("basic bytecode emitter lowers MAT scalar assignment to expression + MatInit") {
+    BasicIr::NormalizedProgram program;
+    BasicIr::MatAssignStmt stmt{};
+    stmt.targetArray = "A";
+    stmt.rhsExpr = makeInt(0);
+    program.lines.push_back({10, std::move(stmt)});
+
+    const BasicBytecodeEmissionResult emitted = BasicBytecodeEmitter::emit(program);
+    REQUIRE(emitted.success);
+    REQUIRE(emitted.program.size() == 3);
+    CHECK(emitted.program[0].op == OpCode::PushInt);
+    CHECK(std::get<int>(emitted.program[0].operand) == 0);
+    CHECK(emitted.program[1].op == OpCode::MatInit);
+    CHECK(std::get<std::string>(emitted.program[1].operand) == "A");
+    CHECK(emitted.program[2].op == OpCode::Halt);
+}
+
+TEST_CASE("basic bytecode emitter lowers MAT A = MAT B to a single MatCopy A|B") {
+    BasicIr::NormalizedProgram program;
+    BasicIr::MatAssignStmt stmt{};
+    stmt.targetArray = "A";
+    stmt.rhsSourceArray = "B";
+    program.lines.push_back({10, std::move(stmt)});
+
+    const BasicBytecodeEmissionResult emitted = BasicBytecodeEmitter::emit(program);
+    REQUIRE(emitted.success);
+    REQUIRE(emitted.program.size() == 2);
+    CHECK(emitted.program[0].op == OpCode::MatCopy);
+    CHECK(std::get<std::string>(emitted.program[0].operand) == "A|B");
+    CHECK(emitted.program[1].op == OpCode::Halt);
+}
+
+TEST_CASE("basic bytecode emitter lowers MAT READ without ELSE to ReadRec + MatLoadFromRec") {
+    BasicIr::NormalizedProgram program;
+    BasicIr::MatReadStmt stmt{};
+    stmt.targetArray = "A";
+    stmt.fileVar = "FVAR";
+    stmt.idExpr = makeStr("KEY");
+    program.lines.push_back({10, std::move(stmt)});
+
+    const BasicBytecodeEmissionResult emitted = BasicBytecodeEmitter::emit(program);
+    REQUIRE(emitted.success);
+    REQUIRE(emitted.program.size() == 4);
+    CHECK(emitted.program[0].op == OpCode::PushStr);
+    CHECK(emitted.program[1].op == OpCode::ReadRec);
+    CHECK(std::get<std::string>(emitted.program[1].operand) == "FVAR");
+    CHECK(emitted.program[2].op == OpCode::MatLoadFromRec);
+    CHECK(std::get<std::string>(emitted.program[2].operand) == "A");
+    CHECK(emitted.program[3].op == OpCode::Halt);
+}
+
+TEST_CASE("basic bytecode emitter lowers MAT WRITE without ELSE to MatStoreToRec + WriteRec") {
+    BasicIr::NormalizedProgram program;
+    BasicIr::MatWriteStmt stmt{};
+    stmt.sourceArray = "A";
+    stmt.fileVar = "FVAR";
+    stmt.idExpr = makeStr("KEY");
+    program.lines.push_back({10, std::move(stmt)});
+
+    const BasicBytecodeEmissionResult emitted = BasicBytecodeEmitter::emit(program);
+    REQUIRE(emitted.success);
+    REQUIRE(emitted.program.size() == 4);
+    CHECK(emitted.program[0].op == OpCode::MatStoreToRec);
+    CHECK(std::get<std::string>(emitted.program[0].operand) == "A");
+    CHECK(emitted.program[1].op == OpCode::PushStr);
+    CHECK(emitted.program[2].op == OpCode::WriteRec);
+    CHECK(std::get<std::string>(emitted.program[2].operand) == "FVAR");
+    CHECK(emitted.program[3].op == OpCode::Halt);
+}
+
 TEST_CASE("basic bytecode emitter emits OpenFile without ELSE") {
     BasicIr::NormalizedProgram program;
     BasicIr::OpenStmt stmt{};

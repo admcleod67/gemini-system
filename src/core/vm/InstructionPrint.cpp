@@ -45,6 +45,10 @@ namespace PickVM {
             case OpCode::DimArray: return "DIM_ARRAY";
             case OpCode::LoadArr: return "LOAD_ARR";
             case OpCode::StoreArr: return "STORE_ARR";
+            case OpCode::MatInit: return "MAT_INIT";
+            case OpCode::MatCopy: return "MAT_COPY";
+            case OpCode::MatLoadFromRec: return "MAT_LOAD_FROM_REC";
+            case OpCode::MatStoreToRec: return "MAT_STORE_TO_REC";
             case OpCode::ClearVars: return "CLEAR_VARS";
             case OpCode::AbsInt: return "ABS_INT";
             case OpCode::SgnInt: return "SGN_INT";
@@ -131,6 +135,10 @@ namespace PickVM {
             case OpCode::DimArray:
             case OpCode::LoadArr:
             case OpCode::StoreArr:
+            case OpCode::MatInit:
+            case OpCode::MatCopy:
+            case OpCode::MatLoadFromRec:
+            case OpCode::MatStoreToRec:
             case OpCode::OpenFile:
             case OpCode::OpenFileTry:
             case OpCode::ReadRec:

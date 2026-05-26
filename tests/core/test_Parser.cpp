@@ -128,6 +128,26 @@ TEST_CASE("parser unknown opcode") {
     CHECK_THROWS_AS(parser.parse(in), std::runtime_error);
 }
 
+TEST_CASE("parser MAT opcodes round-trip with quoted operand") {
+    Parser parser;
+    std::istringstream in(
+        "MAT_INIT \"A\"\n"
+        "MAT_COPY \"A|B\"\n"
+        "MAT_LOAD_FROM_REC \"A\"\n"
+        "MAT_STORE_TO_REC \"A\"\n"
+        "HALT\n");
+    LoadedBytecode lb = parser.parse(in);
+    REQUIRE(lb.program.size() == 5);
+    CHECK(lb.program[0].op == OpCode::MatInit);
+    CHECK(std::get<std::string>(lb.program[0].operand) == "A");
+    CHECK(lb.program[1].op == OpCode::MatCopy);
+    CHECK(std::get<std::string>(lb.program[1].operand) == "A|B");
+    CHECK(lb.program[2].op == OpCode::MatLoadFromRec);
+    CHECK(std::get<std::string>(lb.program[2].operand) == "A");
+    CHECK(lb.program[3].op == OpCode::MatStoreToRec);
+    CHECK(std::get<std::string>(lb.program[3].operand) == "A");
+}
+
 TEST_CASE("parser unknown label JUMP") {
     Parser parser;
     std::istringstream in("JUMP nowhere\nHALT\n");

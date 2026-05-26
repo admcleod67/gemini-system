@@ -676,7 +676,7 @@ TEST_CASE("shell RUN auto-compiles BASIC source when bytecode missing") {
 TEST_CASE("shell RUN compile failure from BASIC source reports diagnostics") {
     auto fsDir = uniqueTempDir();
     seedVocAndBp(fsDir);
-    writeProgramSourceRecord(fsDir, "BROKEN", "10 MAT A = 1\n");
+    writeProgramSourceRecord(fsDir, "BROKEN", "10 ZAP A = 1\n");
 
     PickVM::Runtime rt;
     PickShell::Shell sh(rt);
@@ -686,7 +686,7 @@ TEST_CASE("shell RUN compile failure from BASIC source reports diagnostics") {
 
     sh.handleLine("RUN BROKEN", out, quit);
     CHECK_FALSE(quit);
-    CHECK(out.str() == "Error on line 10: Unknown keyword 'MAT'\nCompilation failed.\n");
+    CHECK(out.str() == "Error on line 10: Unknown keyword 'ZAP'\nCompilation failed.\n");
     PickFS::FileSystem fs(fsDir);
     CHECK_FALSE(fs.read("BP", "BROKEN_OBJ").has_value());
 }
@@ -1627,10 +1627,10 @@ TEST_CASE("shell BASIC COMPILE writes bytecode and failed COMPILE preserves prio
     const std::optional<PickFS::Record> beforeObj = fs.read("BP", "HELLO_OBJ");
     REQUIRE(beforeObj.has_value());
 
-    sh.handleLine("20 MAT A = 1", out, quit);
+    sh.handleLine("20 ZAP A = 1", out, quit);
     out.str("");
     sh.handleLine("COMPILE", out, quit);
-    CHECK(out.str() == "Error on line 20: Unknown keyword 'MAT'\nCompilation failed.\n");
+    CHECK(out.str() == "Error on line 20: Unknown keyword 'ZAP'\nCompilation failed.\n");
     const std::optional<PickFS::Record> afterObj = fs.read("BP", "HELLO_OBJ");
     REQUIRE(afterObj.has_value());
     CHECK(afterObj->value() == beforeObj->value());
@@ -1836,11 +1836,11 @@ TEST_CASE("shell BASIC compile failures print line diagnostics") {
     bool quit = false;
 
     sh.handleLine("BASIC TEST", out, quit);
-    sh.handleLine("30 MAT A = 1", out, quit);
+    sh.handleLine("30 ZAP A = 1", out, quit);
     out.str("");
 
     sh.handleLine("COMPILE", out, quit);
-    CHECK(out.str() == "Error on line 30: Unknown keyword 'MAT'\nCompilation failed.\n");
+    CHECK(out.str() == "Error on line 30: Unknown keyword 'ZAP'\nCompilation failed.\n");
 }
 
 TEST_CASE("shell BASIC RUN compile failure skips execution") {
@@ -1850,12 +1850,12 @@ TEST_CASE("shell BASIC RUN compile failure skips execution") {
     bool quit = false;
 
     sh.handleLine("BASIC TEST", out, quit);
-    sh.handleLine("10 MAT A = 1", out, quit);
+    sh.handleLine("10 ZAP A = 1", out, quit);
     sh.handleLine("20 PRINT \"SHOULD_NOT_RUN\"", out, quit);
     out.str("");
 
     sh.handleLine("RUN", out, quit);
-    CHECK(out.str() == "Error on line 10: Unknown keyword 'MAT'\nCompilation failed.\n");
+    CHECK(out.str() == "Error on line 10: Unknown keyword 'ZAP'\nCompilation failed.\n");
 }
 
 TEST_CASE("shell BASIC RUN recompiles each time and does not depend on COMPILE cache") {

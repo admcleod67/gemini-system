@@ -142,7 +142,30 @@ namespace PickShell::BasicIr {
         std::string fileVar;
     };
 
-    using NormalizedStmt = std::variant<LetStmt, InputStmt, ChainStmt, GotoStmt, GosubStmt, ReturnStmt, ForStmt, NextStmt, IfStmt, PrintStmt, RemStmt, StopStmt, EndStmt, DimStmt, LetArrayStmt, ClearStmt, OpenStmt, ReadStmt, WriteStmt, ReadNextStmt, ReadVStmt, WriteVStmt, CloseStmt>;
+    // MAT statements (Milestone 7 Stage 7).
+    // - MatAssignStmt: either rhsExpr (scalar broadcast) or rhsSourceArray (MAT copy) is populated.
+    // - MAT READ / MAT WRITE mirror ReadStmt / WriteStmt and reuse the same ELSE arm semantics.
+    struct MatAssignStmt {
+        std::string targetArray;
+        std::unique_ptr<BasicAst::Expr> rhsExpr;
+        std::string rhsSourceArray;
+    };
+
+    struct MatReadStmt {
+        std::string targetArray;
+        std::string fileVar;
+        std::unique_ptr<BasicAst::Expr> idExpr;
+        std::optional<BranchArm> elseArm;
+    };
+
+    struct MatWriteStmt {
+        std::string sourceArray;
+        std::string fileVar;
+        std::unique_ptr<BasicAst::Expr> idExpr;
+        std::optional<BranchArm> elseArm;
+    };
+
+    using NormalizedStmt = std::variant<LetStmt, InputStmt, ChainStmt, GotoStmt, GosubStmt, ReturnStmt, ForStmt, NextStmt, IfStmt, PrintStmt, RemStmt, StopStmt, EndStmt, DimStmt, LetArrayStmt, ClearStmt, OpenStmt, ReadStmt, WriteStmt, ReadNextStmt, ReadVStmt, WriteVStmt, CloseStmt, MatAssignStmt, MatReadStmt, MatWriteStmt>;
 
     struct InlineStatement {
         NormalizedStmt statement;

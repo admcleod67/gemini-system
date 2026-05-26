@@ -263,6 +263,16 @@ namespace PickVM {
         // Unknown codes throw BUILTIN: OCONV unsupported code "<code>" (ICONV ditto).
         // NUM(v): 1 if value is fully numeric (empty -> 0).
         // CONVERT(s, from, to): per-character map; chars in `from` past len(to) drop.
+        // MAT opcodes (Stage 7):
+        //   MAT_INIT <ARR>          - pop scalar, broadcast into arrays_[ARR]; `%` arrays CoerceInt per slot.
+        //   MAT_COPY <"DST|SRC">    - element-wise copy; both arrays must be DIM'd with the same size.
+        //   MAT_LOAD_FROM_REC <ARR> - pop raw record string, decompose via StructuredRecord::fromRaw, fill slots 1..N;
+        //                             record's attribute count must equal arrays_[ARR].size().
+        //   MAT_STORE_TO_REC <ARR>  - build StructuredRecord from slots 1..N and push toRaw() onto the stack.
+        // Errors throw stable substrings:
+        //   BUILTIN: MAT undefined array "<ARR>"
+        //   BUILTIN: MAT dimension mismatch
+        //   BUILTIN: MAT READ attribute count mismatch
         constexpr int kBuiltinSpaceMaxCount = 65536;
         constexpr int kPickInternalDateAtUnixEpoch = 732;
 
@@ -1303,6 +1313,98 @@ namespace PickVM {
                     throw std::runtime_error("Array index out of bounds: " + name);
                 }
                 it->second[static_cast<std::size_t>(idx) - 1] = std::move(val);
+                break;
+            }
+
+            case OpCode::MatInit: {
+                const std::string name = canonicalVariableName(stringOperandAtIp(instr, ip_));
+                if (isReadOnlySystemVariableName(name)) {
+                    throw std::runtime_error("Read-only system variable: " + name);
+                }
+                const Value scalar = pop();
+                const auto it = arrays_.find(name);
+                if (it == arrays_.end()) {
+                    throw std::runtime_error("BUILTIN: MAT undefined array \"" + name + "\"");
+                }
+                const bool intArray = !name.empty() && name.back() == '%';
+                for (auto &slot : it->second) {
+                    slot = intArray ? Value{coerceToInt(scalar)} : scalar;
+                }
+                break;
+            }
+
+            case OpCode::MatCopy: {
+                const std::string operand = stringOperandAtIp(instr, ip_);
+                const std::size_t sep = operand.find('|');
+                if (sep == std::string::npos) {
+                    throw std::runtime_error("MAT_COPY: operand must be DST|SRC");
+                }
+                const std::string dst = canonicalVariableName(operand.substr(0, sep));
+                const std::string src = canonicalVariableName(operand.substr(sep + 1));
+                if (isReadOnlySystemVariableName(dst)) {
+                    throw std::runtime_error("Read-only system variable: " + dst);
+                }
+                const auto itDst = arrays_.find(dst);
+                if (itDst == arrays_.end()) {
+                    throw std::runtime_error("BUILTIN: MAT undefined array \"" + dst + "\"");
+                }
+                const auto itSrc = arrays_.find(src);
+                if (itSrc == arrays_.end()) {
+                    throw std::runtime_error("BUILTIN: MAT undefined array \"" + src + "\"");
+                }
+                if (itDst->second.size() != itSrc->second.size()) {
+                    throw std::runtime_error("BUILTIN: MAT dimension mismatch");
+                }
+                const bool dstIsIntArray = !dst.empty() && dst.back() == '%';
+                const std::vector<Value> srcCopy = itSrc->second; // guard against aliasing self-copy
+                for (std::size_t i = 0; i < srcCopy.size(); ++i) {
+                    itDst->second[i] = dstIsIntArray ? Value{coerceToInt(srcCopy[i])} : srcCopy[i];
+                }
+                break;
+            }
+
+            case OpCode::MatLoadFromRec: {
+                const std::string name = canonicalVariableName(stringOperandAtIp(instr, ip_));
+                if (isReadOnlySystemVariableName(name)) {
+                    throw std::runtime_error("Read-only system variable: " + name);
+                }
+                const Value rawVal = pop();
+                const std::string raw = valueToString(rawVal);
+                const auto it = arrays_.find(name);
+                if (it == arrays_.end()) {
+                    throw std::runtime_error("BUILTIN: MAT undefined array \"" + name + "\"");
+                }
+                const PickFS::StructuredRecord sr = PickFS::StructuredRecord::fromRaw(raw);
+                const std::size_t recCount = sr.attributes().empty()
+                                                 ? 0
+                                                 : static_cast<std::size_t>(sr.attributes().rbegin()->first);
+                if (recCount != it->second.size()) {
+                    throw std::runtime_error("BUILTIN: MAT READ attribute count mismatch");
+                }
+                const bool intArray = !name.empty() && name.back() == '%';
+                for (std::size_t i = 0; i < it->second.size(); ++i) {
+                    const int attrNo = static_cast<int>(i) + 1;
+                    const std::string attrRaw = sr.hasAttribute(attrNo) ? sr.attribute(attrNo).raw() : std::string{};
+                    if (intArray) {
+                        it->second[i] = Value{coerceToInt(Value{attrRaw})};
+                    } else {
+                        it->second[i] = Value{attrRaw};
+                    }
+                }
+                break;
+            }
+
+            case OpCode::MatStoreToRec: {
+                const std::string name = canonicalVariableName(stringOperandAtIp(instr, ip_));
+                const auto it = arrays_.find(name);
+                if (it == arrays_.end()) {
+                    throw std::runtime_error("BUILTIN: MAT undefined array \"" + name + "\"");
+                }
+                PickFS::StructuredRecord sr;
+                for (std::size_t i = 0; i < it->second.size(); ++i) {
+                    sr.setAttribute(static_cast<int>(i) + 1, PickFS::RecordAttribute{valueToString(it->second[i])});
+                }
+                push(Value{sr.toRaw()});
                 break;
             }
 

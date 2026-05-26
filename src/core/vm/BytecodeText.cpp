@@ -61,6 +61,10 @@ namespace PickVM {
                 case OpCode::DimArray:
                 case OpCode::LoadArr:
                 case OpCode::StoreArr:
+                case OpCode::MatInit:
+                case OpCode::MatCopy:
+                case OpCode::MatLoadFromRec:
+                case OpCode::MatStoreToRec:
                 case OpCode::OpenFile:
                 case OpCode::OpenFileTry:
                 case OpCode::ReadRec:

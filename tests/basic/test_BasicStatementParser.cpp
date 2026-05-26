@@ -96,7 +96,7 @@ TEST_CASE("basic statement parser preserves diagnostic messages") {
     program.setLine(50, "PRINT");
     program.setLine(60, "STOP 1");
     program.setLine(70, "END 1");
-    program.setLine(80, "MAT A = 1");
+    program.setLine(80, "ZAP A = 1");
 
     const BasicAst::StatementParseResult result = BasicStatementParser::parse(program);
     CHECK_FALSE(result.success);
@@ -108,7 +108,7 @@ TEST_CASE("basic statement parser preserves diagnostic messages") {
     CHECK(result.errors[4].message == "PRINT requires an expression");
     CHECK(result.errors[5].message == "STOP takes no arguments");
     CHECK(result.errors[6].message == "END takes no arguments");
-    CHECK(result.errors[7].message == "Unknown keyword 'MAT'");
+    CHECK(result.errors[7].message == "Unknown keyword 'ZAP'");
 }
 
 TEST_CASE("basic statement parser supports prompted INPUT") {
@@ -522,5 +522,95 @@ TEST_CASE("basic statement parser rejects assignment and input to session @ syst
     CHECK(result.errors[0].message == "Read-only system variable '@ACCOUNT'");
     CHECK(result.errors[1].message == "Read-only system variable '@USERNO'");
     CHECK(result.errors[2].message == "Read-only system variable '@LOGNAME'");
+}
+
+TEST_CASE("basic statement parser parses MAT scalar assignment") {
+    BasicProgram program;
+    program.setLine(10, "MAT A = 0");
+    program.setLine(20, "MAT B$ = \"\"");
+
+    const BasicAst::StatementParseResult result = BasicStatementParser::parse(program);
+    CHECK(result.success);
+    REQUIRE(result.lines.size() == 2);
+    REQUIRE(std::holds_alternative<BasicAst::MatAssignStmt>(result.lines[0].statement));
+    const auto &a = std::get<BasicAst::MatAssignStmt>(result.lines[0].statement);
+    CHECK(a.targetArray == "A");
+    CHECK(a.rhsExpr != nullptr);
+    CHECK(a.rhsSourceArray.empty());
+    const auto &b = std::get<BasicAst::MatAssignStmt>(result.lines[1].statement);
+    CHECK(b.targetArray == "B$");
+    CHECK(b.rhsExpr != nullptr);
+    CHECK(b.rhsSourceArray.empty());
+}
+
+TEST_CASE("basic statement parser parses MAT A = MAT B copy") {
+    BasicProgram program;
+    program.setLine(10, "MAT A = MAT B");
+
+    const BasicAst::StatementParseResult result = BasicStatementParser::parse(program);
+    CHECK(result.success);
+    REQUIRE(result.lines.size() == 1);
+    REQUIRE(std::holds_alternative<BasicAst::MatAssignStmt>(result.lines[0].statement));
+    const auto &stmt = std::get<BasicAst::MatAssignStmt>(result.lines[0].statement);
+    CHECK(stmt.targetArray == "A");
+    CHECK(stmt.rhsExpr == nullptr);
+    CHECK(stmt.rhsSourceArray == "B");
+}
+
+TEST_CASE("basic statement parser parses MAT READ with and without ELSE") {
+    BasicProgram program;
+    program.setLine(10, "MAT A = 0");
+    program.setLine(20, "MAT READ A FROM FVAR, \"KEY\"");
+    program.setLine(30, "MAT READ A FROM FVAR, \"KEY\" ELSE 10");
+
+    const BasicAst::StatementParseResult result = BasicStatementParser::parse(program);
+    CHECK(result.success);
+    REQUIRE(result.lines.size() == 3);
+    REQUIRE(std::holds_alternative<BasicAst::MatReadStmt>(result.lines[1].statement));
+    const auto &plain = std::get<BasicAst::MatReadStmt>(result.lines[1].statement);
+    CHECK(plain.targetArray == "A");
+    CHECK(plain.fileVar == "FVAR");
+    CHECK_FALSE(plain.elseArm.has_value());
+    REQUIRE(std::holds_alternative<BasicAst::MatReadStmt>(result.lines[2].statement));
+    const auto &withElse = std::get<BasicAst::MatReadStmt>(result.lines[2].statement);
+    CHECK(withElse.targetArray == "A");
+    CHECK(withElse.elseArm.has_value());
+}
+
+TEST_CASE("basic statement parser parses MAT WRITE with and without ELSE") {
+    BasicProgram program;
+    program.setLine(10, "MAT WRITE A ON FVAR, \"KEY\"");
+    program.setLine(20, "MAT WRITE A ON FVAR, \"KEY\" ELSE 10");
+
+    const BasicAst::StatementParseResult result = BasicStatementParser::parse(program);
+    CHECK(result.success);
+    REQUIRE(result.lines.size() == 2);
+    REQUIRE(std::holds_alternative<BasicAst::MatWriteStmt>(result.lines[0].statement));
+    const auto &plain = std::get<BasicAst::MatWriteStmt>(result.lines[0].statement);
+    CHECK(plain.sourceArray == "A");
+    CHECK(plain.fileVar == "FVAR");
+    CHECK_FALSE(plain.elseArm.has_value());
+    REQUIRE(std::holds_alternative<BasicAst::MatWriteStmt>(result.lines[1].statement));
+    CHECK(std::get<BasicAst::MatWriteStmt>(result.lines[1].statement).elseArm.has_value());
+}
+
+TEST_CASE("basic statement parser rejects malformed MAT statements") {
+    BasicProgram program;
+    program.setLine(10, "MAT");
+    program.setLine(20, "MAT A");
+    program.setLine(30, "MAT READ");
+    program.setLine(40, "MAT WRITE");
+    program.setLine(50, "MAT A = MAT B + MAT C");
+    program.setLine(60, "MAT A READ FROM F, X");
+
+    const BasicAst::StatementParseResult result = BasicStatementParser::parse(program);
+    CHECK_FALSE(result.success);
+    REQUIRE(result.errors.size() == 6);
+    CHECK(result.errors[0].message.find("MAT") != std::string::npos);
+    CHECK(result.errors[1].message.find("MAT") != std::string::npos);
+    CHECK(result.errors[2].message.find("MAT READ") != std::string::npos);
+    CHECK(result.errors[3].message.find("MAT WRITE") != std::string::npos);
+    CHECK(result.errors[4].message.find("MAT copy source must be a bare array name") != std::string::npos);
+    CHECK(result.errors[5].message.find("MAT") != std::string::npos);
 }
 

@@ -106,6 +106,14 @@ namespace PickShell {
                         if (stmt.elseArm.has_value()) {
                             validateBranchArm(*stmt.elseArm, ownerLine, knownLines, errors);
                         }
+                    } else if constexpr (std::is_same_v<StmtT, BasicAst::MatReadStmt>) {
+                        if (stmt.elseArm.has_value()) {
+                            validateBranchArm(*stmt.elseArm, ownerLine, knownLines, errors);
+                        }
+                    } else if constexpr (std::is_same_v<StmtT, BasicAst::MatWriteStmt>) {
+                        if (stmt.elseArm.has_value()) {
+                            validateBranchArm(*stmt.elseArm, ownerLine, knownLines, errors);
+                        }
                     }
                 },
                 statement);
@@ -207,6 +215,26 @@ namespace PickShell {
                         return BasicIr::RemStmt{};
                     } else if constexpr (std::is_same_v<StmtT, BasicAst::StopStmt>) {
                         return BasicIr::StopStmt{};
+                    } else if constexpr (std::is_same_v<StmtT, BasicAst::MatAssignStmt>) {
+                        return BasicIr::MatAssignStmt{
+                            std::move(stmt.targetArray),
+                            std::move(stmt.rhsExpr),
+                            std::move(stmt.rhsSourceArray)
+                        };
+                    } else if constexpr (std::is_same_v<StmtT, BasicAst::MatReadStmt>) {
+                        return BasicIr::MatReadStmt{
+                            std::move(stmt.targetArray),
+                            std::move(stmt.fileVar),
+                            std::move(stmt.idExpr),
+                            toIrBranchArmOpt(std::move(stmt.elseArm))
+                        };
+                    } else if constexpr (std::is_same_v<StmtT, BasicAst::MatWriteStmt>) {
+                        return BasicIr::MatWriteStmt{
+                            std::move(stmt.sourceArray),
+                            std::move(stmt.fileVar),
+                            std::move(stmt.idExpr),
+                            toIrBranchArmOpt(std::move(stmt.elseArm))
+                        };
                     } else {
                         return BasicIr::EndStmt{};
                     }

@@ -226,7 +226,29 @@ namespace PickShell::BasicAst {
         std::string fileVar;
     };
 
-    using StatementNode = std::variant<LetStmt, InputStmt, ChainStmt, GotoStmt, GosubStmt, ReturnStmt, ForStmt, NextStmt, IfStmt, PrintStmt, RemStmt, StopStmt, EndStmt, DimStmt, LetArrayStmt, ClearStmt, OpenStmt, ReadStmt, WriteStmt, ReadNextStmt, ReadVStmt, WriteVStmt, CloseStmt>;
+    // MAT <arr> = <scalar-expr>  (rhsExpr non-null, rhsSourceArray empty)
+    // MAT <arr> = MAT <arr-src>  (rhsExpr null, rhsSourceArray populated, canonical uppercased)
+    struct MatAssignStmt {
+        std::string targetArray;
+        std::unique_ptr<Expr> rhsExpr;
+        std::string rhsSourceArray;
+    };
+
+    struct MatReadStmt {
+        std::string targetArray;
+        std::string fileVar;
+        std::unique_ptr<Expr> idExpr;
+        std::optional<BranchArm> elseArm;
+    };
+
+    struct MatWriteStmt {
+        std::string sourceArray;
+        std::string fileVar;
+        std::unique_ptr<Expr> idExpr;
+        std::optional<BranchArm> elseArm;
+    };
+
+    using StatementNode = std::variant<LetStmt, InputStmt, ChainStmt, GotoStmt, GosubStmt, ReturnStmt, ForStmt, NextStmt, IfStmt, PrintStmt, RemStmt, StopStmt, EndStmt, DimStmt, LetArrayStmt, ClearStmt, OpenStmt, ReadStmt, WriteStmt, ReadNextStmt, ReadVStmt, WriteVStmt, CloseStmt, MatAssignStmt, MatReadStmt, MatWriteStmt>;
 
     struct InlineStatement {
         StatementNode statement;

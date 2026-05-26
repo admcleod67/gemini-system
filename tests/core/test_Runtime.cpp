@@ -1783,6 +1783,289 @@ TEST_CASE("runtime InvokeBuiltin STR stringifies int") {
     CHECK(std::get<std::string>(rt.stack()[0]) == "42");
 }
 
+TEST_CASE("runtime MatInit broadcasts scalar into every slot of a DIM'd array") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, 3},
+        {OpCode::DimArray, std::string{"A"}},
+        {OpCode::PushInt, 7},
+        {OpCode::MatInit, std::string{"A"}},
+        {OpCode::PushInt, 1}, {OpCode::LoadArr, std::string{"A"}},
+        {OpCode::PushInt, 2}, {OpCode::LoadArr, std::string{"A"}},
+        {OpCode::PushInt, 3}, {OpCode::LoadArr, std::string{"A"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 3);
+    CHECK(std::get<int>(rt.stack()[0]) == 7);
+    CHECK(std::get<int>(rt.stack()[1]) == 7);
+    CHECK(std::get<int>(rt.stack()[2]) == 7);
+}
+
+TEST_CASE("runtime MatInit coerces string scalar into int slots for a percent-suffix array") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, 2},
+        {OpCode::DimArray, std::string{"A%"}},
+        {OpCode::PushStr, std::string{"abc"}},
+        {OpCode::MatInit, std::string{"A%"}},
+        {OpCode::PushInt, 1}, {OpCode::LoadArr, std::string{"A%"}},
+        {OpCode::PushInt, 2}, {OpCode::LoadArr, std::string{"A%"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 2);
+    CHECK(std::get<int>(rt.stack()[0]) == 0);
+    CHECK(std::get<int>(rt.stack()[1]) == 0);
+}
+
+TEST_CASE("runtime MatInit on undefined array throws stable substring") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, 0},
+        {OpCode::MatInit, std::string{"MISSING"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    try {
+        rt.run();
+        FAIL("expected runtime_error");
+    } catch (const std::runtime_error &e) {
+        const std::string msg = e.what();
+        CHECK(msg.find("BUILTIN: MAT undefined array") != std::string::npos);
+        CHECK(msg.find("\"MISSING\"") != std::string::npos);
+    }
+}
+
+TEST_CASE("runtime MatCopy duplicates source slots into destination of matching size") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        // DIM A(2); DIM B(2)
+        {OpCode::PushInt, 2}, {OpCode::DimArray, std::string{"A"}},
+        {OpCode::PushInt, 2}, {OpCode::DimArray, std::string{"B"}},
+        // B(1) = "x", B(2) = "y"
+        {OpCode::PushStr, std::string{"x"}}, {OpCode::PushInt, 1}, {OpCode::StoreArr, std::string{"B"}},
+        {OpCode::PushStr, std::string{"y"}}, {OpCode::PushInt, 2}, {OpCode::StoreArr, std::string{"B"}},
+        {OpCode::MatCopy, std::string{"A|B"}},
+        {OpCode::PushInt, 1}, {OpCode::LoadArr, std::string{"A"}},
+        {OpCode::PushInt, 2}, {OpCode::LoadArr, std::string{"A"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 2);
+    CHECK(std::get<std::string>(rt.stack()[0]) == "x");
+    CHECK(std::get<std::string>(rt.stack()[1]) == "y");
+}
+
+TEST_CASE("runtime MatCopy throws stable substring when sizes differ") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, 2}, {OpCode::DimArray, std::string{"A"}},
+        {OpCode::PushInt, 3}, {OpCode::DimArray, std::string{"B"}},
+        {OpCode::MatCopy, std::string{"A|B"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    try {
+        rt.run();
+        FAIL("expected runtime_error");
+    } catch (const std::runtime_error &e) {
+        const std::string msg = e.what();
+        CHECK(msg.find("BUILTIN: MAT dimension mismatch") != std::string::npos);
+    }
+}
+
+TEST_CASE("runtime MatCopy throws when source array is undefined") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, 2}, {OpCode::DimArray, std::string{"A"}},
+        {OpCode::MatCopy, std::string{"A|MISSING"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    try {
+        rt.run();
+        FAIL("expected runtime_error");
+    } catch (const std::runtime_error &e) {
+        const std::string msg = e.what();
+        CHECK(msg.find("BUILTIN: MAT undefined array") != std::string::npos);
+        CHECK(msg.find("\"MISSING\"") != std::string::npos);
+    }
+}
+
+TEST_CASE("runtime MatLoadFromRec splits a record into slots when attribute count matches") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, 3}, {OpCode::DimArray, std::string{"A"}},
+        {OpCode::PushStr, std::string{"alpha\nbeta\ngamma"}},
+        {OpCode::MatLoadFromRec, std::string{"A"}},
+        {OpCode::PushInt, 1}, {OpCode::LoadArr, std::string{"A"}},
+        {OpCode::PushInt, 2}, {OpCode::LoadArr, std::string{"A"}},
+        {OpCode::PushInt, 3}, {OpCode::LoadArr, std::string{"A"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 3);
+    CHECK(std::get<std::string>(rt.stack()[0]) == "alpha");
+    CHECK(std::get<std::string>(rt.stack()[1]) == "beta");
+    CHECK(std::get<std::string>(rt.stack()[2]) == "gamma");
+}
+
+TEST_CASE("runtime MatLoadFromRec throws stable substring when attribute count is short") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, 3}, {OpCode::DimArray, std::string{"A"}},
+        {OpCode::PushStr, std::string{"alpha\nbeta"}},
+        {OpCode::MatLoadFromRec, std::string{"A"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    try {
+        rt.run();
+        FAIL("expected runtime_error");
+    } catch (const std::runtime_error &e) {
+        const std::string msg = e.what();
+        CHECK(msg.find("BUILTIN: MAT READ attribute count mismatch") != std::string::npos);
+    }
+}
+
+TEST_CASE("runtime MatLoadFromRec throws when attribute count is long") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, 2}, {OpCode::DimArray, std::string{"A"}},
+        {OpCode::PushStr, std::string{"alpha\nbeta\ngamma"}},
+        {OpCode::MatLoadFromRec, std::string{"A"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    try {
+        rt.run();
+        FAIL("expected runtime_error");
+    } catch (const std::runtime_error &e) {
+        const std::string msg = e.what();
+        CHECK(msg.find("BUILTIN: MAT READ attribute count mismatch") != std::string::npos);
+    }
+}
+
+TEST_CASE("runtime MatLoadFromRec coerces strings to int for percent-suffix array") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, 2}, {OpCode::DimArray, std::string{"A%"}},
+        {OpCode::PushStr, std::string{"42\n99"}},
+        {OpCode::MatLoadFromRec, std::string{"A%"}},
+        {OpCode::PushInt, 1}, {OpCode::LoadArr, std::string{"A%"}},
+        {OpCode::PushInt, 2}, {OpCode::LoadArr, std::string{"A%"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 2);
+    CHECK(std::get<int>(rt.stack()[0]) == 42);
+    CHECK(std::get<int>(rt.stack()[1]) == 99);
+}
+
+TEST_CASE("runtime MatStoreToRec pushes the array as a raw record string") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, 3}, {OpCode::DimArray, std::string{"A"}},
+        {OpCode::PushStr, std::string{"alpha"}}, {OpCode::PushInt, 1}, {OpCode::StoreArr, std::string{"A"}},
+        {OpCode::PushStr, std::string{"beta"}},  {OpCode::PushInt, 2}, {OpCode::StoreArr, std::string{"A"}},
+        {OpCode::PushStr, std::string{"gamma"}}, {OpCode::PushInt, 3}, {OpCode::StoreArr, std::string{"A"}},
+        {OpCode::MatStoreToRec, std::string{"A"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<std::string>(rt.stack()[0]) == "alpha\nbeta\ngamma");
+}
+
+TEST_CASE("runtime MatStoreToRec round-trips through MatLoadFromRec") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, 3}, {OpCode::DimArray, std::string{"A"}},
+        {OpCode::PushStr, std::string{"one"}},   {OpCode::PushInt, 1}, {OpCode::StoreArr, std::string{"A"}},
+        {OpCode::PushStr, std::string{"two"}},   {OpCode::PushInt, 2}, {OpCode::StoreArr, std::string{"A"}},
+        {OpCode::PushStr, std::string{"three"}}, {OpCode::PushInt, 3}, {OpCode::StoreArr, std::string{"A"}},
+        {OpCode::PushInt, 3}, {OpCode::DimArray, std::string{"B"}},
+        {OpCode::MatStoreToRec, std::string{"A"}},
+        {OpCode::MatLoadFromRec, std::string{"B"}},
+        {OpCode::PushInt, 1}, {OpCode::LoadArr, std::string{"B"}},
+        {OpCode::PushInt, 2}, {OpCode::LoadArr, std::string{"B"}},
+        {OpCode::PushInt, 3}, {OpCode::LoadArr, std::string{"B"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 3);
+    CHECK(std::get<std::string>(rt.stack()[0]) == "one");
+    CHECK(std::get<std::string>(rt.stack()[1]) == "two");
+    CHECK(std::get<std::string>(rt.stack()[2]) == "three");
+}
+
+TEST_CASE("runtime MatStoreToRec on undefined array throws stable substring") {
+    Runtime rt;
+    std::vector<Instruction> prog = {
+        {OpCode::MatStoreToRec, std::string{"MISSING"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    try {
+        rt.run();
+        FAIL("expected runtime_error");
+    } catch (const std::runtime_error &e) {
+        const std::string msg = e.what();
+        CHECK(msg.find("BUILTIN: MAT undefined array") != std::string::npos);
+        CHECK(msg.find("\"MISSING\"") != std::string::npos);
+    }
+}
+
+TEST_CASE("runtime MAT WRITE + MAT READ round-trip through filesystem") {
+    const std::filesystem::path root = std::filesystem::temp_directory_path() / "pick-runtime-mat-roundtrip-test";
+    std::error_code ec;
+    std::filesystem::remove_all(root, ec);
+    PickFS::FileSystem fs(root);
+    fs.createFile("ORDERS");
+
+    Runtime rt;
+    rt.setFileSystem(&fs);
+
+    std::vector<Instruction> prog = {
+        // OPEN "ORDERS" TO FVAR
+        {OpCode::PushStr, std::string{"ORDERS"}},
+        {OpCode::OpenFile, std::string{"FVAR"}},
+        // DIM A(3); fill A(1..3)
+        {OpCode::PushInt, 3}, {OpCode::DimArray, std::string{"A"}},
+        {OpCode::PushStr, std::string{"one"}},   {OpCode::PushInt, 1}, {OpCode::StoreArr, std::string{"A"}},
+        {OpCode::PushStr, std::string{"two"}},   {OpCode::PushInt, 2}, {OpCode::StoreArr, std::string{"A"}},
+        {OpCode::PushStr, std::string{"three"}}, {OpCode::PushInt, 3}, {OpCode::StoreArr, std::string{"A"}},
+        // MAT WRITE A ON FVAR, "K1"  --> emits MatStoreToRec, then push key, then WriteRec
+        {OpCode::MatStoreToRec, std::string{"A"}},
+        {OpCode::PushStr, std::string{"K1"}},
+        {OpCode::WriteRec, std::string{"FVAR"}},
+        // DIM B(3); MAT READ B FROM FVAR, "K1"  --> push key, ReadRec, MatLoadFromRec
+        {OpCode::PushInt, 3}, {OpCode::DimArray, std::string{"B"}},
+        {OpCode::PushStr, std::string{"K1"}},
+        {OpCode::ReadRec, std::string{"FVAR"}},
+        {OpCode::MatLoadFromRec, std::string{"B"}},
+        {OpCode::PushInt, 1}, {OpCode::LoadArr, std::string{"B"}},
+        {OpCode::PushInt, 2}, {OpCode::LoadArr, std::string{"B"}},
+        {OpCode::PushInt, 3}, {OpCode::LoadArr, std::string{"B"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 3);
+    CHECK(std::get<std::string>(rt.stack()[0]) == "one");
+    CHECK(std::get<std::string>(rt.stack()[1]) == "two");
+    CHECK(std::get<std::string>(rt.stack()[2]) == "three");
+    std::filesystem::remove_all(root, ec);
+}
+
 TEST_CASE("runtime InvokeBuiltin OCONV D formats Pick day 732 as 01 Jan 1970") {
     Runtime rt;
     std::vector<Instruction> prog = {

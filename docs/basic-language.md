@@ -20,6 +20,10 @@ Compiler internals are in an incremental refactor phase. Expression parsing and 
 - `FOR <var> = <init> TO <limit> [STEP <step>]`
 - `NEXT <var>`
 - `DIM <var>(<size>)`
+- `MAT <arr> = <expr>`
+- `MAT <arr> = MAT <arr>`
+- `MAT READ <arr> FROM <filevar>, <id-expr> [ELSE <line-or-statement>]`
+- `MAT WRITE <arr> ON <filevar>, <id-expr> [ELSE <line-or-statement>]`
 - `OPEN <file-expr> TO <filevar> [ELSE <line-or-statement>]`
 - `READ <var> FROM <filevar>, <id-expr> [ELSE <line-or-statement>]`
 - `WRITE <expr> ON <filevar>, <id-expr> [ELSE <line-or-statement>]`
@@ -261,6 +265,70 @@ Expression-related messages include categories such as:
 Arrays are distinct from record multi-values. `A(1)` indexes an in-memory `DIM` array cell, while
 `REC<attr,value>` (or `READV`/`WRITEV`) indexes a subvalue inside an attribute of a record-body string.
 There is no implicit mapping between array indexes and record attributes/subvalues.
+
+## MAT operations
+
+`MAT` statements operate on whole `DIM`'d arrays. All four shapes require the target array (and, for `MAT A = MAT B`, the source array) to have been previously declared with `DIM`; using an undefined array raises a runtime error.
+
+**Shapes:**
+
+- `MAT <arr> = <expr>` — broadcast a scalar into every slot of `<arr>`.
+
+  ```
+  10 DIM A(3)
+  20 MAT A = 0
+  30 PRINT A(1); PRINT A(2); PRINT A(3)
+  40 END
+  ```
+
+  For `%`-suffix arrays each slot is coerced to int on assignment (so `MAT A% = "abc"` fills every slot with `0`, the same rule as `LET A% = "abc"`).
+
+- `MAT <arr-dst> = MAT <arr-src>` — element-wise copy.
+
+  ```
+  10 DIM A(3)
+  20 DIM B(3)
+  30 MAT A = 1
+  40 MAT B = MAT A
+  50 PRINT B(2)
+  60 END
+  ```
+
+  Strict: both arrays must already be `DIM`'d **and have the same size**. A size mismatch raises a runtime error (no padding, no truncation).
+
+- `MAT READ <arr> FROM <filevar>, <id-expr> [ELSE <line-or-statement>]` — read a record and split its attributes into the slots of `<arr>` (slot `i` ← attribute `i`).
+
+  ```
+  10 DIM CUST(4)
+  20 OPEN "CUSTOMERS" TO FVAR ELSE STOP
+  30 MAT READ CUST FROM FVAR, "1001" ELSE STOP
+  40 PRINT CUST(1)
+  50 END
+  ```
+
+  Strict: the record's attribute count must equal `DIM(<arr>)`; otherwise a runtime error is raised. The `ELSE` arm fires on a missing record (same semantics as `READ … ELSE`).
+
+- `MAT WRITE <arr> ON <filevar>, <id-expr> [ELSE <line-or-statement>]` — pack the slots of `<arr>` (slot `i` → attribute `i`) into a record and write it.
+
+  ```
+  10 DIM ORDER(3)
+  20 LET ORDER(1) = "ORD-1"
+  30 LET ORDER(2) = "2026-05-26"
+  40 LET ORDER(3) = "SHIPPED"
+  50 OPEN "ORDERS" TO FVAR ELSE STOP
+  60 MAT WRITE ORDER ON FVAR, "ORD-1" ELSE STOP
+  70 END
+  ```
+
+  The `ELSE` arm fires on a write failure (same semantics as `WRITE … ON … ELSE`).
+
+**Runtime errors (stable substrings):**
+
+- `BUILTIN: MAT undefined array "<ARR>"` — the named array was not previously `DIM`'d.
+- `BUILTIN: MAT dimension mismatch` — `MAT A = MAT B` with `DIM(A) != DIM(B)`.
+- `BUILTIN: MAT READ attribute count mismatch` — record attribute count differs from `DIM(<arr>)`.
+
+**Non-goals (v1):** matrix arithmetic (`MAT A = MAT B + MAT C`), `MAT INPUT`, `MAT PRINT`, automatic `DIM` via `MAT READ`, and overflow of trailing record attributes into the final slot are not supported.
 
 ## File handling (Stage 1)
 
