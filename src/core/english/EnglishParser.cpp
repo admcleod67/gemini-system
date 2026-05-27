@@ -33,10 +33,18 @@ namespace PickCore::English {
             return ieq(t, "HEADING");
         }
 
+        bool isBreakOn(const std::string &t) {
+            return ieq(t, "BREAK-ON");
+        }
+
+        bool isTotal(const std::string &t) {
+            return ieq(t, "TOTAL");
+        }
+
         /// True if the token is one of the ENGLISH structural keywords; used to reject
         /// `HEADING BY ...` and similar typos where the user clearly forgot the literal.
         bool isStructuralKeyword(const std::string &t) {
-            return isBy(t) || isByDsnd(t) || isWith(t) || isHeading(t);
+            return isBy(t) || isByDsnd(t) || isWith(t) || isHeading(t) || isBreakOn(t) || isTotal(t);
         }
 
         std::optional<Verb> verbFrom(const std::string &t) {
@@ -111,12 +119,13 @@ namespace PickCore::English {
         }
         const Verb verb = *verbOpt;
 
-        // Strip out the `HEADING "<text>"` clause first so the rest of the parser
-        // (which has no notion of HEADING) keeps working on a verb-and-fields token stream.
-        // The clause can appear anywhere after the verb; only one occurrence is allowed.
+        // Strip formatting clauses (`HEADING`, `BREAK-ON`) so the rest of the parser
+        // keeps working on a verb-and-fields token stream. Each may appear anywhere
+        // after the verb; only one occurrence of each is allowed.
         std::vector<std::string> tokens;
         tokens.reserve(rawTokens.size());
         std::optional<std::string> heading;
+        std::optional<std::string> breakOnField;
         for (std::size_t k = 0; k < rawTokens.size(); ++k) {
             if (k > 0U && isHeading(rawTokens[k])) {
                 if (heading.has_value()) {
@@ -131,6 +140,19 @@ namespace PickCore::English {
                 ++k; // also skip the heading argument
                 continue;
             }
+            if (k > 0U && isBreakOn(rawTokens[k])) {
+                if (breakOnField.has_value()) {
+                    error = "BREAK-ON can only appear once";
+                    return std::nullopt;
+                }
+                if (k + 1U >= rawTokens.size() || isStructuralKeyword(rawTokens[k + 1U])) {
+                    error = "BREAK-ON requires a field";
+                    return std::nullopt;
+                }
+                breakOnField = rawTokens[k + 1U];
+                ++k; // also skip the break field token
+                continue;
+            }
             tokens.push_back(rawTokens[k]);
         }
 
@@ -139,14 +161,18 @@ namespace PickCore::English {
                 error = "COUNT requires filename or active-list scope";
                 return std::nullopt;
             }
-            Query countQuery{verb, *ctx.imposedFileName, {}, {}, std::nullopt};
+            Query countQuery{};
+            countQuery.verb = verb;
+            countQuery.fileName = *ctx.imposedFileName;
             countQuery.heading = std::move(heading);
+            countQuery.breakOnField = std::move(breakOnField);
             return countQuery;
         }
 
         Query q{};
         q.verb = verb;
         q.heading = std::move(heading);
+        q.breakOnField = std::move(breakOnField);
         std::size_t i = 1U;
         if (ctx.implicitFile) {
             if (!ctx.imposedFileName.has_value() || ctx.imposedFileName->empty()) {

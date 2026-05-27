@@ -14,12 +14,14 @@ namespace PickCore::English {
         /// the type lives here so Stage 2-4 (pagination / break-on / totals) can extend it without
         /// touching the public Formatter API.
         struct Event {
-            enum class Kind { Heading, Row, Trailing };
+            enum class Kind { Heading, BreakLine, Row, Trailing };
             Kind kind{};
             const std::string *headingTemplate{nullptr};
             const Row *row{nullptr};
             const std::string *trailingText{nullptr};
         };
+
+        constexpr int kReportWidth = 79;
 
         /// Stage 1 LayoutPlanner is straight-through; later stages will inject break/total events.
         class LayoutPlanner {
@@ -30,18 +32,25 @@ namespace PickCore::English {
                 : plan_(plan), rows_(rows), trailingLines_(trailingLines) {}
 
             [[nodiscard]] std::vector<Event> events() const {
+                const bool breakOn = plan_.query.breakOnField.has_value();
                 std::vector<Event> ev;
-                ev.reserve((plan_.query.heading.has_value() ? 1U : 0U) + rows_.size() + trailingLines_.size());
+                ev.reserve((plan_.query.heading.has_value() ? 1U : 0U) + rows_.size() +
+                           (breakOn ? rows_.size() : 0U) + trailingLines_.size());
                 if (plan_.query.heading.has_value()) {
                     Event e{};
                     e.kind = Event::Kind::Heading;
                     e.headingTemplate = &*plan_.query.heading;
                     ev.push_back(e);
                 }
-                for (const Row &r: rows_) {
+                for (std::size_t ri = 0; ri < rows_.size(); ++ri) {
+                    if (breakOn && ri > 0U && rows_[ri].breakKey != rows_[ri - 1U].breakKey) {
+                        Event e{};
+                        e.kind = Event::Kind::BreakLine;
+                        ev.push_back(e);
+                    }
                     Event e{};
                     e.kind = Event::Kind::Row;
-                    e.row = &r;
+                    e.row = &rows_[ri];
                     ev.push_back(e);
                 }
                 for (const std::string &line: trailingLines_) {
@@ -101,6 +110,11 @@ namespace PickCore::English {
                 }
             }
             return true;
+        }
+
+        /// Full-width hyphen break line (Milestone 8 Stage 3).
+        std::string renderBreakLine() {
+            return std::string(static_cast<std::size_t>(kReportWidth), '-');
         }
 
         /// Render the `id field1 field2 ...` form. Matches the legacy `formatProjectLine`
@@ -190,6 +204,19 @@ namespace PickCore::English {
                      const std::string *headingTemplate)
                 : ctx_(ctx), pages_(pages), headingTemplate_(headingTemplate) {}
 
+            void emitWithPagination(std::vector<std::string> &lines, const std::string &line) const {
+                if (pages_.paginationActive() && pages_.linesOnPage() >= pages_.pageLength()) {
+                    lines.emplace_back(); // single blank separator (not counted on new page)
+                    pages_.advancePage();
+                    if (headingTemplate_ != nullptr) {
+                        lines.push_back(renderHeading(*headingTemplate_, ctx_, pages_));
+                        pages_.onLineEmitted();
+                    }
+                }
+                lines.push_back(line);
+                pages_.onLineEmitted();
+            }
+
             [[nodiscard]] std::vector<std::string> render(const std::vector<Event> &events) const {
                 std::vector<std::string> lines;
                 lines.reserve(events.size());
@@ -199,26 +226,16 @@ namespace PickCore::English {
                         pages_.onLineEmitted();
                         continue;
                     }
-                    // Row or Trailing — check for page overflow first.
-                    if (pages_.paginationActive() && pages_.linesOnPage() >= pages_.pageLength()) {
-                        lines.emplace_back(); // single blank separator (not counted on new page)
-                        pages_.advancePage();
-                        if (headingTemplate_ != nullptr) {
-                            lines.push_back(renderHeading(*headingTemplate_, ctx_, pages_));
-                            pages_.onLineEmitted();
-                        }
+                    if (e.kind == Event::Kind::BreakLine) {
+                        emitWithPagination(lines, renderBreakLine());
+                        continue;
                     }
-                    switch (e.kind) {
-                        case Event::Kind::Row:
-                            lines.push_back(renderProjection(*e.row));
-                            pages_.onLineEmitted();
-                            break;
-                        case Event::Kind::Trailing:
-                            lines.push_back(*e.trailingText);
-                            pages_.onLineEmitted();
-                            break;
-                        case Event::Kind::Heading:
-                            break; // handled above
+                    if (e.kind == Event::Kind::Row) {
+                        emitWithPagination(lines, renderProjection(*e.row));
+                        continue;
+                    }
+                    if (e.kind == Event::Kind::Trailing) {
+                        emitWithPagination(lines, *e.trailingText);
                     }
                 }
                 return lines;

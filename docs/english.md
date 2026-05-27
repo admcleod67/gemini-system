@@ -113,11 +113,17 @@ CLEAR-LIST
 
 ## Report formatting
 
-The formatting layer (headings, breaks, totals, pagination) is staged in Milestone 8. Stage 1 ships the **`HEADING "<text>"`** clause with Pick‑classic `@`-token substitution (`@DATE`, `@TIME`, `@PAGE`, plus the `@@` escape). See [docs/english-formatting.md](english-formatting.md) for the syntax, token table, and behaviour. Queries without a `HEADING` clause are byte-identical to the pre‑M8 output.
+The formatting layer (headings, breaks, totals, pagination) is staged in Milestone 8. Implemented so far:
+
+- **`HEADING "<text>"`** — Pick‑classic `@`-token substitution (`@DATE`, `@TIME`, `@PAGE`, `@@` escape).
+- **Pagination** — configurable via `SET PAGE-LENGTH n` (default 24) when a `HEADING` is present.
+- **`BREAK-ON <field>`** — full-width hyphen break line when the break-field value changes between consecutive rows.
+
+See [docs/english-formatting.md](english-formatting.md) for syntax, token tables, and behaviour. Queries without formatting clauses remain byte-identical to the pre‑M8 executor output.
 
 ## Non-goals (deferred)
 
-- Breaks, totals, pagination, printer/report delivery (deferred to later Milestone 8 stages and beyond).
+- Totals and `ID-SUPP` (deferred to later Milestone 8 stages).
 - Executed `WITH` predicates.
 - Full `MD` / date-mask / currency semantics and correlatives.
 - Legacy Tcl `SORT` for non-ENGLISH-shaped input.

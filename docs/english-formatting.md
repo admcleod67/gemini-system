@@ -10,7 +10,7 @@ The ENGLISH service runs a query in two halves:
 
 1. **Executor** (`src/core/english/Executor.cpp`) scans, projects, and sorts records, producing a stream of `Row` values plus any verb-specific summary lines (e.g. `5 records selected` for `SELECT`, the count for `COUNT`).
 2. **Formatter** (`src/core/english/Formatter.cpp`) lays out the row stream into the final `Result.lines` using three internal components:
-   - **LayoutPlanner** — turns the input into a small event stream (`[heading?, row*, trailing*]`).
+   - **LayoutPlanner** — turns the input into a small event stream (`[heading?, break?, row*, trailing*]` when `BREAK-ON` is set).
    - **PageManager** — tracks the emitted-line count and the live page number; signals page boundaries (Stage 2).
    - **Renderer** — emits the final line vector, consulting `PageManager` to inject blank-line separators and re-emit the heading at each page boundary.
 
@@ -47,7 +47,7 @@ Heading templates use Pick‑classic `@<token>` substitution, evaluated by the f
 | `@DATE` | current date in `dd MMM yyyy` form — byte-equivalent to BASIC `OCONV(value, "D")` |
 | `@TIME` | current time in `HH:MM:SS` form |
 | `@PAGE` | current page number — incremented at each page boundary (see Pagination below) |
-| `@<digits>` | empty string (reserved for attribute substitution, lands with `BREAK-ON` / `TOTAL` in Stages 3‑4) |
+| `@<digits>` | empty string (reserved for attribute substitution in `HEADING`, lands in Stage 4 with `TOTAL`) |
 | `@<identifier>` | empty string for unknown identifiers (reserved for future tokens) |
 
 Token names are case‑insensitive (`@date`, `@DATE`, `@Date` all match). A bare `@` not followed by `@`, a digit, or a letter is rendered as a literal `@`.
@@ -102,10 +102,45 @@ R11 ...
 R12 ...
 ```
 
+## `BREAK-ON <field>`
+
+Syntax: `BREAK-ON` followed by a single field token (DICT-resolved the same way as projection fields). The clause may appear anywhere after the verb / filename and can be combined with `HEADING`, projection fields, and `BY` on `SORT`. Only one `BREAK-ON` clause is permitted per query.
+
+When present, the formatter compares each row’s resolved break-field value (first sub-value of the attribute) against the previous row in **output order** (after `SORT`). When the value changes, a **break line** is emitted immediately before the row that starts the new group. There is no break line before the first row.
+
+Examples:
+
+```text
+LIST CUSTOMERS NAME CITY BREAK-ON CITY
+SORT CUSTOMERS NAME CITY BREAK-ON CITY BY CITY
+```
+
+Diagnostics (stable, test-locked):
+
+- `BREAK-ON requires a field` — emitted when the next token is missing or is a reserved structural keyword (`BY`, `BY-DSND`, `WITH`, `HEADING`, `BREAK-ON`, `TOTAL`).
+- `BREAK-ON can only appear once` — emitted when two `BREAK-ON` clauses appear in the same query.
+
+Unknown break fields fail at execute time with the same `Unknown ENGLISH field "…"` message as projection fields.
+
+### Break-line format
+
+A single line of **79 literal hyphen (`-`) characters** — no spaces, corners, or field text on the break line itself. This is the minimal Pick/ACCESS style; richer printer conventions are deferred.
+
+```text
+-------------------------------------------------------------------------------
+R3 CAROL PARIS
+```
+
+For readable groups, use `SORT … BY` the same field as `BREAK-ON` so records with the same break value appear consecutively.
+
+Break lines count toward `PAGE-LENGTH` when `HEADING` pagination is active (same as data rows).
+
+Queries without `BREAK-ON` are byte-identical to pre–Stage 3 output.
+
 ## Non‑goals (deferred)
 
 Out of current Stage scope (see the [milestone document](milestones/08-english-formatting-layer.md) for the staging):
 
-- `BREAK-ON`, `TOTAL`, attribute substitution `@n` (Stages 3‑4).
+- `TOTAL` and attribute substitution `@n` in `HEADING` (Stage 4).
 - `ID-SUPP`, `FOOTING`, HELP integration (Stages 5‑6).
 - Per-query page-length modifiers (e.g. classic Pick `(P30)`) and printer-class defaults (60-line pages) — deferred beyond Milestone 8.

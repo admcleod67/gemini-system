@@ -115,6 +115,13 @@ namespace PickCore::English {
             return out;
         }
 
+        std::string materializeBreakKey(const std::optional<PickFS::Record> &rec, const FieldRef &breakRef) {
+            if (!rec.has_value() || !breakRef.attributeNo.has_value()) {
+                return {};
+            }
+            return rec->structured().attribute(*breakRef.attributeNo).firstValue();
+        }
+
         std::vector<KeyPart> materializeSortKeys(const PickFS::Record &rec, const std::vector<FieldRef> &refs) {
             std::vector<KeyPart> parts;
             parts.reserve(refs.size());
@@ -188,6 +195,17 @@ namespace PickCore::English {
             }
         }
 
+        std::optional<FieldRef> breakRef;
+        if (plan.query.breakOnField.has_value()) {
+            const FieldRef resolved =
+                dictResolver.resolveField(fs, fn, *plan.query.breakOnField);
+            if (const std::optional<std::string> err = firstUnresolvedFieldError({resolved}, fn)) {
+                error = *err;
+                return;
+            }
+            breakRef = resolved;
+        }
+
         rows.reserve(ids.size());
         std::vector<std::optional<PickFS::Record>> records;
         records.reserve(ids.size());
@@ -202,6 +220,9 @@ namespace PickCore::English {
                 Row row;
                 row.id = id;
                 row.projectedFields = materializeProjection(rec, fields);
+                if (breakRef.has_value()) {
+                    row.breakKey = materializeBreakKey(rec, *breakRef);
+                }
                 rows.push_back(std::move(row));
                 records.push_back(std::move(rec));
             } catch (const std::exception &e) {

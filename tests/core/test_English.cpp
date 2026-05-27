@@ -292,6 +292,153 @@ TEST_CASE("english parser HEADING on bare COUNT preserves heading") {
     CHECK(*q->heading == "Summary");
 }
 
+TEST_CASE("english parser accepts BREAK-ON clause") {
+    PickCore::English::EnglishParser parser;
+    std::string error;
+    const PickCore::English::ParseContext pc;
+
+    const auto withBreak = parser.parse({"LIST", "DATA", "NAME", "BREAK-ON", "CITY"}, pc, error);
+    REQUIRE(withBreak.has_value());
+    CHECK(error.empty());
+    REQUIRE(withBreak->breakOnField.has_value());
+    CHECK(*withBreak->breakOnField == "CITY");
+    REQUIRE(withBreak->fields.size() == 1);
+    CHECK(withBreak->fields[0] == "NAME");
+
+    const auto noBreak = parser.parse({"LIST", "DATA"}, pc, error);
+    REQUIRE(noBreak.has_value());
+    CHECK_FALSE(noBreak->breakOnField.has_value());
+}
+
+TEST_CASE("english parser BREAK-ON rejects missing field") {
+    PickCore::English::EnglishParser parser;
+    std::string error;
+    const PickCore::English::ParseContext pc;
+    const auto q = parser.parse({"LIST", "DATA", "BREAK-ON"}, pc, error);
+    CHECK_FALSE(q.has_value());
+    CHECK(error == "BREAK-ON requires a field");
+}
+
+TEST_CASE("english parser BREAK-ON rejects structural keyword as field") {
+    PickCore::English::EnglishParser parser;
+    std::string error;
+    const PickCore::English::ParseContext pc;
+    const auto q = parser.parse({"LIST", "DATA", "BREAK-ON", "BY"}, pc, error);
+    CHECK_FALSE(q.has_value());
+    CHECK(error == "BREAK-ON requires a field");
+}
+
+TEST_CASE("english parser BREAK-ON rejects duplicates") {
+    PickCore::English::EnglishParser parser;
+    std::string error;
+    const PickCore::English::ParseContext pc;
+    const auto q = parser.parse({"LIST", "DATA", "BREAK-ON", "CITY", "BREAK-ON", "STATE"}, pc, error);
+    CHECK_FALSE(q.has_value());
+    CHECK(error == "BREAK-ON can only appear once");
+}
+
+TEST_CASE("english parser BREAK-ON stripped from projection fields") {
+    PickCore::English::EnglishParser parser;
+    std::string error;
+    const PickCore::English::ParseContext pc;
+    const auto q = parser.parse({"LIST", "DATA", "BREAK-ON", "CITY", "NAME"}, pc, error);
+    REQUIRE(q.has_value());
+    REQUIRE(q->breakOnField.has_value());
+    CHECK(*q->breakOnField == "CITY");
+    REQUIRE(q->fields.size() == 1);
+    CHECK(q->fields[0] == "NAME");
+}
+
+TEST_CASE("english parser BREAK-ON before BY clause works on SORT") {
+    PickCore::English::EnglishParser parser;
+    std::string error;
+    const PickCore::English::ParseContext pc;
+    const auto q = parser.parse({"SORT", "DATA", "NAME", "BREAK-ON", "CITY", "BY", "CITY"}, pc, error);
+    REQUIRE(q.has_value());
+    CHECK(error.empty());
+    REQUIRE(q->breakOnField.has_value());
+    CHECK(*q->breakOnField == "CITY");
+    REQUIRE(q->sortKeys.size() == 1);
+    CHECK(q->sortKeys[0].fieldToken == "CITY");
+}
+
+TEST_CASE("english service LIST with BREAK-ON emits hyphen line on city change") {
+    const auto root = uniqueEnglishTempDir();
+    PickFS::FileSystem fs(root);
+    fs.createFile("DATA");
+    fs.createFile("DICT");
+    fs.write("DICT", PickFS::Record("NAME", "A\n1\n"));
+    fs.write("DICT", PickFS::Record("CITY", "A\n2\n"));
+    fs.write("DATA", PickFS::Record("R1", "ALICE\nLONDON\n"));
+    fs.write("DATA", PickFS::Record("R2", "BOB\nLONDON\n"));
+    fs.write("DATA", PickFS::Record("R3", "CAROL\nPARIS\n"));
+
+    PickCore::English::EnglishService svc;
+    PickCore::English::ParseContext pc;
+    PickCore::English::EnglishRunOptions eo;
+    std::string error;
+    const auto res = svc.run(fs, {"LIST", "DATA", "NAME", "CITY", "BREAK-ON", "CITY"}, pc, eo, error);
+    REQUIRE(res.has_value());
+    CHECK(error.empty());
+    const std::string hyphen(79, '-');
+    bool sawHyphen = false;
+    bool hyphenBeforeParis = false;
+    for (std::size_t i = 0; i < res->lines.size(); ++i) {
+        if (res->lines[i] == hyphen) {
+            sawHyphen = true;
+            if (i + 1U < res->lines.size() && res->lines[i + 1U].find("CAROL") != std::string::npos) {
+                hyphenBeforeParis = true;
+            }
+        }
+    }
+    CHECK(sawHyphen);
+    CHECK(hyphenBeforeParis);
+    CHECK(res->lines[0].find("ALICE") != std::string::npos);
+}
+
+TEST_CASE("english service SORT BY break field groups with hyphen separator") {
+    const auto root = uniqueEnglishTempDir();
+    PickFS::FileSystem fs(root);
+    fs.createFile("DATA");
+    fs.createFile("DICT");
+    fs.write("DICT", PickFS::Record("NAME", "A\n1\n"));
+    fs.write("DICT", PickFS::Record("CITY", "A\n2\n"));
+    fs.write("DATA", PickFS::Record("R3", "CAROL\nPARIS\n"));
+    fs.write("DATA", PickFS::Record("R1", "ALICE\nLONDON\n"));
+    fs.write("DATA", PickFS::Record("R2", "BOB\nLONDON\n"));
+
+    PickCore::English::EnglishService svc;
+    PickCore::English::ParseContext pc;
+    PickCore::English::EnglishRunOptions eo;
+    std::string error;
+    const auto res =
+        svc.run(fs, {"SORT", "DATA", "NAME", "CITY", "BREAK-ON", "CITY", "BY", "CITY"}, pc, eo, error);
+    REQUIRE(res.has_value());
+    CHECK(error.empty());
+    const std::string hyphen(79, '-');
+    REQUIRE(res->lines.size() >= 4);
+    CHECK(res->lines[0].find("ALICE") != std::string::npos);
+    CHECK(res->lines[1].find("BOB") != std::string::npos);
+    CHECK(res->lines[2] == hyphen);
+    CHECK(res->lines[3].find("CAROL") != std::string::npos);
+}
+
+TEST_CASE("english service LIST with unknown BREAK-ON field yields error") {
+    const auto root = uniqueEnglishTempDir();
+    PickFS::FileSystem fs(root);
+    fs.createFile("DATA");
+    fs.createFile("DICT");
+    fs.write("DATA", PickFS::Record("R1", "A\n"));
+
+    PickCore::English::EnglishService svc;
+    PickCore::English::ParseContext pc;
+    PickCore::English::EnglishRunOptions eo;
+    std::string error;
+    CHECK_FALSE(svc.run(fs, {"LIST", "DATA", "BREAK-ON", "NOSUCH"}, pc, eo, error).has_value());
+    CHECK(error.find("Unknown ENGLISH field") != std::string::npos);
+    CHECK(error.find("NOSUCH") != std::string::npos);
+}
+
 TEST_CASE("english service LIST with HEADING emits heading as first line") {
     const auto root = uniqueEnglishTempDir();
     PickFS::FileSystem fs(root);

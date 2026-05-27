@@ -35,6 +35,8 @@ namespace PickCore::English {
         /// Raw HEADING template (Milestone 8 Stage 1). std::nullopt when no HEADING clause.
         /// `@`-token substitution is performed by the formatter at render time.
         std::optional<std::string> heading;
+        /// Field token from `BREAK-ON <field>` (Milestone 8 Stage 3). Resolved in the executor.
+        std::optional<std::string> breakOnField;
     };
 
     struct Plan {
@@ -52,6 +54,9 @@ namespace PickCore::English {
     struct Row {
         std::string id;
         std::vector<std::string> projectedFields;
+        /// Resolved break-field cell (first sub-value). Empty when absent or no attribute.
+        /// Only meaningful when `Query::breakOnField` is set.
+        std::string breakKey;
     };
 
     struct Result {

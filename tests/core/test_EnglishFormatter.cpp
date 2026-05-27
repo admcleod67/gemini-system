@@ -7,12 +7,18 @@
 namespace {
     using namespace PickCore::English;
 
-    Plan makePlan(std::optional<std::string> heading = std::nullopt) {
+    Plan makePlan(std::optional<std::string> heading = std::nullopt,
+                  std::optional<std::string> breakOnField = std::nullopt) {
         Query q;
         q.verb = Verb::LIST;
         q.fileName = "DATA";
         q.heading = std::move(heading);
+        q.breakOnField = std::move(breakOnField);
         return Plan{q};
+    }
+
+    std::string hyphenBreakLine() {
+        return std::string(79, '-');
     }
 
     FormatterContext fixedCtx(int pickDay = 0, int secondsOfDay = 0, int page = 1, int pageLength = 24) {
@@ -35,10 +41,11 @@ namespace {
         return rows;
     }
 
-    Row row(std::string id, std::vector<std::string> fields = {}) {
+    Row row(std::string id, std::vector<std::string> fields = {}, std::string breakKey = {}) {
         Row r;
         r.id = std::move(id);
         r.projectedFields = std::move(fields);
+        r.breakKey = std::move(breakKey);
         return r;
     }
 } // namespace
@@ -148,6 +155,84 @@ TEST_CASE("formatter appends trailing lines after rows") {
     REQUIRE(r.lines.size() == 2);
     CHECK(r.lines[0] == "Top");
     CHECK(r.lines[1] == "3 records selected");
+}
+
+// --- Milestone 8 Stage 3: BREAK-ON ---
+
+TEST_CASE("formatter without BREAK-ON emits no hyphen break lines") {
+    const Plan plan = makePlan();
+    std::vector<Row> rows;
+    rows.push_back(row("R1", {}, "A"));
+    rows.push_back(row("R2", {}, "A"));
+    rows.push_back(row("R3", {}, "B"));
+    const Result r = format(plan, std::move(rows), {}, {}, fixedCtx());
+    REQUIRE(r.lines.size() == 3);
+    for (const std::string &line: r.lines) {
+        CHECK(line != hyphenBreakLine());
+    }
+}
+
+TEST_CASE("formatter BREAK-ON emits hyphen line when breakKey changes") {
+    const Plan plan = makePlan(std::nullopt, "CITY");
+    std::vector<Row> rows;
+    rows.push_back(row("R1", {}, "A"));
+    rows.push_back(row("R2", {}, "A"));
+    rows.push_back(row("R3", {}, "B"));
+    const Result r = format(plan, std::move(rows), {}, {}, fixedCtx());
+    REQUIRE(r.lines.size() == 4);
+    CHECK(r.lines[0] == "R1");
+    CHECK(r.lines[1] == "R2");
+    CHECK(r.lines[2] == hyphenBreakLine());
+    CHECK(r.lines[3] == "R3");
+}
+
+TEST_CASE("formatter BREAK-ON multiple key changes emit multiple hyphen lines") {
+    const Plan plan = makePlan(std::nullopt, "CITY");
+    std::vector<Row> rows;
+    rows.push_back(row("R1", {}, "A"));
+    rows.push_back(row("R2", {}, "B"));
+    rows.push_back(row("R3", {}, "C"));
+    const Result r = format(plan, std::move(rows), {}, {}, fixedCtx());
+    REQUIRE(r.lines.size() == 5);
+    CHECK(r.lines[1] == hyphenBreakLine());
+    CHECK(r.lines[3] == hyphenBreakLine());
+}
+
+TEST_CASE("formatter BREAK-ON single row emits no hyphen line") {
+    const Plan plan = makePlan(std::nullopt, "CITY");
+    const Result r = format(plan, {row("R1", {}, "A")}, {}, {}, fixedCtx());
+    REQUIRE(r.lines.size() == 1);
+    CHECK(r.lines[0] == "R1");
+}
+
+TEST_CASE("formatter BREAK-ON identical keys emit no hyphen line") {
+    const Plan plan = makePlan(std::nullopt, "CITY");
+    std::vector<Row> rows;
+    rows.push_back(row("R1", {}, "X"));
+    rows.push_back(row("R2", {}, "X"));
+    const Result r = format(plan, std::move(rows), {}, {}, fixedCtx());
+    REQUIRE(r.lines.size() == 2);
+    CHECK(r.lines[0] == "R1");
+    CHECK(r.lines[1] == "R2");
+}
+
+TEST_CASE("formatter BREAK-ON hyphen line counts toward pagination") {
+    const Plan plan = makePlan("Top", "CITY");
+    std::vector<Row> rows;
+    rows.push_back(row("R1", {}, "A"));
+    rows.push_back(row("R2", {}, "A"));
+    rows.push_back(row("R3", {}, "B"));
+    const Result r = format(plan, std::move(rows), {}, {}, fixedCtx(0, 0, 1, /*pageLength=*/3));
+    // Page 1: heading + R1 + R2 (3 lines). Before break: page break -> blank + heading.
+    // Page 2: hyphen + R3
+    REQUIRE(r.lines.size() >= 5);
+    CHECK(r.lines[0] == "Top");
+    CHECK(r.lines[1] == "R1");
+    CHECK(r.lines[2] == "R2");
+    CHECK(r.lines[3].empty());
+    CHECK(r.lines[4] == "Top");
+    CHECK(r.lines[5] == hyphenBreakLine());
+    CHECK(r.lines[6] == "R3");
 }
 
 // --- Milestone 8 Stage 2: pagination ---
