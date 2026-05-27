@@ -1022,6 +1022,33 @@ TEST_CASE("shell LIST with HEADING paginates per SET PAGE-LENGTH") {
     }
 }
 
+TEST_CASE("shell LIST with TOTAL emits grand total line") {
+    auto dir = uniqueTempDir();
+    PickFS::FileSystem fs(dir);
+    fs.createFile("DATA");
+    fs.createFile("DICT");
+    fs.write("DICT", PickFS::Record("NAME", "A\n1\n"));
+    fs.write("DICT", PickFS::Record("AMOUNT", "A\n2\n"));
+    fs.write("DATA", PickFS::Record("R1", "ALICE\n100\n"));
+    fs.write("DATA", PickFS::Record("R2", "BOB\n50\n"));
+
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(dir);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("DEFINE-FIELD DICT NAME 1", out, quit);
+    sh.handleLine("DEFINE-FIELD DICT AMOUNT 2", out, quit);
+    out.str("");
+    sh.handleLine("LIST DATA NAME AMOUNT TOTAL AMOUNT", out, quit);
+
+    const std::string s = out.str();
+    CHECK(s.find("TOTAL AMOUNT: 150") != std::string::npos);
+    CHECK(s.find("ALICE") != std::string::npos);
+    CHECK(s.find("BOB") != std::string::npos);
+}
+
 TEST_CASE("shell LIST with BREAK-ON emits full-width hyphen line on group change") {
     auto dir = uniqueTempDir();
     PickFS::FileSystem fs(dir);

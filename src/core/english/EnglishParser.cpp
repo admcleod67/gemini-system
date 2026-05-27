@@ -119,13 +119,14 @@ namespace PickCore::English {
         }
         const Verb verb = *verbOpt;
 
-        // Strip formatting clauses (`HEADING`, `BREAK-ON`) so the rest of the parser
+        // Strip formatting clauses (`HEADING`, `BREAK-ON`, `TOTAL`) so the rest of the parser
         // keeps working on a verb-and-fields token stream. Each may appear anywhere
         // after the verb; only one occurrence of each is allowed.
         std::vector<std::string> tokens;
         tokens.reserve(rawTokens.size());
         std::optional<std::string> heading;
         std::optional<std::string> breakOnField;
+        std::optional<std::string> totalField;
         for (std::size_t k = 0; k < rawTokens.size(); ++k) {
             if (k > 0U && isHeading(rawTokens[k])) {
                 if (heading.has_value()) {
@@ -153,6 +154,19 @@ namespace PickCore::English {
                 ++k; // also skip the break field token
                 continue;
             }
+            if (k > 0U && isTotal(rawTokens[k])) {
+                if (totalField.has_value()) {
+                    error = "TOTAL can only appear once";
+                    return std::nullopt;
+                }
+                if (k + 1U >= rawTokens.size() || isStructuralKeyword(rawTokens[k + 1U])) {
+                    error = "TOTAL requires a field";
+                    return std::nullopt;
+                }
+                totalField = rawTokens[k + 1U];
+                ++k; // also skip the total field token
+                continue;
+            }
             tokens.push_back(rawTokens[k]);
         }
 
@@ -166,6 +180,7 @@ namespace PickCore::English {
             countQuery.fileName = *ctx.imposedFileName;
             countQuery.heading = std::move(heading);
             countQuery.breakOnField = std::move(breakOnField);
+            countQuery.totalField = std::move(totalField);
             return countQuery;
         }
 
@@ -173,6 +188,7 @@ namespace PickCore::English {
         q.verb = verb;
         q.heading = std::move(heading);
         q.breakOnField = std::move(breakOnField);
+        q.totalField = std::move(totalField);
         std::size_t i = 1U;
         if (ctx.implicitFile) {
             if (!ctx.imposedFileName.has_value() || ctx.imposedFileName->empty()) {

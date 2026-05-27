@@ -10,7 +10,8 @@ The ENGLISH service runs a query in two halves:
 
 1. **Executor** (`src/core/english/Executor.cpp`) scans, projects, and sorts records, producing a stream of `Row` values plus any verb-specific summary lines (e.g. `5 records selected` for `SELECT`, the count for `COUNT`).
 2. **Formatter** (`src/core/english/Formatter.cpp`) lays out the row stream into the final `Result.lines` using three internal components:
-   - **LayoutPlanner** — turns the input into a small event stream (`[heading?, break?, row*, trailing*]` when `BREAK-ON` is set).
+   - **LayoutPlanner** — turns the input into a small event stream (`[heading?, total?, break?, row*, total?, trailing*]` when formatting clauses are set).
+   - **Accumulator Engine** — maintains running totals for `TOTAL` fields (Stage 4).
    - **PageManager** — tracks the emitted-line count and the live page number; signals page boundaries (Stage 2).
    - **Renderer** — emits the final line vector, consulting `PageManager` to inject blank-line separators and re-emit the heading at each page boundary.
 
@@ -47,7 +48,7 @@ Heading templates use Pick‑classic `@<token>` substitution, evaluated by the f
 | `@DATE` | current date in `dd MMM yyyy` form — byte-equivalent to BASIC `OCONV(value, "D")` |
 | `@TIME` | current time in `HH:MM:SS` form |
 | `@PAGE` | current page number — incremented at each page boundary (see Pagination below) |
-| `@<digits>` | empty string (reserved for attribute substitution in `HEADING`, lands in Stage 4 with `TOTAL`) |
+| `@<digits>` | first sub-value of attribute *n* from the **last emitted data row**; empty before any row and on the initial heading |
 | `@<identifier>` | empty string for unknown identifiers (reserved for future tokens) |
 
 Token names are case‑insensitive (`@date`, `@DATE`, `@Date` all match). A bare `@` not followed by `@`, a digit, or a letter is rendered as a literal `@`.
@@ -137,10 +138,59 @@ Break lines count toward `PAGE-LENGTH` when `HEADING` pagination is active (same
 
 Queries without `BREAK-ON` are byte-identical to pre–Stage 3 output.
 
+## `TOTAL <field>`
+
+Syntax: `TOTAL` followed by a single field token (DICT-resolved the same way as projection fields). The clause may appear anywhere after the verb / filename and can be combined with `HEADING`, `BREAK-ON`, projection fields, and `BY` on `SORT`. Only one `TOTAL` clause is permitted per query.
+
+The executor reads each row’s total-field cell (first sub-value) and parses it numerically (same rules as sort numeric coercion: strip commas/`$`, prefix `stod`). Empty or non-numeric cells contribute **0**.
+
+When present, the formatter emits:
+
+- **Subtotal** at each `BREAK-ON` boundary — sum of the group that just ended, **before** the hyphen break line
+- **Grand total** once after all data rows, **before** verb trailing lines (`5 records selected`, the `COUNT` value)
+
+Examples:
+
+```text
+LIST CUSTOMERS NAME AMOUNT TOTAL AMOUNT
+SORT CUSTOMERS NAME CITY AMOUNT BREAK-ON CITY TOTAL AMOUNT BY CITY
+```
+
+Diagnostics (stable, test-locked):
+
+- `TOTAL requires a field` — emitted when the next token is missing or is a reserved structural keyword (`BY`, `BY-DSND`, `WITH`, `HEADING`, `BREAK-ON`, `TOTAL`).
+- `TOTAL can only appear once` — emitted when two `TOTAL` clauses appear in the same query.
+
+Unknown total fields fail at execute time with the same `Unknown ENGLISH field "…"` message as projection fields.
+
+### Total-line format
+
+A single plain-text line:
+
+```text
+TOTAL AMOUNT: 1500
+```
+
+Shape: literal `TOTAL`, one space, field token from the clause, colon, one space, accumulated value. Integer sums render without a fractional part; non-integer sums use default `to_string` precision. No padding or column alignment.
+
+With `BREAK-ON` and `TOTAL` together, a typical group change looks like:
+
+```text
+R2 BOB LONDON 50
+TOTAL AMOUNT: 150
+-------------------------------------------------------------------------------
+R3 CAROL PARIS 200
+…
+TOTAL AMOUNT: 350
+```
+
+The final line is the **grand total** for the entire report. Total lines count toward `PAGE-LENGTH` when `HEADING` pagination is active.
+
+Queries without `TOTAL` are byte-identical to pre–Stage 4 output.
+
 ## Non‑goals (deferred)
 
 Out of current Stage scope (see the [milestone document](milestones/08-english-formatting-layer.md) for the staging):
 
-- `TOTAL` and attribute substitution `@n` in `HEADING` (Stage 4).
 - `ID-SUPP`, `FOOTING`, HELP integration (Stages 5‑6).
 - Per-query page-length modifiers (e.g. classic Pick `(P30)`) and printer-class defaults (60-line pages) — deferred beyond Milestone 8.

@@ -8,12 +8,14 @@ namespace {
     using namespace PickCore::English;
 
     Plan makePlan(std::optional<std::string> heading = std::nullopt,
-                  std::optional<std::string> breakOnField = std::nullopt) {
+                  std::optional<std::string> breakOnField = std::nullopt,
+                  std::optional<std::string> totalField = std::nullopt) {
         Query q;
         q.verb = Verb::LIST;
         q.fileName = "DATA";
         q.heading = std::move(heading);
         q.breakOnField = std::move(breakOnField);
+        q.totalField = std::move(totalField);
         return Plan{q};
     }
 
@@ -41,11 +43,17 @@ namespace {
         return rows;
     }
 
-    Row row(std::string id, std::vector<std::string> fields = {}, std::string breakKey = {}) {
+    Row row(std::string id,
+            std::vector<std::string> fields = {},
+            std::string breakKey = {},
+            double totalAddend = 0,
+            std::vector<std::string> headingAttrs = {}) {
         Row r;
         r.id = std::move(id);
         r.projectedFields = std::move(fields);
         r.breakKey = std::move(breakKey);
+        r.totalAddend = totalAddend;
+        r.headingAttrs = std::move(headingAttrs);
         return r;
     }
 } // namespace
@@ -110,7 +118,7 @@ TEST_CASE("formatter @@ escapes to literal @ and disables substitution") {
     CHECK(r.lines[0] == "@DATE");
 }
 
-TEST_CASE("formatter @<digits> renders empty (reserved for Stage 3-4)") {
+TEST_CASE("formatter @<digits> renders empty before any row") {
     const Plan plan = makePlan("Attr @1");
     const Result r = format(plan, {}, {}, {}, fixedCtx());
     REQUIRE(r.lines.size() == 1);
@@ -214,6 +222,112 @@ TEST_CASE("formatter BREAK-ON identical keys emit no hyphen line") {
     REQUIRE(r.lines.size() == 2);
     CHECK(r.lines[0] == "R1");
     CHECK(r.lines[1] == "R2");
+}
+
+// --- Milestone 8 Stage 4: TOTAL ---
+
+TEST_CASE("formatter without TOTAL emits no total lines") {
+    const Plan plan = makePlan();
+    std::vector<Row> rows;
+    rows.push_back(row("R1", {}, {}, 10));
+    rows.push_back(row("R2", {}, {}, 20));
+    const Result r = format(plan, std::move(rows), {}, {}, fixedCtx());
+    REQUIRE(r.lines.size() == 2);
+    for (const std::string &line: r.lines) {
+        CHECK(line.find("TOTAL ") == std::string::npos);
+    }
+}
+
+TEST_CASE("formatter TOTAL emits grand total after rows") {
+    const Plan plan = makePlan(std::nullopt, std::nullopt, "AMOUNT");
+    std::vector<Row> rows;
+    rows.push_back(row("R1", {}, {}, 10));
+    rows.push_back(row("R2", {}, {}, 20));
+    rows.push_back(row("R3", {}, {}, 30));
+    const Result r = format(plan, std::move(rows), {}, {}, fixedCtx());
+    REQUIRE(r.lines.size() == 4);
+    CHECK(r.lines[0] == "R1");
+    CHECK(r.lines[1] == "R2");
+    CHECK(r.lines[2] == "R3");
+    CHECK(r.lines[3] == "TOTAL AMOUNT: 60");
+}
+
+TEST_CASE("formatter TOTAL single row emits grand total only") {
+    const Plan plan = makePlan(std::nullopt, std::nullopt, "AMT");
+    const Result r = format(plan, {row("R1", {}, {}, 42)}, {}, {}, fixedCtx());
+    REQUIRE(r.lines.size() == 2);
+    CHECK(r.lines[0] == "R1");
+    CHECK(r.lines[1] == "TOTAL AMT: 42");
+}
+
+TEST_CASE("formatter BREAK-ON and TOTAL emit subtotal before hyphen then grand total") {
+    const Plan plan = makePlan(std::nullopt, "CITY", "AMT");
+    std::vector<Row> rows;
+    rows.push_back(row("R1", {}, "A", 1));
+    rows.push_back(row("R2", {}, "A", 2));
+    rows.push_back(row("R3", {}, "B", 4));
+    const Result r = format(plan, std::move(rows), {}, {}, fixedCtx());
+    REQUIRE(r.lines.size() == 6);
+    CHECK(r.lines[0] == "R1");
+    CHECK(r.lines[1] == "R2");
+    CHECK(r.lines[2] == "TOTAL AMT: 3");
+    CHECK(r.lines[3] == hyphenBreakLine());
+    CHECK(r.lines[4] == "R3");
+    CHECK(r.lines[5] == "TOTAL AMT: 7");
+}
+
+TEST_CASE("formatter TOTAL with zero rows emits grand total zero") {
+    const Plan plan = makePlan(std::nullopt, std::nullopt, "AMOUNT");
+    const Result r = format(plan, {}, {"5"}, {}, fixedCtx());
+    REQUIRE(r.lines.size() == 2);
+    CHECK(r.lines[0] == "TOTAL AMOUNT: 0");
+    CHECK(r.lines[1] == "5");
+}
+
+TEST_CASE("formatter HEADING @1 uses last emitted row attributes") {
+    const Plan plan = makePlan("Item @1");
+    std::vector<Row> rows;
+    rows.push_back(row("R1", {}, {}, 0, {"ALICE"}));
+    rows.push_back(row("R2", {}, {}, 0, {"BOB"}));
+    const Result r = format(plan, std::move(rows), {}, {}, fixedCtx());
+    REQUIRE(r.lines.size() == 3);
+    CHECK(r.lines[0] == "Item ");
+    CHECK(r.lines[1] == "R1");
+    CHECK(r.lines[2] == "R2");
+}
+
+TEST_CASE("formatter HEADING @1 on page break uses last row on previous page") {
+    const Plan plan = makePlan("Name @1", std::nullopt, std::nullopt);
+    std::vector<Row> rows;
+    rows.push_back(row("R1", {}, {}, 0, {"ALICE"}));
+    rows.push_back(row("R2", {}, {}, 0, {"BOB"}));
+    rows.push_back(row("R3", {}, {}, 0, {"CAROL"}));
+    const Result r = format(plan, std::move(rows), {}, {}, fixedCtx(0, 0, 1, /*pageLength=*/2));
+    // Page 1: heading + R1 (2 lines). Before R2: page break -> blank + heading with @1=ALICE
+    REQUIRE(r.lines.size() >= 5);
+    CHECK(r.lines[0] == "Name ");
+    CHECK(r.lines[1] == "R1");
+    CHECK(r.lines[2].empty());
+    CHECK(r.lines[3] == "Name ALICE");
+    CHECK(r.lines[4] == "R2");
+}
+
+TEST_CASE("formatter TOTAL line counts toward pagination") {
+    const Plan plan = makePlan("Top", std::nullopt, "AMT");
+    std::vector<Row> rows;
+    rows.push_back(row("R1", {}, {}, 1));
+    rows.push_back(row("R2", {}, {}, 2));
+    const Result r = format(plan, std::move(rows), {}, {}, fixedCtx(0, 0, 1, /*pageLength=*/2));
+    // Page 1: heading + R1. Before R2: page break. Page 2: R2 fills page; TOTAL triggers another break.
+    REQUIRE(r.lines.size() >= 8);
+    CHECK(r.lines[0] == "Top");
+    CHECK(r.lines[1] == "R1");
+    CHECK(r.lines[2].empty());
+    CHECK(r.lines[3] == "Top");
+    CHECK(r.lines[4] == "R2");
+    CHECK(r.lines[5].empty());
+    CHECK(r.lines[6] == "Top");
+    CHECK(r.lines[7] == "TOTAL AMT: 3");
 }
 
 TEST_CASE("formatter BREAK-ON hyphen line counts toward pagination") {

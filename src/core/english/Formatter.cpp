@@ -2,6 +2,7 @@
 
 #include "FormatterDateTime.h"
 
+#include <cmath>
 #include <cctype>
 #include <sstream>
 #include <string>
@@ -14,9 +15,11 @@ namespace PickCore::English {
         /// the type lives here so Stage 2-4 (pagination / break-on / totals) can extend it without
         /// touching the public Formatter API.
         struct Event {
-            enum class Kind { Heading, BreakLine, Row, Trailing };
+            enum class Kind { Heading, TotalLine, BreakLine, Row, Trailing };
             Kind kind{};
             const std::string *headingTemplate{nullptr};
+            const std::string *totalFieldToken{nullptr};
+            double totalValue{0};
             const Row *row{nullptr};
             const std::string *trailingText{nullptr};
         };
@@ -31,27 +34,50 @@ namespace PickCore::English {
                           const std::vector<std::string> &trailingLines)
                 : plan_(plan), rows_(rows), trailingLines_(trailingLines) {}
 
+            void pushTotalLine(std::vector<Event> &ev, const double value) const {
+                Event e{};
+                e.kind = Event::Kind::TotalLine;
+                e.totalFieldToken = &*plan_.query.totalField;
+                e.totalValue = value;
+                ev.push_back(e);
+            }
+
             [[nodiscard]] std::vector<Event> events() const {
                 const bool breakOn = plan_.query.breakOnField.has_value();
+                const bool totalOn = plan_.query.totalField.has_value();
                 std::vector<Event> ev;
                 ev.reserve((plan_.query.heading.has_value() ? 1U : 0U) + rows_.size() +
-                           (breakOn ? rows_.size() : 0U) + trailingLines_.size());
+                           (breakOn ? rows_.size() : 0U) + (totalOn ? rows_.size() + 1U : 0U) +
+                           trailingLines_.size());
                 if (plan_.query.heading.has_value()) {
                     Event e{};
                     e.kind = Event::Kind::Heading;
                     e.headingTemplate = &*plan_.query.heading;
                     ev.push_back(e);
                 }
+                double groupSum = 0;
+                double grandSum = 0;
                 for (std::size_t ri = 0; ri < rows_.size(); ++ri) {
                     if (breakOn && ri > 0U && rows_[ri].breakKey != rows_[ri - 1U].breakKey) {
+                        if (totalOn) {
+                            pushTotalLine(ev, groupSum);
+                            groupSum = 0;
+                        }
                         Event e{};
                         e.kind = Event::Kind::BreakLine;
                         ev.push_back(e);
+                    }
+                    if (totalOn) {
+                        groupSum += rows_[ri].totalAddend;
+                        grandSum += rows_[ri].totalAddend;
                     }
                     Event e{};
                     e.kind = Event::Kind::Row;
                     e.row = &rows_[ri];
                     ev.push_back(e);
+                }
+                if (totalOn) {
+                    pushTotalLine(ev, grandSum);
                 }
                 for (const std::string &line: trailingLines_) {
                     Event e{};
@@ -117,6 +143,17 @@ namespace PickCore::English {
             return std::string(static_cast<std::size_t>(kReportWidth), '-');
         }
 
+        std::string formatTotalValue(const double value) {
+            if (value == std::trunc(value)) {
+                return std::to_string(static_cast<long long>(value));
+            }
+            return std::to_string(value);
+        }
+
+        std::string renderTotalLine(const std::string &fieldToken, const double value) {
+            return "TOTAL " + fieldToken + ": " + formatTotalValue(value);
+        }
+
         /// Render the `id field1 field2 ...` form. Matches the legacy `formatProjectLine`
         /// byte-for-byte: when `projectedFields` is empty (no record loaded), only the id
         /// is emitted; otherwise each field is prefixed with a single space, including
@@ -133,7 +170,8 @@ namespace PickCore::English {
         /// Expand `@`-tokens in the heading template using Pick-classic rules.
         std::string renderHeading(const std::string &tpl,
                                   const FormatterContext &ctx,
-                                  const PageManager &pages) {
+                                  const PageManager &pages,
+                                  const std::vector<std::string> *headingAttrs) {
             std::string out;
             out.reserve(tpl.size());
             const std::size_t n = tpl.size();
@@ -179,7 +217,17 @@ namespace PickCore::English {
                 }
                 const std::string token = tpl.substr(i + 1U, j - (i + 1U));
                 if (digitsOnly) {
-                    // `@<digits>` (attribute substitution) reserved for Stage 3/4 — empty for now.
+                    if (headingAttrs != nullptr) {
+                        try {
+                            const int attrNo = std::stoi(token);
+                            if (attrNo >= 1 &&
+                                attrNo <= static_cast<int>(headingAttrs->size())) {
+                                out += (*headingAttrs)[static_cast<std::size_t>(attrNo - 1)];
+                            }
+                        } catch (const std::exception &) {
+                            // malformed digit token — empty
+                        }
+                    }
                 } else if (ieq(token, "DATE")) {
                     out += formatDate(ctx.currentPickDay);
                 } else if (ieq(token, "TIME")) {
@@ -204,12 +252,12 @@ namespace PickCore::English {
                      const std::string *headingTemplate)
                 : ctx_(ctx), pages_(pages), headingTemplate_(headingTemplate) {}
 
-            void emitWithPagination(std::vector<std::string> &lines, const std::string &line) const {
+            void emitWithPagination(std::vector<std::string> &lines, const std::string &line) {
                 if (pages_.paginationActive() && pages_.linesOnPage() >= pages_.pageLength()) {
                     lines.emplace_back(); // single blank separator (not counted on new page)
                     pages_.advancePage();
                     if (headingTemplate_ != nullptr) {
-                        lines.push_back(renderHeading(*headingTemplate_, ctx_, pages_));
+                        lines.push_back(renderHeading(*headingTemplate_, ctx_, pages_, lastHeadingAttrs_));
                         pages_.onLineEmitted();
                     }
                 }
@@ -217,13 +265,17 @@ namespace PickCore::English {
                 pages_.onLineEmitted();
             }
 
-            [[nodiscard]] std::vector<std::string> render(const std::vector<Event> &events) const {
+            [[nodiscard]] std::vector<std::string> render(const std::vector<Event> &events) {
                 std::vector<std::string> lines;
                 lines.reserve(events.size());
                 for (const Event &e: events) {
                     if (e.kind == Event::Kind::Heading) {
-                        lines.push_back(renderHeading(*e.headingTemplate, ctx_, pages_));
+                        lines.push_back(renderHeading(*e.headingTemplate, ctx_, pages_, lastHeadingAttrs_));
                         pages_.onLineEmitted();
+                        continue;
+                    }
+                    if (e.kind == Event::Kind::TotalLine) {
+                        emitWithPagination(lines, renderTotalLine(*e.totalFieldToken, e.totalValue));
                         continue;
                     }
                     if (e.kind == Event::Kind::BreakLine) {
@@ -232,6 +284,7 @@ namespace PickCore::English {
                     }
                     if (e.kind == Event::Kind::Row) {
                         emitWithPagination(lines, renderProjection(*e.row));
+                        lastHeadingAttrs_ = &e.row->headingAttrs;
                         continue;
                     }
                     if (e.kind == Event::Kind::Trailing) {
@@ -245,6 +298,7 @@ namespace PickCore::English {
             const FormatterContext &ctx_;
             PageManager &pages_;
             const std::string *headingTemplate_;
+            const std::vector<std::string> *lastHeadingAttrs_{nullptr};
         };
     } // namespace
 
@@ -266,7 +320,7 @@ namespace PickCore::English {
         const bool hasHeading = plan.query.heading.has_value();
         PageManager pages(ctx, hasHeading);
         const std::string *headingTemplate = hasHeading ? &*plan.query.heading : nullptr;
-        const Renderer renderer(ctx, pages, headingTemplate);
+        Renderer renderer(ctx, pages, headingTemplate);
         Result result;
         result.lines = renderer.render(planner.events());
         result.selectedIds = std::move(selectedIds);

@@ -122,6 +122,81 @@ namespace PickCore::English {
             return rec->structured().attribute(*breakRef.attributeNo).firstValue();
         }
 
+        std::string materializeTotalCell(const std::optional<PickFS::Record> &rec, const FieldRef &totalRef) {
+            if (!rec.has_value() || !totalRef.attributeNo.has_value()) {
+                return {};
+            }
+            return rec->structured().attribute(*totalRef.attributeNo).firstValue();
+        }
+
+        /// Largest 1-based attribute index referenced by `@<digits>` tokens in a HEADING template.
+        int maxHeadingAttributeIndex(const std::string &tpl) {
+            int maxAttr = 0;
+            const std::size_t n = tpl.size();
+            for (std::size_t i = 0; i < n;) {
+                if (tpl[i] != '@') {
+                    ++i;
+                    continue;
+                }
+                if (i + 1U >= n) {
+                    ++i;
+                    continue;
+                }
+                if (tpl[i + 1U] == '@') {
+                    i += 2U;
+                    continue;
+                }
+                const unsigned char nu = static_cast<unsigned char>(tpl[i + 1U]);
+                if (!std::isdigit(nu)) {
+                    ++i;
+                    continue;
+                }
+                std::size_t j = i + 1U;
+                bool digitsOnly = true;
+                while (j < n) {
+                    const unsigned char cj = static_cast<unsigned char>(tpl[j]);
+                    if (!std::isalpha(cj) && !std::isdigit(cj)) {
+                        break;
+                    }
+                    if (!std::isdigit(cj)) {
+                        digitsOnly = false;
+                    }
+                    ++j;
+                }
+                if (digitsOnly) {
+                    const std::string token = tpl.substr(i + 1U, j - (i + 1U));
+                    try {
+                        const int attrNo = std::stoi(token);
+                        if (attrNo > maxAttr) {
+                            maxAttr = attrNo;
+                        }
+                    } catch (const std::exception &) {
+                        // ignore malformed digit runs
+                    }
+                }
+                i = j;
+            }
+            return maxAttr;
+        }
+
+        void materializeHeadingAttrs(const PickFS::Record &rec,
+                                     const int maxAttr,
+                                     std::vector<std::string> &out) {
+            if (maxAttr <= 0) {
+                out.clear();
+                return;
+            }
+            out.resize(static_cast<std::size_t>(maxAttr));
+            for (int n = 1; n <= maxAttr; ++n) {
+                if (rec.structured().hasAttribute(n)) {
+                    out[static_cast<std::size_t>(n - 1)] =
+                        rec.structured().attribute(n).firstValue();
+                } else {
+                    out[static_cast<std::size_t>(n - 1)].clear();
+                }
+            }
+        }
+
         std::vector<KeyPart> materializeSortKeys(const PickFS::Record &rec, const std::vector<FieldRef> &refs) {
             std::vector<KeyPart> parts;
             parts.reserve(refs.size());
@@ -206,6 +281,19 @@ namespace PickCore::English {
             breakRef = resolved;
         }
 
+        std::optional<FieldRef> totalRef;
+        if (plan.query.totalField.has_value()) {
+            const FieldRef resolved = dictResolver.resolveField(fs, fn, *plan.query.totalField);
+            if (const std::optional<std::string> err = firstUnresolvedFieldError({resolved}, fn)) {
+                error = *err;
+                return;
+            }
+            totalRef = resolved;
+        }
+
+        const int headingMaxAttr =
+            plan.query.heading.has_value() ? maxHeadingAttributeIndex(*plan.query.heading) : 0;
+
         rows.reserve(ids.size());
         std::vector<std::optional<PickFS::Record>> records;
         records.reserve(ids.size());
@@ -222,6 +310,13 @@ namespace PickCore::English {
                 row.projectedFields = materializeProjection(rec, fields);
                 if (breakRef.has_value()) {
                     row.breakKey = materializeBreakKey(rec, *breakRef);
+                }
+                if (totalRef.has_value()) {
+                    const std::string cell = materializeTotalCell(rec, *totalRef);
+                    row.totalAddend = tryParseNumeric(cell).value_or(0.0);
+                }
+                if (headingMaxAttr > 0 && rec.has_value()) {
+                    materializeHeadingAttrs(*rec, headingMaxAttr, row.headingAttrs);
                 }
                 rows.push_back(std::move(row));
                 records.push_back(std::move(rec));

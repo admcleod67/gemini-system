@@ -423,6 +423,173 @@ TEST_CASE("english service SORT BY break field groups with hyphen separator") {
     CHECK(res->lines[3].find("CAROL") != std::string::npos);
 }
 
+TEST_CASE("english parser accepts TOTAL clause") {
+    PickCore::English::EnglishParser parser;
+    std::string error;
+    const PickCore::English::ParseContext pc;
+
+    const auto withTotal = parser.parse({"LIST", "DATA", "NAME", "TOTAL", "AMOUNT"}, pc, error);
+    REQUIRE(withTotal.has_value());
+    CHECK(error.empty());
+    REQUIRE(withTotal->totalField.has_value());
+    CHECK(*withTotal->totalField == "AMOUNT");
+    REQUIRE(withTotal->fields.size() == 1);
+    CHECK(withTotal->fields[0] == "NAME");
+
+    const auto noTotal = parser.parse({"LIST", "DATA"}, pc, error);
+    REQUIRE(noTotal.has_value());
+    CHECK_FALSE(noTotal->totalField.has_value());
+}
+
+TEST_CASE("english parser TOTAL rejects missing field") {
+    PickCore::English::EnglishParser parser;
+    std::string error;
+    const PickCore::English::ParseContext pc;
+    const auto q = parser.parse({"LIST", "DATA", "TOTAL"}, pc, error);
+    CHECK_FALSE(q.has_value());
+    CHECK(error == "TOTAL requires a field");
+}
+
+TEST_CASE("english parser TOTAL rejects structural keyword as field") {
+    PickCore::English::EnglishParser parser;
+    std::string error;
+    const PickCore::English::ParseContext pc;
+    const auto q = parser.parse({"LIST", "DATA", "TOTAL", "BY"}, pc, error);
+    CHECK_FALSE(q.has_value());
+    CHECK(error == "TOTAL requires a field");
+}
+
+TEST_CASE("english parser TOTAL rejects duplicates") {
+    PickCore::English::EnglishParser parser;
+    std::string error;
+    const PickCore::English::ParseContext pc;
+    const auto q = parser.parse({"LIST", "DATA", "TOTAL", "AMOUNT", "TOTAL", "QTY"}, pc, error);
+    CHECK_FALSE(q.has_value());
+    CHECK(error == "TOTAL can only appear once");
+}
+
+TEST_CASE("english parser TOTAL stripped from projection fields") {
+    PickCore::English::EnglishParser parser;
+    std::string error;
+    const PickCore::English::ParseContext pc;
+    const auto q = parser.parse({"LIST", "DATA", "TOTAL", "AMOUNT", "NAME"}, pc, error);
+    REQUIRE(q.has_value());
+    REQUIRE(q->totalField.has_value());
+    CHECK(*q->totalField == "AMOUNT");
+    REQUIRE(q->fields.size() == 1);
+    CHECK(q->fields[0] == "NAME");
+}
+
+TEST_CASE("english parser TOTAL with BREAK-ON and HEADING on SORT") {
+    PickCore::English::EnglishParser parser;
+    std::string error;
+    const PickCore::English::ParseContext pc;
+    const auto q = parser.parse({"SORT", "DATA", "NAME", "HEADING", "Report", "BREAK-ON", "CITY",
+                                 "TOTAL", "AMOUNT", "BY", "CITY"},
+                                pc, error);
+    REQUIRE(q.has_value());
+    CHECK(error.empty());
+    REQUIRE(q->heading.has_value());
+    REQUIRE(q->breakOnField.has_value());
+    REQUIRE(q->totalField.has_value());
+    CHECK(*q->totalField == "AMOUNT");
+}
+
+TEST_CASE("english parser TOTAL on bare COUNT preserves totalField") {
+    PickCore::English::EnglishParser parser;
+    std::string error;
+    PickCore::English::ParseContext pc;
+    pc.implicitFile = true;
+    pc.imposedFileName = "DATA";
+    const auto q = parser.parse({"COUNT", "TOTAL", "AMOUNT"}, pc, error);
+    REQUIRE(q.has_value());
+    REQUIRE(q->totalField.has_value());
+    CHECK(*q->totalField == "AMOUNT");
+}
+
+TEST_CASE("english service SORT with BREAK-ON and TOTAL emits subtotals and grand total") {
+    const auto root = uniqueEnglishTempDir();
+    PickFS::FileSystem fs(root);
+    fs.createFile("DATA");
+    fs.createFile("DICT");
+    fs.write("DICT", PickFS::Record("NAME", "A\n1\n"));
+    fs.write("DICT", PickFS::Record("CITY", "A\n2\n"));
+    fs.write("DICT", PickFS::Record("AMOUNT", "A\n3\n"));
+    fs.write("DATA", PickFS::Record("R1", "ALICE\nLONDON\n100\n"));
+    fs.write("DATA", PickFS::Record("R2", "BOB\nLONDON\n50\n"));
+    fs.write("DATA", PickFS::Record("R3", "CAROL\nPARIS\n200\n"));
+
+    PickCore::English::EnglishService svc;
+    PickCore::English::ParseContext pc;
+    PickCore::English::EnglishRunOptions eo;
+    std::string error;
+    const auto res = svc.run(fs,
+                             {"SORT", "DATA", "NAME", "CITY", "AMOUNT", "BREAK-ON", "CITY", "TOTAL",
+                              "AMOUNT", "BY", "CITY"},
+                             pc, eo, error);
+    REQUIRE(res.has_value());
+    CHECK(error.empty());
+    const std::string hyphen(79, '-');
+    bool sawSubtotal = false;
+    bool sawGrandTotal = false;
+    bool totalBeforeHyphen = false;
+    for (std::size_t i = 0; i < res->lines.size(); ++i) {
+        if (res->lines[i] == "TOTAL AMOUNT: 150") {
+            sawSubtotal = true;
+            if (i + 1U < res->lines.size() && res->lines[i + 1U] == hyphen) {
+                totalBeforeHyphen = true;
+            }
+        }
+        if (res->lines[i] == "TOTAL AMOUNT: 350") {
+            sawGrandTotal = true;
+        }
+    }
+    CHECK(sawSubtotal);
+    CHECK(sawGrandTotal);
+    CHECK(totalBeforeHyphen);
+}
+
+TEST_CASE("english service TOTAL treats non-numeric cells as zero") {
+    const auto root = uniqueEnglishTempDir();
+    PickFS::FileSystem fs(root);
+    fs.createFile("DATA");
+    fs.createFile("DICT");
+    fs.write("DICT", PickFS::Record("AMOUNT", "A\n1\n"));
+    fs.write("DATA", PickFS::Record("R1", "100\n"));
+    fs.write("DATA", PickFS::Record("R2", "N/A\n"));
+
+    PickCore::English::EnglishService svc;
+    PickCore::English::ParseContext pc;
+    PickCore::English::EnglishRunOptions eo;
+    std::string error;
+    const auto res = svc.run(fs, {"LIST", "DATA", "TOTAL", "AMOUNT"}, pc, eo, error);
+    REQUIRE(res.has_value());
+    CHECK(error.empty());
+    bool sawGrand = false;
+    for (const std::string &line: res->lines) {
+        if (line == "TOTAL AMOUNT: 100") {
+            sawGrand = true;
+        }
+    }
+    CHECK(sawGrand);
+}
+
+TEST_CASE("english service LIST with unknown TOTAL field yields error") {
+    const auto root = uniqueEnglishTempDir();
+    PickFS::FileSystem fs(root);
+    fs.createFile("DATA");
+    fs.createFile("DICT");
+    fs.write("DATA", PickFS::Record("R1", "A\n"));
+
+    PickCore::English::EnglishService svc;
+    PickCore::English::ParseContext pc;
+    PickCore::English::EnglishRunOptions eo;
+    std::string error;
+    CHECK_FALSE(svc.run(fs, {"LIST", "DATA", "TOTAL", "NOSUCH"}, pc, eo, error).has_value());
+    CHECK(error.find("Unknown ENGLISH field") != std::string::npos);
+    CHECK(error.find("NOSUCH") != std::string::npos);
+}
+
 TEST_CASE("english service LIST with unknown BREAK-ON field yields error") {
     const auto root = uniqueEnglishTempDir();
     PickFS::FileSystem fs(root);

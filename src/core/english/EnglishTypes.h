@@ -37,6 +37,8 @@ namespace PickCore::English {
         std::optional<std::string> heading;
         /// Field token from `BREAK-ON <field>` (Milestone 8 Stage 3). Resolved in the executor.
         std::optional<std::string> breakOnField;
+        /// Field token from `TOTAL <field>` (Milestone 8 Stage 4). Resolved in the executor.
+        std::optional<std::string> totalField;
     };
 
     struct Plan {
@@ -57,6 +59,10 @@ namespace PickCore::English {
         /// Resolved break-field cell (first sub-value). Empty when absent or no attribute.
         /// Only meaningful when `Query::breakOnField` is set.
         std::string breakKey;
+        /// Numeric addend for TOTAL when `Query::totalField` is set. 0 when cell is empty/non-numeric.
+        double totalAddend{0};
+        /// 1-based attribute first-values for HEADING `@n` substitution (index 0 = attribute 1).
+        std::vector<std::string> headingAttrs;
     };
 
     struct Result {

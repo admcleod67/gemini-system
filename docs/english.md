@@ -118,12 +118,14 @@ The formatting layer (headings, breaks, totals, pagination) is staged in Milesto
 - **`HEADING "<text>"`** — Pick‑classic `@`-token substitution (`@DATE`, `@TIME`, `@PAGE`, `@@` escape).
 - **Pagination** — configurable via `SET PAGE-LENGTH n` (default 24) when a `HEADING` is present.
 - **`BREAK-ON <field>`** — full-width hyphen break line when the break-field value changes between consecutive rows.
+- **`TOTAL <field>`** — numeric accumulation with subtotals at break boundaries and a grand total at end of report (`TOTAL <field>: <value>`).
+- **`@<digits>` in `HEADING`** — attribute substitution from the last emitted data row.
 
 See [docs/english-formatting.md](english-formatting.md) for syntax, token tables, and behaviour. Queries without formatting clauses remain byte-identical to the pre‑M8 executor output.
 
 ## Non-goals (deferred)
 
-- Totals and `ID-SUPP` (deferred to later Milestone 8 stages).
+- `ID-SUPP` (deferred to later Milestone 8 stages).
 - Executed `WITH` predicates.
 - Full `MD` / date-mask / currency semantics and correlatives.
 - Legacy Tcl `SORT` for non-ENGLISH-shaped input.
