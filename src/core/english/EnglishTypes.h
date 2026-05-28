@@ -41,6 +41,8 @@ namespace PickCore::English {
         std::optional<std::string> totalField;
         /// When true, `ID-SUPP` suppresses record ids on formatted data rows (M8 Stage 5).
         bool idSupp{false};
+        /// Raw FOOTING template (M8 Stage 6). std::nullopt when no FOOTING clause.
+        std::optional<std::string> footing;
     };
 
     struct Plan {

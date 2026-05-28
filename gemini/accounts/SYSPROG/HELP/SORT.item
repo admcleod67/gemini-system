@@ -1,7 +1,8 @@
 HELP SORT
   SORT <file> [fields...] BY <field> [BY-DSND ...]
   Formatting clauses (any position after verb/file):
-    HEADING "text" — @DATE @TIME @PAGE @<n> substitution
+    HEADING "text"  FOOTING "text" — @DATE @TIME @PAGE @<n>
     BREAK-ON <field>  TOTAL <field>  ID-SUPP
+  FOOTING once at end without HEADING; per-page with HEADING + PAGE-LENGTH
   Pagination: SET PAGE-LENGTH n | GET PAGE-LENGTH (when HEADING present)
   See docs/english-formatting.md and docs/english.md

@@ -60,8 +60,8 @@ Status labels:
 
 - **Core query verbs** — `Implemented`
   - `LIST`, `SORT`, `COUNT`, `SELECT` core pipeline is in place.
-- **Report-writer/formatting surface** — `Deferred`
-  - `HEADING`, `BREAK-ON`, `TOTAL`, pagination, and related features remain deferred.
+- **Report-writer/formatting surface** — `Implemented`
+  - `HEADING`, `FOOTING`, `BREAK-ON`, `TOTAL`, `ID-SUPP`, and `SET PAGE-LENGTH` pagination are available on `LIST` / `SORT` / `SELECT` / `COUNT`.
 
 ## BASIC
 

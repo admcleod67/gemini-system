@@ -1,2 +1,3 @@
 HELP ENGLISH
   ENGLISH core: LIST, SORT, COUNT, SELECT — see docs/english.md and docs/filesystem-m3.md.
+  Report formatting: HEADING, FOOTING, BREAK-ON, TOTAL, ID-SUPP — docs/english-formatting.md.

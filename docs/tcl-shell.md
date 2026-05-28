@@ -99,6 +99,27 @@ For ENGLISH command forms and worked query examples, see [ENGLISH query core](en
 
 Unknown first token: **`Unknown command: …`**.
 
+### ENGLISH report formatting
+
+`LIST`, `SORT`, `SELECT`, and `COUNT` accept optional formatting clauses on the same line as the query (see [ENGLISH formatting](english-formatting.md)):
+
+| Clause | Summary |
+| --- | --- |
+| **`HEADING "text"`** | First output line; re-printed at each page break when paginated. `@DATE`, `@TIME`, `@PAGE`, `@<n>`, `@@`. |
+| **`FOOTING "text"`** | Footer once at end of report without `HEADING`; per-page footer when `HEADING` + pagination. Same `@` tokens. |
+| **`BREAK-ON`** *field* | 79-hyphen break line when the field value changes. |
+| **`TOTAL`** *field* | `TOTAL field: value` at break boundaries and end of report. |
+| **`ID-SUPP`** | Data rows omit record ids (fields only). |
+
+Page length defaults to **24** lines and is session-scoped: **`SET PAGE-LENGTH`** *n* (positive integer), **`GET PAGE-LENGTH`**, resets on **`LOGOFF`**. Pagination applies only when a **`HEADING`** is present.
+
+Example:
+
+```text
+SET PAGE-LENGTH 30
+LIST CUSTOMERS NAME CITY HEADING "Customer list — @DATE" FOOTING "Page @PAGE — confidential"
+```
+
 ## TCL EDIT (line record editor)
 
 `EDIT` is a **Tcl-level** session (not BASIC mode). **BASIC EDIT** uses the same **`LineRecordEditor`** implementation via an internal host callback (flush current source, run the editor, reload from disk); see [BASIC shell](basic-shell.md).

@@ -129,8 +129,8 @@ namespace PickCore::English {
             return rec->structured().attribute(*totalRef.attributeNo).firstValue();
         }
 
-        /// Largest 1-based attribute index referenced by `@<digits>` tokens in a HEADING template.
-        int maxHeadingAttributeIndex(const std::string &tpl) {
+        /// Largest 1-based attribute index referenced by `@<digits>` tokens in a report template.
+        int maxTemplateAttributeIndex(const std::string &tpl) {
             int maxAttr = 0;
             const std::size_t n = tpl.size();
             for (std::size_t i = 0; i < n;) {
@@ -291,8 +291,13 @@ namespace PickCore::English {
             totalRef = resolved;
         }
 
-        const int headingMaxAttr =
-            plan.query.heading.has_value() ? maxHeadingAttributeIndex(*plan.query.heading) : 0;
+        int templateMaxAttr = 0;
+        if (plan.query.heading.has_value()) {
+            templateMaxAttr = std::max(templateMaxAttr, maxTemplateAttributeIndex(*plan.query.heading));
+        }
+        if (plan.query.footing.has_value()) {
+            templateMaxAttr = std::max(templateMaxAttr, maxTemplateAttributeIndex(*plan.query.footing));
+        }
 
         rows.reserve(ids.size());
         std::vector<std::optional<PickFS::Record>> records;
@@ -315,8 +320,8 @@ namespace PickCore::English {
                     const std::string cell = materializeTotalCell(rec, *totalRef);
                     row.totalAddend = tryParseNumeric(cell).value_or(0.0);
                 }
-                if (headingMaxAttr > 0 && rec.has_value()) {
-                    materializeHeadingAttrs(*rec, headingMaxAttr, row.headingAttrs);
+                if (templateMaxAttr > 0 && rec.has_value()) {
+                    materializeHeadingAttrs(*rec, templateMaxAttr, row.headingAttrs);
                 }
                 rows.push_back(std::move(row));
                 records.push_back(std::move(rec));

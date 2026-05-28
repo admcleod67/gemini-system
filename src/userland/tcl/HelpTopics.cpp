@@ -14,8 +14,9 @@ namespace PickShell::HelpTopics {
 
         constexpr const char kEnglishFormattingClausesHelp[] =
             "  Formatting clauses (any position after verb/file):\n"
-            "    HEADING \"text\" — @DATE @TIME @PAGE @<n> substitution\n"
+            "    HEADING \"text\"  FOOTING \"text\" — @DATE @TIME @PAGE @<n>\n"
             "    BREAK-ON <field>  TOTAL <field>  ID-SUPP\n"
+            "  FOOTING once at end without HEADING; per-page with HEADING + PAGE-LENGTH\n"
             "  Pagination: SET PAGE-LENGTH n | GET PAGE-LENGTH (when HEADING present)\n"
             "  See docs/english-formatting.md\n";
 

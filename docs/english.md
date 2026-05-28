@@ -113,22 +113,19 @@ CLEAR-LIST
 
 ## Report formatting
 
-The formatting layer (headings, breaks, totals, pagination) is staged in Milestone 8. Implemented so far:
+Milestone 8 report-formatting clauses (full detail in [docs/english-formatting.md](english-formatting.md)):
 
-- **`HEADING "<text>"`** — Pick‑classic `@`-token substitution (`@DATE`, `@TIME`, `@PAGE`, `@@` escape).
+- **`HEADING "<text>"`** — Pick‑classic `@`-token substitution (`@DATE`, `@TIME`, `@PAGE`, `@<digits>`, `@@` escape).
+- **`FOOTING "<text>"`** — same `@` tokens as `HEADING`; once at end of report without `HEADING`, per-page footer when `HEADING` + pagination are active.
 - **Pagination** — configurable via `SET PAGE-LENGTH n` (default 24) when a `HEADING` is present.
 - **`BREAK-ON <field>`** — full-width hyphen break line when the break-field value changes between consecutive rows.
 - **`TOTAL <field>`** — numeric accumulation with subtotals at break boundaries and a grand total at end of report (`TOTAL <field>: <value>`).
-- **`@<digits>` in `HEADING`** — attribute substitution from the last emitted data row.
 - **`ID-SUPP`** — suppress record ids on data rows (fields only).
 
-`HELP LIST`, `HELP SORT`, and `HELP SELECT` document the formatting clauses above.
-
-See [docs/english-formatting.md](english-formatting.md) for syntax, token tables, and behaviour. Queries without formatting clauses remain byte-identical to the pre‑M8 executor output.
+`HELP LIST`, `HELP SORT`, and `HELP SELECT` document these clauses. Queries without formatting clauses remain byte-identical to the pre‑M8 executor output.
 
 ## Non-goals (deferred)
 
-- `FOOTING` (deferred to Milestone 8 Stage 6).
 - Executed `WITH` predicates.
 - Full `MD` / date-mask / currency semantics and correlatives.
 - Legacy Tcl `SORT` for non-ENGLISH-shaped input.

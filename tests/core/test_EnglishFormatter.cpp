@@ -10,7 +10,8 @@ namespace {
     Plan makePlan(std::optional<std::string> heading = std::nullopt,
                   std::optional<std::string> breakOnField = std::nullopt,
                   std::optional<std::string> totalField = std::nullopt,
-                  const bool idSupp = false) {
+                  const bool idSupp = false,
+                  std::optional<std::string> footing = std::nullopt) {
         Query q;
         q.verb = Verb::LIST;
         q.fileName = "DATA";
@@ -18,6 +19,7 @@ namespace {
         q.breakOnField = std::move(breakOnField);
         q.totalField = std::move(totalField);
         q.idSupp = idSupp;
+        q.footing = std::move(footing);
         return Plan{q};
     }
 
@@ -363,6 +365,45 @@ TEST_CASE("formatter HEADING with ID-SUPP suppresses ids on data rows") {
     REQUIRE(r.lines.size() == 2);
     CHECK(r.lines[0] == "Report");
     CHECK(r.lines[1] == "ALICE");
+}
+
+// --- Milestone 8 Stage 6: FOOTING ---
+
+TEST_CASE("formatter FOOTING emits footer before trailing lines") {
+    const Plan plan = makePlan(std::nullopt, std::nullopt, std::nullopt, false, "Done");
+    std::vector<Row> rows;
+    rows.push_back(row("R1", {"X"}));
+    const Result r = format(plan, std::move(rows), {"trail"}, {}, fixedCtx());
+    REQUIRE(r.lines.size() == 3);
+    CHECK(r.lines[0] == "R1 X");
+    CHECK(r.lines[1] == "Done");
+    CHECK(r.lines[2] == "trail");
+}
+
+TEST_CASE("formatter HEADING and FOOTING paginated emits footing before page break") {
+    const Plan plan = makePlan("Top", std::nullopt, std::nullopt, false, "Bottom");
+    std::vector<Row> rows;
+    rows.push_back(row("R1"));
+    rows.push_back(row("R2"));
+    rows.push_back(row("R3"));
+    const Result r = format(plan, std::move(rows), {}, {}, fixedCtx(0, 0, 1, /*pageLength=*/3));
+    REQUIRE(r.lines.size() == 8);
+    CHECK(r.lines[0] == "Top");
+    CHECK(r.lines[1] == "R1");
+    CHECK(r.lines[2] == "R2");
+    CHECK(r.lines[3] == "Bottom");
+    CHECK(r.lines[4].empty());
+    CHECK(r.lines[5] == "Top");
+    CHECK(r.lines[6] == "R3");
+    CHECK(r.lines[7] == "Bottom");
+}
+
+TEST_CASE("formatter FOOTING substitutes PAGE from PageManager") {
+    const Plan plan = makePlan(std::nullopt, std::nullopt, std::nullopt, false, "Page @PAGE");
+    const Result r = format(plan, {row("R1")}, {}, {}, fixedCtx(0, 0, 1, 24));
+    REQUIRE(r.lines.size() == 2);
+    CHECK(r.lines[0] == "R1");
+    CHECK(r.lines[1] == "Page 1");
 }
 
 TEST_CASE("formatter BREAK-ON hyphen line counts toward pagination") {

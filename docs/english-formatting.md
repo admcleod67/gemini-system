@@ -10,7 +10,7 @@ The ENGLISH service runs a query in two halves:
 
 1. **Executor** (`src/core/english/Executor.cpp`) scans, projects, and sorts records, producing a stream of `Row` values plus any verb-specific summary lines (e.g. `5 records selected` for `SELECT`, the count for `COUNT`).
 2. **Formatter** (`src/core/english/Formatter.cpp`) lays out the row stream into the final `Result.lines` using three internal components:
-   - **LayoutPlanner** — turns the input into a small event stream (`[heading?, total?, break?, row*, total?, trailing*]` when formatting clauses are set).
+   - **LayoutPlanner** — turns the input into a small event stream (`[heading?, total?, break?, row*, total?, footing?, trailing*]` when formatting clauses are set).
    - **Accumulator Engine** — maintains running totals for `TOTAL` fields (Stage 4).
    - **PageManager** — tracks the emitted-line count and the live page number; signals page boundaries (Stage 2).
    - **Renderer** — emits the final line vector, consulting `PageManager` to inject blank-line separators and re-emit the heading at each page boundary.
@@ -39,7 +39,7 @@ Diagnostics (stable, test-locked):
 
 ### Substitution tokens
 
-Heading templates use Pick‑classic `@<token>` substitution, evaluated by the formatter at render time. The grammar is deliberately small and unambiguous; later stages extend the token table without changing the parser.
+`HEADING` and `FOOTING` templates use Pick‑classic `@<token>` substitution, evaluated by the formatter at render time (`renderReportTemplate`). The grammar is deliberately small and unambiguous.
 
 | Token | Stage 1 output |
 | --- | --- |
@@ -76,9 +76,10 @@ Validation: `PAGE-LENGTH` must be a positive integer; bad inputs emit `SET PAGE-
 Rules:
 
 - **One blank line separator** between pages, followed immediately by the re-rendered `HEADING`. No form feed, no banner.
-- `@PAGE` resolves to the live page number every time it is rendered, so headings on page 2 say `"... 2"` etc.
-- Heading lines, row lines, and verb-trailing lines (`5 records selected`, the count value) all count toward the page line budget. The blank separator does **not** count toward the new page.
-- Pagination only fires for queries that have a `HEADING`. Without a heading the formatter emits the row stream unchanged — byte-identical to the pre‑M8 output.
+- When `FOOTING` is also present, each page break emits the footing **before** the blank separator (if not already emitted on that page), then starts the new page with a fresh heading.
+- `@PAGE` resolves to the live page number every time it is rendered, so headings and footings on page 2 say `"... 2"` etc.
+- Heading lines, row lines, footing lines, and verb-trailing lines (`5 records selected`, the count value) all count toward the page line budget. The blank separator does **not** count toward the new page.
+- Pagination only fires for queries that have a `HEADING`. `FOOTING` alone does not enable pagination; without a heading the footer is emitted once at end of report (see `FOOTING` below).
 - `PAGE-LENGTH` ≤ 0 (only reachable internally via the `EnglishRunOptions::pageLength` plumbing) disables pagination entirely.
 
 Example: 12 records, `SET PAGE-LENGTH 5`, `LIST CUSTOMERS NAME HEADING "Page @PAGE"` produces:
@@ -214,9 +215,35 @@ SORT CUSTOMERS NAME ID-SUPP BY NAME
 
 Queries without `ID-SUPP` are byte-identical to pre–Stage 5 output.
 
+## `FOOTING "<text>"`
+
+Syntax: `FOOTING` followed by a single quoted string. The clause may appear anywhere after the verb / filename and can be combined with `HEADING`, `BREAK-ON`, `TOTAL`, `ID-SUPP`, projection fields, and `BY` on `SORT`. Only one `FOOTING` clause is permitted per query. Allowed on `LIST`, `SORT`, `SELECT`, and `COUNT`.
+
+Substitution uses the same `@` token table as `HEADING` (`@DATE`, `@TIME`, `@PAGE`, `@<digits>` from the last emitted row, `@@` escape).
+
+| Mode | Behaviour |
+| --- | --- |
+| `FOOTING` only (no `HEADING`) | Single footer line after all data rows and any `TOTAL` lines, **before** verb trailing lines (`5 records selected`, the `COUNT` value). |
+| `HEADING` + `FOOTING` + pagination | Footer at the bottom of each page: emitted on page break (before the blank separator) if not yet printed on that page, and once more after the last body event if the final page has no footer yet. |
+
+Examples:
+
+```text
+LIST CUSTOMERS NAME FOOTING "End of report"
+LIST CUSTOMERS NAME HEADING "Customers" FOOTING "Page @PAGE"
+SORT CUSTOMERS BY NAME HEADING "Sorted" FOOTING "Confidential"
+```
+
+Diagnostics (stable, test-locked):
+
+- `FOOTING requires a quoted string` — emitted when the next token is missing or is a reserved structural keyword.
+- `FOOTING can only appear once` — emitted when two `FOOTING` clauses appear in the same query.
+
+Queries without `FOOTING` are byte-identical to pre–Stage 5 output.
+
 ## Non‑goals (deferred)
 
-Out of current Stage scope (see the [milestone document](milestones/08-english-formatting-layer.md) for the staging):
+Out of Milestone 8 scope (see the [milestone document](milestones/08-english-formatting-layer.md)):
 
-- `FOOTING` and HELP/tcl-shell polish (Stage 6).
-- Per-query page-length modifiers (e.g. classic Pick `(P30)`) and printer-class defaults (60-line pages) — deferred beyond Milestone 8.
+- Per-query page-length modifiers (e.g. classic Pick `(P30)`) and printer-class defaults (60-line pages).
+- Printer control codes and spooler integration.

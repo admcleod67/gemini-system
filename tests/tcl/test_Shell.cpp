@@ -1036,6 +1036,7 @@ TEST_CASE("shell builtin HELP LIST SORT SELECT mention formatting clauses") {
     REQUIRE(selectBody.has_value());
     for (const std::string &body: {*listBody, *sortBody, *selectBody}) {
         CHECK(body.find("HEADING") != std::string::npos);
+        CHECK(body.find("FOOTING") != std::string::npos);
         CHECK(body.find("BREAK-ON") != std::string::npos);
         CHECK(body.find("TOTAL") != std::string::npos);
         CHECK(body.find("ID-SUPP") != std::string::npos);
@@ -1053,10 +1054,34 @@ TEST_CASE("shell HELP LIST SORT SELECT mention formatting clauses") {
         sh.handleLine(std::string("HELP ") + verb, out, quit);
         const std::string s = out.str();
         CHECK(s.find("HEADING") != std::string::npos);
+        CHECK(s.find("FOOTING") != std::string::npos);
         CHECK(s.find("BREAK-ON") != std::string::npos);
         CHECK(s.find("TOTAL") != std::string::npos);
         CHECK(s.find("ID-SUPP") != std::string::npos);
     }
+}
+
+TEST_CASE("shell LIST with FOOTING emits footer line") {
+    auto dir = uniqueTempDir();
+    PickFS::FileSystem fs(dir);
+    fs.createFile("DATA");
+    fs.createFile("DICT");
+    fs.write("DICT", PickFS::Record("NAME", "A\n1\n"));
+    fs.write("DATA", PickFS::Record("R1", "ALICE\n"));
+
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(dir);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("DEFINE-FIELD DICT NAME 1", out, quit);
+    out.str("");
+    sh.handleLine("LIST DATA NAME FOOTING \"End of report\"", out, quit);
+
+    const std::string s = out.str();
+    CHECK(s.find("ALICE") != std::string::npos);
+    CHECK(s.find("End of report") != std::string::npos);
 }
 
 TEST_CASE("shell HELP LIST uses committed SYSPROG formatting help when fixture set") {
@@ -1071,6 +1096,7 @@ TEST_CASE("shell HELP LIST uses committed SYSPROG formatting help when fixture s
     bool quit = false;
     sh.handleLine("HELP LIST", out, quit);
     CHECK(out.str().find("ID-SUPP") != std::string::npos);
+    CHECK(out.str().find("FOOTING") != std::string::npos);
     CHECK(out.str().find("english-formatting.md") != std::string::npos);
 }
 

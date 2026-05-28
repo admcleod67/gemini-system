@@ -681,6 +681,85 @@ TEST_CASE("english service LIST with ID-SUPP omits record ids") {
     CHECK(baseline->lines[0] == "R1 ALICE");
 }
 
+TEST_CASE("english parser accepts FOOTING clause") {
+    PickCore::English::EnglishParser parser;
+    std::string error;
+    const PickCore::English::ParseContext pc;
+
+    const auto withFoot = parser.parse({"LIST", "DATA", "FOOTING", "End"}, pc, error);
+    REQUIRE(withFoot.has_value());
+    CHECK(error.empty());
+    REQUIRE(withFoot->footing.has_value());
+    CHECK(*withFoot->footing == "End");
+    CHECK_FALSE(withFoot->fields.size() > 0);
+
+    const auto noFoot = parser.parse({"LIST", "DATA"}, pc, error);
+    REQUIRE(noFoot.has_value());
+    CHECK_FALSE(noFoot->footing.has_value());
+}
+
+TEST_CASE("english parser FOOTING rejects missing quoted string") {
+    PickCore::English::EnglishParser parser;
+    std::string error;
+    const PickCore::English::ParseContext pc;
+    const auto q = parser.parse({"LIST", "DATA", "FOOTING"}, pc, error);
+    CHECK_FALSE(q.has_value());
+    CHECK(error == "FOOTING requires a quoted string");
+}
+
+TEST_CASE("english parser FOOTING rejects duplicates") {
+    PickCore::English::EnglishParser parser;
+    std::string error;
+    const PickCore::English::ParseContext pc;
+    const auto q = parser.parse({"LIST", "DATA", "FOOTING", "A", "FOOTING", "B"}, pc, error);
+    CHECK_FALSE(q.has_value());
+    CHECK(error == "FOOTING can only appear once");
+}
+
+TEST_CASE("english parser HEADING and FOOTING both preserved") {
+    PickCore::English::EnglishParser parser;
+    std::string error;
+    const PickCore::English::ParseContext pc;
+    const auto q = parser.parse({"LIST", "DATA", "HEADING", "H", "FOOTING", "F"}, pc, error);
+    REQUIRE(q.has_value());
+    REQUIRE(q->heading.has_value());
+    REQUIRE(q->footing.has_value());
+    CHECK(*q->heading == "H");
+    CHECK(*q->footing == "F");
+}
+
+TEST_CASE("english parser FOOTING on bare COUNT preserves footing") {
+    PickCore::English::EnglishParser parser;
+    std::string error;
+    PickCore::English::ParseContext pc;
+    pc.implicitFile = true;
+    pc.imposedFileName = "DATA";
+    const auto q = parser.parse({"COUNT", "FOOTING", "X"}, pc, error);
+    REQUIRE(q.has_value());
+    REQUIRE(q->footing.has_value());
+    CHECK(*q->footing == "X");
+}
+
+TEST_CASE("english service LIST with FOOTING emits footer line") {
+    const auto root = uniqueEnglishTempDir();
+    PickFS::FileSystem fs(root);
+    fs.createFile("DATA");
+    fs.createFile("DICT");
+    fs.write("DICT", PickFS::Record("NAME", "A\n1\n"));
+    fs.write("DATA", PickFS::Record("R1", "ALICE\n"));
+
+    PickCore::English::EnglishService svc;
+    PickCore::English::ParseContext pc;
+    PickCore::English::EnglishRunOptions eo;
+    std::string error;
+    const auto res = svc.run(fs, {"LIST", "DATA", "NAME", "FOOTING", "Report footer"}, pc, eo, error);
+    REQUIRE(res.has_value());
+    CHECK(error.empty());
+    REQUIRE(res->lines.size() == 2);
+    CHECK(res->lines[0] == "R1 ALICE");
+    CHECK(res->lines[1] == "Report footer");
+}
+
 TEST_CASE("english service LIST with HEADING emits heading as first line") {
     const auto root = uniqueEnglishTempDir();
     PickFS::FileSystem fs(root);

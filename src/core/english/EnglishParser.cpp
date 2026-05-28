@@ -33,6 +33,10 @@ namespace PickCore::English {
             return ieq(t, "HEADING");
         }
 
+        bool isFooting(const std::string &t) {
+            return ieq(t, "FOOTING");
+        }
+
         bool isBreakOn(const std::string &t) {
             return ieq(t, "BREAK-ON");
         }
@@ -48,8 +52,8 @@ namespace PickCore::English {
         /// True if the token is one of the ENGLISH structural keywords; used to reject
         /// `HEADING BY ...` and similar typos where the user clearly forgot the literal.
         bool isStructuralKeyword(const std::string &t) {
-            return isBy(t) || isByDsnd(t) || isWith(t) || isHeading(t) || isBreakOn(t) || isTotal(t) ||
-                   isIdSupp(t);
+            return isBy(t) || isByDsnd(t) || isWith(t) || isHeading(t) || isFooting(t) || isBreakOn(t) ||
+                   isTotal(t) || isIdSupp(t);
         }
 
         std::optional<Verb> verbFrom(const std::string &t) {
@@ -124,12 +128,13 @@ namespace PickCore::English {
         }
         const Verb verb = *verbOpt;
 
-        // Strip formatting clauses (`HEADING`, `BREAK-ON`, `TOTAL`, `ID-SUPP`) so the rest of
-        // the parser keeps working on a verb-and-fields token stream. Each may appear anywhere
-        // after the verb; only one occurrence of each is allowed.
+        // Strip formatting clauses (`HEADING`, `FOOTING`, `BREAK-ON`, `TOTAL`, `ID-SUPP`) so the
+        // rest of the parser keeps working on a verb-and-fields token stream. Each may appear
+        // anywhere after the verb; only one occurrence of each is allowed.
         std::vector<std::string> tokens;
         tokens.reserve(rawTokens.size());
         std::optional<std::string> heading;
+        std::optional<std::string> footing;
         std::optional<std::string> breakOnField;
         std::optional<std::string> totalField;
         bool idSupp = false;
@@ -145,6 +150,19 @@ namespace PickCore::English {
                 }
                 heading = rawTokens[k + 1U];
                 ++k; // also skip the heading argument
+                continue;
+            }
+            if (k > 0U && isFooting(rawTokens[k])) {
+                if (footing.has_value()) {
+                    error = "FOOTING can only appear once";
+                    return std::nullopt;
+                }
+                if (k + 1U >= rawTokens.size() || isStructuralKeyword(rawTokens[k + 1U])) {
+                    error = "FOOTING requires a quoted string";
+                    return std::nullopt;
+                }
+                footing = rawTokens[k + 1U];
+                ++k; // also skip the footing argument
                 continue;
             }
             if (k > 0U && isBreakOn(rawTokens[k])) {
@@ -196,12 +214,14 @@ namespace PickCore::English {
             countQuery.breakOnField = std::move(breakOnField);
             countQuery.totalField = std::move(totalField);
             countQuery.idSupp = idSupp;
+            countQuery.footing = std::move(footing);
             return countQuery;
         }
 
         Query q{};
         q.verb = verb;
         q.heading = std::move(heading);
+        q.footing = std::move(footing);
         q.breakOnField = std::move(breakOnField);
         q.totalField = std::move(totalField);
         q.idSupp = idSupp;
