@@ -154,11 +154,21 @@ namespace PickCore::English {
             return "TOTAL " + fieldToken + ": " + formatTotalValue(value);
         }
 
-        /// Render the `id field1 field2 ...` form. Matches the legacy `formatProjectLine`
-        /// byte-for-byte: when `projectedFields` is empty (no record loaded), only the id
-        /// is emitted; otherwise each field is prefixed with a single space, including
-        /// empty placeholder fields.
-        std::string renderProjection(const Row &r) {
+        /// Render the `id field1 field2 ...` form (or fields only when `idSupp`).
+        /// Matches the legacy `formatProjectLine` byte-for-byte when `idSupp` is false.
+        std::string renderProjection(const Row &r, const bool idSupp) {
+            if (idSupp) {
+                std::ostringstream out;
+                bool first = true;
+                for (const std::string &f: r.projectedFields) {
+                    if (!first) {
+                        out << ' ';
+                    }
+                    first = false;
+                    out << f;
+                }
+                return out.str();
+            }
             std::ostringstream out;
             out << r.id;
             for (const std::string &f: r.projectedFields) {
@@ -248,9 +258,9 @@ namespace PickCore::English {
         /// re-rendered heading (with the live `@PAGE`) before the next data line.
         class Renderer {
         public:
-            Renderer(const FormatterContext &ctx, PageManager &pages,
-                     const std::string *headingTemplate)
-                : ctx_(ctx), pages_(pages), headingTemplate_(headingTemplate) {}
+            Renderer(const FormatterContext &ctx, PageManager &pages, const std::string *headingTemplate,
+                     const bool idSupp)
+                : ctx_(ctx), pages_(pages), headingTemplate_(headingTemplate), idSupp_(idSupp) {}
 
             void emitWithPagination(std::vector<std::string> &lines, const std::string &line) {
                 if (pages_.paginationActive() && pages_.linesOnPage() >= pages_.pageLength()) {
@@ -283,7 +293,7 @@ namespace PickCore::English {
                         continue;
                     }
                     if (e.kind == Event::Kind::Row) {
-                        emitWithPagination(lines, renderProjection(*e.row));
+                        emitWithPagination(lines, renderProjection(*e.row, idSupp_));
                         lastHeadingAttrs_ = &e.row->headingAttrs;
                         continue;
                     }
@@ -299,6 +309,7 @@ namespace PickCore::English {
             PageManager &pages_;
             const std::string *headingTemplate_;
             const std::vector<std::string> *lastHeadingAttrs_{nullptr};
+            bool idSupp_;
         };
     } // namespace
 
@@ -320,7 +331,7 @@ namespace PickCore::English {
         const bool hasHeading = plan.query.heading.has_value();
         PageManager pages(ctx, hasHeading);
         const std::string *headingTemplate = hasHeading ? &*plan.query.heading : nullptr;
-        Renderer renderer(ctx, pages, headingTemplate);
+        Renderer renderer(ctx, pages, headingTemplate, plan.query.idSupp);
         Result result;
         result.lines = renderer.render(planner.events());
         result.selectedIds = std::move(selectedIds);

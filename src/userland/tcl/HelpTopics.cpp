@@ -12,6 +12,13 @@ namespace PickShell::HelpTopics {
         constexpr const char kBuiltinHelpTopicHelp[] =
             "HELP [topic...]  Type HELP-LIST for topics.  See docs/tcl-shell.md.\n";
 
+        constexpr const char kEnglishFormattingClausesHelp[] =
+            "  Formatting clauses (any position after verb/file):\n"
+            "    HEADING \"text\" — @DATE @TIME @PAGE @<n> substitution\n"
+            "    BREAK-ON <field>  TOTAL <field>  ID-SUPP\n"
+            "  Pagination: SET PAGE-LENGTH n | GET PAGE-LENGTH (when HEADING present)\n"
+            "  See docs/english-formatting.md\n";
+
         void asciiUpperInPlace(std::string &s) {
             for (char &ch: s) {
                 ch = static_cast<char>(std::toupper(static_cast<unsigned char>(ch)));
@@ -171,10 +178,16 @@ namespace PickShell::HelpTopics {
             m.emplace("CREATE-FILE", "CREATE-FILE <name>\n");
             m.emplace("DELETE-FILE", "DELETE-FILE <name>\n");
             m.emplace("LIST-FILES", "LIST-FILES\n");
-            m.emplace("LIST", "LIST <file> [fields... | WITH ...]\n");
+            m.emplace("LIST", std::string{"HELP LIST\n"
+                                          "  LIST <file> [fields... | WITH ...]\n"} +
+                                      kEnglishFormattingClausesHelp);
             m.emplace("COUNT", "COUNT <file> [fields...] | COUNT\n");
-            m.emplace("SELECT", "SELECT <file> [fields...]\n");
-            m.emplace("SORT", "SORT <file> [...] BY ...\n");
+            m.emplace("SELECT", std::string{"HELP SELECT\n"
+                                            "  SELECT <file> [fields...]\n"} +
+                                        kEnglishFormattingClausesHelp);
+            m.emplace("SORT", std::string{"HELP SORT\n"
+                                         "  SORT <file> [fields...] BY <field> [BY-DSND ...]\n"} +
+                                     kEnglishFormattingClausesHelp);
             m.emplace("LIST-LIST", "LIST-LIST\n");
             m.emplace("CLEAR-LIST", "CLEAR-LIST\n");
             m.emplace("RESOLVE-FIELD", "RESOLVE-FIELD <data-file> <field-token>\n");

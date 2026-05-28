@@ -41,10 +41,15 @@ namespace PickCore::English {
             return ieq(t, "TOTAL");
         }
 
+        bool isIdSupp(const std::string &t) {
+            return ieq(t, "ID-SUPP");
+        }
+
         /// True if the token is one of the ENGLISH structural keywords; used to reject
         /// `HEADING BY ...` and similar typos where the user clearly forgot the literal.
         bool isStructuralKeyword(const std::string &t) {
-            return isBy(t) || isByDsnd(t) || isWith(t) || isHeading(t) || isBreakOn(t) || isTotal(t);
+            return isBy(t) || isByDsnd(t) || isWith(t) || isHeading(t) || isBreakOn(t) || isTotal(t) ||
+                   isIdSupp(t);
         }
 
         std::optional<Verb> verbFrom(const std::string &t) {
@@ -119,14 +124,15 @@ namespace PickCore::English {
         }
         const Verb verb = *verbOpt;
 
-        // Strip formatting clauses (`HEADING`, `BREAK-ON`, `TOTAL`) so the rest of the parser
-        // keeps working on a verb-and-fields token stream. Each may appear anywhere
+        // Strip formatting clauses (`HEADING`, `BREAK-ON`, `TOTAL`, `ID-SUPP`) so the rest of
+        // the parser keeps working on a verb-and-fields token stream. Each may appear anywhere
         // after the verb; only one occurrence of each is allowed.
         std::vector<std::string> tokens;
         tokens.reserve(rawTokens.size());
         std::optional<std::string> heading;
         std::optional<std::string> breakOnField;
         std::optional<std::string> totalField;
+        bool idSupp = false;
         for (std::size_t k = 0; k < rawTokens.size(); ++k) {
             if (k > 0U && isHeading(rawTokens[k])) {
                 if (heading.has_value()) {
@@ -167,6 +173,14 @@ namespace PickCore::English {
                 ++k; // also skip the total field token
                 continue;
             }
+            if (k > 0U && isIdSupp(rawTokens[k])) {
+                if (idSupp) {
+                    error = "ID-SUPP can only appear once";
+                    return std::nullopt;
+                }
+                idSupp = true;
+                continue;
+            }
             tokens.push_back(rawTokens[k]);
         }
 
@@ -181,6 +195,7 @@ namespace PickCore::English {
             countQuery.heading = std::move(heading);
             countQuery.breakOnField = std::move(breakOnField);
             countQuery.totalField = std::move(totalField);
+            countQuery.idSupp = idSupp;
             return countQuery;
         }
 
@@ -189,6 +204,7 @@ namespace PickCore::English {
         q.heading = std::move(heading);
         q.breakOnField = std::move(breakOnField);
         q.totalField = std::move(totalField);
+        q.idSupp = idSupp;
         std::size_t i = 1U;
         if (ctx.implicitFile) {
             if (!ctx.imposedFileName.has_value() || ctx.imposedFileName->empty()) {

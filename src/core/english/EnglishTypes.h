@@ -39,6 +39,8 @@ namespace PickCore::English {
         std::optional<std::string> breakOnField;
         /// Field token from `TOTAL <field>` (Milestone 8 Stage 4). Resolved in the executor.
         std::optional<std::string> totalField;
+        /// When true, `ID-SUPP` suppresses record ids on formatted data rows (M8 Stage 5).
+        bool idSupp{false};
     };
 
     struct Plan {

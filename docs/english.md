@@ -120,12 +120,15 @@ The formatting layer (headings, breaks, totals, pagination) is staged in Milesto
 - **`BREAK-ON <field>`** — full-width hyphen break line when the break-field value changes between consecutive rows.
 - **`TOTAL <field>`** — numeric accumulation with subtotals at break boundaries and a grand total at end of report (`TOTAL <field>: <value>`).
 - **`@<digits>` in `HEADING`** — attribute substitution from the last emitted data row.
+- **`ID-SUPP`** — suppress record ids on data rows (fields only).
+
+`HELP LIST`, `HELP SORT`, and `HELP SELECT` document the formatting clauses above.
 
 See [docs/english-formatting.md](english-formatting.md) for syntax, token tables, and behaviour. Queries without formatting clauses remain byte-identical to the pre‑M8 executor output.
 
 ## Non-goals (deferred)
 
-- `ID-SUPP` (deferred to later Milestone 8 stages).
+- `FOOTING` (deferred to Milestone 8 Stage 6).
 - Executed `WITH` predicates.
 - Full `MD` / date-mask / currency semantics and correlatives.
 - Legacy Tcl `SORT` for non-ENGLISH-shaped input.

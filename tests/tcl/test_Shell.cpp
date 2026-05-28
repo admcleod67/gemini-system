@@ -1022,6 +1022,81 @@ TEST_CASE("shell LIST with HEADING paginates per SET PAGE-LENGTH") {
     }
 }
 
+TEST_CASE("shell builtin HELP LIST SORT SELECT mention formatting clauses") {
+    const auto fsDir = uniqueTempDir();
+    PickFS::FileSystem fs(fsDir);
+    const std::optional<std::string> listBody =
+        PickShell::HelpTopics::resolveHelpBody(fs, std::nullopt, fsDir, "LIST");
+    const std::optional<std::string> sortBody =
+        PickShell::HelpTopics::resolveHelpBody(fs, std::nullopt, fsDir, "SORT");
+    const std::optional<std::string> selectBody =
+        PickShell::HelpTopics::resolveHelpBody(fs, std::nullopt, fsDir, "SELECT");
+    REQUIRE(listBody.has_value());
+    REQUIRE(sortBody.has_value());
+    REQUIRE(selectBody.has_value());
+    for (const std::string &body: {*listBody, *sortBody, *selectBody}) {
+        CHECK(body.find("HEADING") != std::string::npos);
+        CHECK(body.find("BREAK-ON") != std::string::npos);
+        CHECK(body.find("TOTAL") != std::string::npos);
+        CHECK(body.find("ID-SUPP") != std::string::npos);
+        CHECK(body.find("english-formatting.md") != std::string::npos);
+    }
+}
+
+TEST_CASE("shell HELP LIST SORT SELECT mention formatting clauses") {
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    std::ostringstream out;
+    bool quit = false;
+    for (const char *verb: {"LIST", "SORT", "SELECT"}) {
+        out.str("");
+        sh.handleLine(std::string("HELP ") + verb, out, quit);
+        const std::string s = out.str();
+        CHECK(s.find("HEADING") != std::string::npos);
+        CHECK(s.find("BREAK-ON") != std::string::npos);
+        CHECK(s.find("TOTAL") != std::string::npos);
+        CHECK(s.find("ID-SUPP") != std::string::npos);
+    }
+}
+
+TEST_CASE("shell HELP LIST uses committed SYSPROG formatting help when fixture set") {
+    if (std::string(PICK_SYSTEM_GEMINI_SYSPROG_FIXTURE).empty()) {
+        return;
+    }
+    const std::filesystem::path sp(PICK_SYSTEM_GEMINI_SYSPROG_FIXTURE);
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(sp);
+    std::ostringstream out;
+    bool quit = false;
+    sh.handleLine("HELP LIST", out, quit);
+    CHECK(out.str().find("ID-SUPP") != std::string::npos);
+    CHECK(out.str().find("english-formatting.md") != std::string::npos);
+}
+
+TEST_CASE("shell LIST with ID-SUPP omits record ids") {
+    auto dir = uniqueTempDir();
+    PickFS::FileSystem fs(dir);
+    fs.createFile("DATA");
+    fs.createFile("DICT");
+    fs.write("DICT", PickFS::Record("NAME", "A\n1\n"));
+    fs.write("DATA", PickFS::Record("R1", "ALICE\n"));
+
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(dir);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("DEFINE-FIELD DICT NAME 1", out, quit);
+    out.str("");
+    sh.handleLine("LIST DATA NAME ID-SUPP", out, quit);
+
+    const std::string s = out.str();
+    CHECK(s.find("ALICE") != std::string::npos);
+    CHECK(s.find("R1") == std::string::npos);
+}
+
 TEST_CASE("shell LIST with TOTAL emits grand total line") {
     auto dir = uniqueTempDir();
     PickFS::FileSystem fs(dir);

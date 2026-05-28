@@ -606,6 +606,81 @@ TEST_CASE("english service LIST with unknown BREAK-ON field yields error") {
     CHECK(error.find("NOSUCH") != std::string::npos);
 }
 
+TEST_CASE("english parser accepts ID-SUPP clause") {
+    PickCore::English::EnglishParser parser;
+    std::string error;
+    const PickCore::English::ParseContext pc;
+
+    const auto withSupp = parser.parse({"LIST", "DATA", "NAME", "ID-SUPP"}, pc, error);
+    REQUIRE(withSupp.has_value());
+    CHECK(error.empty());
+    CHECK(withSupp->idSupp);
+    REQUIRE(withSupp->fields.size() == 1);
+    CHECK(withSupp->fields[0] == "NAME");
+
+    const auto noSupp = parser.parse({"LIST", "DATA"}, pc, error);
+    REQUIRE(noSupp.has_value());
+    CHECK_FALSE(noSupp->idSupp);
+}
+
+TEST_CASE("english parser ID-SUPP rejects duplicates") {
+    PickCore::English::EnglishParser parser;
+    std::string error;
+    const PickCore::English::ParseContext pc;
+    const auto q = parser.parse({"LIST", "DATA", "ID-SUPP", "ID-SUPP"}, pc, error);
+    CHECK_FALSE(q.has_value());
+    CHECK(error == "ID-SUPP can only appear once");
+}
+
+TEST_CASE("english parser ID-SUPP with BREAK-ON strips both flags") {
+    PickCore::English::EnglishParser parser;
+    std::string error;
+    const PickCore::English::ParseContext pc;
+    const auto q = parser.parse({"LIST", "DATA", "ID-SUPP", "BREAK-ON", "CITY", "NAME"}, pc, error);
+    REQUIRE(q.has_value());
+    CHECK(q->idSupp);
+    REQUIRE(q->breakOnField.has_value());
+    CHECK(*q->breakOnField == "CITY");
+    REQUIRE(q->fields.size() == 1);
+    CHECK(q->fields[0] == "NAME");
+}
+
+TEST_CASE("english parser ID-SUPP on bare COUNT preserves flag") {
+    PickCore::English::EnglishParser parser;
+    std::string error;
+    PickCore::English::ParseContext pc;
+    pc.implicitFile = true;
+    pc.imposedFileName = "DATA";
+    const auto q = parser.parse({"COUNT", "ID-SUPP"}, pc, error);
+    REQUIRE(q.has_value());
+    CHECK(q->idSupp);
+}
+
+TEST_CASE("english service LIST with ID-SUPP omits record ids") {
+    const auto root = uniqueEnglishTempDir();
+    PickFS::FileSystem fs(root);
+    fs.createFile("DATA");
+    fs.createFile("DICT");
+    fs.write("DICT", PickFS::Record("NAME", "A\n1\n"));
+    fs.write("DATA", PickFS::Record("R1", "ALICE\n"));
+    fs.write("DATA", PickFS::Record("R2", "BOB\n"));
+
+    PickCore::English::EnglishService svc;
+    PickCore::English::ParseContext pc;
+    PickCore::English::EnglishRunOptions eo;
+    std::string error;
+    const auto res = svc.run(fs, {"LIST", "DATA", "NAME", "ID-SUPP"}, pc, eo, error);
+    REQUIRE(res.has_value());
+    CHECK(error.empty());
+    REQUIRE(res->lines.size() == 2);
+    CHECK(res->lines[0] == "ALICE");
+    CHECK(res->lines[1] == "BOB");
+
+    const auto baseline = svc.run(fs, {"LIST", "DATA", "NAME"}, pc, eo, error);
+    REQUIRE(baseline.has_value());
+    CHECK(baseline->lines[0] == "R1 ALICE");
+}
+
 TEST_CASE("english service LIST with HEADING emits heading as first line") {
     const auto root = uniqueEnglishTempDir();
     PickFS::FileSystem fs(root);

@@ -188,9 +188,35 @@ The final line is the **grand total** for the entire report. Total lines count t
 
 Queries without `TOTAL` are byte-identical to pre–Stage 4 output.
 
+## `ID-SUPP`
+
+Syntax: `ID-SUPP` alone (no argument). The clause may appear anywhere after the verb / filename and can be combined with other formatting clauses. Only one `ID-SUPP` per query.
+
+When present, formatted **data rows** omit the record id prefix. Projection fields are emitted space-separated only.
+
+| Situation | Default output | With `ID-SUPP` |
+| --- | --- | --- |
+| Row with projection fields | `R1 ALICE LONDON` | `ALICE LONDON` |
+| Row with no projection fields | `R1` | empty line |
+
+`HEADING`, break lines, `TOTAL` lines, and verb trailing lines (`5 records selected`, the `COUNT` value) are unchanged. `SELECT` still returns full record ids in the active list (`Result.selectedIds`); only printed data rows are affected.
+
+Diagnostics (stable, test-locked):
+
+- `ID-SUPP can only appear once` — emitted when two `ID-SUPP` clauses appear in the same query.
+
+Examples:
+
+```text
+LIST CUSTOMERS NAME CITY ID-SUPP
+SORT CUSTOMERS NAME ID-SUPP BY NAME
+```
+
+Queries without `ID-SUPP` are byte-identical to pre–Stage 5 output.
+
 ## Non‑goals (deferred)
 
 Out of current Stage scope (see the [milestone document](milestones/08-english-formatting-layer.md) for the staging):
 
-- `ID-SUPP`, `FOOTING`, HELP integration (Stages 5‑6).
+- `FOOTING` and HELP/tcl-shell polish (Stage 6).
 - Per-query page-length modifiers (e.g. classic Pick `(P30)`) and printer-class defaults (60-line pages) — deferred beyond Milestone 8.

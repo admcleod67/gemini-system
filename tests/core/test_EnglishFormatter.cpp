@@ -9,13 +9,15 @@ namespace {
 
     Plan makePlan(std::optional<std::string> heading = std::nullopt,
                   std::optional<std::string> breakOnField = std::nullopt,
-                  std::optional<std::string> totalField = std::nullopt) {
+                  std::optional<std::string> totalField = std::nullopt,
+                  const bool idSupp = false) {
         Query q;
         q.verb = Verb::LIST;
         q.fileName = "DATA";
         q.heading = std::move(heading);
         q.breakOnField = std::move(breakOnField);
         q.totalField = std::move(totalField);
+        q.idSupp = idSupp;
         return Plan{q};
     }
 
@@ -328,6 +330,39 @@ TEST_CASE("formatter TOTAL line counts toward pagination") {
     CHECK(r.lines[5].empty());
     CHECK(r.lines[6] == "Top");
     CHECK(r.lines[7] == "TOTAL AMT: 3");
+}
+
+// --- Milestone 8 Stage 5: ID-SUPP ---
+
+TEST_CASE("formatter without ID-SUPP emits record id on rows") {
+    const Plan plan = makePlan();
+    const Result r = format(plan, {row("R1", {"ALICE"})}, {}, {}, fixedCtx());
+    REQUIRE(r.lines.size() == 1);
+    CHECK(r.lines[0] == "R1 ALICE");
+}
+
+TEST_CASE("formatter ID-SUPP emits fields only") {
+    const Plan plan = makePlan(std::nullopt, std::nullopt, std::nullopt, true);
+    const Result r = format(plan, {row("R1", {"ALICE", "LONDON"})}, {}, {}, fixedCtx());
+    REQUIRE(r.lines.size() == 1);
+    CHECK(r.lines[0] == "ALICE LONDON");
+}
+
+TEST_CASE("formatter ID-SUPP with empty projection emits blank line") {
+    const Plan plan = makePlan(std::nullopt, std::nullopt, std::nullopt, true);
+    const Result r = format(plan, {row("R1", {})}, {}, {}, fixedCtx());
+    REQUIRE(r.lines.size() == 1);
+    CHECK(r.lines[0].empty());
+}
+
+TEST_CASE("formatter HEADING with ID-SUPP suppresses ids on data rows") {
+    const Plan plan = makePlan("Report", std::nullopt, std::nullopt, true);
+    std::vector<Row> rows;
+    rows.push_back(row("R1", {"ALICE"}));
+    const Result r = format(plan, std::move(rows), {}, {}, fixedCtx());
+    REQUIRE(r.lines.size() == 2);
+    CHECK(r.lines[0] == "Report");
+    CHECK(r.lines[1] == "ALICE");
 }
 
 TEST_CASE("formatter BREAK-ON hyphen line counts toward pagination") {

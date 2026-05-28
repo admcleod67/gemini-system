@@ -1,5 +1,5 @@
-HELP LIST
-  LIST <file> [fields... | WITH ...]
+HELP SELECT
+  SELECT <file> [fields...]
   Formatting clauses (any position after verb/file):
     HEADING "text" — @DATE @TIME @PAGE @<n> substitution
     BREAK-ON <field>  TOTAL <field>  ID-SUPP
