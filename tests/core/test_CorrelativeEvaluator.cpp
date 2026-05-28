@@ -119,18 +119,43 @@ TEST_CASE("CorrelativeEvaluator missing attribute error") {
     CHECK(error == "F-type: attribute 9 missing");
 }
 
-TEST_CASE("CorrelativeEvaluator conversion tail not supported in stage 1") {
+TEST_CASE("CorrelativeEvaluator ConversionRaw applies OCONV D") {
     PickFS::StructuredRecord data;
-    data.setAttribute(2, PickFS::RecordAttribute("100"));
+    data.setAttribute(2, PickFS::RecordAttribute("732"));
 
     FCorrelativeDef def;
     def.sourceAttributeNo = 2;
     def.selectorKind = FSelectorKind::ConversionRaw;
-    def.tailRaw = "D2/";
+    def.tailRaw = "D";
 
     std::string error;
-    CHECK_FALSE(CorrelativeEvaluator::evaluateF(def, data, error).has_value());
-    CHECK(error == "F-type conversion not supported");
+    const auto value = CorrelativeEvaluator::evaluateF(def, data, error);
+    REQUIRE(value.has_value());
+    CHECK(error.empty());
+    CHECK(*value == "01 Jan 1970");
+}
+
+TEST_CASE("CorrelativeEvaluator ConversionRaw MD2 and unsupported code") {
+    PickFS::StructuredRecord data;
+    data.setAttribute(1, PickFS::RecordAttribute("1234"));
+
+    FCorrelativeDef md2;
+    md2.sourceAttributeNo = 1;
+    md2.selectorKind = FSelectorKind::ConversionRaw;
+    md2.tailRaw = "MD2";
+
+    std::string error;
+    const auto scaled = CorrelativeEvaluator::evaluateF(md2, data, error);
+    REQUIRE(scaled.has_value());
+    CHECK(*scaled == "12.34");
+
+    FCorrelativeDef bad;
+    bad.sourceAttributeNo = 1;
+    bad.selectorKind = FSelectorKind::ConversionRaw;
+    bad.tailRaw = "D2/";
+    error.clear();
+    CHECK_FALSE(CorrelativeEvaluator::evaluateF(bad, data, error).has_value());
+    CHECK(error == "F-type: unsupported conversion code \"D2/\"");
 }
 
 TEST_CASE("CorrelativeEvaluator empty attribute yields empty string for L") {
@@ -221,6 +246,13 @@ TEST_CASE("DictionaryResolver describeFieldKind and describeFSelector") {
     fRef.fCorrelative->tailRaw = "L";
     CHECK(DictionaryResolver::describeFieldKind(fRef) == "F");
     CHECK(DictionaryResolver::describeFSelector(*fRef.fCorrelative) == "leftmost (L)");
+
+    FieldRef convRef;
+    convRef.kind = DictFieldKind::FCorrelative;
+    convRef.fCorrelative = FCorrelativeDef{};
+    convRef.fCorrelative->selectorKind = FSelectorKind::ConversionRaw;
+    convRef.fCorrelative->tailRaw = "D";
+    CHECK(DictionaryResolver::describeFSelector(*convRef.fCorrelative) == "conversion OCONV \"D\"");
 }
 
 TEST_CASE("DictionaryResolver A-type unchanged") {

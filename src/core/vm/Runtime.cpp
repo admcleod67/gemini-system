@@ -8,6 +8,7 @@
 #include "../filesystem/StructuredRecord.h"
 #include "../filesystem/RecordAttribute.h"
 #include "../english/DictionaryResolver.h"
+#include "../conversion/PickOconv.h"
 
 #include <algorithm>
 #include <cctype>
@@ -759,13 +760,14 @@ namespace PickVM {
         }
 
         Value dispatchConvertCode(ConvertDirection dir, const Value &value, const std::string &codeRaw) {
+            if (dir == ConvertDirection::Output) {
+                return PickCore::Conversion::oconvOutputBuiltin(valueToString(value), codeRaw);
+            }
+
             const std::string code = upperCopy(codeRaw);
-            const char *direction = (dir == ConvertDirection::Output) ? "OCONV" : "ICONV";
+            const char *direction = "ICONV";
 
             if (code == "D") {
-                if (dir == ConvertDirection::Output) {
-                    return dateStringFromPickDay(coerceToInt(value));
-                }
                 bool ok = false;
                 const int day = pickDayFromDateString(valueToString(value), ok);
                 if (!ok) {
@@ -775,9 +777,6 @@ namespace PickVM {
             }
             if (code == "MT" || code == "MTS") {
                 const bool wantSeconds = (code == "MTS");
-                if (dir == ConvertDirection::Output) {
-                    return timeStringFromSeconds(coerceToInt(value), wantSeconds);
-                }
                 bool ok = false;
                 const int n = secondsFromTimeString(valueToString(value), wantSeconds, ok);
                 if (!ok) {
@@ -796,9 +795,6 @@ namespace PickVM {
             }
             if (code == "MD" || code == "MD2") {
                 const int decimals = (code == "MD2") ? 2 : 0;
-                if (dir == ConvertDirection::Output) {
-                    return formatMdScaled(static_cast<long long>(coerceToInt(value)), decimals);
-                }
                 bool ok = false;
                 const long long n = parseMdScaled(valueToString(value), decimals, ok);
                 if (!ok || n < std::numeric_limits<int>::min() || n > std::numeric_limits<int>::max()) {

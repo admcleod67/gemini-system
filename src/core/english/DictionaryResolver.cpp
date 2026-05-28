@@ -221,9 +221,9 @@ namespace PickCore::English {
             case FSelectorKind::Rightmost:
                 return "rightmost (R)";
             case FSelectorKind::ConversionRaw:
-                return "conversion (not evaluated)";
+                return "conversion OCONV \"" + def.tailRaw + "\"";
         }
-        return "conversion (not evaluated)";
+        return "conversion OCONV \"" + def.tailRaw + "\"";
     }
 
     FieldRef DictionaryResolver::resolveField(PickFS::FileSystem &fs,

@@ -50,6 +50,8 @@ add_library(gemini-core
         english/correlatives/DictFItemParser.h
         english/correlatives/CorrelativeEvaluator.cpp
         english/correlatives/CorrelativeEvaluator.h
+        conversion/PickOconv.cpp
+        conversion/PickOconv.h
 )
 
 target_include_directories(
@@ -65,6 +67,7 @@ target_include_directories(
         "${CMAKE_CURRENT_SOURCE_DIR}/boot"
         "${CMAKE_CURRENT_SOURCE_DIR}/md"
         "${CMAKE_CURRENT_SOURCE_DIR}/english"
+        "${CMAKE_CURRENT_SOURCE_DIR}/conversion"
 )
 
 target_link_libraries(gemini-core PUBLIC nlohmann_json::nlohmann_json)

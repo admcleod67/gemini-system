@@ -1291,6 +1291,24 @@ TEST_CASE("shell RESOLVE-FIELD shows F-type DICT layout") {
     CHECK(s.find("Tail (raw): 3") != std::string::npos);
 }
 
+TEST_CASE("shell RESOLVE-FIELD shows OCONV on F-type conversion tail") {
+    auto dir = uniqueTempDir();
+    PickFS::FileSystem fs(dir);
+    fs.createFile("DATA");
+    fs.createFile("DICT");
+    fs.write("DICT", PickFS::Record("PICKDAY", "F\n2\nD\n"));
+
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(dir);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("RESOLVE-FIELD DATA PICKDAY", out, quit);
+    const std::string s = out.str();
+    CHECK(s.find("conversion OCONV \"D\"") != std::string::npos);
+}
+
 TEST_CASE("shell LIST with F-type field emits evaluated value") {
     auto dir = uniqueTempDir();
     PickFS::FileSystem fs(dir);
@@ -1310,6 +1328,24 @@ TEST_CASE("shell LIST with F-type field emits evaluated value") {
     sh.handleLine("LIST DATA THIRD", out, quit);
     CHECK(out.str().find("C") != std::string::npos);
     CHECK(out.str().find("R1") != std::string::npos);
+}
+
+TEST_CASE("shell LIST with F-type OCONV D field") {
+    auto dir = uniqueTempDir();
+    PickFS::FileSystem fs(dir);
+    fs.createFile("DATA");
+    fs.createFile("DICT");
+    fs.write("DICT", PickFS::Record("PICKDAY", "F\n2\nD\n"));
+    fs.write("DATA", PickFS::Record("R1", "X\n732\n"));
+
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(dir);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("LIST DATA PICKDAY", out, quit);
+    CHECK(out.str().find("01 Jan 1970") != std::string::npos);
 }
 
 TEST_CASE("shell DEFINE-FIELD arity missing dict and ENGLISH LIST") {

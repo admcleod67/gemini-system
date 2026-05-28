@@ -27,6 +27,7 @@ add_executable(
         core/test_English.cpp
         core/test_EnglishFormatter.cpp
         core/test_CorrelativeEvaluator.cpp
+        core/test_PickOconv.cpp
         basic/test_BasicBytecodeEmitter.cpp
         basic/test_BasicCompiler.cpp
         basic/test_BasicCompilerGolden.cpp

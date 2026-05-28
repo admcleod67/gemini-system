@@ -1,19 +1,12 @@
 #include "CorrelativeEvaluator.h"
 
-namespace PickCore::English {
-    namespace {
-        constexpr const char *kConversionNotSupported = "F-type conversion not supported";
-    } // namespace
+#include "../../conversion/PickOconv.h"
 
+namespace PickCore::English {
     std::optional<std::string> CorrelativeEvaluator::evaluateF(const FCorrelativeDef &def,
                                                                const PickFS::StructuredRecord &dataRecord,
                                                                std::string &error) {
         error.clear();
-
-        if (def.selectorKind == FSelectorKind::ConversionRaw) {
-            error = kConversionNotSupported;
-            return std::nullopt;
-        }
 
         const int attrNo = def.sourceAttributeNo;
         if (!dataRecord.hasAttribute(attrNo)) {
@@ -22,6 +15,10 @@ namespace PickCore::English {
         }
 
         const PickFS::RecordAttribute &attr = dataRecord.attribute(attrNo);
+
+        if (def.selectorKind == FSelectorKind::ConversionRaw) {
+            return Conversion::oconvOutput(attr.firstValue(), def.tailRaw, error);
+        }
 
         switch (def.selectorKind) {
             case FSelectorKind::ValueIndex: {
@@ -40,12 +37,9 @@ namespace PickCore::English {
                 }
                 return values.back();
             }
-            case FSelectorKind::ConversionRaw:
-                error = kConversionNotSupported;
-                return std::nullopt;
         }
 
-        error = kConversionNotSupported;
+        error = "F-type: invalid selector";
         return std::nullopt;
     }
 

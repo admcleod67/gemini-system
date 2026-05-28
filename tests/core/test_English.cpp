@@ -949,23 +949,41 @@ TEST_CASE("english service SORT BY F-type field") {
     CHECK(res->lines[1] == "R1 C");
 }
 
-TEST_CASE("english service LIST F-type conversion tail yields empty cell") {
+TEST_CASE("english service LIST F-type OCONV D formats date") {
     const auto root = uniqueEnglishTempDir();
     PickFS::FileSystem fs(root);
     fs.createFile("DATA");
     fs.createFile("DICT");
-    fs.write("DICT", PickFS::Record("FMT", "F\n2\nD2/\n"));
-    fs.write("DATA", PickFS::Record("R1", dataRecordWithAttr2Values("100", "200", "300")));
+    fs.write("DICT", PickFS::Record("PICKDAY", "F\n2\nD\n"));
+    fs.write("DATA", PickFS::Record("R1", "X\n732\n"));
 
     PickCore::English::EnglishService svc;
     PickCore::English::ParseContext pc;
     PickCore::English::EnglishRunOptions eo;
     std::string error;
-    const auto res = svc.run(fs, {"LIST", "DATA", "FMT"}, pc, eo, error);
+    const auto res = svc.run(fs, {"LIST", "DATA", "PICKDAY"}, pc, eo, error);
     REQUIRE(res.has_value());
     CHECK(error.empty());
     REQUIRE(res->lines.size() == 1);
-    CHECK(res->lines[0] == "R1 ");
+    CHECK(res->lines[0] == "R1 01 Jan 1970");
+}
+
+TEST_CASE("english service LIST F-type OCONV MD2 formats amount") {
+    const auto root = uniqueEnglishTempDir();
+    PickFS::FileSystem fs(root);
+    fs.createFile("DATA");
+    fs.createFile("DICT");
+    fs.write("DICT", PickFS::Record("AMT", "F\n2\nMD2\n"));
+    fs.write("DATA", PickFS::Record("R1", "X\n1234\n"));
+
+    PickCore::English::EnglishService svc;
+    PickCore::English::ParseContext pc;
+    PickCore::English::EnglishRunOptions eo;
+    std::string error;
+    const auto res = svc.run(fs, {"LIST", "DATA", "AMT"}, pc, eo, error);
+    REQUIRE(res.has_value());
+    REQUIRE(res->lines.size() == 1);
+    CHECK(res->lines[0] == "R1 12.34");
 }
 
 TEST_CASE("english service LIST unknown field still errors with F DICT present") {
