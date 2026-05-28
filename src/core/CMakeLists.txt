@@ -45,6 +45,11 @@ add_library(gemini-core
         english/Formatter.h
         english/FormatterDateTime.cpp
         english/FormatterDateTime.h
+        english/correlatives/FCorrelativeDef.h
+        english/correlatives/DictFItemParser.cpp
+        english/correlatives/DictFItemParser.h
+        english/correlatives/CorrelativeEvaluator.cpp
+        english/correlatives/CorrelativeEvaluator.h
 )
 
 target_include_directories(

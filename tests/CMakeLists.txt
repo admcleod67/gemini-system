@@ -26,6 +26,7 @@ add_executable(
         core/test_MdDefaultDataFile.cpp
         core/test_English.cpp
         core/test_EnglishFormatter.cpp
+        core/test_CorrelativeEvaluator.cpp
         basic/test_BasicBytecodeEmitter.cpp
         basic/test_BasicCompiler.cpp
         basic/test_BasicCompilerGolden.cpp

@@ -1,11 +1,17 @@
 #ifndef PICK_SYSTEM_CORE_ENGLISH_TYPES_H
 #define PICK_SYSTEM_CORE_ENGLISH_TYPES_H
 
+#include "correlatives/FCorrelativeDef.h"
+
 #include <optional>
 #include <string>
 #include <vector>
 
 namespace PickCore::English {
+    enum class DictFieldKind {
+        Attribute,
+        FCorrelative,
+    };
     enum class Verb {
         LIST,
         COUNT,
@@ -51,9 +57,19 @@ namespace PickCore::English {
 
     struct FieldRef {
         std::string token;
+        DictFieldKind kind{DictFieldKind::Attribute};
         std::optional<int> attributeNo;
         ConversionCode conversion{ConversionCode::None};
+        /// Populated when `kind == DictFieldKind::FCorrelative` (Milestone 9 Stage 1).
+        std::optional<FCorrelativeDef> fCorrelative;
     };
+
+    [[nodiscard]] inline bool fieldRefIsResolved(const FieldRef &ref) {
+        if (ref.kind == DictFieldKind::FCorrelative) {
+            return ref.fCorrelative.has_value();
+        }
+        return ref.attributeNo.has_value();
+    }
 
     /// Internal handoff between Executor (row production) and Formatter (rendering) — Milestone 8.
     /// Each Row represents one projected record before any layout/heading work.

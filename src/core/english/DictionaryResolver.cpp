@@ -1,5 +1,7 @@
 #include "DictionaryResolver.h"
 
+#include "correlatives/DictFItemParser.h"
+
 #include "StructuredRecord.h"
 
 #include <algorithm>
@@ -91,21 +93,44 @@ namespace PickCore::English {
             }
         }
 
+        FieldRef makeAttributeRef(const std::string &token,
+                                  const std::optional<int> &attrNum,
+                                  const ConversionCode conv) {
+            FieldRef ref;
+            ref.token = token;
+            ref.kind = DictFieldKind::Attribute;
+            ref.attributeNo = attrNum;
+            ref.conversion = conv;
+            return ref;
+        }
+
+        FieldRef makeUnresolvedRef(const std::string &token) {
+            return makeAttributeRef(token, std::nullopt, ConversionCode::None);
+        }
+
         std::optional<FieldRef> fieldFromStructuredDict(const PickFS::StructuredRecord &attrs,
                                                         const std::string &originalToken) {
             const std::string type = attrs.attribute(1).firstValue();
             if (type == "A" || type == "a") {
                 const std::optional<int> attrNum = parsePositiveInt(attrs.attribute(2).firstValue());
                 const ConversionCode conv = classifyFromAttrs(attrs);
-                if (!attrNum.has_value()) {
-                    return FieldRef{originalToken, std::nullopt, conv};
+                return makeAttributeRef(originalToken, attrNum, conv);
+            }
+            if (type == "F" || type == "f") {
+                std::string parseError;
+                if (const std::optional<FCorrelativeDef> def = DictFItemParser::parse(attrs, parseError)) {
+                    FieldRef ref;
+                    ref.token = originalToken;
+                    ref.kind = DictFieldKind::FCorrelative;
+                    ref.fCorrelative = *def;
+                    return ref;
                 }
-                return FieldRef{originalToken, *attrNum, conv};
+                return std::nullopt;
             }
             if (type == "S" || type == "s") {
                 return std::nullopt;
             }
-            return FieldRef{originalToken, std::nullopt, ConversionCode::None};
+            return makeUnresolvedRef(originalToken);
         }
 
         std::optional<FieldRef> resolveFieldRec(PickFS::FileSystem &fs,
@@ -117,7 +142,7 @@ namespace PickCore::English {
                 return std::nullopt;
             }
             if (const std::optional<int> numeric = parsePositiveInt(lookupToken)) {
-                return FieldRef{originalToken, *numeric, ConversionCode::None};
+                return makeAttributeRef(originalToken, numeric, ConversionCode::None);
             }
 
             const std::optional<PickFS::Record> scoped = [&]() -> std::optional<PickFS::Record> {
@@ -148,14 +173,14 @@ namespace PickCore::English {
             if (type == "S" || type == "s") {
                 const std::string target = structured.attribute(2).firstValue();
                 if (target.empty()) {
-                    return FieldRef{originalToken, std::nullopt, ConversionCode::None};
+                    return makeUnresolvedRef(originalToken);
                 }
                 return resolveFieldRec(fs, originalToken, target, depth + 1, dataFileName);
             }
             if (auto f = fieldFromStructuredDict(structured, originalToken)) {
                 return *f;
             }
-            return FieldRef{originalToken, std::nullopt, ConversionCode::None};
+            return makeUnresolvedRef(originalToken);
         }
     } // namespace
 
@@ -183,7 +208,7 @@ namespace PickCore::English {
         if (auto r = resolveFieldRec(fs, token, token, 0, dataFileName)) {
             return *r;
         }
-        return FieldRef{token, std::nullopt, ConversionCode::None};
+        return makeUnresolvedRef(token);
     }
 
     std::vector<FieldRef> DictionaryResolver::resolveFields(PickFS::FileSystem &fs,
