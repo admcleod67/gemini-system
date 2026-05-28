@@ -1,6 +1,7 @@
 #include "DictionaryResolver.h"
 
 #include "correlatives/DictFItemParser.h"
+#include "correlatives/DictIItemParser.h"
 
 #include "StructuredRecord.h"
 
@@ -127,6 +128,17 @@ namespace PickCore::English {
                 }
                 return std::nullopt;
             }
+            if (type == "I" || type == "i") {
+                std::string parseError;
+                if (const std::optional<ICorrelativeDef> def = DictIItemParser::parse(attrs, parseError)) {
+                    FieldRef ref;
+                    ref.token = originalToken;
+                    ref.kind = DictFieldKind::ICorrelative;
+                    ref.iCorrelative = *def;
+                    return ref;
+                }
+                return std::nullopt;
+            }
             if (type == "S" || type == "s") {
                 return std::nullopt;
             }
@@ -206,10 +218,17 @@ namespace PickCore::English {
         if (ref.kind == DictFieldKind::FCorrelative) {
             return "F";
         }
+        if (ref.kind == DictFieldKind::ICorrelative) {
+            return "I";
+        }
         if (ref.attributeNo.has_value()) {
             return "A";
         }
         return "unknown";
+    }
+
+    std::string DictionaryResolver::describeIExpression(const ICorrelativeDef &def) {
+        return def.expressionRaw;
     }
 
     std::string DictionaryResolver::describeFSelector(const FCorrelativeDef &def) {

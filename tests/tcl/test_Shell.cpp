@@ -1309,6 +1309,25 @@ TEST_CASE("shell RESOLVE-FIELD shows OCONV on F-type conversion tail") {
     CHECK(s.find("conversion OCONV \"D\"") != std::string::npos);
 }
 
+TEST_CASE("shell RESOLVE-FIELD shows I-type DICT layout") {
+    auto dir = uniqueTempDir();
+    PickFS::FileSystem fs(dir);
+    fs.createFile("DATA");
+    fs.createFile("DICT");
+    fs.write("DICT", PickFS::Record("NET", "I\nA + B\n"));
+
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(dir);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("RESOLVE-FIELD DATA NET", out, quit);
+    const std::string s = out.str();
+    CHECK(s.find("Field kind: I") != std::string::npos);
+    CHECK(s.find("Expression: A + B") != std::string::npos);
+}
+
 TEST_CASE("shell LIST with F-type field emits evaluated value") {
     auto dir = uniqueTempDir();
     PickFS::FileSystem fs(dir);

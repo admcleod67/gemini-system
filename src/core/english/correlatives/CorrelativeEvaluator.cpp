@@ -1,6 +1,7 @@
 #include "CorrelativeEvaluator.h"
 
 #include "../../conversion/PickOconv.h"
+#include "IExpressionEvaluator.h"
 
 namespace PickCore::English {
     std::optional<std::string> CorrelativeEvaluator::evaluateF(const FCorrelativeDef &def,
@@ -43,6 +44,17 @@ namespace PickCore::English {
         return std::nullopt;
     }
 
+    std::optional<std::string> CorrelativeEvaluator::evaluateI(const ICorrelativeDef &def,
+                                                               const PickFS::StructuredRecord &dataRecord,
+                                                               std::string &error) {
+        error.clear();
+        if (!def.expression) {
+            error = "I-type: invalid expression";
+            return std::nullopt;
+        }
+        return IExpressionEvaluator::evaluate(*def.expression, dataRecord, error);
+    }
+
     std::string CorrelativeEvaluator::evaluateFieldCell(const FieldRef &ref,
                                                         const PickFS::StructuredRecord &dataRecord) {
         if (ref.kind == DictFieldKind::FCorrelative) {
@@ -52,6 +64,18 @@ namespace PickCore::English {
             std::string error;
             if (const std::optional<std::string> value =
                     evaluateF(*ref.fCorrelative, dataRecord, error)) {
+                return *value;
+            }
+            return {};
+        }
+
+        if (ref.kind == DictFieldKind::ICorrelative) {
+            if (!ref.iCorrelative.has_value()) {
+                return {};
+            }
+            std::string error;
+            if (const std::optional<std::string> value =
+                    evaluateI(*ref.iCorrelative, dataRecord, error)) {
                 return *value;
             }
             return {};

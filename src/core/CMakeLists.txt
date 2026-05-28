@@ -50,6 +50,15 @@ add_library(gemini-core
         english/correlatives/DictFItemParser.h
         english/correlatives/CorrelativeEvaluator.cpp
         english/correlatives/CorrelativeEvaluator.h
+        english/correlatives/IExpressionAst.cpp
+        english/correlatives/IExpressionAst.h
+        english/correlatives/IExpressionParser.cpp
+        english/correlatives/IExpressionParser.h
+        english/correlatives/IExpressionEvaluator.cpp
+        english/correlatives/IExpressionEvaluator.h
+        english/correlatives/ICorrelativeDef.h
+        english/correlatives/DictIItemParser.cpp
+        english/correlatives/DictIItemParser.h
         conversion/PickOconv.cpp
         conversion/PickOconv.h
 )

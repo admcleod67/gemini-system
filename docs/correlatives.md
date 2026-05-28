@@ -43,4 +43,30 @@ Unsupported codes produce `F-type: unsupported conversion code "<code>"` when ev
 
 `LIST`, `SORT`, and related verbs resolve F-type field tokens through the DICT and evaluate them per row. Use `RESOLVE-FIELD <file> <token>` in the Tcl shell to inspect a definition.
 
-I-type computed attributes and `ICONV` in F tails are planned for later Milestone 9 stages.
+## I-type DICT items (two-attribute layout)
+
+| Attribute | Content |
+|-----------|---------|
+| 1 | `I` (type code) |
+| 2 | Expression source (non-empty) |
+
+Documentation shorthand `I;A + B` means attr 2 = `A + B`, not a semicolon program in one field.
+
+### Supported expressions (Stage 4)
+
+| Construct | Meaning |
+|-----------|---------|
+| `A`–`Z` (case-insensitive) | First value of attribute 1–26 on the **data** record (`A` = attribute 1) |
+| Integer / decimal literals | e.g. `123`, `12.34` |
+| `+` `-` `*` `/` | Arithmetic; `*` `/` bind tighter than `+` `-` |
+| Unary `-` | Negation |
+| `( … )` | Grouping |
+
+Empty field values coerce to **0** in numeric contexts. Non-numeric text in a numeric context yields `I-type: type mismatch`. Division by zero yields `I-type: division by zero`.
+
+### Not yet supported (later stages)
+
+- `IF … THEN … ELSE …`, string literals, `ICONV()` / `OCONV()` in expressions (Stage 5)
+- BASIC `READV` by DICT field name for F/I (Stage 5)
+
+Use `RESOLVE-FIELD <file> <token>` to inspect an I-type definition (`Field kind: I`, `Expression: …`).

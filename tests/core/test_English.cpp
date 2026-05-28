@@ -1000,3 +1000,44 @@ TEST_CASE("english service LIST unknown field still errors with F DICT present")
     CHECK_FALSE(svc.run(fs, {"LIST", "DATA", "NOTADICT"}, pc, eo, error).has_value());
     CHECK(error.find("Unknown ENGLISH field") != std::string::npos);
 }
+
+TEST_CASE("english service LIST projects I-type field") {
+    const auto root = uniqueEnglishTempDir();
+    PickFS::FileSystem fs(root);
+    fs.createFile("DATA");
+    fs.createFile("DICT");
+    fs.write("DICT", PickFS::Record("NET", "I\nA + B\n"));
+    fs.write("DATA", PickFS::Record("R1", "10\n5\n"));
+
+    PickCore::English::EnglishService svc;
+    PickCore::English::ParseContext pc;
+    PickCore::English::EnglishRunOptions eo;
+    std::string error;
+    const auto res = svc.run(fs, {"LIST", "DATA", "NET"}, pc, eo, error);
+    REQUIRE(res.has_value());
+    CHECK(error.empty());
+    REQUIRE(res->lines.size() == 1);
+    CHECK(res->lines[0] == "R1 15");
+}
+
+TEST_CASE("english service SORT BY I-type field") {
+    const auto root = uniqueEnglishTempDir();
+    PickFS::FileSystem fs(root);
+    fs.createFile("DATA");
+    fs.createFile("DICT");
+    fs.write("DICT", PickFS::Record("NET", "I\nA + B\n"));
+    fs.write("DATA", PickFS::Record("R1", "1\n1\n"));
+    fs.write("DATA", PickFS::Record("R2", "3\n4\n"));
+
+    PickCore::English::EnglishService svc;
+    PickCore::English::ParseContext pc;
+    PickCore::English::EnglishRunOptions eo;
+    std::string error;
+    const auto res = svc.run(fs, {"SORT", "DATA", "NET", "BY", "NET"}, pc, eo, error);
+    REQUIRE(res.has_value());
+    CHECK(error.empty());
+    REQUIRE(res->lines.size() == 2);
+    // I-type sort keys use string ordering when no A-type conversion hint (same as F-type).
+    CHECK(res->lines[0] == "R1 2");
+    CHECK(res->lines[1] == "R2 7");
+}

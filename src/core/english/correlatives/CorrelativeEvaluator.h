@@ -3,6 +3,7 @@
 
 #include "EnglishTypes.h"
 #include "FCorrelativeDef.h"
+#include "ICorrelativeDef.h"
 
 #include "StructuredRecord.h"
 
@@ -15,6 +16,10 @@ namespace PickCore::English {
         /// Evaluate an F-type definition against a data record.
         /// @return Cell value, or std::nullopt with stable `error` text.
         [[nodiscard]] static std::optional<std::string> evaluateF(const FCorrelativeDef &def,
+                                                                  const PickFS::StructuredRecord &dataRecord,
+                                                                  std::string &error);
+
+        [[nodiscard]] static std::optional<std::string> evaluateI(const ICorrelativeDef &def,
                                                                   const PickFS::StructuredRecord &dataRecord,
                                                                   std::string &error);
 

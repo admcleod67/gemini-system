@@ -2,6 +2,7 @@
 #define PICK_SYSTEM_CORE_ENGLISH_TYPES_H
 
 #include "correlatives/FCorrelativeDef.h"
+#include "correlatives/ICorrelativeDef.h"
 
 #include <optional>
 #include <string>
@@ -11,6 +12,7 @@ namespace PickCore::English {
     enum class DictFieldKind {
         Attribute,
         FCorrelative,
+        ICorrelative,
     };
     enum class Verb {
         LIST,
@@ -62,11 +64,16 @@ namespace PickCore::English {
         ConversionCode conversion{ConversionCode::None};
         /// Populated when `kind == DictFieldKind::FCorrelative` (Milestone 9 Stage 1).
         std::optional<FCorrelativeDef> fCorrelative;
+        /// Populated when `kind == DictFieldKind::ICorrelative` (Milestone 9 Stage 4).
+        std::optional<ICorrelativeDef> iCorrelative;
     };
 
     [[nodiscard]] inline bool fieldRefIsResolved(const FieldRef &ref) {
         if (ref.kind == DictFieldKind::FCorrelative) {
             return ref.fCorrelative.has_value();
+        }
+        if (ref.kind == DictFieldKind::ICorrelative) {
+            return ref.iCorrelative.has_value() && ref.iCorrelative->expression != nullptr;
         }
         return ref.attributeNo.has_value();
     }

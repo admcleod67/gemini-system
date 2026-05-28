@@ -8,6 +8,9 @@
 #include "StructuredRecord.h"
 #include "correlatives/CorrelativeEvaluator.h"
 #include "correlatives/DictFItemParser.h"
+#include "correlatives/DictIItemParser.h"
+#include "correlatives/IExpressionEvaluator.h"
+#include "correlatives/IExpressionParser.h"
 
 namespace {
     using namespace PickCore::English;
@@ -269,4 +272,168 @@ TEST_CASE("DictionaryResolver A-type unchanged") {
     REQUIRE(ref.attributeNo.has_value());
     CHECK(*ref.attributeNo == 1);
     CHECK(fieldRefIsResolved(ref));
+}
+
+// --- Milestone 9 Stage 4: I-type ---
+
+TEST_CASE("IExpressionParser accepts arithmetic and field letters") {
+    std::string error;
+    const auto ast = IExpressionParser::parse("A + B * 2", error);
+    REQUIRE(ast);
+    CHECK(error.empty());
+}
+
+TEST_CASE("IExpressionParser rejects invalid tokens") {
+    std::string error;
+    CHECK_FALSE(IExpressionParser::parse("IF A THEN 1", error));
+    CHECK(error == "I-type: invalid expression");
+}
+
+TEST_CASE("DictIItemParser accepts classic I DICT attrs 1-2") {
+    std::string error;
+    const auto def = DictIItemParser::parse(dictFromRaw("I\nA + B\n"), error);
+    REQUIRE(def.has_value());
+    CHECK(error.empty());
+    CHECK(def->expressionRaw == "A + B");
+    REQUIRE(def->expression != nullptr);
+}
+
+TEST_CASE("DictIItemParser rejects invalid I DICT items") {
+    std::string error;
+
+    CHECK_FALSE(DictIItemParser::parse(dictFromRaw("I\n\n"), error).has_value());
+    CHECK(error == "Invalid I-type DICT item: missing expression");
+
+    error.clear();
+    CHECK_FALSE(DictIItemParser::parse(dictFromRaw("A\n1\n"), error).has_value());
+    CHECK(error == "Invalid I-type DICT item: not an I-type record");
+}
+
+TEST_CASE("IExpressionEvaluator computes A + B") {
+    PickFS::StructuredRecord data;
+    data.setAttribute(1, PickFS::RecordAttribute("10"));
+    data.setAttribute(2, PickFS::RecordAttribute("5"));
+
+    std::string error;
+    const auto ast = IExpressionParser::parse("A + B", error);
+    REQUIRE(ast);
+
+    const auto value = IExpressionEvaluator::evaluate(*ast, data, error);
+    REQUIRE(value.has_value());
+    CHECK(*value == "15");
+}
+
+TEST_CASE("IExpressionEvaluator respects precedence and parentheses") {
+    PickFS::StructuredRecord data;
+    data.setAttribute(1, PickFS::RecordAttribute("2"));
+    data.setAttribute(2, PickFS::RecordAttribute("3"));
+
+    std::string parseError;
+    const auto ast = IExpressionParser::parse("(A + B) * 2", parseError);
+    REQUIRE(ast);
+
+    std::string error;
+    const auto value = IExpressionEvaluator::evaluate(*ast, data, error);
+    REQUIRE(value.has_value());
+    CHECK(*value == "10");
+}
+
+TEST_CASE("IExpressionEvaluator empty field coerces to zero") {
+    PickFS::StructuredRecord data;
+    data.setAttribute(1, PickFS::RecordAttribute(""));
+    data.setAttribute(2, PickFS::RecordAttribute("7"));
+
+    std::string parseError;
+    const auto ast = IExpressionParser::parse("A + B", parseError);
+    REQUIRE(ast);
+
+    std::string error;
+    const auto value = IExpressionEvaluator::evaluate(*ast, data, error);
+    REQUIRE(value.has_value());
+    CHECK(*value == "7");
+}
+
+TEST_CASE("IExpressionEvaluator type mismatch error") {
+    PickFS::StructuredRecord data;
+    data.setAttribute(1, PickFS::RecordAttribute("abc"));
+    data.setAttribute(2, PickFS::RecordAttribute("1"));
+
+    std::string parseError;
+    const auto ast = IExpressionParser::parse("A * B", parseError);
+    REQUIRE(ast);
+
+    std::string error;
+    CHECK_FALSE(IExpressionEvaluator::evaluate(*ast, data, error).has_value());
+    CHECK(error == "I-type: type mismatch");
+}
+
+TEST_CASE("IExpressionEvaluator division by zero error") {
+    PickFS::StructuredRecord data;
+    data.setAttribute(1, PickFS::RecordAttribute("1"));
+    data.setAttribute(2, PickFS::RecordAttribute("0"));
+
+    std::string parseError;
+    const auto ast = IExpressionParser::parse("A / B", parseError);
+    REQUIRE(ast);
+
+    std::string error;
+    CHECK_FALSE(IExpressionEvaluator::evaluate(*ast, data, error).has_value());
+    CHECK(error == "I-type: division by zero");
+}
+
+TEST_CASE("DictionaryResolver resolves I-type DICT item") {
+    const auto dir = uniqueTempDir();
+    PickFS::FileSystem fs(dir);
+    fs.createFile("DATA");
+    fs.createFile("DICT");
+    fs.write("DICT", PickFS::Record("TOTAL", "I\nA + B\n"));
+
+    DictionaryResolver resolver;
+    const FieldRef ref = resolver.resolveField(fs, "DATA", "TOTAL");
+
+    CHECK(ref.kind == DictFieldKind::ICorrelative);
+    REQUIRE(ref.iCorrelative.has_value());
+    CHECK(ref.iCorrelative->expressionRaw == "A + B");
+    CHECK(fieldRefIsResolved(ref));
+}
+
+TEST_CASE("DictionaryResolver invalid I DICT item stays unresolved") {
+    const auto dir = uniqueTempDir();
+    PickFS::FileSystem fs(dir);
+    fs.createFile("DATA");
+    fs.createFile("DICT");
+    fs.write("DICT", PickFS::Record("BAD", "I\n\n"));
+
+    DictionaryResolver resolver;
+    const FieldRef ref = resolver.resolveField(fs, "DATA", "BAD");
+
+    CHECK(ref.kind == DictFieldKind::Attribute);
+    CHECK_FALSE(fieldRefIsResolved(ref));
+}
+
+TEST_CASE("CorrelativeEvaluator evaluateFieldCell I-type") {
+    PickFS::StructuredRecord data;
+    data.setAttribute(1, PickFS::RecordAttribute("4"));
+    data.setAttribute(2, PickFS::RecordAttribute("6"));
+
+    std::string parseError;
+    ICorrelativeDef def;
+    def.expressionRaw = "A + B";
+    def.expression = std::shared_ptr<const IExpr>(IExpressionParser::parse("A + B", parseError));
+    REQUIRE(def.expression);
+
+    FieldRef ref;
+    ref.kind = DictFieldKind::ICorrelative;
+    ref.iCorrelative = def;
+
+    CHECK(CorrelativeEvaluator::evaluateFieldCell(ref, data) == "10");
+}
+
+TEST_CASE("DictionaryResolver describeFieldKind I") {
+    FieldRef iRef;
+    iRef.kind = DictFieldKind::ICorrelative;
+    iRef.iCorrelative = ICorrelativeDef{};
+    iRef.iCorrelative->expressionRaw = "A + B";
+    CHECK(DictionaryResolver::describeFieldKind(iRef) == "I");
+    CHECK(DictionaryResolver::describeIExpression(*iRef.iCorrelative) == "A + B");
 }

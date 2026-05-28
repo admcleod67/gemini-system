@@ -1661,6 +1661,9 @@ namespace PickShell {
             out << "Selector: "
                 << PickCore::English::DictionaryResolver::describeFSelector(*ref.fCorrelative) << '\n';
             out << "Tail (raw): " << ref.fCorrelative->tailRaw << '\n';
+        } else if (ref.kind == PickCore::English::DictFieldKind::ICorrelative && ref.iCorrelative.has_value()) {
+            out << "Expression: "
+                << PickCore::English::DictionaryResolver::describeIExpression(*ref.iCorrelative) << '\n';
         } else if (ref.attributeNo.has_value()) {
             out << "Resolved attribute: " << *ref.attributeNo << '\n';
         } else {

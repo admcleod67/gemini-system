@@ -193,7 +193,7 @@ namespace PickShell::HelpTopics {
             m.emplace("CLEAR-LIST", "CLEAR-LIST\n");
             m.emplace("RESOLVE-FIELD",
                       "RESOLVE-FIELD <data-file> <field-token>\n"
-                      "  Resolves A-type and F-type DICT items (F: source attr + value/L/R or OCONV code).\n");
+                      "  Resolves A-, F-, and I-type DICT items (F: source attr + selector; I: expression).\n");
             m.emplace("DEFINE-FIELD", "DEFINE-FIELD <dict-file> <field-name> <attribute-number>\n");
             m.emplace("CREATE-VOC", "CREATE-VOC <item-id> <type> <target...>\n");
             m.emplace("DELETE-VOC", "DELETE-VOC <item-id>\n");

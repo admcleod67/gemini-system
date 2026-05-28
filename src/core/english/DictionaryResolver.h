@@ -29,6 +29,8 @@ namespace PickCore::English {
         [[nodiscard]] static std::string describeFieldKind(const FieldRef &ref);
 
         [[nodiscard]] static std::string describeFSelector(const FCorrelativeDef &def);
+
+        [[nodiscard]] static std::string describeIExpression(const ICorrelativeDef &def);
     };
 } // namespace PickCore::English
 
