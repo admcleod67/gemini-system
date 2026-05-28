@@ -1,6 +1,7 @@
 #ifndef PICK_SYSTEM_CORE_ENGLISH_CORRELATIVE_EVALUATOR_H
 #define PICK_SYSTEM_CORE_ENGLISH_CORRELATIVE_EVALUATOR_H
 
+#include "EnglishTypes.h"
 #include "FCorrelativeDef.h"
 
 #include "StructuredRecord.h"
@@ -16,6 +17,10 @@ namespace PickCore::English {
         [[nodiscard]] static std::optional<std::string> evaluateF(const FCorrelativeDef &def,
                                                                   const PickFS::StructuredRecord &dataRecord,
                                                                   std::string &error);
+
+        /// Resolve one DICT field to a display/sort cell (Milestone 9 Stage 2).
+        [[nodiscard]] static std::string evaluateFieldCell(const FieldRef &ref,
+                                                           const PickFS::StructuredRecord &dataRecord);
     };
 } // namespace PickCore::English
 

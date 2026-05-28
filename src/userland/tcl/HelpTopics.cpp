@@ -191,7 +191,9 @@ namespace PickShell::HelpTopics {
                                      kEnglishFormattingClausesHelp);
             m.emplace("LIST-LIST", "LIST-LIST\n");
             m.emplace("CLEAR-LIST", "CLEAR-LIST\n");
-            m.emplace("RESOLVE-FIELD", "RESOLVE-FIELD <data-file> <field-token>\n");
+            m.emplace("RESOLVE-FIELD",
+                      "RESOLVE-FIELD <data-file> <field-token>\n"
+                      "  Resolves A-type and F-type DICT items (F: source attr + selector).\n");
             m.emplace("DEFINE-FIELD", "DEFINE-FIELD <dict-file> <field-name> <attribute-number>\n");
             m.emplace("CREATE-VOC", "CREATE-VOC <item-id> <type> <target...>\n");
             m.emplace("DELETE-VOC", "DELETE-VOC <item-id>\n");

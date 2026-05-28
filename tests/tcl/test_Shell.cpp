@@ -1265,8 +1265,51 @@ TEST_CASE("shell RESOLVE-FIELD arity and DICT resolution") {
     out.str("");
     sh.handleLine("RESOLVE-FIELD DATA NM", out, quit);
     CHECK(out.str().find("DICT-DATA") != std::string::npos);
+    CHECK(out.str().find("Field kind: A") != std::string::npos);
     CHECK(out.str().find("Resolved attribute: 1") != std::string::npos);
     CHECK(out.str().find("Conversion hint") != std::string::npos);
+}
+
+TEST_CASE("shell RESOLVE-FIELD shows F-type DICT layout") {
+    auto dir = uniqueTempDir();
+    PickFS::FileSystem fs(dir);
+    fs.createFile("DATA");
+    fs.createFile("DICT");
+    fs.write("DICT", PickFS::Record("THIRD", "F\n2\n3\n"));
+
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(dir);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("RESOLVE-FIELD DATA THIRD", out, quit);
+    const std::string s = out.str();
+    CHECK(s.find("Field kind: F") != std::string::npos);
+    CHECK(s.find("Source attribute: 2") != std::string::npos);
+    CHECK(s.find("Selector: value 3") != std::string::npos);
+    CHECK(s.find("Tail (raw): 3") != std::string::npos);
+}
+
+TEST_CASE("shell LIST with F-type field emits evaluated value") {
+    auto dir = uniqueTempDir();
+    PickFS::FileSystem fs(dir);
+    fs.createFile("DATA");
+    fs.createFile("DICT");
+    fs.write("DICT", PickFS::Record("THIRD", "F\n2\n3\n"));
+    const std::string body = std::string("X\n") + std::string("A") + static_cast<char>(0xFD) + "B" +
+                             static_cast<char>(0xFD) + "C\n";
+    fs.write("DATA", PickFS::Record("R1", body));
+
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(dir);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("LIST DATA THIRD", out, quit);
+    CHECK(out.str().find("C") != std::string::npos);
+    CHECK(out.str().find("R1") != std::string::npos);
 }
 
 TEST_CASE("shell DEFINE-FIELD arity missing dict and ENGLISH LIST") {

@@ -181,6 +181,48 @@ TEST_CASE("DictionaryResolver invalid F DICT item stays unresolved") {
     CHECK_FALSE(fieldRefIsResolved(ref));
 }
 
+TEST_CASE("CorrelativeEvaluator evaluateFieldCell A-type") {
+    PickFS::StructuredRecord data;
+    data.setAttribute(1, PickFS::RecordAttribute("ALICE"));
+
+    FieldRef ref;
+    ref.token = "NAME";
+    ref.kind = DictFieldKind::Attribute;
+    ref.attributeNo = 1;
+
+    CHECK(CorrelativeEvaluator::evaluateFieldCell(ref, data) == "ALICE");
+}
+
+TEST_CASE("CorrelativeEvaluator evaluateFieldCell F-type") {
+    PickFS::StructuredRecord data;
+    data.setAttribute(2, PickFS::RecordAttribute(std::string("A") + kVm + "B" + kVm + "C"));
+
+    FieldRef ref;
+    ref.token = "THIRD";
+    ref.kind = DictFieldKind::FCorrelative;
+    ref.fCorrelative = FCorrelativeDef{};
+    ref.fCorrelative->sourceAttributeNo = 2;
+    ref.fCorrelative->selectorKind = FSelectorKind::ValueIndex;
+    ref.fCorrelative->valueIndex = 3;
+    ref.fCorrelative->tailRaw = "3";
+
+    CHECK(CorrelativeEvaluator::evaluateFieldCell(ref, data) == "C");
+}
+
+TEST_CASE("DictionaryResolver describeFieldKind and describeFSelector") {
+    FieldRef aRef;
+    aRef.attributeNo = 1;
+    CHECK(DictionaryResolver::describeFieldKind(aRef) == "A");
+
+    FieldRef fRef;
+    fRef.kind = DictFieldKind::FCorrelative;
+    fRef.fCorrelative = FCorrelativeDef{};
+    fRef.fCorrelative->selectorKind = FSelectorKind::Leftmost;
+    fRef.fCorrelative->tailRaw = "L";
+    CHECK(DictionaryResolver::describeFieldKind(fRef) == "F");
+    CHECK(DictionaryResolver::describeFSelector(*fRef.fCorrelative) == "leftmost (L)");
+}
+
 TEST_CASE("DictionaryResolver A-type unchanged") {
     const auto dir = uniqueTempDir();
     PickFS::FileSystem fs(dir);

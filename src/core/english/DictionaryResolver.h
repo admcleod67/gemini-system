@@ -25,6 +25,10 @@ namespace PickCore::English {
         [[nodiscard]] static std::string scopedDictLogicalName(const std::string &dataFileName);
 
         [[nodiscard]] static std::string describeConversion(const FieldRef &ref);
+
+        [[nodiscard]] static std::string describeFieldKind(const FieldRef &ref);
+
+        [[nodiscard]] static std::string describeFSelector(const FCorrelativeDef &def);
     };
 } // namespace PickCore::English
 

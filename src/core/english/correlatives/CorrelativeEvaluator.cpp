@@ -48,4 +48,24 @@ namespace PickCore::English {
         error = kConversionNotSupported;
         return std::nullopt;
     }
+
+    std::string CorrelativeEvaluator::evaluateFieldCell(const FieldRef &ref,
+                                                        const PickFS::StructuredRecord &dataRecord) {
+        if (ref.kind == DictFieldKind::FCorrelative) {
+            if (!ref.fCorrelative.has_value()) {
+                return {};
+            }
+            std::string error;
+            if (const std::optional<std::string> value =
+                    evaluateF(*ref.fCorrelative, dataRecord, error)) {
+                return *value;
+            }
+            return {};
+        }
+
+        if (!ref.attributeNo.has_value()) {
+            return {};
+        }
+        return dataRecord.attribute(*ref.attributeNo).firstValue();
+    }
 } // namespace PickCore::English

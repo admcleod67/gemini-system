@@ -896,3 +896,89 @@ TEST_CASE("english SORT unknown BY field yields error") {
     CHECK_FALSE(svc.run(fs, {"SORT", "DATA", "BY", "NOSUCHKEY"}, pc, eo, error).has_value());
     CHECK(error.find("Unknown ENGLISH field") != std::string::npos);
 }
+
+// --- Milestone 9 Stage 2: F-type in ENGLISH ---
+
+namespace {
+    constexpr char kVm = static_cast<char>(0xFD);
+
+    std::string dataRecordWithAttr2Values(const std::string &v1,
+                                          const std::string &v2,
+                                          const std::string &v3) {
+        return std::string("X\n") + v1 + kVm + v2 + kVm + v3 + '\n';
+    }
+} // namespace
+
+TEST_CASE("english service LIST projects F-type field") {
+    const auto root = uniqueEnglishTempDir();
+    PickFS::FileSystem fs(root);
+    fs.createFile("DATA");
+    fs.createFile("DICT");
+    fs.write("DICT", PickFS::Record("THIRD", "F\n2\n3\n"));
+    fs.write("DATA", PickFS::Record("R1", dataRecordWithAttr2Values("A", "B", "C")));
+
+    PickCore::English::EnglishService svc;
+    PickCore::English::ParseContext pc;
+    PickCore::English::EnglishRunOptions eo;
+    std::string error;
+    const auto res = svc.run(fs, {"LIST", "DATA", "THIRD"}, pc, eo, error);
+    REQUIRE(res.has_value());
+    CHECK(error.empty());
+    REQUIRE(res->lines.size() == 1);
+    CHECK(res->lines[0] == "R1 C");
+}
+
+TEST_CASE("english service SORT BY F-type field") {
+    const auto root = uniqueEnglishTempDir();
+    PickFS::FileSystem fs(root);
+    fs.createFile("DATA");
+    fs.createFile("DICT");
+    fs.write("DICT", PickFS::Record("THIRD", "F\n2\n3\n"));
+    fs.write("DATA", PickFS::Record("R1", dataRecordWithAttr2Values("A", "B", "C")));
+    fs.write("DATA", PickFS::Record("R2", dataRecordWithAttr2Values("Z", "Y", "A")));
+
+    PickCore::English::EnglishService svc;
+    PickCore::English::ParseContext pc;
+    PickCore::English::EnglishRunOptions eo;
+    std::string error;
+    const auto res = svc.run(fs, {"SORT", "DATA", "THIRD", "BY", "THIRD"}, pc, eo, error);
+    REQUIRE(res.has_value());
+    CHECK(error.empty());
+    REQUIRE(res->lines.size() == 2);
+    CHECK(res->lines[0] == "R2 A");
+    CHECK(res->lines[1] == "R1 C");
+}
+
+TEST_CASE("english service LIST F-type conversion tail yields empty cell") {
+    const auto root = uniqueEnglishTempDir();
+    PickFS::FileSystem fs(root);
+    fs.createFile("DATA");
+    fs.createFile("DICT");
+    fs.write("DICT", PickFS::Record("FMT", "F\n2\nD2/\n"));
+    fs.write("DATA", PickFS::Record("R1", dataRecordWithAttr2Values("100", "200", "300")));
+
+    PickCore::English::EnglishService svc;
+    PickCore::English::ParseContext pc;
+    PickCore::English::EnglishRunOptions eo;
+    std::string error;
+    const auto res = svc.run(fs, {"LIST", "DATA", "FMT"}, pc, eo, error);
+    REQUIRE(res.has_value());
+    CHECK(error.empty());
+    REQUIRE(res->lines.size() == 1);
+    CHECK(res->lines[0] == "R1 ");
+}
+
+TEST_CASE("english service LIST unknown field still errors with F DICT present") {
+    const auto root = uniqueEnglishTempDir();
+    PickFS::FileSystem fs(root);
+    fs.createFile("DATA");
+    fs.createFile("DICT");
+    fs.write("DICT", PickFS::Record("THIRD", "F\n2\n3\n"));
+
+    PickCore::English::EnglishService svc;
+    PickCore::English::ParseContext pc;
+    PickCore::English::EnglishRunOptions eo;
+    std::string error;
+    CHECK_FALSE(svc.run(fs, {"LIST", "DATA", "NOTADICT"}, pc, eo, error).has_value());
+    CHECK(error.find("Unknown ENGLISH field") != std::string::npos);
+}

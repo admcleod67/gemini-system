@@ -1655,7 +1655,13 @@ namespace PickShell {
         out << "Field token: " << tokens[2] << '\n';
         out << "File-scoped dict: "
             << PickCore::English::DictionaryResolver::scopedDictLogicalName(tokens[1]) << '\n';
-        if (ref.attributeNo.has_value()) {
+        out << "Field kind: " << PickCore::English::DictionaryResolver::describeFieldKind(ref) << '\n';
+        if (ref.kind == PickCore::English::DictFieldKind::FCorrelative && ref.fCorrelative.has_value()) {
+            out << "Source attribute: " << ref.fCorrelative->sourceAttributeNo << '\n';
+            out << "Selector: "
+                << PickCore::English::DictionaryResolver::describeFSelector(*ref.fCorrelative) << '\n';
+            out << "Tail (raw): " << ref.fCorrelative->tailRaw << '\n';
+        } else if (ref.attributeNo.has_value()) {
             out << "Resolved attribute: " << *ref.attributeNo << '\n';
         } else {
             out << "Resolved attribute: (none — unknown field)\n";

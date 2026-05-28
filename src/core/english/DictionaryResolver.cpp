@@ -202,6 +202,30 @@ namespace PickCore::English {
         }
     }
 
+    std::string DictionaryResolver::describeFieldKind(const FieldRef &ref) {
+        if (ref.kind == DictFieldKind::FCorrelative) {
+            return "F";
+        }
+        if (ref.attributeNo.has_value()) {
+            return "A";
+        }
+        return "unknown";
+    }
+
+    std::string DictionaryResolver::describeFSelector(const FCorrelativeDef &def) {
+        switch (def.selectorKind) {
+            case FSelectorKind::ValueIndex:
+                return "value " + std::to_string(def.valueIndex);
+            case FSelectorKind::Leftmost:
+                return "leftmost (L)";
+            case FSelectorKind::Rightmost:
+                return "rightmost (R)";
+            case FSelectorKind::ConversionRaw:
+                return "conversion (not evaluated)";
+        }
+        return "conversion (not evaluated)";
+    }
+
     FieldRef DictionaryResolver::resolveField(PickFS::FileSystem &fs,
                                               const std::string &dataFileName,
                                               const std::string &token) const {

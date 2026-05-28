@@ -1,5 +1,7 @@
 #include "Executor.h"
 
+#include "correlatives/CorrelativeEvaluator.h"
+
 #include <algorithm>
 #include <cctype>
 #include <numeric>
@@ -104,29 +106,26 @@ namespace PickCore::English {
             if (!rec.has_value()) {
                 return out;
             }
+            const PickFS::StructuredRecord &structured = rec->structured();
             out.reserve(fields.size());
             for (const FieldRef &field: fields) {
-                if (field.attributeNo.has_value()) {
-                    out.push_back(rec->structured().attribute(*field.attributeNo).firstValue());
-                } else {
-                    out.emplace_back();
-                }
+                out.push_back(CorrelativeEvaluator::evaluateFieldCell(field, structured));
             }
             return out;
         }
 
         std::string materializeBreakKey(const std::optional<PickFS::Record> &rec, const FieldRef &breakRef) {
-            if (!rec.has_value() || !breakRef.attributeNo.has_value()) {
+            if (!rec.has_value()) {
                 return {};
             }
-            return rec->structured().attribute(*breakRef.attributeNo).firstValue();
+            return CorrelativeEvaluator::evaluateFieldCell(breakRef, rec->structured());
         }
 
         std::string materializeTotalCell(const std::optional<PickFS::Record> &rec, const FieldRef &totalRef) {
-            if (!rec.has_value() || !totalRef.attributeNo.has_value()) {
+            if (!rec.has_value()) {
                 return {};
             }
-            return rec->structured().attribute(*totalRef.attributeNo).firstValue();
+            return CorrelativeEvaluator::evaluateFieldCell(totalRef, rec->structured());
         }
 
         /// Largest 1-based attribute index referenced by `@<digits>` tokens in a report template.
@@ -200,11 +199,9 @@ namespace PickCore::English {
         std::vector<KeyPart> materializeSortKeys(const PickFS::Record &rec, const std::vector<FieldRef> &refs) {
             std::vector<KeyPart> parts;
             parts.reserve(refs.size());
+            const PickFS::StructuredRecord &structured = rec.structured();
             for (const FieldRef &ref: refs) {
-                std::string cell;
-                if (ref.attributeNo.has_value()) {
-                    cell = rec.structured().attribute(*ref.attributeNo).firstValue();
-                }
+                const std::string cell = CorrelativeEvaluator::evaluateFieldCell(ref, structured);
                 parts.push_back(makeSortPart(cell, ref.conversion));
             }
             return parts;
@@ -220,7 +217,7 @@ namespace PickCore::English {
         std::optional<std::string> firstUnresolvedFieldError(const std::vector<FieldRef> &refs,
                                                                const std::string &dataFile) {
             for (const FieldRef &r: refs) {
-                if (!r.attributeNo.has_value()) {
+                if (!fieldRefIsResolved(r)) {
                     const std::string scoped = DictionaryResolver::scopedDictLogicalName(dataFile);
                     return std::optional<std::string>{
                         "Unknown ENGLISH field \"" + r.token + "\" (not in " + scoped + " nor DICT)"};
