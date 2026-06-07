@@ -1041,3 +1041,23 @@ TEST_CASE("english service SORT BY I-type field") {
     CHECK(res->lines[0] == "R1 2");
     CHECK(res->lines[1] == "R2 7");
 }
+
+TEST_CASE("english service LIST I-type IF field") {
+    const auto root = uniqueEnglishTempDir();
+    PickFS::FileSystem fs(root);
+    fs.createFile("DATA");
+    fs.createFile("DICT");
+    fs.write("DICT", PickFS::Record("LEVEL", "I\nIF A > 10 THEN \"HIGH\" ELSE \"LOW\"\n"));
+    fs.write("DATA", PickFS::Record("R1", "15\n"));
+    fs.write("DATA", PickFS::Record("R2", "3\n"));
+
+    PickCore::English::EnglishService svc;
+    PickCore::English::ParseContext pc;
+    PickCore::English::EnglishRunOptions eo;
+    std::string error;
+    const auto res = svc.run(fs, {"LIST", "DATA", "LEVEL"}, pc, eo, error);
+    REQUIRE(res.has_value());
+    REQUIRE(res->lines.size() == 2);
+    CHECK(res->lines[0] == "R1 HIGH");
+    CHECK(res->lines[1] == "R2 LOW");
+}

@@ -437,3 +437,52 @@ TEST_CASE("DictionaryResolver describeFieldKind I") {
     CHECK(DictionaryResolver::describeFieldKind(iRef) == "I");
     CHECK(DictionaryResolver::describeIExpression(*iRef.iCorrelative) == "A + B");
 }
+
+// --- Milestone 9 Stage 5: I-type advanced ---
+
+TEST_CASE("IExpressionParser accepts IF THEN ELSE with string branches") {
+    std::string error;
+    const auto ast = IExpressionParser::parse("IF A > 10 THEN \"HIGH\" ELSE \"LOW\"", error);
+    REQUIRE(ast);
+    CHECK(error.empty());
+}
+
+TEST_CASE("IExpressionParser accepts OCONV call") {
+    std::string error;
+    const auto ast = IExpressionParser::parse("OCONV(A, \"D\")", error);
+    REQUIRE(ast);
+    CHECK(error.empty());
+}
+
+TEST_CASE("IExpressionParser rejects DATE function") {
+    std::string error;
+    CHECK_FALSE(IExpressionParser::parse("DATE()", error));
+}
+
+TEST_CASE("IExpressionEvaluator IF THEN ELSE returns string branch") {
+    PickFS::StructuredRecord data;
+    data.setAttribute(1, PickFS::RecordAttribute("15"));
+
+    std::string parseError;
+    const auto ast = IExpressionParser::parse("IF A > 10 THEN \"HIGH\" ELSE \"LOW\"", parseError);
+    REQUIRE(ast);
+
+    std::string error;
+    const auto value = IExpressionEvaluator::evaluate(*ast, data, error);
+    REQUIRE(value.has_value());
+    CHECK(*value == "HIGH");
+}
+
+TEST_CASE("IExpressionEvaluator OCONV on field") {
+    PickFS::StructuredRecord data;
+    data.setAttribute(1, PickFS::RecordAttribute("732"));
+
+    std::string parseError;
+    const auto ast = IExpressionParser::parse("OCONV(A, \"D\")", parseError);
+    REQUIRE(ast);
+
+    std::string error;
+    const auto value = IExpressionEvaluator::evaluate(*ast, data, error);
+    REQUIRE(value.has_value());
+    CHECK(*value == "01 Jan 1970");
+}

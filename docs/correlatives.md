@@ -52,21 +52,48 @@ Unsupported codes produce `F-type: unsupported conversion code "<code>"` when ev
 
 Documentation shorthand `I;A + B` means attr 2 = `A + B`, not a semicolon program in one field.
 
-### Supported expressions (Stage 4)
+### Supported expressions (Stage 4–5)
 
 | Construct | Meaning |
 |-----------|---------|
 | `A`–`Z` (case-insensitive) | First value of attribute 1–26 on the **data** record (`A` = attribute 1) |
 | Integer / decimal literals | e.g. `123`, `12.34` |
+| `"text"` string literals | Used in `IF` branches and conversion codes |
 | `+` `-` `*` `/` | Arithmetic; `*` `/` bind tighter than `+` `-` |
+| `>`, `<`, `>=`, `<=`, `=`, `<>`, `#` | Comparisons (numeric when both sides coerce, else lexicographic) |
+| `IF cond THEN expr ELSE expr` | Conditional (condition is a comparison or numeric truth) |
+| `OCONV(value, code)` | Output conversion (M7 table) |
+| `ICONV(value, code)` | Input conversion (M7 table) |
 | Unary `-` | Negation |
 | `( … )` | Grouping |
 
 Empty field values coerce to **0** in numeric contexts. Non-numeric text in a numeric context yields `I-type: type mismatch`. Division by zero yields `I-type: division by zero`.
 
-### Not yet supported (later stages)
+Example: `IF A > 10 THEN "HIGH" ELSE "LOW"` (DICT attr 2 = that expression).
 
-- `IF … THEN … ELSE …`, string literals, `ICONV()` / `OCONV()` in expressions (Stage 5)
-- BASIC `READV` by DICT field name for F/I (Stage 5)
+### ICONV codes (I-type and BASIC)
+
+| Code | Input → internal |
+|------|------------------|
+| `D` | `dd MMM yyyy` → Pick internal day |
+| `MT` / `MTS` | `HH:MM` / `HH:MM:SS` → seconds since midnight |
+| `MCU` / `MCL` | Case change (string) |
+| `MD` / `MD2` | Display decimal → scaled integer |
+
+Unsupported codes: `I-type: unsupported conversion code "…"`. Invalid input: `I-type: invalid ICONV "…" input`.
+
+### BASIC READV on computed fields
+
+`READV var FROM filevar, id, DICT<TOKEN>` or `READV var FROM filevar, id, "TOKEN"` evaluates **F-type** and **I-type** DICT items via the same correlative engine as ENGLISH. **A-type** behaviour is unchanged (attribute index). Value index on computed fields is rejected (`SUBVALUE.NOT.FOUND`).
+
+### DICT authoring note
+
+In **`EDIT`**, the command **`I`** means **INSERT**, not the I-type code. To create an I-type item use **`INSERT`**, then type **`I`**, the expression, and **`.`** on its own line, then **`SAVE`**.
+
+### Not yet supported
+
+- `DATE()` and other functions beyond `ICONV` / `OCONV`
+- `WRITEV` on F/I computed fields
+- `REC<"FIELDNAME">` (optional stretch)
 
 Use `RESOLVE-FIELD <file> <token>` to inspect an I-type definition (`Field kind: I`, `Expression: …`).

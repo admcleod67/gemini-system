@@ -4,13 +4,16 @@
 #include <memory>
 #include <string>
 #include <variant>
-#include <vector>
 
 namespace PickCore::English {
     struct IExpr;
 
     struct IExprNumber {
         double value{};
+    };
+
+    struct IExprString {
+        std::string value;
     };
 
     struct IExprField {
@@ -29,17 +32,66 @@ namespace PickCore::English {
         std::unique_ptr<IExpr> right;
     };
 
-    using IExprPayload = std::variant<IExprNumber, IExprField, IExprUnary, IExprBinary>;
+    enum class ICompareOp {
+        Eq,
+        Ne,
+        Lt,
+        Le,
+        Gt,
+        Ge,
+    };
+
+    struct IExprCompare {
+        ICompareOp op{};
+        std::unique_ptr<IExpr> left;
+        std::unique_ptr<IExpr> right;
+    };
+
+    struct IExprIf {
+        std::unique_ptr<IExpr> condition;
+        std::unique_ptr<IExpr> thenExpr;
+        std::unique_ptr<IExpr> elseExpr;
+    };
+
+    enum class ICallKind {
+        Iconv,
+        Oconv,
+    };
+
+    struct IExprCall {
+        ICallKind kind{};
+        std::unique_ptr<IExpr> valueArg;
+        std::unique_ptr<IExpr> codeArg;
+    };
+
+    using IExprPayload = std::variant<IExprNumber,
+                                      IExprString,
+                                      IExprField,
+                                      IExprUnary,
+                                      IExprBinary,
+                                      IExprCompare,
+                                      IExprIf,
+                                      IExprCall>;
 
     struct IExpr {
         IExprPayload payload;
 
         static std::unique_ptr<IExpr> makeNumber(double value);
+        static std::unique_ptr<IExpr> makeString(std::string value);
         static std::unique_ptr<IExpr> makeField(int attributeNo);
         static std::unique_ptr<IExpr> makeUnary(char op, std::unique_ptr<IExpr> operand);
         static std::unique_ptr<IExpr> makeBinary(char op,
                                                  std::unique_ptr<IExpr> left,
                                                  std::unique_ptr<IExpr> right);
+        static std::unique_ptr<IExpr> makeCompare(ICompareOp op,
+                                                  std::unique_ptr<IExpr> left,
+                                                  std::unique_ptr<IExpr> right);
+        static std::unique_ptr<IExpr> makeIf(std::unique_ptr<IExpr> condition,
+                                             std::unique_ptr<IExpr> thenExpr,
+                                             std::unique_ptr<IExpr> elseExpr);
+        static std::unique_ptr<IExpr> makeCall(ICallKind kind,
+                                               std::unique_ptr<IExpr> valueArg,
+                                               std::unique_ptr<IExpr> codeArg);
     };
 } // namespace PickCore::English
 

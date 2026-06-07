@@ -342,6 +342,8 @@ File handling uses the PickFS backend and file-variable handles:
 - `WRITEV <expr> ON <filevar>, <id-expr>, <attr-expr>[, <value-index-expr>] [ELSE <line-or-statement>]`
 - `CLOSE <filevar>`
 
+For `READV`, a numeric `<attr-expr>` reads that attribute directly. **`DICT<token>`** or a **quoted field name** (e.g. `"NET"`) resolves through the DICT and evaluates **A-type**, **F-type**, and **I-type** fields — see [Correlatives and computed attributes](correlatives.md).
+
 Examples:
 
 ```

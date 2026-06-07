@@ -61,6 +61,8 @@ add_library(gemini-core
         english/correlatives/DictIItemParser.h
         conversion/PickOconv.cpp
         conversion/PickOconv.h
+        conversion/PickIconv.cpp
+        conversion/PickIconv.h
 )
 
 target_include_directories(

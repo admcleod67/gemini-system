@@ -2914,6 +2914,129 @@ TEST_CASE("runtime READV_TRY treats unknown DICT token as missing attribute") {
     std::filesystem::remove_all(root, ec);
 }
 
+TEST_CASE("runtime ResolveDictAttr pushes token string for F-type field") {
+    const std::filesystem::path root = std::filesystem::temp_directory_path() / "pick-runtime-resolvedictattr-f";
+    std::error_code ec;
+    std::filesystem::remove_all(root, ec);
+
+    PickFS::FileSystem fs(root);
+    fs.createFile("DICT");
+    fs.write("DICT", PickFS::Record{"THIRD", std::string{"F\n2\n3\n"}});
+    fs.createFile("DATA");
+
+    Runtime rt;
+    rt.setFileSystem(&fs);
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"DATA"}},
+        {OpCode::OpenFile, std::string{"F"}},
+        {OpCode::PushStr, std::string{"THIRD"}},
+        {OpCode::ResolveDictAttr, std::string{"F"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<std::string>(rt.stack()[0]) == "THIRD");
+    std::filesystem::remove_all(root, ec);
+}
+
+TEST_CASE("runtime READV evaluates F-type DICT field") {
+    const std::filesystem::path root = std::filesystem::temp_directory_path() / "pick-runtime-readv-f";
+    std::error_code ec;
+    std::filesystem::remove_all(root, ec);
+
+    PickFS::FileSystem fs(root);
+    fs.createFile("DICT");
+    fs.write("DICT", PickFS::Record{"THIRD", std::string{"F\n2\n3\n"}});
+    fs.createFile("DATA");
+    const std::string body = std::string("X\n") + std::string("A") + static_cast<char>(0xFD) + "B" +
+                             static_cast<char>(0xFD) + "C\n";
+    fs.write("DATA", PickFS::Record{"ID1", body});
+
+    Runtime rt;
+    rt.setFileSystem(&fs);
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"DATA"}},
+        {OpCode::OpenFile, std::string{"F"}},
+        {OpCode::PushStr, std::string{"ID1"}},
+        {OpCode::PushStr, std::string{"THIRD"}},
+        {OpCode::ResolveDictAttr, std::string{"F"}},
+        {OpCode::PushInt, 0},
+        {OpCode::ReadV, std::string{"F"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<std::string>(rt.stack()[0]) == "C");
+    std::filesystem::remove_all(root, ec);
+}
+
+TEST_CASE("runtime READV evaluates I-type DICT field") {
+    const std::filesystem::path root = std::filesystem::temp_directory_path() / "pick-runtime-readv-i";
+    std::error_code ec;
+    std::filesystem::remove_all(root, ec);
+
+    PickFS::FileSystem fs(root);
+    fs.createFile("DICT");
+    fs.write("DICT", PickFS::Record{"NET", std::string{"I\nA + B\n"}});
+    fs.createFile("DATA");
+    fs.write("DATA", PickFS::Record{"ID1", std::string{"10\n5\n"}});
+
+    Runtime rt;
+    rt.setFileSystem(&fs);
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"DATA"}},
+        {OpCode::OpenFile, std::string{"F"}},
+        {OpCode::PushStr, std::string{"ID1"}},
+        {OpCode::PushStr, std::string{"NET"}},
+        {OpCode::ResolveDictAttr, std::string{"F"}},
+        {OpCode::PushInt, 0},
+        {OpCode::ReadV, std::string{"F"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<std::string>(rt.stack()[0]) == "15");
+    std::filesystem::remove_all(root, ec);
+}
+
+TEST_CASE("runtime READV computed field rejects value index") {
+    const std::filesystem::path root = std::filesystem::temp_directory_path() / "pick-runtime-readv-i-vi";
+    std::error_code ec;
+    std::filesystem::remove_all(root, ec);
+
+    PickFS::FileSystem fs(root);
+    fs.createFile("DICT");
+    fs.write("DICT", PickFS::Record{"NET", std::string{"I\nA + B\n"}});
+    fs.createFile("DATA");
+    fs.write("DATA", PickFS::Record{"ID1", std::string{"10\n5\n"}});
+
+    Runtime rt;
+    rt.setFileSystem(&fs);
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"DATA"}},
+        {OpCode::OpenFile, std::string{"F"}},
+        {OpCode::PushStr, std::string{"ID1"}},
+        {OpCode::PushStr, std::string{"NET"}},
+        {OpCode::ResolveDictAttr, std::string{"F"}},
+        {OpCode::PushInt, 1},
+        {OpCode::ReadV, std::string{"F"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    bool threw = false;
+    try {
+        rt.run();
+    } catch (const std::exception &e) {
+        threw = true;
+        CHECK(std::string(e.what()).find("SUBVALUE.NOT.FOUND") != std::string::npos);
+    }
+    CHECK(threw);
+    std::filesystem::remove_all(root, ec);
+}
+
 TEST_CASE("runtime CHAIN throws ChainRequest with program name") {
     std::vector<Instruction> prog = {
         {OpCode::PushStr, std::string{"NEXTPROG"}},

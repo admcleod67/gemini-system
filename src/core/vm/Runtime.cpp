@@ -8,7 +8,10 @@
 #include "../filesystem/StructuredRecord.h"
 #include "../filesystem/RecordAttribute.h"
 #include "../english/DictionaryResolver.h"
+#include "../english/correlatives/CorrelativeEvaluator.h"
+#include "../english/EnglishTypes.h"
 #include "../conversion/PickOconv.h"
+#include "../conversion/PickIconv.h"
 
 #include <algorithm>
 #include <cctype>
@@ -110,6 +113,15 @@ namespace PickVM {
                 throw std::runtime_error(std::string(ctx) + ": expected string on stack");
             }
             return std::get<std::string>(v);
+        }
+
+        std::string evaluateDictFieldCell(PickFS::FileSystem *fileSystem,
+                                          const std::string &dataFileName,
+                                          const std::string &token,
+                                          const PickFS::StructuredRecord &dataRecord) {
+            PickCore::English::DictionaryResolver resolver;
+            const PickCore::English::FieldRef ref = resolver.resolveField(*fileSystem, dataFileName, token);
+            return PickCore::English::CorrelativeEvaluator::evaluateFieldCell(ref, dataRecord);
         }
 
         std::string valueToString(const Value &v) {
@@ -765,45 +777,12 @@ namespace PickVM {
             }
 
             const std::string code = upperCopy(codeRaw);
-            const char *direction = "ICONV";
-
-            if (code == "D") {
-                bool ok = false;
-                const int day = pickDayFromDateString(valueToString(value), ok);
-                if (!ok) {
-                    throw std::runtime_error("BUILTIN: ICONV invalid \"D\" input");
-                }
-                return day;
-            }
-            if (code == "MT" || code == "MTS") {
-                const bool wantSeconds = (code == "MTS");
-                bool ok = false;
-                const int n = secondsFromTimeString(valueToString(value), wantSeconds, ok);
-                if (!ok) {
-                    throw std::runtime_error(std::string("BUILTIN: ICONV invalid \"") + code + "\" input");
-                }
-                return n;
-            }
+            const std::string input = valueToString(value);
+            const std::string converted = PickCore::Conversion::iconvOutputBuiltin(input, codeRaw);
             if (code == "MCU" || code == "MCL") {
-                const bool toUpper = (code == "MCU");
-                std::string s = valueToString(value);
-                for (char &c : s) {
-                    c = static_cast<char>(toUpper ? std::toupper(static_cast<unsigned char>(c))
-                                                  : std::tolower(static_cast<unsigned char>(c)));
-                }
-                return s;
+                return converted;
             }
-            if (code == "MD" || code == "MD2") {
-                const int decimals = (code == "MD2") ? 2 : 0;
-                bool ok = false;
-                const long long n = parseMdScaled(valueToString(value), decimals, ok);
-                if (!ok || n < std::numeric_limits<int>::min() || n > std::numeric_limits<int>::max()) {
-                    throw std::runtime_error(std::string("BUILTIN: ICONV invalid \"") + code + "\" input");
-                }
-                return static_cast<int>(n);
-            }
-
-            throw std::runtime_error(std::string("BUILTIN: ") + direction + " unsupported code \"" + codeRaw + "\"");
+            return coerceToInt(converted);
         }
 
         void builtinOconv(std::vector<Value> &stack, Runtime *) {
@@ -1595,7 +1574,7 @@ namespace PickVM {
             case OpCode::ReadV: {
                 const std::string fileVar = canonicalVariableName(stringOperandAtIp(instr, ip_));
                 const int valueIndex = coerceToInt(pop());
-                const int attrNo = coerceToInt(pop());
+                const Value attrSlot = pop();
                 const std::string id = valueToString(pop());
                 const auto fit = openFiles_.find(fileVar);
                 if (fit == openFiles_.end()) {
@@ -1609,6 +1588,16 @@ namespace PickVM {
                     throw makeIoError("READV", IoErrorKind::MissingRecord, id);
                 }
                 const PickFS::StructuredRecord sr = PickFS::StructuredRecord::fromRaw(rec->value());
+                if (std::holds_alternative<std::string>(attrSlot)) {
+                    if (valueIndex > 0) {
+                        throw makeIoError("READV", IoErrorKind::MissingSubvalue,
+                                           "computed field does not support value index");
+                    }
+                    const std::string token = std::get<std::string>(attrSlot);
+                    push(evaluateDictFieldCell(fileSystem_, fit->second.name, token, sr));
+                    break;
+                }
+                const int attrNo = coerceToInt(attrSlot);
                 if (!sr.hasAttribute(attrNo)) {
                     throw makeIoError("READV", IoErrorKind::MissingAttribute, "attr=" + std::to_string(attrNo));
                 }
@@ -1620,7 +1609,6 @@ namespace PickVM {
                     }
                     push(attr.valueAt(valueIndex));
                 } else {
-                    // valueIndex == 0 → attribute-level read.
                     push(attr.raw());
                 }
                 break;
@@ -1629,7 +1617,7 @@ namespace PickVM {
             case OpCode::ReadVTry: {
                 const std::string fileVar = canonicalVariableName(stringOperandAtIp(instr, ip_));
                 const int valueIndex = coerceToInt(pop());
-                const int attrNo = coerceToInt(pop());
+                const Value attrSlot = pop();
                 const std::string id = valueToString(pop());
                 const auto fit = openFiles_.find(fileVar);
                 if (fit == openFiles_.end() || !fileSystem_) {
@@ -1644,6 +1632,26 @@ namespace PickVM {
                     break;
                 }
                 const PickFS::StructuredRecord sr = PickFS::StructuredRecord::fromRaw(rec->value());
+                if (std::holds_alternative<std::string>(attrSlot)) {
+                    if (valueIndex > 0) {
+                        push(std::string{});
+                        push(0);
+                        break;
+                    }
+                    const std::string token = std::get<std::string>(attrSlot);
+                    PickCore::English::DictionaryResolver resolver;
+                    const PickCore::English::FieldRef ref =
+                        resolver.resolveField(*fileSystem_, fit->second.name, token);
+                    if (!PickCore::English::fieldRefIsResolved(ref)) {
+                        push(std::string{});
+                        push(0);
+                        break;
+                    }
+                    push(evaluateDictFieldCell(fileSystem_, fit->second.name, token, sr));
+                    push(1);
+                    break;
+                }
+                const int attrNo = coerceToInt(attrSlot);
                 if (!sr.hasAttribute(attrNo)) {
                     push(std::string{});
                     push(0);
@@ -1659,7 +1667,6 @@ namespace PickVM {
                     push(attr.valueAt(valueIndex));
                     push(1);
                 } else {
-                    // valueIndex == 0 → attribute-level read.
                     push(attr.raw());
                     push(1);
                 }
@@ -1677,27 +1684,35 @@ namespace PickVM {
             }
 
             case OpCode::ResolveDictAttr: {
-                // Pops a dictionary field-token string and resolves it into an attribute index
-                // using DICT-<dataFile> precedence. Resolution failures push 0 (missing attribute)
-                // instead of throwing so *TRY/ELSE stack contracts remain intact.
+                // Pops a dictionary field-token string. A-type → int attribute index on stack.
+                // F/I-type → re-push token string for ReadV/ReadVTry computed-field evaluation.
+                // Unknown → int 0 (missing attribute for TRY/ELSE paths).
                 const std::string fileVar = canonicalVariableName(stringOperandAtIp(instr, ip_));
                 const std::string token = valueToString(pop());
-                int resolvedAttrNo = 0;
                 if (fileSystem_) {
                     const auto fit = openFiles_.find(fileVar);
                     if (fit != openFiles_.end()) {
                         try {
                             PickCore::English::DictionaryResolver resolver;
-                            const auto field = resolver.resolveField(*fileSystem_, fit->second.name, token);
-                            if (field.attributeNo.has_value()) {
-                                resolvedAttrNo = *field.attributeNo;
+                            const PickCore::English::FieldRef field =
+                                resolver.resolveField(*fileSystem_, fit->second.name, token);
+                            if (field.kind == PickCore::English::DictFieldKind::FCorrelative ||
+                                field.kind == PickCore::English::DictFieldKind::ICorrelative) {
+                                if (PickCore::English::fieldRefIsResolved(field)) {
+                                    push(token);
+                                    break;
+                                }
+                            } else if (field.attributeNo.has_value()) {
+                                push(*field.attributeNo);
+                                break;
                             }
                         } catch (const std::exception &) {
-                            resolvedAttrNo = 0;
+                            push(0);
+                            break;
                         }
                     }
                 }
-                push(resolvedAttrNo);
+                push(0);
                 break;
             }
 

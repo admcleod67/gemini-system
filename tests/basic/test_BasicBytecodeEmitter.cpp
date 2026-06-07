@@ -898,6 +898,23 @@ TEST_CASE("basic bytecode emitter emits ResolveDictAttr for DICT<token> in READV
     CHECK(std::get<std::string>(emitted.program[resolveIp + 3].operand) == "NAME");
 }
 
+TEST_CASE("basic bytecode emitter emits ResolveDictAttr for quoted field in READV") {
+    BasicIr::NormalizedProgram program;
+    program.lines.push_back({10, BasicIr::ReadVStmt{"NAME", "FVAR", makeVar("ID"), makeStr("NET"), nullptr, std::nullopt}});
+
+    const BasicBytecodeEmissionResult emitted = BasicBytecodeEmitter::emit(program);
+    REQUIRE(emitted.success);
+
+    bool foundResolve = false;
+    for (const auto &ins : emitted.program) {
+        if (ins.op == OpCode::ResolveDictAttr) {
+            foundResolve = true;
+            break;
+        }
+    }
+    CHECK(foundResolve);
+}
+
 TEST_CASE("basic bytecode emitter emits *_Try opcodes for file ELSE flow") {
     BasicIr::NormalizedProgram program;
     BasicIr::OpenStmt open{};

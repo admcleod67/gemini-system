@@ -34,6 +34,11 @@ namespace PickShell {
                    op == BasicAst::BinaryOp::Divide;
         }
 
+        bool readVAttrNeedsDictResolve(const BasicAst::Expr &expr) {
+            return std::holds_alternative<BasicAst::DictFieldExpr>(expr.node) ||
+                   std::holds_alternative<BasicAst::StringLiteralExpr>(expr.node);
+        }
+
         class ExpressionAstEmitter {
         public:
             ExpressionAstEmitter(std::vector<PickVM::Instruction> &out, std::string &error)
@@ -527,6 +532,10 @@ namespace PickShell {
                             result.errors.push_back({sourceLine, "READV attribute expression error: " + error});
                             return false;
                         }
+                        const std::string fileVar = uppercase(stmt.fileVar);
+                        if (readVAttrNeedsDictResolve(*stmt.attrExpr)) {
+                            result.program.push_back(PickVM::Instruction{PickVM::OpCode::ResolveDictAttr, fileVar});
+                        }
                         if (stmt.valueIndexExpr) {
                             if (!emitter.emit(*stmt.valueIndexExpr)) {
                                 result.errors.push_back({sourceLine, "READV value-index expression error: " + error});
@@ -535,7 +544,6 @@ namespace PickShell {
                         } else {
                             result.program.push_back(PickVM::Instruction{PickVM::OpCode::PushInt, 0});
                         }
-                        const std::string fileVar = uppercase(stmt.fileVar);
                         const std::string targetVar = uppercase(stmt.targetVar);
                         if (!stmt.elseArm.has_value()) {
                             result.program.push_back(PickVM::Instruction{PickVM::OpCode::ReadV, fileVar});
@@ -990,9 +998,8 @@ namespace PickShell {
                             result.errors.push_back({line.lineNumber, "READV attribute expression error: " + error});
                             return false;
                         }
-                        // DICT<token> in READV/WRITEV attribute position is resolved to an integer
-                        // attribute number just before the READV/WRITEV runtime opcodes.
-                        if (std::holds_alternative<BasicAst::DictFieldExpr>(stmt.attrExpr->node)) {
+                        // DICT<token> or quoted field name resolves via ResolveDictAttr before READV.
+                        if (readVAttrNeedsDictResolve(*stmt.attrExpr)) {
                             result.program.push_back(PickVM::Instruction{PickVM::OpCode::ResolveDictAttr, fileVar});
                         }
                         if (stmt.valueIndexExpr) {
