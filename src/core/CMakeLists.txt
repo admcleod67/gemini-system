@@ -69,6 +69,9 @@ add_library(gemini-core
         locking/LockTable.cpp
         locking/LockTable.h
         locking/LockRegistry.h
+        languages/LanguageRegistry.cpp
+        languages/LanguageRegistry.h
+        languages/LanguageTypes.h
 )
 
 target_include_directories(
@@ -86,6 +89,7 @@ target_include_directories(
         "${CMAKE_CURRENT_SOURCE_DIR}/english"
         "${CMAKE_CURRENT_SOURCE_DIR}/conversion"
         "${CMAKE_CURRENT_SOURCE_DIR}/locking"
+        "${CMAKE_CURRENT_SOURCE_DIR}/languages"
 )
 
 target_link_libraries(gemini-core PUBLIC nlohmann_json::nlohmann_json)
