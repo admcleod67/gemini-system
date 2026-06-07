@@ -8,6 +8,7 @@
 #include "HelpTopics.h"
 #include "LineRecordEditor.h"
 #include "LoginService.h"
+#include "LockRegistry.h"
 
 #include <pick_system/version.hpp>
 
@@ -18,6 +19,7 @@
 #include <filesystem>
 #include <iostream>
 #include <limits>
+#include <memory>
 #include <optional>
 #include <set>
 #include <sstream>
@@ -199,6 +201,9 @@ namespace PickShell {
         : session_(runtime),
           vmDebugService_(session_),
           assemblerShell_(vmDebugService_) {
+        const std::shared_ptr<PickCore::Locking::LockTable> lockTable =
+            PickCore::Locking::LockRegistry::instance().table();
+        session_.setSharedLockTable(lockTable);
         session_.runtime_.setFileSystem(&session_.fileSystem_);
         basicShell_.setResolveProgramLocationFn([this](const std::string &programName) {
             const PickVoc::VocResolver::ProgramLocation resolved = session_.vocResolver_.resolveProgramLocation(programName);

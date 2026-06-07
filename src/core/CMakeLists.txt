@@ -68,6 +68,7 @@ add_library(gemini-core
         locking/LockTypes.h
         locking/LockTable.cpp
         locking/LockTable.h
+        locking/LockRegistry.h
 )
 
 target_include_directories(

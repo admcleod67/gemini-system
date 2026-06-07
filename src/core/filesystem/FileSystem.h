@@ -8,10 +8,16 @@
 #include "Catalog.h"
 #include "Record.h"
 
+#include <memory>
 #include <optional>
 #include <stdexcept>
 #include <string>
 #include <vector>
+
+namespace PickCore::Locking {
+    class LockTable;
+    enum class LockType;
+} // namespace PickCore::Locking
 
 namespace PickFS {
     class FileSystemError final : public std::runtime_error {
@@ -39,6 +45,10 @@ namespace PickFS {
 
         const std::filesystem::path &root() const { return catalog_.root(); }
 
+        void setLockContext(std::shared_ptr<PickCore::Locking::LockTable> table, std::string sessionId);
+
+        void clearLockContext();
+
         void createFile(const std::string &name);
 
         void deleteFile(const std::string &name);
@@ -56,6 +66,12 @@ namespace PickFS {
         std::optional<Record> read(const std::string &fileName, const std::string &recordName) const;
 
         void write(const std::string &fileName, const Record &record);
+
+        std::optional<Record> readU(const std::string &fileName, const std::string &recordName);
+
+        void writeU(const std::string &fileName, const Record &record);
+
+        bool releaseRecord(const std::string &fileName, const std::string &recordName);
 
         std::vector<std::string> listFiles() const;
 
@@ -89,6 +105,16 @@ namespace PickFS {
 
     private:
         Catalog catalog_;
+        std::shared_ptr<PickCore::Locking::LockTable> lockTable_;
+        std::string lockSessionId_;
+
+        [[nodiscard]] bool lockingEnabled() const;
+
+        void assertRecordAccessible(const std::string &fileName, const std::string &recordName) const;
+
+        void acquireRecordLock(const std::string &fileName,
+                               const std::string &recordName,
+                               PickCore::Locking::LockType lockType);
 
         static bool isValidRecordName(const std::string &name);
 

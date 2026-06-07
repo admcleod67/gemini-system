@@ -16,12 +16,17 @@
 #include "VocResolver.h"
 
 #include <filesystem>
+#include <memory>
 #include <optional>
 #include <ostream>
 #include <string_view>
 #include <unordered_set>
 #include <utility>
 #include <vector>
+
+namespace PickCore::Locking {
+    class LockTable;
+} // namespace PickCore::Locking
 
 namespace PickShell {
     class ShellSession {
@@ -62,6 +67,16 @@ namespace PickShell {
         void setSessionIdentity(int port, std::string username, std::string account);
 
         void clearLoginSession();
+
+        void setSharedLockTable(std::shared_ptr<PickCore::Locking::LockTable> table);
+
+        [[nodiscard]] static std::string makeSessionLockId(int port,
+                                                           const std::string &account,
+                                                           const std::string &username);
+
+        void bindLockSession(const std::string &sessionLockId);
+
+        [[nodiscard]] const std::string &sessionLockId() const { return sessionLockId_; }
 
         [[nodiscard]] int whoPort() const { return whoPort_; }
 
@@ -109,9 +124,12 @@ namespace PickShell {
         std::unordered_set<std::size_t> breakpoints_;
         bool suspended_{false};
         std::optional<std::size_t> resumePastBreakpointIp_;
+        std::shared_ptr<PickCore::Locking::LockTable> lockTable_;
+        std::string sessionLockId_;
 
-    private:
         void reloadMdDefaultDataFile();
+        void syncLockContextToFileSystem();
+        void releaseSessionLocks();
     };
 } // namespace PickShell
 

@@ -38,6 +38,8 @@ Compatibility wrappers still expose current callers to:
 
 so Tcl commands and VM callbacks do not need backend-specific knowledge.
 
+When a lock context is bound (shared lock table + session id), **`readU`** / **`writeU`** acquire record locks before I/O; plain **`read`** / **`write`** / **`deleteRecord`** enforce foreign locks without acquiring; **`releaseRecord`** and **`deleteFile`** release locks. See [Milestone 10](milestones/10-record-locking-multi-user.md).
+
 ## Record extension policy
 
 Extensions are backend-only and are not exposed to Tcl:

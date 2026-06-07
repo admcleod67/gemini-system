@@ -30,6 +30,7 @@ add_executable(
         core/test_PickOconv.cpp
         core/test_PickIconv.cpp
         core/test_LockTable.cpp
+        core/test_FileSystemLocking.cpp
         basic/test_BasicBytecodeEmitter.cpp
         basic/test_BasicCompiler.cpp
         basic/test_BasicCompilerGolden.cpp
@@ -38,6 +39,7 @@ add_executable(
         basic/test_BasicStatementParser.cpp
         tcl/test_AssemblerShell.cpp
         tcl/test_Shell.cpp
+        tcl/test_ShellSessionLocks.cpp
         tcl/test_TclEnvironment.cpp
         proc/test_ProcShell.cpp
 )

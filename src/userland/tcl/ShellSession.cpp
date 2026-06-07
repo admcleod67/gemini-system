@@ -1,10 +1,12 @@
 #include "ShellSession.h"
 
+#include "LockTable.h"
 #include "MdDefaultDataFile.h"
 #include "TclEnvironment.h"
 
 #include <algorithm>
 #include <cctype>
+#include <sstream>
 #include <vector>
 
 namespace PickShell {
@@ -22,6 +24,7 @@ namespace PickShell {
         vocResolver_.invalidate();
         reloadMdDefaultDataFile();
         clearActiveList();
+        syncLockContextToFileSystem();
     }
 
     bool ShellSession::programImageLoaded() const {
@@ -79,6 +82,7 @@ namespace PickShell {
     }
 
     void ShellSession::resetForQuit() {
+        releaseSessionLocks();
         lastLoaded_.reset();
         suspended_ = false;
         resumePastBreakpointIp_.reset();
@@ -98,6 +102,7 @@ namespace PickShell {
         setSessionIdentity(session.whoPort, session.username, session.accountName);
         loggedIn_ = true;
         userNo_ = session.userNo.empty() ? std::string{"0"} : session.userNo;
+        bindLockSession(makeSessionLockId(session.whoPort, session.accountName, session.username));
     }
 
     void ShellSession::setSessionIdentity(const int port, std::string username, std::string account) {
@@ -117,6 +122,8 @@ namespace PickShell {
     }
 
     void ShellSession::clearLoginSession() {
+        releaseSessionLocks();
+        bindLockSession("");
         loggedIn_ = false;
         whoPort_ = 0;
         sessionUsername_.clear();
@@ -129,6 +136,38 @@ namespace PickShell {
 
     void ShellSession::reloadMdDefaultDataFile() {
         defaultDataFile_ = PickCore::loadDefaultDataFileFromMd(fileSystem_);
+    }
+
+    void ShellSession::setSharedLockTable(std::shared_ptr<PickCore::Locking::LockTable> table) {
+        lockTable_ = std::move(table);
+        syncLockContextToFileSystem();
+    }
+
+    std::string ShellSession::makeSessionLockId(const int port,
+                                                const std::string &account,
+                                                const std::string &username) {
+        std::ostringstream id;
+        id << "S:" << port << ':' << account << ':' << username;
+        return id.str();
+    }
+
+    void ShellSession::bindLockSession(const std::string &sessionLockId) {
+        sessionLockId_ = sessionLockId;
+        syncLockContextToFileSystem();
+    }
+
+    void ShellSession::syncLockContextToFileSystem() {
+        if (lockTable_ && !sessionLockId_.empty()) {
+            fileSystem_.setLockContext(lockTable_, sessionLockId_);
+        } else {
+            fileSystem_.clearLockContext();
+        }
+    }
+
+    void ShellSession::releaseSessionLocks() {
+        if (lockTable_ && !sessionLockId_.empty()) {
+            (void) lockTable_->releaseAllForSession(sessionLockId_);
+        }
     }
 
     bool ShellSession::isSessionSystemVariableName(const std::string_view name) {

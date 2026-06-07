@@ -1,6 +1,9 @@
 #include "FileSystem.h"
 #include "StructuredRecord.h"
 
+#include "LockTable.h"
+#include "LockTypes.h"
+
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
@@ -19,6 +22,48 @@ namespace PickFS {
 
     void FileSystem::setRoot(std::filesystem::path root) {
         catalog_.setRoot(std::move(root));
+    }
+
+    void FileSystem::setLockContext(std::shared_ptr<PickCore::Locking::LockTable> table, std::string sessionId) {
+        lockTable_ = std::move(table);
+        lockSessionId_ = std::move(sessionId);
+    }
+
+    void FileSystem::clearLockContext() {
+        lockTable_.reset();
+        lockSessionId_.clear();
+    }
+
+    bool FileSystem::lockingEnabled() const {
+        return lockTable_ != nullptr && !lockSessionId_.empty();
+    }
+
+    void FileSystem::assertRecordAccessible(const std::string &fileName, const std::string &recordName) const {
+        if (!lockingEnabled()) {
+            return;
+        }
+        const std::optional<PickCore::Locking::LockEntry> entry = lockTable_->lookup(fileName, recordName);
+        if (!entry.has_value() || entry->ownerSessionId == lockSessionId_) {
+            return;
+        }
+        PickCore::Locking::LockConflict conflict;
+        conflict.fileName = fileName;
+        conflict.recordId = recordName;
+        conflict.ownerSessionId = entry->ownerSessionId;
+        conflict.lockType = entry->lockType;
+        throw FileSystemError(PickCore::Locking::describeLockConflict(conflict));
+    }
+
+    void FileSystem::acquireRecordLock(const std::string &fileName,
+                                       const std::string &recordName,
+                                       const PickCore::Locking::LockType lockType) {
+        if (!lockingEnabled()) {
+            return;
+        }
+        PickCore::Locking::LockConflict conflict;
+        if (!lockTable_->tryAcquire(lockSessionId_, fileName, recordName, lockType, &conflict)) {
+            throw FileSystemError(PickCore::Locking::describeLockConflict(conflict));
+        }
     }
 
     void FileSystem::createFile(const std::string &name) {
@@ -46,6 +91,10 @@ namespace PickFS {
     void FileSystem::deleteFile(const std::string &name) {
         if (!Catalog::isValidName(name)) {
             throw FileSystemError("Invalid file name");
+        }
+
+        if (lockTable_) {
+            (void) lockTable_->releaseAllForFile(name);
         }
 
         const std::filesystem::path path = catalog_.filePath(name);
@@ -121,6 +170,7 @@ namespace PickFS {
         if (!isValidRecordName(recordName)) {
             throw FileSystemError("Invalid record name");
         }
+        assertRecordAccessible(handle.name, recordName);
 
         const std::vector<std::string> extensions = {
             preferredExtensionForFile(handle.name),
@@ -156,6 +206,7 @@ namespace PickFS {
         if (!isValidRecordName(record.name())) {
             throw FileSystemError("Invalid record name");
         }
+        assertRecordAccessible(handle.name, record.name());
 
         const std::filesystem::path path = resolveRecordPath(handle, record.name());
         const std::filesystem::path tempPath = path.string() + ".tmp";
@@ -183,6 +234,8 @@ namespace PickFS {
         if (!isValidRecordName(recordName)) {
             throw FileSystemError("Invalid record name");
         }
+        assertRecordAccessible(handle.name, recordName);
+
         const std::filesystem::path path = resolveRecordPath(handle, recordName);
         std::error_code ec;
         const bool removed = std::filesystem::remove(path, ec);
@@ -192,6 +245,10 @@ namespace PickFS {
         if (!removed) {
             throw FileSystemError("Record not found: " + recordName);
         }
+
+        if (lockingEnabled()) {
+            (void) lockTable_->release(lockSessionId_, handle.name, recordName);
+        }
     }
 
     std::optional<Record> FileSystem::read(const std::string &fileName, const std::string &recordName) const {
@@ -200,6 +257,23 @@ namespace PickFS {
 
     void FileSystem::write(const std::string &fileName, const Record &record) {
         writeRecord(openFile(fileName), record);
+    }
+
+    std::optional<Record> FileSystem::readU(const std::string &fileName, const std::string &recordName) {
+        acquireRecordLock(fileName, recordName, PickCore::Locking::LockType::ReadU);
+        return read(fileName, recordName);
+    }
+
+    void FileSystem::writeU(const std::string &fileName, const Record &record) {
+        acquireRecordLock(fileName, record.name(), PickCore::Locking::LockType::WriteU);
+        write(fileName, record);
+    }
+
+    bool FileSystem::releaseRecord(const std::string &fileName, const std::string &recordName) {
+        if (!lockingEnabled()) {
+            return false;
+        }
+        return lockTable_->release(lockSessionId_, fileName, recordName);
     }
 
     std::vector<std::string> FileSystem::listFiles() const {
