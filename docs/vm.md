@@ -111,3 +111,7 @@ Optional **`(line L)`** suffix when `loaded` is provided and a source line is kn
 ## Sample programs
 
 See the **`programs/`** directory (e.g. `hello.tbc`, `stacktest.tbc`) for runnable examples.
+
+## See also
+
+- [Concurrency and record locking](concurrency.md) — lock opcodes in context of the session lock model.

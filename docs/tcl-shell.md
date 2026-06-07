@@ -145,7 +145,7 @@ LIST CUSTOMERS NAME CITY HEADING "Customer list — @DATE" FOOTING "Page @PAGE �
 
 ## PROC mode
 
-`PROC` runs host-interpreted scripts (no VM bytecode) via `PROC <programName> [args...]`. Script lookup and Tcl-bridge behavior are documented here; the full PROC language contract (execution model, substitution rules, statements, and error behavior) lives in [PROC language](proc.md).
+`PROC` runs host-interpreted scripts (no VM bytecode) via `PROC <programName> [args...]`. Script lookup and Tcl-bridge behavior are documented here; the full PROC language contract (execution model, substitution rules, statements, and error behavior) lives in [PROC language](proc.md). Native PROC lock statements report conflicts via **`PROCERR = ?LOCKED?`**; bridged **`TCL READU`** uses Tcl-style **`RECORD LOCKED`** errors instead (see [Concurrency](concurrency.md)).
 
 ## Shell variables
 
@@ -169,4 +169,5 @@ Parse/runtime failures during **`RUN`** print **`Error:`** followed by the excep
 
 - [HELP system](help-system.md) — file-backed HELP topics, lookup chain, `HELP-LIST` / `HELP-EDIT`.
 - [Bytecode VM](vm.md) — opcode reference and parser/runtime details.
+- [Concurrency and record locking](concurrency.md) — session lock table and Tcl/BASIC/PROC behaviour.
 - [Assembler shell](assembler-shell.md) — instruction-level debugger shell.

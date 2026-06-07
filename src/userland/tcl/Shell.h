@@ -123,6 +123,15 @@ namespace PickShell {
         void executeProcTclCommand(const std::string &line, std::ostream &out);
         bool procSelect(const std::string &fileName, std::string &error);
         std::optional<std::string> procReadNext(std::string &error);
+        ProcLockOutcome procReadU(const std::string &fileName,
+                                  const std::string &recordKey,
+                                  std::string &recordBody,
+                                  std::string &hardError);
+        ProcLockOutcome procWriteU(const std::string &fileName,
+                                     const std::string &recordKey,
+                                     const std::string &value,
+                                     std::string &hardError);
+        bool procRelease(const std::string &fileName, const std::string &recordKey, std::string &hardError);
         void resetProcReadNextCursor();
         static std::string programObjectRecordKey(const std::string &recordKey);
         std::optional<std::string> readProgramRecord(const BasicShell::ProgramLocation &location, bool objectRecord);

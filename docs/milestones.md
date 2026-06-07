@@ -15,6 +15,6 @@ Detailed scope for each milestone is in [`docs/milestones/`](milestones/) (two-d
 - [Milestone 7 — BASIC Functions & MAT Operations (completed)](milestones/07-basic-functions-mat-operations.md)
 - [Milestone 8 — ENGLISH Formatting Layer (completed)](milestones/08-english-formatting-layer.md)
 - [Milestone 9 — Correlatives & Computed Attributes (completed)](milestones/09-correlatives-computed-attributes.md)
-- [Milestone 10 — Record Locking & Multi‑User Concurrency](milestones/10-record-locking-multi-user.md)
+- [Milestone 10 — Record Locking & Multi‑User Concurrency (completed)](milestones/10-record-locking-multi-user.md)
 - [Milestone 11 — Multi‑Language Runtime Infrastructure](milestones/11-multi-language-runtime-infrastructure.md)
 

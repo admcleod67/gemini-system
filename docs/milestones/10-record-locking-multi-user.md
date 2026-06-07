@@ -243,12 +243,12 @@ These belong to later milestones.
 
 Milestone 10 is complete when:
 
-- [ ] All lock operations are implemented
-- [ ] All file operations respect locks
-- [ ] BASIC, PROC, and TCL behave consistently
-- [ ] Multi‑session tests pass
-- [ ] Documentation is updated
-- [ ] Concurrency model is stable and predictable
+- [x] All lock operations are implemented
+- [x] All file operations respect locks
+- [x] BASIC, PROC, and TCL behave consistently
+- [x] Multi‑session tests pass
+- [x] Documentation is updated
+- [x] Concurrency model is stable and predictable
 
 ---
 
@@ -264,7 +264,7 @@ Implementation is sequenced into vertical stages. Each stage ships a test‑lock
 
 - **Stage 4 — VM + BASIC**: new VM opcodes **`READU`**, **`WRITEU`**, **`RELEASE`**; BASIC statement parser and bytecode emitter; runtime sets **`STATUS()`** and routes to **`ON ERROR`** when defined, otherwise raises with **`ERR_RECORD_LOCKED`**. Compiler/runtime tests; no PROC changes yet. *Status: implemented.* Ships VM opcodes **`ReadRecU`** / **`WriteRecU`** / **`ReleaseRec`** (+ try variants), **`SetOnErrorHandler`**, BASIC **`READU`** / **`WRITEU`** / **`RELEASE`** / **`ON ERROR`**, **`STATUS()`** builtin, and tests in **`test_Runtime.cpp`**, **`test_Parser.cpp`**, **`test_BasicStatementParser.cpp`**, **`test_BasicCompiler.cpp`**.
 
-- **Stage 5 — PROC + docs — closes M10**: PROC **`READU`** / **`WRITEU`** / **`RELEASE`** with **`?LOCKED?`** (or equivalent stable token); integration tests across Tcl, BASIC, and PROC. Update [docs/tcl-shell.md](../tcl-shell.md), [docs/basic-language.md](../basic-language.md), [docs/proc.md](../proc.md), [docs/vm.md](../vm.md); add concurrency model overview. **`MATREAD`** / **`MATWRITE`** remain deferred unless trivially wired. **Closes Milestone 10.** *Status: pending.*
+- **Stage 5 — PROC + docs — closes M10**: PROC **`READU`** / **`WRITEU`** / **`RELEASE`** with **`?LOCKED?`** via **`PROCERR`**; cross-shell integration tests (Tcl, BASIC, PROC); concurrency overview and operator doc cross-links. **`MATREADU`** / **`MATWRITEU`** remain deferred. **Closes Milestone 10.** *Status: implemented.* Ships native PROC lock statements in [`ProcInterpreter.cpp`](src/userland/proc/ProcInterpreter.cpp), Shell callbacks [`procReadU`](src/userland/tcl/Shell.cpp) / `procWriteU` / `procRelease`, [`tests/proc/test_ProcLocking.cpp`](tests/proc/test_ProcLocking.cpp), [`tests/tcl/test_M10CrossShell.cpp`](tests/tcl/test_M10CrossShell.cpp), and [`docs/concurrency.md`](docs/concurrency.md).
 
 Only Stage 5's exit criteria should claim "Closes Milestone 10".
 

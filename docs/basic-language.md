@@ -5,6 +5,7 @@ This page documents BASIC compiler subset v1: the currently supported language f
 - BASIC shell commands and the shared **`EDIT`** line editor are documented in [BASIC shell](basic-shell.md).
 - VM opcode/runtime behavior is documented in [Bytecode VM](vm.md).
 - Compiler phase architecture is documented in [Compiler architecture](compiler-architecture.md).
+- Session record locking is documented in [Concurrency and record locking](concurrency.md).
 
 ## Compiler architecture note
 

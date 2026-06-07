@@ -21,6 +21,8 @@ Status labels:
 - **SELECT/READNEXT** — `Partial`
   - Native PROC statements are present; Stage 1 scope is simple `SELECT <file>` + active-list iteration.
   - Advanced selection expressions are deferred.
+- **READU/WRITEU/RELEASE** — `Implemented`
+  - Native PROC lock statements with `PROCERR = ?LOCKED?` on conflict; `RELEASE` drops session locks.
 
 ## TCL shell
 
@@ -74,8 +76,9 @@ Status labels:
 
 - **Pick-style logical files and record APIs** — `Implemented`
   - Logical file/record operations and session-scoped active list behavior are available.
-- **Multi-user locking/concurrency parity** — `Deferred`
-  - `READU`/`WRITEU`/`RELEASE` and full concurrency model remain deferred.
+- **Multi-user locking/concurrency parity** — `Partial`
+  - Session-scoped `READU`/`WRITEU`/`RELEASE` across Tcl, BASIC, and PROC; no distributed locking or timeouts.
+  - See [Concurrency and record locking](concurrency.md).
 
 ## Interpretation notes
 

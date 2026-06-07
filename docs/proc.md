@@ -56,11 +56,42 @@ Session `@` names in PROC:
 - `EXITIF <lhs> = <rhs>`: conditional loop exit.
 - `SELECT <file>`: populate session active list from file ids.
 - `READNEXT <name>`: read next active-list id into a variable (empty string when exhausted).
+- `READU <var> <file> <id>`: acquire a read-with-update lock and assign the record body to `<var>`. Shorthand: `READU <var> <id>` when `@DEFDATA` resolves to a default file.
+- `WRITEU <file> <id> <value-tokens…>`: acquire a write lock and upsert the record. Shorthand: `WRITEU <id> <value…>` with `@DEFDATA`.
+- `RELEASE <file> <id>`: release the session lock on the record (silent if not held). Shorthand: `RELEASE <id>` with `@DEFDATA`.
 - `TCL <command...>`: pass reconstructed, substituted operand string to Tcl dispatcher.
 - `<name> = <tokens...>`: string assignment.
 - `END`: terminate script successfully.
 
 Stage 1 selection scope is intentionally minimal: simple `SELECT <file>` plus active-list iteration with `READNEXT`. Richer selection expressions are deferred to later milestone slices.
+
+## Record locking (Milestone 10)
+
+Native lock statements use the session filesystem lock context (requires catalogue login for cross-session enforcement). On lock conflict:
+
+- **`PROCERR`** is set to **`?LOCKED?`**
+- execution **continues** (no `Error:` line, no script abort)
+- scripts branch with `IF PROCERR = ?LOCKED? THEN …`
+
+On successful `READU` / `WRITEU`, **`PROCERR`** is cleared (empty string). **`RELEASE`** clears **`PROCERR`** after a successful release call.
+
+Missing record on **`READU`** aborts with `Error: No such record` (same semantics as Tcl **`READU`**).
+
+**`TCL READU …`** remains Tcl-flavoured: conflicts print `Error: RECORD LOCKED: …` and do not set **`PROCERR`**.
+
+Example:
+
+```text
+READU REC DATA R1
+IF PROCERR = ?LOCKED? THEN GO HANDLE
+DISPLAY REC
+END
+HANDLE:
+DISPLAY LOCKED
+END
+```
+
+See [Concurrency and record locking](concurrency.md) for the full model.
 
 ## R83 aliases and long-form canonical keywords
 
@@ -96,6 +127,7 @@ Representative runtime errors include:
 - `Error: IF requires IF <lhs> = <rhs> THEN <statement>`
 - `Error: Read-only system variable`
 - `Error: Unknown PROC statement`
+- `Error: READU requires <var> <file> <id> or <var> <id> when MD DEFDATA is set`
 - `Error: EXIT outside LOOP`
 - `Error: REPEAT without LOOP`
 
@@ -106,4 +138,5 @@ PROC aims to stay a predictable, token-driven interpreter in the R83 spirit, not
 ## See also
 
 - [Developer shell (TCL)](tcl-shell.md) - host shell commands and `PROC` entry command.
+- [Concurrency and record locking](concurrency.md) - session lock table and cross-consumer behaviour.
 - [Project milestones](milestones.md) - roadmap and fidelity goals.

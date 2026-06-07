@@ -40,9 +40,11 @@ add_executable(
         tcl/test_AssemblerShell.cpp
         tcl/test_Shell.cpp
         tcl/test_ShellLocking.cpp
+        tcl/test_M10CrossShell.cpp
         tcl/test_ShellSessionLocks.cpp
         tcl/test_TclEnvironment.cpp
         proc/test_ProcShell.cpp
+        proc/test_ProcLocking.cpp
 )
 target_include_directories(pick-tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(pick-tests PRIVATE gemini-tcl doctest_headers)

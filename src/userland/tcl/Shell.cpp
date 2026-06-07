@@ -1058,7 +1058,82 @@ namespace PickShell {
                                           },
                                           [this](std::string &error) {
                                               return procReadNext(error);
+                                          },
+                                          [this](const std::string &fileName,
+                                                 const std::string &recordKey,
+                                                 std::string &recordBody,
+                                                 std::string &hardError) {
+                                              return procReadU(fileName, recordKey, recordBody, hardError);
+                                          },
+                                          [this](const std::string &fileName,
+                                                 const std::string &recordKey,
+                                                 const std::string &value,
+                                                 std::string &hardError) {
+                                              return procWriteU(fileName, recordKey, value, hardError);
+                                          },
+                                          [this](const std::string &fileName,
+                                                 const std::string &recordKey,
+                                                 std::string &hardError) {
+                                              return procRelease(fileName, recordKey, hardError);
                                           });
+    }
+
+    ProcLockOutcome Shell::procReadU(const std::string &fileName,
+                                     const std::string &recordKey,
+                                     std::string &recordBody,
+                                     std::string &hardError) {
+        try {
+            const std::optional<PickFS::Record> record =
+                session_.fileSystem_.readU(fileName, recordKey);
+            if (!record.has_value()) {
+                return ProcLockOutcome::MissingRecord;
+            }
+            recordBody = record->value();
+            return ProcLockOutcome::Success;
+        } catch (const PickFS::FileSystemError &ex) {
+            if (std::string_view(ex.what()).find("RECORD LOCKED") != std::string_view::npos) {
+                return ProcLockOutcome::Locked;
+            }
+            hardError = ex.what();
+            return ProcLockOutcome::HardError;
+        } catch (const std::exception &ex) {
+            hardError = ex.what();
+            return ProcLockOutcome::HardError;
+        }
+    }
+
+    ProcLockOutcome Shell::procWriteU(const std::string &fileName,
+                                      const std::string &recordKey,
+                                      const std::string &value,
+                                      std::string &hardError) {
+        try {
+            session_.fileSystem_.writeU(fileName, PickFS::Record(recordKey, value));
+            if (fileName == "VOC") {
+                session_.vocResolver_.invalidate();
+            }
+            return ProcLockOutcome::Success;
+        } catch (const PickFS::FileSystemError &ex) {
+            if (std::string_view(ex.what()).find("RECORD LOCKED") != std::string_view::npos) {
+                return ProcLockOutcome::Locked;
+            }
+            hardError = ex.what();
+            return ProcLockOutcome::HardError;
+        } catch (const std::exception &ex) {
+            hardError = ex.what();
+            return ProcLockOutcome::HardError;
+        }
+    }
+
+    bool Shell::procRelease(const std::string &fileName,
+                            const std::string &recordKey,
+                            std::string &hardError) {
+        try {
+            (void) session_.fileSystem_.releaseRecord(fileName, recordKey);
+            return true;
+        } catch (const std::exception &ex) {
+            hardError = ex.what();
+            return false;
+        }
     }
 
     bool Shell::procSelect(const std::string &fileName, std::string &error) {

@@ -96,6 +96,9 @@ namespace PickShell {
             ExitIf,
             Select,
             ReadNext,
+            ReadU,
+            WriteU,
+            Release,
             Assignment,
             Unknown
         };
@@ -128,6 +131,61 @@ namespace PickShell {
                 }
             }
             return true;
+        }
+
+        constexpr const char *kProcErrVar = "PROCERR";
+        constexpr const char *kProcLockedToken = "?LOCKED?";
+
+        std::optional<std::string> defaultDataFile(const ProcInterpreter::SessionAtFn *sessionAt) {
+            if (sessionAt == nullptr || !static_cast<bool>(*sessionAt)) {
+                return std::nullopt;
+            }
+            if (const std::optional<std::string> v = (*sessionAt)("@DEFDATA")) {
+                if (v->empty()) {
+                    return std::nullopt;
+                }
+                return v;
+            }
+            return std::nullopt;
+        }
+
+        struct FileRecordPair {
+            std::string file;
+            std::string id;
+        };
+
+        std::optional<FileRecordPair> parseFileRecordPair(const std::vector<std::string> &operands,
+                                                          const ProcInterpreter::SessionAtFn *sessionAt) {
+            if (operands.size() == 2) {
+                return FileRecordPair{operands[0], operands[1]};
+            }
+            if (operands.size() == 1) {
+                if (const std::optional<std::string> defData = defaultDataFile(sessionAt)) {
+                    return FileRecordPair{*defData, operands[0]};
+                }
+            }
+            return std::nullopt;
+        }
+
+        std::optional<FileRecordPair> parseReadUOperands(const std::vector<std::string> &substitutedOperands,
+                                                         const ProcInterpreter::SessionAtFn *sessionAt) {
+            if (substitutedOperands.size() == 2) {
+                return FileRecordPair{substitutedOperands[0], substitutedOperands[1]};
+            }
+            if (substitutedOperands.size() == 1) {
+                if (const std::optional<std::string> defData = defaultDataFile(sessionAt)) {
+                    return FileRecordPair{*defData, substitutedOperands[0]};
+                }
+            }
+            return std::nullopt;
+        }
+
+        void clearProcErr(std::unordered_map<std::string, std::string> &variables) {
+            variables[kProcErrVar].clear();
+        }
+
+        void setProcLocked(std::unordered_map<std::string, std::string> &variables) {
+            variables[kProcErrVar] = kProcLockedToken;
         }
 
         std::string canonicalKeyword(const std::string &token) {
@@ -171,6 +229,15 @@ namespace PickShell {
             if (up == "READNEXT" || up == "RN") {
                 return "READNEXT";
             }
+            if (up == "READU") {
+                return "READU";
+            }
+            if (up == "WRITEU") {
+                return "WRITEU";
+            }
+            if (up == "RELEASE") {
+                return "RELEASE";
+            }
             return up;
         }
 
@@ -213,6 +280,15 @@ namespace PickShell {
             }
             if (keyword == "READNEXT") {
                 return Command::ReadNext;
+            }
+            if (keyword == "READU") {
+                return Command::ReadU;
+            }
+            if (keyword == "WRITEU") {
+                return Command::WriteU;
+            }
+            if (keyword == "RELEASE") {
+                return Command::Release;
             }
             return Command::Unknown;
         }
@@ -365,10 +441,16 @@ namespace PickShell {
                                     const TclBridgeFn &tclBridgeFn,
                                     const SessionAtFn &sessionAt,
                                     const SelectFn &selectFn,
-                                    const ReadNextFn &readNextFn) const {
+                                    const ReadNextFn &readNextFn,
+                                    const ReadUFn &readUFn,
+                                    const WriteUFn &writeUFn,
+                                    const ReleaseFn &releaseFn) const {
         const SessionAtFn *const sessionPtr = static_cast<bool>(sessionAt) ? &sessionAt : nullptr;
         const SelectFn *const selectPtr = static_cast<bool>(selectFn) ? &selectFn : nullptr;
         const ReadNextFn *const readNextPtr = static_cast<bool>(readNextFn) ? &readNextFn : nullptr;
+        const ReadUFn *const readUPtr = static_cast<bool>(readUFn) ? &readUFn : nullptr;
+        const WriteUFn *const writeUPtr = static_cast<bool>(writeUFn) ? &writeUFn : nullptr;
+        const ReleaseFn *const releasePtr = static_cast<bool>(releaseFn) ? &releaseFn : nullptr;
 
         std::unordered_map<std::string, int> labels;
         labels.reserve(lines.size());
@@ -599,6 +681,116 @@ namespace PickShell {
                     }
                     variables[tokens[1]].clear();
                 }
+                if (!inlineStmt) {
+                    nextLine();
+                }
+                return true;
+            }
+            if (parsed.command == Command::ReadU) {
+                if (tokens.size() < 3) {
+                    out << "Error: READU requires a variable and file/record operands\n";
+                    return false;
+                }
+                if (isReadonlySessionAtTarget(tokens[1])) {
+                    out << "Error: Read-only system variable\n";
+                    return false;
+                }
+                if (readUPtr == nullptr) {
+                    out << "Error: READU not available in this PROC host\n";
+                    return false;
+                }
+                const std::vector<std::string> operands =
+                    substituteTokens(tokens, 2, variables, sessionPtr);
+                const std::optional<FileRecordPair> target = parseReadUOperands(operands, sessionPtr);
+                if (!target.has_value()) {
+                    out << "Error: READU requires <var> <file> <id> or <var> <id> when MD DEFDATA is set\n";
+                    return false;
+                }
+                std::string recordBody;
+                std::string hardError;
+                const ProcLockOutcome outcome =
+                    (*readUPtr)(target->file, target->id, recordBody, hardError);
+                if (outcome == ProcLockOutcome::Locked) {
+                    setProcLocked(variables);
+                } else if (outcome == ProcLockOutcome::Success) {
+                    variables[tokens[1]] = recordBody;
+                    clearProcErr(variables);
+                } else if (outcome == ProcLockOutcome::MissingRecord) {
+                    out << "Error: No such record\n";
+                    return false;
+                } else {
+                    out << "Error: " << hardError << "\n";
+                    return false;
+                }
+                if (!inlineStmt) {
+                    nextLine();
+                }
+                return true;
+            }
+            if (parsed.command == Command::WriteU) {
+                if (tokens.size() < 3) {
+                    out << "Error: WRITEU requires file/record/value operands\n";
+                    return false;
+                }
+                if (writeUPtr == nullptr) {
+                    out << "Error: WRITEU not available in this PROC host\n";
+                    return false;
+                }
+                const std::vector<std::string> operands =
+                    substituteTokens(tokens, 1, variables, sessionPtr);
+                std::optional<FileRecordPair> target;
+                std::string value;
+                if (operands.size() >= 3) {
+                    target = FileRecordPair{operands[0], operands[1]};
+                    value = joinTokens(operands, 2);
+                } else if (operands.size() == 2) {
+                    if (const std::optional<std::string> defData = defaultDataFile(sessionPtr)) {
+                        target = FileRecordPair{*defData, operands[0]};
+                        value = operands[1];
+                    }
+                }
+                if (!target.has_value() || value.empty()) {
+                    out << "Error: WRITEU requires <file> <id> <value> or <id> <value> when MD DEFDATA is set\n";
+                    return false;
+                }
+                std::string hardError;
+                const ProcLockOutcome outcome =
+                    (*writeUPtr)(target->file, target->id, value, hardError);
+                if (outcome == ProcLockOutcome::Locked) {
+                    setProcLocked(variables);
+                } else if (outcome == ProcLockOutcome::Success) {
+                    clearProcErr(variables);
+                } else {
+                    out << "Error: " << hardError << "\n";
+                    return false;
+                }
+                if (!inlineStmt) {
+                    nextLine();
+                }
+                return true;
+            }
+            if (parsed.command == Command::Release) {
+                if (tokens.size() < 2) {
+                    out << "Error: RELEASE requires file/record operands\n";
+                    return false;
+                }
+                if (releasePtr == nullptr) {
+                    out << "Error: RELEASE not available in this PROC host\n";
+                    return false;
+                }
+                const std::vector<std::string> operands =
+                    substituteTokens(tokens, 1, variables, sessionPtr);
+                const std::optional<FileRecordPair> target = parseFileRecordPair(operands, sessionPtr);
+                if (!target.has_value()) {
+                    out << "Error: RELEASE requires <file> <id> or <id> when MD DEFDATA is set\n";
+                    return false;
+                }
+                std::string hardError;
+                if (!(*releasePtr)(target->file, target->id, hardError)) {
+                    out << "Error: " << hardError << "\n";
+                    return false;
+                }
+                clearProcErr(variables);
                 if (!inlineStmt) {
                     nextLine();
                 }
