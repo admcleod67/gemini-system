@@ -65,6 +65,9 @@ add_library(gemini-core
         conversion/PickOconv.h
         conversion/PickIconv.cpp
         conversion/PickIconv.h
+        locking/LockTypes.h
+        locking/LockTable.cpp
+        locking/LockTable.h
 )
 
 target_include_directories(
@@ -81,6 +84,7 @@ target_include_directories(
         "${CMAKE_CURRENT_SOURCE_DIR}/md"
         "${CMAKE_CURRENT_SOURCE_DIR}/english"
         "${CMAKE_CURRENT_SOURCE_DIR}/conversion"
+        "${CMAKE_CURRENT_SOURCE_DIR}/locking"
 )
 
 target_link_libraries(gemini-core PUBLIC nlohmann_json::nlohmann_json)
