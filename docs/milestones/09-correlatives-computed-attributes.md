@@ -157,6 +157,14 @@ Implementation is sequenced into vertical stages. Each stage ships a test‑lock
 
 - **Stage 5 — I‑type advanced + BASIC `READV`**: `IF … THEN … ELSE …` and **`ICONV()`** / **`OCONV()`** in I‑expressions; reuse M7 conversion tables. BASIC **`READV`** *var* **FROM** *file*, *id*, `"FIELDNAME"` / `DICT<TOKEN>` evaluates F/I fields via the same DICT evaluator (no new VM opcodes). **`REC<"FIELDNAME">`** remains an optional stretch within this stage. *Status: implemented.* Ships `PickIconv`, I-type IF/compare/strings/calls, extended `ResolveDictAttr` + `ReadV`/`ReadVTry` for F/I, and quoted-field READV emission.
 
-- **Stage 6 — TCL authoring, `WITH` (if ready), docs — closes M9**: **`LIST-DICT`** (type A/S/F/I and validity); **`RESOLVE-FIELD`** polish for I‑types; optional minimal **`DEFINE-FIELD`** for F/I (stretch). ENGLISH **`WITH`** predicates on computed fields only when selection evaluation is implemented — otherwise document as follow‑up and keep the existing WITH absorption stub. Add [docs/correlatives.md](../correlatives.md) and update [docs/english.md](../english.md), [docs/tcl-shell.md](../tcl-shell.md), planned [docs/dict.md](../dict.md) / [docs/basic-file-io.md](../basic-file-io.md), and the milestone index. **Closes Milestone 9.**
+- **Stage 6 — TCL authoring, `WITH` (if ready), docs — closes M9**: **`LIST-DICT`** (type A/S/F/I and validity); **`RESOLVE-FIELD`** polish for I‑types; optional minimal **`DEFINE-FIELD`** for F/I (stretch). ENGLISH **`WITH`** predicates on computed fields only when selection evaluation is implemented — otherwise document as follow‑up and keep the existing WITH absorption stub. Add [docs/correlatives.md](../correlatives.md) and update [docs/english.md](../english.md), [docs/tcl-shell.md](../tcl-shell.md), planned [docs/dict.md](../dict.md) / [docs/basic-file-io.md](../basic-file-io.md), and the milestone index. **Closes Milestone 9.** *Status: implemented.* Ships **`DictItemClassifier`**, Tcl **`LIST-DICT`**, **`RESOLVE-FIELD`** invalid F/I diagnostics, full doc pass; **`WITH`** selection and **`DEFINE-FIELD`** F/I authoring deferred.
 
 Only Stage 6's exit criteria should claim "Closes Milestone 9".
+
+### Post-M9 follow-ups (deferred)
+
+- ENGLISH **`WITH`** selection predicates (including on computed fields)
+- **`DEFINE-FIELD`** overloads for F/I (use **`EDIT DICT`** today)
+- **`WRITEV`** on F/I computed fields
+- **`REC<"FIELDNAME">`** angle-bracket DICT syntax
+- Full ICONV/OCONV conversion table

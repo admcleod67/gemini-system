@@ -35,6 +35,8 @@ add_library(gemini-core
         english/EnglishParser.h
         english/DictionaryResolver.cpp
         english/DictionaryResolver.h
+        english/DictItemClassifier.cpp
+        english/DictItemClassifier.h
         english/Planner.cpp
         english/Planner.h
         english/Executor.cpp

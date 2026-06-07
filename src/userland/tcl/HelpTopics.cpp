@@ -193,8 +193,11 @@ namespace PickShell::HelpTopics {
             m.emplace("CLEAR-LIST", "CLEAR-LIST\n");
             m.emplace("RESOLVE-FIELD",
                       "RESOLVE-FIELD <data-file> <field-token>\n"
-                      "  Resolves A-, F-, and I-type DICT items (F: source attr + selector; I: expression).\n");
+                      "  Resolves A-, F-, and I-type DICT items; invalid F/I rows show Validity INVALID.\n");
             m.emplace("DEFINE-FIELD", "DEFINE-FIELD <dict-file> <field-name> <attribute-number>\n");
+            m.emplace("LIST-DICT",
+                      "LIST-DICT <dict-file>\n"
+                      "  Lists DICT items sorted by id: <id> <type> VALID|INVALID.\n");
             m.emplace("CREATE-VOC", "CREATE-VOC <item-id> <type> <target...>\n");
             m.emplace("DELETE-VOC", "DELETE-VOC <item-id>\n");
             m.emplace("LIST-VOC", "LIST-VOC\n");

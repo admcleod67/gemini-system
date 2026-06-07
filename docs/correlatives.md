@@ -1,6 +1,6 @@
 # Correlatives and computed attributes
 
-Companion to [docs/english.md](english.md) and [Milestone 9](milestones/09-correlatives-computed-attributes.md).
+Companion to [docs/english.md](english.md), [docs/dict.md](dict.md), [docs/basic-file-io.md](basic-file-io.md), and [Milestone 9](milestones/09-correlatives-computed-attributes.md).
 
 ## F-type DICT items (three-attribute layout)
 
@@ -41,7 +41,7 @@ Unsupported codes produce `F-type: unsupported conversion code "<code>"` when ev
 
 ## ENGLISH usage
 
-`LIST`, `SORT`, and related verbs resolve F-type field tokens through the DICT and evaluate them per row. Use `RESOLVE-FIELD <file> <token>` in the Tcl shell to inspect a definition.
+`LIST`, `SORT`, and related verbs resolve F-type and I-type field tokens through the DICT and evaluate them per row. Use `RESOLVE-FIELD <file> <token>` to inspect a definition; use `LIST-DICT <dict-file>` to list all items with type and validity.
 
 ## I-type DICT items (two-attribute layout)
 
@@ -96,4 +96,4 @@ In **`EDIT`**, the command **`I`** means **INSERT**, not the I-type code. To cre
 - `WRITEV` on F/I computed fields
 - `REC<"FIELDNAME">` (optional stretch)
 
-Use `RESOLVE-FIELD <file> <token>` to inspect an I-type definition (`Field kind: I`, `Expression: …`).
+Use `RESOLVE-FIELD <file> <token>` to inspect an I-type definition (`Field kind: I`, `Expression: …`). Invalid rows show `Validity: INVALID` and a parse error. See [docs/dict.md](dict.md) for DICT authoring and introspection.

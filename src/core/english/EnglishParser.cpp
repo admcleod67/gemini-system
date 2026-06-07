@@ -268,7 +268,7 @@ namespace PickCore::English {
             // Skip WITH keyword and absorption body until BY boundary (already at byIdx).
             for (std::size_t k = withPos + 1; k < byIdx; ++k) {
                 (void) tokens[k];
-                // Selection stub — not evaluated in this milestone (docs: WITH reserved).
+            // Selection stub — not evaluated (post-M9 follow-up; see docs/english.md).
             }
         } else {
             for (std::size_t k = i; k < byIdx; ++k) {

@@ -4,6 +4,7 @@
 #include <filesystem>
 
 #include "DictionaryResolver.h"
+#include "DictItemClassifier.h"
 #include "FileSystem.h"
 #include "StructuredRecord.h"
 #include "correlatives/CorrelativeEvaluator.h"
@@ -485,4 +486,56 @@ TEST_CASE("IExpressionEvaluator OCONV on field") {
     const auto value = IExpressionEvaluator::evaluate(*ast, data, error);
     REQUIRE(value.has_value());
     CHECK(*value == "01 Jan 1970");
+}
+
+TEST_CASE("DictItemClassifier A-type validity") {
+    const auto valid = DictItemClassifier::classify(dictFromRaw("A\n1\n"));
+    CHECK(valid.typeLabel == "A");
+    CHECK(valid.valid);
+    CHECK(valid.error.empty());
+
+    const auto invalid = DictItemClassifier::classify(dictFromRaw("A\n\n"));
+    CHECK(invalid.typeLabel == "A");
+    CHECK_FALSE(invalid.valid);
+    CHECK(invalid.error == "Invalid A-type DICT item: bad attribute number");
+}
+
+TEST_CASE("DictItemClassifier S-type validity") {
+    const auto valid = DictItemClassifier::classify(dictFromRaw("S\nNAME\n"));
+    CHECK(valid.typeLabel == "S");
+    CHECK(valid.valid);
+
+    const auto invalid = DictItemClassifier::classify(dictFromRaw("S\n\n"));
+    CHECK(invalid.typeLabel == "S");
+    CHECK_FALSE(invalid.valid);
+    CHECK(invalid.error == "Invalid S-type DICT item: missing synonym target");
+}
+
+TEST_CASE("DictItemClassifier F-type validity") {
+    const auto valid = DictItemClassifier::classify(dictFromRaw("F\n2\n3\n"));
+    CHECK(valid.typeLabel == "F");
+    CHECK(valid.valid);
+
+    const auto invalid = DictItemClassifier::classify(dictFromRaw("F\n2\n\n"));
+    CHECK(invalid.typeLabel == "F");
+    CHECK_FALSE(invalid.valid);
+    CHECK(invalid.error == "Invalid F-type DICT item: missing selector");
+}
+
+TEST_CASE("DictItemClassifier I-type validity") {
+    const auto valid = DictItemClassifier::classify(dictFromRaw("I\nA + B\n"));
+    CHECK(valid.typeLabel == "I");
+    CHECK(valid.valid);
+
+    const auto invalid = DictItemClassifier::classify(dictFromRaw("I\n\n"));
+    CHECK(invalid.typeLabel == "I");
+    CHECK_FALSE(invalid.valid);
+    CHECK(invalid.error == "Invalid I-type DICT item: missing expression");
+}
+
+TEST_CASE("DictItemClassifier unknown type is INVALID") {
+    const auto summary = DictItemClassifier::classify(dictFromRaw("garbage\n"));
+    CHECK(summary.typeLabel == "INVALID");
+    CHECK_FALSE(summary.valid);
+    CHECK(summary.error.find("unknown type") != std::string::npos);
 }

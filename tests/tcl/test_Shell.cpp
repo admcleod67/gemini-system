@@ -1328,6 +1328,75 @@ TEST_CASE("shell RESOLVE-FIELD shows I-type DICT layout") {
     CHECK(s.find("Expression: A + B") != std::string::npos);
 }
 
+TEST_CASE("shell RESOLVE-FIELD shows invalid I-type DICT diagnostics") {
+    auto dir = uniqueTempDir();
+    PickFS::FileSystem fs(dir);
+    fs.createFile("DATA");
+    fs.createFile("DICT");
+    fs.write("DICT", PickFS::Record("BAD", "I\n\n"));
+
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(dir);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("RESOLVE-FIELD DATA BAD", out, quit);
+    const std::string s = out.str();
+    CHECK(s.find("Field kind: I") != std::string::npos);
+    CHECK(s.find("Validity: INVALID") != std::string::npos);
+    CHECK(s.find("Invalid I-type DICT item: missing expression") != std::string::npos);
+    CHECK(s.find("Expression: (empty)") != std::string::npos);
+}
+
+TEST_CASE("shell LIST-DICT arity and missing dict file") {
+    auto dir = uniqueTempDir();
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(dir);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("LIST-DICT", out, quit);
+    CHECK(out.str() == "LIST-DICT takes <dict-file>\n");
+
+    out.str("");
+    sh.handleLine("LIST-DICT DICT EXTRA", out, quit);
+    CHECK(out.str() == "LIST-DICT takes <dict-file>\n");
+
+    out.str("");
+    sh.handleLine("LIST-DICT DICT", out, quit);
+    CHECK(out.str().find("LIST-DICT requires dictionary file DICT") == 0);
+}
+
+TEST_CASE("shell LIST-DICT shows stable type and validity output") {
+    auto dir = uniqueTempDir();
+    PickFS::FileSystem fs(dir);
+    fs.createFile("DICT");
+    fs.write("DICT", PickFS::Record("ALIAS", "S\nNAME\n"));
+    fs.write("DICT", PickFS::Record("BADF", "F\n2\n\n"));
+    fs.write("DICT", PickFS::Record("BADI", "I\n\n"));
+    fs.write("DICT", PickFS::Record("GARBAGE", "???\n"));
+    fs.write("DICT", PickFS::Record("NAME", "A\n1\n"));
+    fs.write("DICT", PickFS::Record("NET", "I\nA + B\n"));
+    fs.write("DICT", PickFS::Record("THIRD", "F\n2\n3\n"));
+
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(dir);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("LIST-DICT DICT", out, quit);
+    CHECK(out.str() == "ALIAS S VALID\n"
+                       "BADF F INVALID\n"
+                       "BADI I INVALID\n"
+                       "GARBAGE INVALID INVALID\n"
+                       "NAME A VALID\n"
+                       "NET I VALID\n"
+                       "THIRD F VALID\n");
+}
+
 TEST_CASE("shell LIST with F-type field emits evaluated value") {
     auto dir = uniqueTempDir();
     PickFS::FileSystem fs(dir);

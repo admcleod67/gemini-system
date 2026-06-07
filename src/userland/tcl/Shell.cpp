@@ -2,6 +2,8 @@
 
 #include "BytecodeText.h"
 #include "Catalog.h"
+#include "DictItemClassifier.h"
+#include "EnglishTypes.h"
 #include "GeminiCatalog.h"
 #include "HelpTopics.h"
 #include "LineRecordEditor.h"
@@ -432,6 +434,7 @@ namespace PickShell {
         tclCommands_["DEFINE-FIELD"] = [this](const Tokens &tokens, std::ostream &out, bool &) {
             cmdDefineField(tokens, out);
         };
+        tclCommands_["LIST-DICT"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdListDict(tokens, out); };
         tclCommands_["CREATE-VOC"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdCreateVoc(tokens, out); };
         tclCommands_["DELETE-VOC"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdDeleteVoc(tokens, out); };
         tclCommands_["LIST-VOC"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdListVoc(tokens, out); };
@@ -1651,22 +1654,65 @@ namespace PickShell {
         const PickCore::English::DictionaryResolver &resolver = englishService_.dictionaryResolver();
         const PickCore::English::FieldRef ref =
             resolver.resolveField(session_.fileSystem_, tokens[1], tokens[2]);
+
+        std::optional<PickFS::Record> dictRec;
+        const std::string scopedDict =
+            PickCore::English::DictionaryResolver::scopedDictLogicalName(tokens[1]);
+        try {
+            (void) session_.fileSystem_.openFile(scopedDict);
+            dictRec = session_.fileSystem_.read(scopedDict, tokens[2]);
+        } catch (const PickFS::FileSystemError &) {
+            // fall through to global DICT
+        }
+        if (!dictRec.has_value()) {
+            try {
+                dictRec = session_.fileSystem_.read("DICT", tokens[2]);
+            } catch (const PickFS::FileSystemError &) {
+                // no DICT row for this token
+            }
+        }
+
         out << "Data file: " << tokens[1] << '\n';
         out << "Field token: " << tokens[2] << '\n';
-        out << "File-scoped dict: "
-            << PickCore::English::DictionaryResolver::scopedDictLogicalName(tokens[1]) << '\n';
-        out << "Field kind: " << PickCore::English::DictionaryResolver::describeFieldKind(ref) << '\n';
-        if (ref.kind == PickCore::English::DictFieldKind::FCorrelative && ref.fCorrelative.has_value()) {
-            out << "Source attribute: " << ref.fCorrelative->sourceAttributeNo << '\n';
-            out << "Selector: "
-                << PickCore::English::DictionaryResolver::describeFSelector(*ref.fCorrelative) << '\n';
-            out << "Tail (raw): " << ref.fCorrelative->tailRaw << '\n';
-        } else if (ref.kind == PickCore::English::DictFieldKind::ICorrelative && ref.iCorrelative.has_value()) {
-            out << "Expression: "
-                << PickCore::English::DictionaryResolver::describeIExpression(*ref.iCorrelative) << '\n';
-        } else if (ref.attributeNo.has_value()) {
-            out << "Resolved attribute: " << *ref.attributeNo << '\n';
+        out << "File-scoped dict: " << scopedDict << '\n';
+
+        if (PickCore::English::fieldRefIsResolved(ref)) {
+            out << "Field kind: " << PickCore::English::DictionaryResolver::describeFieldKind(ref) << '\n';
+            if (ref.kind == PickCore::English::DictFieldKind::FCorrelative && ref.fCorrelative.has_value()) {
+                out << "Source attribute: " << ref.fCorrelative->sourceAttributeNo << '\n';
+                out << "Selector: "
+                    << PickCore::English::DictionaryResolver::describeFSelector(*ref.fCorrelative) << '\n';
+                out << "Tail (raw): " << ref.fCorrelative->tailRaw << '\n';
+            } else if (ref.kind == PickCore::English::DictFieldKind::ICorrelative &&
+                       ref.iCorrelative.has_value()) {
+                out << "Expression: "
+                    << PickCore::English::DictionaryResolver::describeIExpression(*ref.iCorrelative) << '\n';
+            } else if (ref.attributeNo.has_value()) {
+                out << "Resolved attribute: " << *ref.attributeNo << '\n';
+            }
+        } else if (dictRec.has_value()) {
+            const PickCore::English::DictItemSummary summary =
+                PickCore::English::DictItemClassifier::classify(dictRec->structured());
+            const std::string kindLabel =
+                summary.typeLabel == "INVALID" ? "unknown" : summary.typeLabel;
+            out << "Field kind: " << kindLabel << '\n';
+            if (!summary.valid) {
+                out << "Validity: INVALID\n";
+                if (!summary.error.empty()) {
+                    out << "Error: " << summary.error << '\n';
+                }
+            }
+            if (summary.typeLabel == "F") {
+                out << "Source attribute: " << dictRec->structured().attribute(2).firstValue() << '\n';
+                out << "Tail (raw): " << dictRec->structured().attribute(3).firstValue() << '\n';
+            } else if (summary.typeLabel == "I") {
+                const std::string expression = dictRec->structured().attribute(2).firstValue();
+                out << "Expression: " << (expression.empty() ? "(empty)" : expression) << '\n';
+            } else {
+                out << "Resolved attribute: (none — unknown field)\n";
+            }
         } else {
+            out << "Field kind: " << PickCore::English::DictionaryResolver::describeFieldKind(ref) << '\n';
             out << "Resolved attribute: (none — unknown field)\n";
         }
         out << "Conversion hint (D/MD/MC): "
@@ -1699,6 +1745,34 @@ namespace PickShell {
             out << "Error: " << e.what() << '\n';
         } catch (const std::exception &e) {
             out << "Error: " << e.what() << '\n';
+        }
+    }
+
+    void Shell::cmdListDict(const std::vector<std::string> &tokens, std::ostream &out) {
+        if (tokens.size() != 2) {
+            out << "LIST-DICT takes <dict-file>\n";
+            return;
+        }
+        const std::string &dictFile = tokens[1];
+        try {
+            const PickFS::FileSystem::FileHandle handle = session_.fileSystem_.openFile(dictFile);
+            std::vector<std::string> ids = session_.fileSystem_.listRecords(handle);
+            std::sort(ids.begin(), ids.end());
+            for (const std::string &id: ids) {
+                const std::optional<PickFS::Record> rec = session_.fileSystem_.readRecord(handle, id);
+                if (!rec.has_value()) {
+                    out << id << " INVALID INVALID\n";
+                    continue;
+                }
+                const PickCore::English::DictItemSummary summary =
+                    PickCore::English::DictItemClassifier::classify(rec->structured());
+                out << id << ' ' << summary.typeLabel << ' '
+                    << (summary.valid ? "VALID" : "INVALID") << '\n';
+            }
+        } catch (const PickFS::FileSystemError &) {
+            out << "LIST-DICT requires dictionary file " << dictFile << "; use CREATE-FILE first\n";
+        } catch (const std::exception &e) {
+            out << "Error: " << e.what() << "\n";
         }
     }
 

@@ -165,6 +165,7 @@ namespace PickShell {
         void cmdResolveField(const std::vector<std::string> &tokens, std::ostream &out);
 
         void cmdDefineField(const std::vector<std::string> &tokens, std::ostream &out);
+        void cmdListDict(const std::vector<std::string> &tokens, std::ostream &out);
         void cmdCreateVoc(const std::vector<std::string> &tokens, std::ostream &out);
         void cmdDeleteVoc(const std::vector<std::string> &tokens, std::ostream &out);
         void cmdListVoc(const std::vector<std::string> &tokens, std::ostream &out);

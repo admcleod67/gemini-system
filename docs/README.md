@@ -11,18 +11,21 @@ Technical reference for Gemini System. Paths below are relative to this director
 - **[Developer shell (TCL)](tcl-shell.md)** — system-level TCL commands (`BASIC`, `PROC`, `ASM`, filesystem, variables, VOC-backed `RUN`/`EDIT`, …).
 - **[PROC language](proc.md)** — host-interpreted PROC execution model, token/substitution rules, Tcl bridge, and statement semantics.
 - **[Assembler shell (ASM)](assembler-shell.md)** — VM-level debugger workflow (`STEP`, `CONT`, breakpoints, trace, dumps).
-- **[ENGLISH query core](english.md)** — `LIST`, `SORT`, `COUNT`, `SELECT`; file-scoped **`DICT-<file>`** / global **`DICT`**; **`RESOLVE-FIELD`**; **`DEFINE-FIELD`** (minimal type-**`A`** DICT authoring); active-list lifecycle (`LIST-LIST`, `CLEAR-LIST`).
+- **[ENGLISH query core](english.md)** — `LIST`, `SORT`, `COUNT`, `SELECT`; file-scoped **`DICT-<file>`** / global **`DICT`**; computed F/I fields; **`RESOLVE-FIELD`**, **`LIST-DICT`**, **`DEFINE-FIELD`** (minimal type-**`A`** DICT authoring); active-list lifecycle (`LIST-LIST`, `CLEAR-LIST`).
 
 ## BASIC
 
 - **[BASIC shell](basic-shell.md)** — BASIC program buffer, SAVE/LOAD, COMPILE/`RUN`; `EDIT` delegates to the system line editor.
 - **[BASIC language](basic-language.md)** — compiler subset (`LET`, `PRINT`, `END`, …), expression rules, diagnostics.
+- **[BASIC file I/O (DICT-aware reads)](basic-file-io.md)** — `READV` on computed F/I fields.
 - **[Compiler architecture](compiler-architecture.md)** — BASIC compiler phases: parse, semantic analysis, bytecode emit.
 
 ## Storage and VOC
 
 - **[File system](filesystem.md)** — Pick-style logical files and records (host-backed store used by Tcl and BASIC runtime I/O).
 - **[Filesystem M3 model](filesystem-m3.md)** — Milestone 3 attribute-aware record model and parse/serialize contract.
+- **[DICT dictionary items](dict.md)** — A/S/F/I item types, lookup precedence, authoring, and Tcl introspection.
+- **[Correlatives and computed attributes](correlatives.md)** — F/I syntax, evaluation, and conversion codes.
 
 ## Roadmap
 
