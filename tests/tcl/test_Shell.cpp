@@ -2254,8 +2254,11 @@ TEST_CASE("shell BASIC LOAD loads saved program") {
 }
 
 TEST_CASE("shell BASIC COMPILE reports success summary") {
+    auto fsDir = uniqueTempDir();
+
     PickVM::Runtime rt;
     PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
     bool quit = false;
 
@@ -2285,8 +2288,11 @@ TEST_CASE("shell BASIC RUN is quiet on compile success and executes output") {
 }
 
 TEST_CASE("shell BASIC RUN (C mirrors COMPILE and does not execute") {
+    auto fsDir = uniqueTempDir();
+
     PickVM::Runtime rt;
     PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
     bool quit = false;
 
@@ -2328,8 +2334,11 @@ TEST_CASE("shell BASIC RUN compile failure skips execution") {
 }
 
 TEST_CASE("shell BASIC RUN recompiles each time and does not depend on COMPILE cache") {
+    auto fsDir = uniqueTempDir();
+
     PickVM::Runtime rt;
     PickShell::Shell sh(rt);
+    sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
     bool quit = false;
 
