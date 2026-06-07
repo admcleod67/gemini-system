@@ -1,107 +1,252 @@
 ← [Project milestones index](../milestones.md)
 
-## Milestone 11 — Multi‑Language Runtime Infrastructure
+## Milestone 11 — Multi‑Language Runtime Infrastructure (Expanded)
 
-Milestone 11 introduces the foundational runtime architecture required for Gemini to support multiple compiled languages (BASIC, Pascal, COMAL, COBOL, and future front‑ends) **without modifying or rebuilding the core system** for each new language. This milestone adds a stable, language‑agnostic **`CALL_FUNC`** opcode, a global **`LanguageRegistry`**, and a **dynamic module loader** that discovers and registers language helper libraries at system boot. The VM remains minimal in role: it does not encode language semantics; language‑specific behaviour lives in dynamically loadable modules. External compilers (for example **Apollo**) can target Gemini by emitting VM bytecode that references **known language namespaces** and **function IDs**, so new languages can be added by placing shared libraries in the system module directory and restarting — without rebuilding the Gemini binary. **Pick‑authentic dynamic program loading** is preserved: object code can be supplied via normal Pick file storage and executed when bytecode is valid.
+Milestone 11 establishes the runtime substrate that allows Gemini to execute programs compiled from multiple languages—BASIC, Pascal, COMAL, COBOL, and future front‑ends—**without modifying or rebuilding the VM**. This milestone introduces a stable, language‑agnostic **`CALL_FUNC`** opcode, a global **`LanguageRegistry`**, and a **dynamic module loader** that discovers and registers language helper libraries at system boot. The VM remains deliberately minimal: it does not encode language semantics; instead, language‑specific behaviour is delegated to dynamically loadable modules. External compilers (such as **Apollo**) can target Gemini by emitting bytecode referencing **namespace IDs** and **function IDs**, enabling new languages to be added simply by placing shared libraries in the module directory and restarting the system.
 
-### Goals
+This milestone completes the architectural shift from a single‑language VM to a **multi‑language execution host**, while preserving Pick‑authentic dynamic program loading and ensuring that **existing bytecode remains stable and unaffected**.
 
-- Introduce a stable, VM‑level function‑call mechanism (**`CALL_FUNC`**) that supports **multiple language namespaces**.
-- Add a global **`LanguageRegistry`** that maps language namespaces to **function tables** and optional **runtime hooks**.
-- Support **dynamic loading** of language helper libraries at boot via shared libraries (`.so` / `.dll`).
-- **Decouple** language semantics from the VM core, enabling new languages without rebuilding Gemini.
-- **Migrate** BASIC built‑ins delivered in [Milestone 7](07-basic-functions-mat-operations.md) onto the new function‑dispatch mechanism (source compatibility unchanged).
-- Preserve **Pick‑authentic dynamic program loading**: externally compiled object code can be added and executed without a full system rebuild.
-- **Maintain VM stability:** no language‑specific opcodes, no semantic pollution of existing bytecode beyond the new dispatch primitive, and **no change** to the meaning of bytecode that does not use **`CALL_FUNC`** (existing programs keep prior semantics).
+---
 
-### Scope
+### 1. Objectives
 
-#### 1. `CALL_FUNC` opcode (language‑agnostic function dispatch)
+#### 1.1 Architectural goals
 
-Introduce a new VM opcode (exact encoding to be specified in **`docs/vm.md`**), conceptually:
+- Introduce a stable, language‑agnostic function‑call mechanism (**`CALL_FUNC`**) for all language built‑ins.
+- Provide a global registry for language namespaces, function tables, and optional runtime hooks.
+- Support dynamic discovery and loading of language helper modules at system boot.
+- Decouple language semantics from the VM core, enabling new languages without rebuilding Gemini.
+- Preserve Pick‑authentic dynamic program loading: object code stored in Pick files remains executable without system rebuilds.
+
+#### 1.2 Compatibility goals
+
+- Maintain full backward compatibility for all existing bytecode that does not use **`CALL_FUNC`**.
+- Migrate BASIC built‑ins ([Milestone 7](07-basic-functions-mat-operations.md)) onto the new dispatch mechanism without changing BASIC source semantics.
+- Provide a stable ABI for external compilers (Apollo, future Pascal/COMAL/COBOL compilers).
+
+---
+
+### 2. `CALL_FUNC` opcode (language‑agnostic dispatch)
+
+#### 2.1 Purpose
+
+**`CALL_FUNC`** is the sole VM opcode for invoking language‑specific built‑ins. It replaces ad‑hoc lowering paths and prevents language semantics from leaking into the VM.
+
+#### 2.2 Conceptual form
 
 ```text
 CALL_FUNC <namespace-id>, <function-id>, <arg-count>
 ```
 
-Semantics:
+Exact operand encoding (layout, types, versioning) is specified in [`docs/vm.md`](../vm.md) at implementation time.
 
-- Pop **`<arg-count>`** values from the VM stack (evaluation order documented).
-- Resolve **`<namespace-id>`** in the **`LanguageRegistry`** and dispatch to that namespace’s **function table**.
+#### 2.3 Semantics
+
+- Pop **`<arg-count>`** arguments from the VM stack (evaluation order documented).
+- Resolve **`<namespace-id>`** in the **`LanguageRegistry`**.
+- Dispatch to the function table for that namespace.
 - Invoke the function at **`<function-id>`** with the popped arguments.
-- Push the **return value** onto the VM stack.
-- Raise **runtime errors** for unknown namespaces, unknown function IDs, arity mismatches, or module failures.
+- Push the return value onto the stack.
+- Raise runtime errors for:
+  - Unknown namespace
+  - Unknown function ID
+  - Arity mismatch
+  - Module failure
 
-This opcode is the **sole** VM mechanism for invoking language‑specific built‑ins across all registered languages (BASIC, future Pascal/COMAL/COBOL helpers, etc.).
+#### 2.4 VM stability
 
-#### 2. `LanguageRegistry` (global dispatch table)
+- No new language‑specific opcodes are added beyond **`CALL_FUNC`** as the generic dispatch primitive.
+- Existing bytecode remains unchanged in meaning.
+- **`CALL_FUNC`** is strictly additive and does not alter prior semantics for programs that do not emit it.
 
-Implement a global registry mapping **namespace ID** to:
+---
 
-- **Function table** (implementation detail: table of callable targets — C++ function pointers, thin wrappers, or equivalent indirection; ABI documented for module authors).
-- **Optional runtime hooks** (initialisation, teardown, metadata queries).
-- **Optional opcode extensions** — explicitly **deferred** beyond registration hooks unless a follow‑on milestone narrows the contract; registry may reserve extension points without implementing them in M11.
+### 3. `LanguageRegistry` (global dispatch table)
 
-The registry is **populated at boot** from successfully loaded dynamic modules. The VM **does not** branch on language names; it only queries the registry by numeric or opaque **namespace** / **function** identifiers as defined in the bytecode format.
+#### 3.1 Responsibilities
 
-#### 3. Dynamic module loader (`modules/` directory)
+The registry maps **namespace IDs** to:
 
-Gemini loads language helper libraries **early in system boot**. A dedicated **module loader**:
+- **Function tables** (arrays of callable targets)
+- **Optional runtime hooks** (initialisation, teardown, metadata)
+- **Optional extension points** (reserved for future milestones; no dynamic opcode registration in M11)
 
-- Scans a **configurable** directory (default example: **`gemini/modules/`** next to catalogue layout, or a path set by host configuration — exact default documented at implementation time).
-- Attempts to load each shared library using the host API (**`dlopen`** on Unix‑like systems, **`LoadLibrary`** on Windows).
-- Resolves and invokes a single **C ABI** entry point per module:
+#### 3.2 Registry characteristics
+
+- Populated at boot by dynamic modules.
+- The VM never branches on language names; it only uses numeric or opaque IDs.
+- Registry is **immutable after boot** (no dynamic unloading in M11).
+
+#### 3.3 ABI requirements
+
+Each namespace must provide:
+
+- A stable **namespace ID**
+- A **function table** with fixed indices
+- Optional **metadata** (version, language name, capabilities)
+
+Implementation detail (C++ function pointers, thin wrappers, or equivalent indirection) is documented for module authors in the module ABI reference.
+
+---
+
+### 4. Dynamic module loader
+
+#### 4.1 Boot‑time module discovery
+
+A new loader scans a **configurable** directory (default: **`gemini/modules/`** next to catalogue layout, or a path set by host configuration) and attempts to load each shared library using the host API (**`dlopen`** on Unix‑like systems, **`LoadLibrary`** on Windows).
+
+#### 4.2 Module entry point
+
+Each module must export:
 
 ```cpp
 extern "C" void register_language(LanguageRegistry&);
 ```
 
-The module receives a reference to the global **`LanguageRegistry`** and registers its **namespace**, **function table**, and any **optional hooks**. After all modules load, **`CALL_FUNC`** can resolve any namespace supplied by those modules.
+The module:
 
-Modules may provide (non‑exhaustive):
+- Registers its namespace
+- Provides its function table
+- Installs optional hooks
+- Performs any initialisation required for its language runtime
 
-- **BASIC** built‑ins (migrated from Milestone 7).
-- **Pascal**, **COMAL**, **COBOL**, or other **future** language helper tables.
-- Stubs or minimal tables until a full compiler ships.
+After all modules load, **`CALL_FUNC`** can resolve any namespace supplied by those modules.
 
-#### 4. BASIC migration to `CALL_FUNC`
+#### 4.3 Supported module types
 
-Refactor BASIC built‑ins introduced in Milestone 7:
+- **BASIC** built‑ins (migrated from [Milestone 7](07-basic-functions-mat-operations.md))
+- **Pascal** helper library
+- **COMAL** helper library
+- **COBOL** helper library
+- Future languages (e.g. FORTRAN, RPG, etc.)
+- **Stub modules** for languages not yet implemented
 
-- Move built‑in implementations (**`LEN`**, **`TRIM`**, **`FIELD`**, **`ABS`**, **`DATE`**, etc.) into a **BASIC** namespace function table (typically shipped inside the reference BASIC module or core‑adjacent library as decided at build time).
-- Update the **BASIC compiler** to emit **`CALL_FUNC`** with the **BASIC** namespace and stable **function IDs** instead of ad hoc lowering, once the table and IDs are frozen.
-- **Remove** direct lowering paths for those built‑ins **after** the function table and bytecode tests are stable.
-- **Preserve** all Milestone 7 **source** semantics and observable behaviour; migration is **internal** to compiler and runtime.
+#### 4.4 Error handling
 
-#### 5. External compiler compatibility (Apollo)
+- Failed modules do not crash the system.
+- The registry only contains successfully registered namespaces.
+- Diagnostics are logged for operator visibility.
 
-Define a **stable ABI** for external compilers:
+---
 
-- **Namespace IDs** per language (published constants or header).
-- **Function ID tables** (published metadata or schema).
-- **Bytecode encoding** for **`CALL_FUNC`** (operand layout, endianness if applicable, versioning).
-- **Error behaviour** for unknown namespaces, unknown functions, and bad arity.
+### 5. BASIC migration to `CALL_FUNC`
 
-**Apollo** and other external compilers target Gemini by emitting bytecode that references **known** namespaces. Compiled programs integrate via **normal Pick file storage** (same dynamic loading story as today’s object records); **no Gemini binary rebuild** is required to add a new **module** that registers a namespace.
+#### 5.1 Motivation
 
-#### 6. Documentation and tooling
+BASIC built‑ins currently use ad‑hoc lowering paths (notably **`InvokeBuiltin`** and compiler‑specific emission). Milestone 11 migrates them to the new dispatch mechanism.
 
-- Document the **module ABI** (`register_language`, function table layout, namespace IDs, versioning).
-- Document **`CALL_FUNC`** and bytecode encoding in **`docs/vm.md`**; compiler contract in **`docs/compiler.md`** (or dedicated **`docs/bytecode.md`** if split).
-- Provide a **reference module** for BASIC as the canonical example.
-- Update **[`docs/milestones.md`](../milestones.md)** (hub) and milestone files under [`docs/milestones/`](../milestones/) (including cross‑links from Milestone 7).
-- Add **operator/developer tooling** to inspect loaded languages (for example a **`SYSTEM LANGUAGES`** surface or Tcl equivalent — exact UX decided at implementation time).
+#### 5.2 Migration steps
 
-### Non‑Goals (Deferred)
+1. Create a **BASIC** namespace with a stable namespace ID.
+2. Move all Milestone 7 built‑ins into a BASIC module:
+   - **`LEN`**, **`TRIM`**, **`FIELD`**, **`ABS`**, **`DATE`**, etc.
+3. Update the BASIC compiler to emit **`CALL_FUNC`** for built‑ins.
+4. Remove old lowering paths once tests are stable.
+5. Preserve all BASIC source semantics and observable behaviour.
 
-- **No dynamic unloading** of modules after registration.
-- **No runtime addition** of new VM opcodes from modules (M11 does not make the opcode set user‑extensible beyond **`CALL_FUNC`** dispatch).
-- **No JIT** compilation or dynamic optimisation in M11.
-- **No cross‑language** symbol resolution (e.g. Pascal calling BASIC built‑ins by name across namespaces without explicit ABI).
-- **No module sandboxing** or hardened security model (trust model: operator‑controlled **`modules/`** only; hardening is a later milestone).
-- **No** dynamic linking of **arbitrary user‑authored** untrusted libraries outside the controlled module policy (future milestone if needed).
+#### 5.3 Result
 
-These belong to later extensibility, performance, and security milestones.
+BASIC becomes a **first‑class module**, not a special case in the VM.
+
+---
+
+### 6. External compiler support (Apollo and others)
+
+#### 6.1 ABI for compilers
+
+External compilers must know:
+
+- **Namespace IDs**
+- **Function ID tables**
+- **Bytecode encoding** for **`CALL_FUNC`**
+- **Error behaviour** for invalid calls
+
+Published constants, headers, or schema define namespace and function IDs; operand layout and versioning are part of the bytecode contract.
+
+#### 6.2 Integration workflow
+
+1. Compiler emits bytecode referencing known namespaces.
+2. Compiled object code is stored in normal Pick files (same dynamic loading story as today’s object records).
+3. Gemini loads and executes the bytecode **without rebuilding the system**.
+4. New languages can be added by dropping modules into the module directory and restarting.
+
+#### 6.3 Benefits
+
+- Gemini becomes a **multi‑language host**.
+- No VM rebuild required for new languages.
+- External compilers can evolve independently.
+
+---
+
+### 7. Documentation and tooling
+
+#### 7.1 Documentation deliverables
+
+- [`docs/vm.md`](../vm.md): **`CALL_FUNC`** encoding, operand layout, error model.
+- [`docs/compiler.md`](../compiler.md) or dedicated **`docs/bytecode.md`**: ABI for compilers.
+- **Module ABI documentation** (`register_language`, function table layout, namespace IDs, versioning).
+- Updated [milestone index](../milestones.md) and cross‑links (including from [Milestone 7](07-basic-functions-mat-operations.md)).
+- A **reference BASIC module** as the canonical example implementation.
+
+#### 7.2 Developer/operator tooling
+
+- A command or Tcl surface to inspect loaded languages:
+  - **`SYSTEM LANGUAGES`**
+  - or **`SHOW MODULES`**
+- Optional debug tooling to dump function tables.
+
+Exact UX is decided at implementation time; behaviour must expose namespace IDs, module version metadata, and load failures from boot diagnostics.
+
+---
+
+### 8. Non‑goals (explicitly deferred)
+
+To preserve minimalism and avoid premature complexity:
+
+- No dynamic unloading of modules
+- No runtime addition of new VM opcodes from modules (M11 does not make the opcode set user‑extensible beyond **`CALL_FUNC`** dispatch)
+- No JIT or optimisation layer
+- No cross‑language symbol resolution
+- No sandboxing or security hardening
+- No user‑authored arbitrary shared libraries outside operator‑controlled module policy
+
+These belong to future extensibility, performance, and security milestones.
+
+---
+
+### 9. Completion criteria
+
+Milestone 11 is complete when:
+
+- [ ] **`CALL_FUNC`** opcode is implemented and documented.
+- [ ] **`LanguageRegistry`** is implemented and populated at boot.
+- [ ] Dynamic module loader loads and registers modules.
+- [ ] BASIC built‑ins are migrated to the new dispatch mechanism.
+- [ ] External compilers can target Gemini using namespace/function IDs.
+- [ ] Existing bytecode remains fully compatible.
+- [ ] Documentation and tooling are updated.
+
+---
+
+### Delivery plan
+
+Implementation is sequenced into vertical stages. Each stage ships a test‑locked slice before the next starts. Introduce the **`LanguageRegistry`** and dispatch contract first; add **`CALL_FUNC`** and assembler support second; wire **dynamic module loading** third; **migrate BASIC built‑ins** fourth; publish the **external ABI** and reference stubs fifth; finish with **operator tooling and docs** sixth. Detailed per‑stage plans may live in `~/.cursor/plans/m11_stage_*.plan.md` during implementation; status is summarised here as each stage lands (matching the M8 / M9 / M10 precedent).
+
+- **Stage 1 — Registry foundation**: implement **`LanguageRegistry`** (namespace ID → function table, optional hooks/metadata); stable runtime errors for unknown namespace, unknown function ID, and arity mismatch; unit tests only with an **in‑process test namespace** (no **`dlopen`**, no compiler or **`InvokeBuiltin`** changes). *Status: pending.*
+
+- **Stage 2 — `CALL_FUNC` VM + assembler**: add **`CALL_FUNC`** opcode to **`Runtime`**, text assembler (**`Parser`**, **`InstructionPrint`**, **`BytecodeText`**); dispatch through the registry populated with the Stage 1 test namespace; VM/assembler/runtime tests; existing bytecode unchanged. No dynamic loading yet. *Status: pending.*
+
+- **Stage 3 — Dynamic module loader**: boot‑time scan of configurable **`gemini/modules/`** (or host‑configured path); **`dlopen`** / **`LoadLibrary`**; **`register_language(LanguageRegistry&)`** C ABI; failed modules logged, not fatal; registry immutable after boot. Ship a **minimal stub module** proving load + registration. No BASIC migration yet. *Status: pending.*
+
+- **Stage 4 — BASIC module + compiler migration**: create **BASIC** namespace with stable IDs; move [Milestone 7](07-basic-functions-mat-operations.md) built‑ins (**`LEN`**, **`TRIM`**, **`FIELD`**, **`ABS`**, **`DATE`**, etc.) into a BASIC shared module; update compiler to emit **`CALL_FUNC`**; remove **`InvokeBuiltin`** lowering paths once tests are green; preserve all BASIC source semantics. *Status: pending.*
+
+- **Stage 5 — External ABI + reference docs**: publish namespace/function ID constants (header or schema); document **`CALL_FUNC`** operand layout and module ABI; update [`docs/vm.md`](../vm.md) and compiler/bytecode contract (**[`docs/compiler.md`](../compiler.md)** or **`docs/bytecode.md`**); optional **stub modules** for Pascal/COMAL/COBOL (registration only, no compilers). *Status: pending.*
+
+- **Stage 6 — Tooling + docs — closes M11**: operator/developer surface to inspect loaded languages (**`SYSTEM LANGUAGES`** or **`SHOW MODULES`**); boot diagnostics for module failures; milestone index cross‑links; reference BASIC module documented as canonical example. **Closes Milestone 11.** *Status: pending.*
+
+Only Stage 6's exit criteria should claim "Closes Milestone 11".
+
+---
 
 ### Rationale
 
