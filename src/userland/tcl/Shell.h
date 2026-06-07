@@ -174,6 +174,12 @@ namespace PickShell {
 
         void cmdWrite(const std::vector<std::string> &tokens, std::ostream &out);
 
+        void cmdReadU(const std::vector<std::string> &tokens, std::ostream &out);
+
+        void cmdWriteU(const std::vector<std::string> &tokens, std::ostream &out);
+
+        void cmdRelease(const std::vector<std::string> &tokens, std::ostream &out);
+
         void cmdEdit(const std::vector<std::string> &tokens, std::ostream &out);
 
         void runLineRecordEditorForLocation(const std::string &fileName,

@@ -445,6 +445,9 @@ namespace PickShell {
         tclCommands_["LIST-VOC"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdListVoc(tokens, out); };
         tclCommands_["READ"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdRead(tokens, out); };
         tclCommands_["WRITE"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdWrite(tokens, out); };
+        tclCommands_["READU"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdReadU(tokens, out); };
+        tclCommands_["WRITEU"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdWriteU(tokens, out); };
+        tclCommands_["RELEASE"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdRelease(tokens, out); };
         tclCommands_["ASM"] = [this](const Tokens &tokens, std::ostream &out, bool &) {
             if (tokens.size() > 2) {
                 out << "ASM takes at most one program name\n";
@@ -1882,21 +1885,74 @@ namespace PickShell {
         }
     }
 
+    namespace {
+        struct FileRecordReadTarget {
+            std::string fileName;
+            std::string recordKey;
+        };
+
+        struct FileRecordWriteTarget {
+            std::string fileName;
+            std::string recordKey;
+            std::size_t valueStart{0};
+        };
+
+        [[nodiscard]] std::optional<FileRecordReadTarget> parseFileRecordReadOperands(
+            const std::vector<std::string> &tokens,
+            const std::optional<std::string> &defaultDataFile) {
+            if (tokens.size() == 3) {
+                return FileRecordReadTarget{tokens[1], tokens[2]};
+            }
+            if (tokens.size() == 2 && defaultDataFile.has_value()) {
+                return FileRecordReadTarget{*defaultDataFile, tokens[1]};
+            }
+            return std::nullopt;
+        }
+
+        [[nodiscard]] std::optional<FileRecordWriteTarget> parseFileRecordWriteOperands(
+            const std::vector<std::string> &tokens,
+            const std::optional<std::string> &defaultDataFile) {
+            if (tokens.size() >= 4) {
+                return FileRecordWriteTarget{tokens[1], tokens[2], 3};
+            }
+            if (tokens.size() == 3 && defaultDataFile.has_value()) {
+                return FileRecordWriteTarget{*defaultDataFile, tokens[1], 2};
+            }
+            return std::nullopt;
+        }
+
+        [[nodiscard]] std::string fileRecordReadArityMessage(const std::string &verb) {
+            return verb + " requires a file and record name (or " + verb +
+                   " <record> when MD DEFDATA is set)\n";
+        }
+
+        [[nodiscard]] std::string fileRecordWriteArityMessage(const std::string &verb) {
+            return verb + " requires a file, record name, and value (or " + verb +
+                   " <record> <value> when MD DEFDATA is set)\n";
+        }
+
+        [[nodiscard]] std::string joinTokensFrom(const std::vector<std::string> &tokens, std::size_t start) {
+            std::string value;
+            for (std::size_t i = start; i < tokens.size(); ++i) {
+                if (i > start) {
+                    value += ' ';
+                }
+                value += tokens[i];
+            }
+            return value;
+        }
+    } // namespace
+
     void Shell::cmdRead(const std::vector<std::string> &tokens, std::ostream &out) {
-        std::string fileName;
-        std::string recordKey;
-        if (tokens.size() == 3) {
-            fileName = tokens[1];
-            recordKey = tokens[2];
-        } else if (tokens.size() == 2 && session_.defaultDataFile().has_value()) {
-            fileName = *session_.defaultDataFile();
-            recordKey = tokens[1];
-        } else {
-            out << "READ requires a file and record name (or READ <record> when MD DEFDATA is set)\n";
+        const std::optional<FileRecordReadTarget> target =
+            parseFileRecordReadOperands(tokens, session_.defaultDataFile());
+        if (!target.has_value()) {
+            out << fileRecordReadArityMessage("READ");
             return;
         }
         try {
-            const std::optional<PickFS::Record> record = session_.fileSystem_.read(fileName, recordKey);
+            const std::optional<PickFS::Record> record =
+                session_.fileSystem_.read(target->fileName, target->recordKey);
             if (!record) {
                 out << "No such record\n";
                 return;
@@ -1908,33 +1964,72 @@ namespace PickShell {
     }
 
     void Shell::cmdWrite(const std::vector<std::string> &tokens, std::ostream &out) {
-        std::string fileName;
-        std::string recordKey;
-        std::size_t valueStart = 0;
-        if (tokens.size() >= 4) {
-            fileName = tokens[1];
-            recordKey = tokens[2];
-            valueStart = 3;
-        } else if (tokens.size() == 3 && session_.defaultDataFile().has_value()) {
-            fileName = *session_.defaultDataFile();
-            recordKey = tokens[1];
-            valueStart = 2;
-        } else {
-            out << "WRITE requires a file, record name, and value (or WRITE <record> <value> when MD DEFDATA is set)\n";
+        const std::optional<FileRecordWriteTarget> target =
+            parseFileRecordWriteOperands(tokens, session_.defaultDataFile());
+        if (!target.has_value()) {
+            out << fileRecordWriteArityMessage("WRITE");
             return;
         }
-        std::string value;
-        for (std::size_t i = valueStart; i < tokens.size(); ++i) {
-            if (i > valueStart) {
-                value += ' ';
-            }
-            value += tokens[i];
-        }
         try {
-            session_.fileSystem_.write(fileName, PickFS::Record(recordKey, std::move(value)));
-            if (fileName == "VOC") {
+            session_.fileSystem_.write(target->fileName,
+                                       PickFS::Record(target->recordKey,
+                                                        joinTokensFrom(tokens, target->valueStart)));
+            if (target->fileName == "VOC") {
                 session_.vocResolver_.invalidate();
             }
+        } catch (const std::exception &e) {
+            out << "Error: " << e.what() << "\n";
+        }
+    }
+
+    void Shell::cmdReadU(const std::vector<std::string> &tokens, std::ostream &out) {
+        const std::optional<FileRecordReadTarget> target =
+            parseFileRecordReadOperands(tokens, session_.defaultDataFile());
+        if (!target.has_value()) {
+            out << fileRecordReadArityMessage("READU");
+            return;
+        }
+        try {
+            const std::optional<PickFS::Record> record =
+                session_.fileSystem_.readU(target->fileName, target->recordKey);
+            if (!record) {
+                out << "No such record\n";
+                return;
+            }
+            out << record->value() << '\n';
+        } catch (const std::exception &e) {
+            out << "Error: " << e.what() << "\n";
+        }
+    }
+
+    void Shell::cmdWriteU(const std::vector<std::string> &tokens, std::ostream &out) {
+        const std::optional<FileRecordWriteTarget> target =
+            parseFileRecordWriteOperands(tokens, session_.defaultDataFile());
+        if (!target.has_value()) {
+            out << fileRecordWriteArityMessage("WRITEU");
+            return;
+        }
+        try {
+            session_.fileSystem_.writeU(target->fileName,
+                                        PickFS::Record(target->recordKey,
+                                                         joinTokensFrom(tokens, target->valueStart)));
+            if (target->fileName == "VOC") {
+                session_.vocResolver_.invalidate();
+            }
+        } catch (const std::exception &e) {
+            out << "Error: " << e.what() << "\n";
+        }
+    }
+
+    void Shell::cmdRelease(const std::vector<std::string> &tokens, std::ostream &out) {
+        const std::optional<FileRecordReadTarget> target =
+            parseFileRecordReadOperands(tokens, session_.defaultDataFile());
+        if (!target.has_value()) {
+            out << fileRecordReadArityMessage("RELEASE");
+            return;
+        }
+        try {
+            (void) session_.fileSystem_.releaseRecord(target->fileName, target->recordKey);
         } catch (const std::exception &e) {
             out << "Error: " << e.what() << "\n";
         }

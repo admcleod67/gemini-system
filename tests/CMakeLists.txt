@@ -39,6 +39,7 @@ add_executable(
         basic/test_BasicStatementParser.cpp
         tcl/test_AssemblerShell.cpp
         tcl/test_Shell.cpp
+        tcl/test_ShellLocking.cpp
         tcl/test_ShellSessionLocks.cpp
         tcl/test_TclEnvironment.cpp
         proc/test_ProcShell.cpp

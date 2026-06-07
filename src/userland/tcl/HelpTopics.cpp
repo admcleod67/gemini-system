@@ -202,7 +202,13 @@ namespace PickShell::HelpTopics {
             m.emplace("DELETE-VOC", "DELETE-VOC <item-id>\n");
             m.emplace("LIST-VOC", "LIST-VOC\n");
             m.emplace("READ", "READ <file> <record-name>\n");
+            m.emplace("READU", "READU <file> <record-name>\n"
+                               "  Acquire a READU lock then read (same output as READ).\n");
             m.emplace("WRITE", "WRITE <file> <record-name> <value...>\n");
+            m.emplace("WRITEU", "WRITEU <file> <record-name> <value...>\n"
+                                "  Acquire a WRITEU lock then write (same behaviour as WRITE).\n");
+            m.emplace("RELEASE", "RELEASE <file> <record-name>\n"
+                                 "  Release a record lock held by this session.\n");
             m.emplace("EDIT", "EDIT <file> <record> | EDIT <programName>\n");
             m.emplace("DUMP-STACK", "DUMP-STACK\n");
             m.emplace("QUIT", "QUIT\n");
