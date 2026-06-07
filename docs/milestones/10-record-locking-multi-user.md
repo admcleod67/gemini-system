@@ -252,6 +252,24 @@ Milestone 10 is complete when:
 
 ---
 
+### Delivery plan
+
+Implementation is sequenced into vertical stages. Each stage ships a test‑locked slice before the next starts. Introduce the in‑memory **lock table** first; wire **filesystem** enforcement and **session lifecycle** second; then surface **`READU`** / **`WRITEU`** / **`RELEASE`** through Tcl, BASIC/VM, and PROC in that order so all consumers call the same enforcement layer. Detailed per‑stage plans may live in `~/.cursor/plans/m10_stage_*.plan.md` during implementation; status is summarised here as each stage lands (matching the M4 / M5 / M8 / M9 precedent).
+
+- **Stage 1 — Lock table foundation**: in‑memory lock table (`fileId` → `recordId` → owner, lock type, timestamp); acquire, release, idempotent re‑acquire by the same session; conflict detection when another session holds **`READU`** or **`WRITEU`**. Unit tests only — no filesystem, Tcl, BASIC, or PROC integration yet. Lock stable error text for conflicts. *Status: pending.*
+
+- **Stage 2 — Session scope + filesystem enforcement**: attach lock table to session identity; **`LOGOFF`** / session termination releases all locks held by the session; implicit release on file deletion. Filesystem becomes the single enforcement point: **`READU`** / **`WRITEU`** acquire then delegate to existing I/O; plain **`READ`** / **`WRITE`** / **`DELETE`** do not acquire but fail when another session holds the lock. Multi‑session simulation tests at the filesystem layer. *Status: pending.*
+
+- **Stage 3 — Tcl integration**: Tcl commands **`READU`**, **`WRITEU`**, **`RELEASE`**; extend existing **`READ`** / **`WRITE`** / **`DELETE`** to route through lock‑aware filesystem paths. On conflict → **`RECORD LOCKED`** (stable, test‑locked). Optional Gemini diagnostic: file, record, owner session, lock type. *Status: pending.*
+
+- **Stage 4 — VM + BASIC**: new VM opcodes **`READU`**, **`WRITEU`**, **`RELEASE`**; BASIC statement parser and bytecode emitter; runtime sets **`STATUS()`** and routes to **`ON ERROR`** when defined, otherwise raises with **`ERR_RECORD_LOCKED`**. Compiler/runtime tests; no PROC changes yet. *Status: pending.*
+
+- **Stage 5 — PROC + docs — closes M10**: PROC **`READU`** / **`WRITEU`** / **`RELEASE`** with **`?LOCKED?`** (or equivalent stable token); integration tests across Tcl, BASIC, and PROC. Update [docs/tcl-shell.md](../tcl-shell.md), [docs/basic-language.md](../basic-language.md), [docs/proc.md](../proc.md), [docs/vm.md](../vm.md); add concurrency model overview. **`MATREAD`** / **`MATWRITE`** remain deferred unless trivially wired. **Closes Milestone 10.** *Status: pending.*
+
+Only Stage 5's exit criteria should claim "Closes Milestone 10".
+
+---
+
 ### Rationale
 
 Record locking is the foundation of safe multi‑user Pick operation: without it, concurrent sessions can corrupt shared data silently. By centralising enforcement in the filesystem layer and surfacing consistent errors through TCL, BASIC, and PROC, Gemini gains a predictable concurrency model that matches operator expectations from classic Pick systems while remaining simple enough to test and reason about in a single‑host, multi‑session environment.
