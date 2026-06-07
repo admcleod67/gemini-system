@@ -26,7 +26,11 @@ Compiler internals are in an incremental refactor phase. Expression parsing and 
 - `MAT WRITE <arr> ON <filevar>, <id-expr> [ELSE <line-or-statement>]`
 - `OPEN <file-expr> TO <filevar> [ELSE <line-or-statement>]`
 - `READ <var> FROM <filevar>, <id-expr> [ELSE <line-or-statement>]`
+- `READU <var> FROM <filevar>, <id-expr> [ELSE <line-or-statement>]`
 - `WRITE <expr> ON <filevar>, <id-expr> [ELSE <line-or-statement>]`
+- `WRITEU <expr> ON <filevar>, <id-expr> [ELSE <line-or-statement>]`
+- `RELEASE <filevar>, <id-expr>`
+- `ON ERROR GOTO <line>` | `ON ERROR STOP`
 - `READNEXT <var> FROM <filevar> [ELSE <line-or-statement>]`
 - `READV <var> FROM <filevar>, <id-expr>, <attr-expr>[, <value-index-expr>] [ELSE <line-or-statement>]`
 - `WRITEV <expr> ON <filevar>, <id-expr>, <attr-expr>[, <value-index-expr>] [ELSE <line-or-statement>]`
@@ -336,7 +340,12 @@ File handling uses the PickFS backend and file-variable handles:
 
 - `OPEN <file-expr> TO <filevar> [ELSE <line-or-statement>]`
 - `READ <var> FROM <filevar>, <id-expr> [ELSE <line-or-statement>]`
+- `READU <var> FROM <filevar>, <id-expr> [ELSE <line-or-statement>]`
 - `WRITE <expr> ON <filevar>, <id-expr> [ELSE <line-or-statement>]`
+- `WRITEU <expr> ON <filevar>, <id-expr> [ELSE <line-or-statement>]`
+- `RELEASE <filevar>, <id-expr>`
+- `ON ERROR GOTO <line>` | `ON ERROR STOP`
+- `STATUS()` — returns the last record-lock conflict code (`0` = OK, `1` = record locked)
 - `READNEXT <var> FROM <filevar> [ELSE <line-or-statement>]`
 - `READV <var> FROM <filevar>, <id-expr>, <attr-expr>[, <value-index-expr>] [ELSE <line-or-statement>]`
 - `WRITEV <expr> ON <filevar>, <id-expr>, <attr-expr>[, <value-index-expr>] [ELSE <line-or-statement>]`
@@ -369,6 +378,10 @@ Rules:
 
 - `OPEN` succeeds only if the file already exists. There is no automatic file creation from BASIC.
 - `OPEN`, `READ`, `WRITE`, `READNEXT`, `READV`, and `WRITEV` route failures to `ELSE` when provided.
+- `READU` and `WRITEU` acquire record locks via the session lock context; lock conflicts set `STATUS()` to `1` and transfer control to `ON ERROR GOTO` when active, otherwise raise `ERR_RECORD_LOCKED`.
+- `READU`/`WRITEU` with `ELSE` use try opcodes (same pattern as `READ`/`WRITE`); lock conflicts on the try path push failure without invoking `ON ERROR`.
+- `RELEASE` drops the session's lock on the named record (no-op if not held).
+- `ON ERROR STOP` clears any active error handler.
 - Without `ELSE`, failures raise runtime errors and stop execution.
 - `READNEXT` iterates record IDs in deterministic lexicographic order per open file handle.
 - `OPEN` resets `READNEXT` cursor state for that file handle (`PickFS::FileSystem::FileHandle`).

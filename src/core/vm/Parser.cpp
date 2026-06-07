@@ -410,6 +410,18 @@ namespace PickVM {
                     throw std::runtime_error("READ_REC_TRY requires a file variable at line " + std::to_string(pl.sourceLine));
                 }
                 inst.operand = parseQuotedString(pl.operand, pl.sourceLine);
+            } else if (pl.opcode == "READ_REC_U") {
+                inst.op = OpCode::ReadRecU;
+                if (pl.operand.empty()) {
+                    throw std::runtime_error("READ_REC_U requires a file variable at line " + std::to_string(pl.sourceLine));
+                }
+                inst.operand = parseQuotedString(pl.operand, pl.sourceLine);
+            } else if (pl.opcode == "READ_REC_U_TRY") {
+                inst.op = OpCode::ReadRecUTry;
+                if (pl.operand.empty()) {
+                    throw std::runtime_error("READ_REC_U_TRY requires a file variable at line " + std::to_string(pl.sourceLine));
+                }
+                inst.operand = parseQuotedString(pl.operand, pl.sourceLine);
             } else if (pl.opcode == "WRITE_REC") {
                 inst.op = OpCode::WriteRec;
                 if (pl.operand.empty()) {
@@ -422,6 +434,36 @@ namespace PickVM {
                     throw std::runtime_error("WRITE_REC_TRY requires a file variable at line " + std::to_string(pl.sourceLine));
                 }
                 inst.operand = parseQuotedString(pl.operand, pl.sourceLine);
+            } else if (pl.opcode == "WRITE_REC_U") {
+                inst.op = OpCode::WriteRecU;
+                if (pl.operand.empty()) {
+                    throw std::runtime_error("WRITE_REC_U requires a file variable at line " + std::to_string(pl.sourceLine));
+                }
+                inst.operand = parseQuotedString(pl.operand, pl.sourceLine);
+            } else if (pl.opcode == "WRITE_REC_U_TRY") {
+                inst.op = OpCode::WriteRecUTry;
+                if (pl.operand.empty()) {
+                    throw std::runtime_error("WRITE_REC_U_TRY requires a file variable at line " + std::to_string(pl.sourceLine));
+                }
+                inst.operand = parseQuotedString(pl.operand, pl.sourceLine);
+            } else if (pl.opcode == "RELEASE_REC") {
+                inst.op = OpCode::ReleaseRec;
+                if (pl.operand.empty()) {
+                    throw std::runtime_error("RELEASE_REC requires a file variable at line " + std::to_string(pl.sourceLine));
+                }
+                inst.operand = parseQuotedString(pl.operand, pl.sourceLine);
+            } else if (pl.opcode == "SET_ON_ERROR_HANDLER") {
+                inst.op = OpCode::SetOnErrorHandler;
+                if (pl.operand.empty()) {
+                    throw std::runtime_error(
+                        "SET_ON_ERROR_HANDLER requires a target IP at line " + std::to_string(pl.sourceLine));
+                }
+                try {
+                    inst.operand = std::stoi(pl.operand);
+                } catch (const std::exception &) {
+                    throw std::runtime_error("Invalid SET_ON_ERROR_HANDLER operand at line " +
+                                           std::to_string(pl.sourceLine) + ": '" + pl.operand + "'");
+                }
             } else if (pl.opcode == "READ_NEXT") {
                 inst.op = OpCode::ReadNext;
                 if (pl.operand.empty()) {

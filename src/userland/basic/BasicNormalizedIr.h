@@ -107,7 +107,21 @@ namespace PickShell::BasicIr {
         std::optional<BranchArm> elseArm;
     };
 
+    struct ReadUStmt {
+        std::string targetVar;
+        std::string fileVar;
+        std::unique_ptr<BasicAst::Expr> idExpr;
+        std::optional<BranchArm> elseArm;
+    };
+
     struct WriteStmt {
+        std::unique_ptr<BasicAst::Expr> valueExpr;
+        std::string fileVar;
+        std::unique_ptr<BasicAst::Expr> idExpr;
+        std::optional<BranchArm> elseArm;
+    };
+
+    struct WriteUStmt {
         std::unique_ptr<BasicAst::Expr> valueExpr;
         std::string fileVar;
         std::unique_ptr<BasicAst::Expr> idExpr;
@@ -142,6 +156,16 @@ namespace PickShell::BasicIr {
         std::string fileVar;
     };
 
+    struct ReleaseStmt {
+        std::string fileVar;
+        std::unique_ptr<BasicAst::Expr> idExpr;
+    };
+
+    struct OnErrorStmt {
+        bool stop{false};
+        int targetLine{0};
+    };
+
     // MAT statements (Milestone 7 Stage 7).
     // - MatAssignStmt: either rhsExpr (scalar broadcast) or rhsSourceArray (MAT copy) is populated.
     // - MAT READ / MAT WRITE mirror ReadStmt / WriteStmt and reuse the same ELSE arm semantics.
@@ -165,7 +189,7 @@ namespace PickShell::BasicIr {
         std::optional<BranchArm> elseArm;
     };
 
-    using NormalizedStmt = std::variant<LetStmt, InputStmt, ChainStmt, GotoStmt, GosubStmt, ReturnStmt, ForStmt, NextStmt, IfStmt, PrintStmt, RemStmt, StopStmt, EndStmt, DimStmt, LetArrayStmt, ClearStmt, OpenStmt, ReadStmt, WriteStmt, ReadNextStmt, ReadVStmt, WriteVStmt, CloseStmt, MatAssignStmt, MatReadStmt, MatWriteStmt>;
+    using NormalizedStmt = std::variant<LetStmt, InputStmt, ChainStmt, GotoStmt, GosubStmt, ReturnStmt, ForStmt, NextStmt, IfStmt, PrintStmt, RemStmt, StopStmt, EndStmt, DimStmt, LetArrayStmt, ClearStmt, OpenStmt, ReadStmt, ReadUStmt, WriteStmt, WriteUStmt, ReadNextStmt, ReadVStmt, WriteVStmt, CloseStmt, ReleaseStmt, OnErrorStmt, MatAssignStmt, MatReadStmt, MatWriteStmt>;
 
     struct InlineStatement {
         NormalizedStmt statement;

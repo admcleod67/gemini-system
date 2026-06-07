@@ -396,6 +396,43 @@ namespace PickShell {
                 continue;
             }
 
+            if (op == "ON") {
+                std::string nextTok;
+                iss >> nextTok;
+                if (uppercase(nextTok) != "ERROR") {
+                    result.errors.push_back({lineNumber, "Unknown ON statement"});
+                    continue;
+                }
+                std::string rest;
+                std::getline(iss, rest);
+                rest = trim(rest);
+                if (rest.empty()) {
+                    result.errors.push_back({lineNumber, "ON ERROR requires GOTO <line> or STOP"});
+                    continue;
+                }
+                const std::string restUpper = uppercase(rest);
+                if (restUpper == "STOP") {
+                    result.lines.push_back({lineNumber, BasicAst::OnErrorStmt{true, 0}});
+                    continue;
+                }
+                const std::size_t gotoPos = findKeywordToken(restUpper, "GOTO");
+                if (gotoPos == std::string::npos) {
+                    result.errors.push_back({lineNumber, "ON ERROR requires GOTO <line> or STOP"});
+                    continue;
+                }
+                const std::string afterGoto = trim(rest.substr(gotoPos + 4));
+                int targetLine = 0;
+                if (!parsePositiveLineNumber(afterGoto, targetLine)) {
+                    result.errors.push_back({lineNumber, "ON ERROR GOTO requires a line number"});
+                    continue;
+                }
+                BasicAst::OnErrorStmt stmt{};
+                stmt.stop = false;
+                stmt.targetLine = targetLine;
+                result.lines.push_back({lineNumber, std::move(stmt)});
+                continue;
+            }
+
             if (op == "OPEN") {
                 std::string rest;
                 std::getline(iss, rest);
@@ -448,6 +485,75 @@ namespace PickShell {
                 BasicAst::OpenStmt stmt{};
                 stmt.fileExpr = std::move(fileExpr.expression);
                 stmt.fileVar = fileVar;
+                stmt.elseArm = elseArm;
+                result.lines.push_back({lineNumber, std::move(stmt)});
+                continue;
+            }
+
+            if (op == "READU") {
+                std::string rest;
+                std::getline(iss, rest);
+                rest = trim(rest);
+                if (rest.empty()) {
+                    result.errors.push_back({lineNumber, "READU requires REC FROM FVAR, ID"});
+                    continue;
+                }
+
+                std::optional<BasicAst::BranchArm> elseArm;
+                std::string mainPart = rest;
+                const std::string restUpper = uppercase(rest);
+                const std::size_t elsePos = findKeywordToken(restUpper, "ELSE");
+                if (elsePos != std::string::npos) {
+                    mainPart = trim(rest.substr(0, elsePos));
+                    const std::string elseRaw = trim(rest.substr(elsePos + 4));
+                    BasicAst::BranchArm parsedElseArm{};
+                    std::string armError;
+                    if (!parseBranchArmSpec(elseRaw, "READU ELSE", parsedElseArm, armError)) {
+                        result.errors.push_back({lineNumber, armError});
+                        continue;
+                    }
+                    elseArm = std::move(parsedElseArm);
+                }
+
+                const std::string mainUpper = uppercase(mainPart);
+                const std::size_t fromPos = findKeywordToken(mainUpper, "FROM");
+                if (fromPos == std::string::npos) {
+                    result.errors.push_back({lineNumber, "READU requires FROM"});
+                    continue;
+                }
+                const std::string targetVar = trim(mainPart.substr(0, fromPos));
+                if (!isValidVariableName(targetVar)) {
+                    result.errors.push_back({lineNumber, "READU requires a valid target variable name"});
+                    continue;
+                }
+
+                const std::string afterFrom = trim(mainPart.substr(fromPos + 4));
+                const std::size_t commaPos = afterFrom.find(',');
+                if (commaPos == std::string::npos) {
+                    result.errors.push_back({lineNumber, "READU requires FVAR, ID"});
+                    continue;
+                }
+                const std::string fileVar = trim(afterFrom.substr(0, commaPos));
+                const std::string idExprRaw = trim(afterFrom.substr(commaPos + 1));
+                if (!isValidVariableName(fileVar)) {
+                    result.errors.push_back({lineNumber, "READU requires a valid file variable name"});
+                    continue;
+                }
+                if (idExprRaw.empty()) {
+                    result.errors.push_back({lineNumber, "READU requires an ID expression"});
+                    continue;
+                }
+
+                BasicExpressionParseResult idExpr = BasicExpressionParser::parse(idExprRaw);
+                if (!idExpr.success || !idExpr.expression) {
+                    result.errors.push_back({lineNumber, "READU ID expression error: " + idExpr.error});
+                    continue;
+                }
+
+                BasicAst::ReadUStmt stmt{};
+                stmt.targetVar = targetVar;
+                stmt.fileVar = fileVar;
+                stmt.idExpr = std::move(idExpr.expression);
                 stmt.elseArm = elseArm;
                 result.lines.push_back({lineNumber, std::move(stmt)});
                 continue;
@@ -515,6 +621,80 @@ namespace PickShell {
 
                 BasicAst::ReadStmt stmt{};
                 stmt.targetVar = targetVar;
+                stmt.fileVar = fileVar;
+                stmt.idExpr = std::move(idExpr.expression);
+                stmt.elseArm = elseArm;
+                result.lines.push_back({lineNumber, std::move(stmt)});
+                continue;
+            }
+
+            if (op == "WRITEU") {
+                std::string rest;
+                std::getline(iss, rest);
+                rest = trim(rest);
+                if (rest.empty()) {
+                    result.errors.push_back({lineNumber, "WRITEU requires REC ON FVAR, ID"});
+                    continue;
+                }
+
+                std::optional<BasicAst::BranchArm> elseArm;
+                std::string mainPart = rest;
+                const std::string restUpper = uppercase(rest);
+                const std::size_t elsePos = findKeywordToken(restUpper, "ELSE");
+                if (elsePos != std::string::npos) {
+                    mainPart = trim(rest.substr(0, elsePos));
+                    const std::string elseRaw = trim(rest.substr(elsePos + 4));
+                    BasicAst::BranchArm parsedElseArm{};
+                    std::string armError;
+                    if (!parseBranchArmSpec(elseRaw, "WRITEU ELSE", parsedElseArm, armError)) {
+                        result.errors.push_back({lineNumber, armError});
+                        continue;
+                    }
+                    elseArm = std::move(parsedElseArm);
+                }
+
+                const std::string mainUpper = uppercase(mainPart);
+                const std::size_t onPos = findKeywordToken(mainUpper, "ON");
+                if (onPos == std::string::npos) {
+                    result.errors.push_back({lineNumber, "WRITEU requires ON"});
+                    continue;
+                }
+                const std::string valueExprRaw = trim(mainPart.substr(0, onPos));
+                if (valueExprRaw.empty()) {
+                    result.errors.push_back({lineNumber, "WRITEU requires a value expression"});
+                    continue;
+                }
+
+                const std::string afterOn = trim(mainPart.substr(onPos + 2));
+                const std::size_t commaPos = afterOn.find(',');
+                if (commaPos == std::string::npos) {
+                    result.errors.push_back({lineNumber, "WRITEU requires FVAR, ID"});
+                    continue;
+                }
+                const std::string fileVar = trim(afterOn.substr(0, commaPos));
+                const std::string idExprRaw = trim(afterOn.substr(commaPos + 1));
+                if (!isValidVariableName(fileVar)) {
+                    result.errors.push_back({lineNumber, "WRITEU requires a valid file variable name"});
+                    continue;
+                }
+                if (idExprRaw.empty()) {
+                    result.errors.push_back({lineNumber, "WRITEU requires an ID expression"});
+                    continue;
+                }
+
+                BasicExpressionParseResult valueExpr = BasicExpressionParser::parse(valueExprRaw);
+                if (!valueExpr.success || !valueExpr.expression) {
+                    result.errors.push_back({lineNumber, "WRITEU value expression error: " + valueExpr.error});
+                    continue;
+                }
+                BasicExpressionParseResult idExpr = BasicExpressionParser::parse(idExprRaw);
+                if (!idExpr.success || !idExpr.expression) {
+                    result.errors.push_back({lineNumber, "WRITEU ID expression error: " + idExpr.error});
+                    continue;
+                }
+
+                BasicAst::WriteUStmt stmt{};
+                stmt.valueExpr = std::move(valueExpr.expression);
                 stmt.fileVar = fileVar;
                 stmt.idExpr = std::move(idExpr.expression);
                 stmt.elseArm = elseArm;
@@ -872,6 +1052,41 @@ namespace PickShell {
                 stmt.attrExpr = std::move(attrExprNode);
                 stmt.valueIndexExpr = std::move(valueIndexExpr);
                 stmt.elseArm = elseArm;
+                result.lines.push_back({lineNumber, std::move(stmt)});
+                continue;
+            }
+
+            if (op == "RELEASE") {
+                std::string rest;
+                std::getline(iss, rest);
+                rest = trim(rest);
+                if (rest.empty()) {
+                    result.errors.push_back({lineNumber, "RELEASE requires FVAR, ID"});
+                    continue;
+                }
+                const std::size_t commaPos = rest.find(',');
+                if (commaPos == std::string::npos) {
+                    result.errors.push_back({lineNumber, "RELEASE requires FVAR, ID"});
+                    continue;
+                }
+                const std::string fileVar = trim(rest.substr(0, commaPos));
+                const std::string idExprRaw = trim(rest.substr(commaPos + 1));
+                if (!isValidVariableName(fileVar)) {
+                    result.errors.push_back({lineNumber, "RELEASE requires a valid file variable name"});
+                    continue;
+                }
+                if (idExprRaw.empty()) {
+                    result.errors.push_back({lineNumber, "RELEASE requires an ID expression"});
+                    continue;
+                }
+                BasicExpressionParseResult idExpr = BasicExpressionParser::parse(idExprRaw);
+                if (!idExpr.success || !idExpr.expression) {
+                    result.errors.push_back({lineNumber, "RELEASE ID expression error: " + idExpr.error});
+                    continue;
+                }
+                BasicAst::ReleaseStmt stmt{};
+                stmt.fileVar = fileVar;
+                stmt.idExpr = std::move(idExpr.expression);
                 result.lines.push_back({lineNumber, std::move(stmt)});
                 continue;
             }

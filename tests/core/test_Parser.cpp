@@ -306,3 +306,31 @@ TEST_CASE("parser INVOKE_BUILTIN parses quoted builtin name") {
     CHECK(lb.program[1].op == OpCode::InvokeBuiltin);
     CHECK(std::get<std::string>(lb.program[1].operand) == "LEN");
 }
+
+TEST_CASE("parser record lock opcodes round-trip") {
+    Parser parser;
+    std::istringstream in(
+        "PUSH_STR \"R1\"\n"
+        "READ_REC_U FVAR\n"
+        "PUSH_STR \"R1\"\n"
+        "READ_REC_U_TRY FVAR\n"
+        "PUSH_STR \"VAL\"\n"
+        "PUSH_STR \"R1\"\n"
+        "WRITE_REC_U FVAR\n"
+        "PUSH_STR \"VAL\"\n"
+        "PUSH_STR \"R1\"\n"
+        "WRITE_REC_U_TRY FVAR\n"
+        "PUSH_STR \"R1\"\n"
+        "RELEASE_REC FVAR\n"
+        "SET_ON_ERROR_HANDLER 5\n"
+        "HALT\n");
+    LoadedBytecode lb = parser.parse(in);
+    REQUIRE(lb.program.size() == 14);
+    CHECK(lb.program[1].op == OpCode::ReadRecU);
+    CHECK(lb.program[3].op == OpCode::ReadRecUTry);
+    CHECK(lb.program[6].op == OpCode::WriteRecU);
+    CHECK(lb.program[9].op == OpCode::WriteRecUTry);
+    CHECK(lb.program[11].op == OpCode::ReleaseRec);
+    CHECK(lb.program[12].op == OpCode::SetOnErrorHandler);
+    CHECK(std::get<int>(lb.program[12].operand) == 5);
+}

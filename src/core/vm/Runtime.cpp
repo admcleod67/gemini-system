@@ -41,6 +41,7 @@ namespace PickVM {
             CursorExhausted,
             MissingAttribute,
             MissingSubvalue,
+            RecordLocked,
         };
 
         const char *ioErrorKindName(const IoErrorKind kind) {
@@ -52,8 +53,13 @@ namespace PickVM {
                 case IoErrorKind::CursorExhausted: return "CURSOR.EXHAUSTED";
                 case IoErrorKind::MissingAttribute: return "ATTRIBUTE.NOT.FOUND";
                 case IoErrorKind::MissingSubvalue: return "SUBVALUE.NOT.FOUND";
+                case IoErrorKind::RecordLocked: return "ERR_RECORD_LOCKED";
             }
             return "IO.ERROR";
+        }
+
+        [[nodiscard]] bool isRecordLockConflict(const PickFS::FileSystemError &ex) {
+            return std::string_view(ex.what()).find("RECORD LOCKED") != std::string_view::npos;
         }
 
         std::runtime_error makeIoError(const char *op, const IoErrorKind kind, const std::string &detail) {
@@ -836,6 +842,10 @@ namespace PickVM {
             stack.push_back(std::move(out));
         }
 
+        void builtinStatus(std::vector<Value> &stack, Runtime *rt) {
+            stack.push_back(rt != nullptr ? rt->statusCode() : 0);
+        }
+
         const std::unordered_map<std::string, BuiltinEntry> &builtinRegistry() {
             static const std::unordered_map<std::string, BuiltinEntry> kRegistry{
                 {"ABS", {1, builtinAbs}},
@@ -864,6 +874,7 @@ namespace PickVM {
                 {"ICONV", {2, builtinIconv}},
                 {"NUM", {1, builtinNum}},
                 {"CONVERT", {3, builtinConvert}},
+                {"STATUS", {0, builtinStatus}},
             };
             return kRegistry;
         }
@@ -930,6 +941,17 @@ namespace PickVM {
         arrays_.clear();
         interrupted_.store(false, std::memory_order_relaxed);
         variables_.clear();
+        statusCode_ = 0;
+        onErrorIp_.reset();
+    }
+
+    bool Runtime::handleRecordLockConflict(const char *op) {
+        statusCode_ = kStatusRecordLocked;
+        if (onErrorIp_.has_value()) {
+            ip_ = *onErrorIp_;
+            return true;
+        }
+        throw makeIoError(op, IoErrorKind::RecordLocked, "");
     }
 
     int Runtime::sourceLineAtInstruction(const std::size_t ip) const {
@@ -1456,15 +1478,20 @@ namespace PickVM {
                 if (!fileSystem_) {
                     throw makeIoError("READ", IoErrorKind::BackendUnavailable, "filesystem backend not configured");
                 }
-                std::optional<std::string> value;
-                const std::optional<PickFS::Record> rec = fileSystem_->read(fit->second.name, id);
-                if (rec.has_value()) {
-                    value = rec->value();
+                try {
+                    const std::optional<PickFS::Record> rec = fileSystem_->read(fit->second.name, id);
+                    if (!rec.has_value()) {
+                        throw makeIoError("READ", IoErrorKind::MissingRecord, id);
+                    }
+                    push(rec->value());
+                } catch (const PickFS::FileSystemError &ex) {
+                    if (isRecordLockConflict(ex)) {
+                        if (handleRecordLockConflict("READ")) {
+                            return ip_ < program_.size();
+                        }
+                    }
+                    throw;
                 }
-                if (!value.has_value()) {
-                    throw makeIoError("READ", IoErrorKind::MissingRecord, id);
-                }
-                push(*value);
                 break;
             }
 
@@ -1482,18 +1509,84 @@ namespace PickVM {
                     push(0);
                     break;
                 }
-                std::optional<std::string> value;
-                const std::optional<PickFS::Record> rec = fileSystem_->read(fit->second.name, id);
-                if (rec.has_value()) {
-                    value = rec->value();
+                try {
+                    const std::optional<PickFS::Record> rec = fileSystem_->read(fit->second.name, id);
+                    if (!rec.has_value()) {
+                        push(std::string{});
+                        push(0);
+                        break;
+                    }
+                    push(rec->value());
+                    push(1);
+                } catch (const PickFS::FileSystemError &ex) {
+                    if (isRecordLockConflict(ex)) {
+                        push(std::string{});
+                        push(0);
+                        break;
+                    }
+                    throw;
                 }
-                if (!value.has_value()) {
+                break;
+            }
+
+            case OpCode::ReadRecU: {
+                const std::string fileVar = canonicalVariableName(stringOperandAtIp(instr, ip_));
+                const std::string id = valueToString(pop());
+                const auto fit = openFiles_.find(fileVar);
+                if (fit == openFiles_.end()) {
+                    throw makeIoError("READU", IoErrorKind::FileVarNotOpen, fileVar);
+                }
+                if (!fileSystem_) {
+                    throw makeIoError("READU", IoErrorKind::BackendUnavailable, "filesystem backend not configured");
+                }
+                try {
+                    const std::optional<PickFS::Record> rec = fileSystem_->readU(fit->second.name, id);
+                    if (!rec.has_value()) {
+                        throw makeIoError("READU", IoErrorKind::MissingRecord, id);
+                    }
+                    push(rec->value());
+                } catch (const PickFS::FileSystemError &ex) {
+                    if (isRecordLockConflict(ex)) {
+                        if (handleRecordLockConflict("READU")) {
+                            return ip_ < program_.size();
+                        }
+                    }
+                    throw;
+                }
+                break;
+            }
+
+            case OpCode::ReadRecUTry: {
+                const std::string fileVar = canonicalVariableName(stringOperandAtIp(instr, ip_));
+                const std::string id = valueToString(pop());
+                const auto fit = openFiles_.find(fileVar);
+                if (fit == openFiles_.end()) {
                     push(std::string{});
                     push(0);
                     break;
                 }
-                push(*value);
-                push(1);
+                if (!fileSystem_) {
+                    push(std::string{});
+                    push(0);
+                    break;
+                }
+                try {
+                    const std::optional<PickFS::Record> rec = fileSystem_->readU(fit->second.name, id);
+                    if (!rec.has_value()) {
+                        push(std::string{});
+                        push(0);
+                        break;
+                    }
+                    push(rec->value());
+                    push(1);
+                } catch (const PickFS::FileSystemError &ex) {
+                    if (isRecordLockConflict(ex)) {
+                        push(std::string{});
+                        push(0);
+                        break;
+                    }
+                    throw;
+                }
                 break;
             }
 
@@ -1508,8 +1601,17 @@ namespace PickVM {
                 if (!fileSystem_) {
                     throw makeIoError("WRITE", IoErrorKind::BackendUnavailable, "filesystem backend not configured");
                 }
-                fileSystem_->write(fit->second.name, PickFS::Record{id, value});
-                fileSystem_->resetReadNextCursor(fit->second);
+                try {
+                    fileSystem_->write(fit->second.name, PickFS::Record{id, value});
+                    fileSystem_->resetReadNextCursor(fit->second);
+                } catch (const PickFS::FileSystemError &ex) {
+                    if (isRecordLockConflict(ex)) {
+                        if (handleRecordLockConflict("WRITE")) {
+                            return ip_ < program_.size();
+                        }
+                    }
+                    throw;
+                }
                 break;
             }
 
@@ -1530,8 +1632,92 @@ namespace PickVM {
                     fileSystem_->write(fit->second.name, PickFS::Record{id, value});
                     fileSystem_->resetReadNextCursor(fit->second);
                     push(1);
+                } catch (const PickFS::FileSystemError &ex) {
+                    if (isRecordLockConflict(ex)) {
+                        push(0);
+                        break;
+                    }
+                    throw;
                 } catch (const std::exception &) {
                     push(0);
+                }
+                break;
+            }
+
+            case OpCode::WriteRecU: {
+                const std::string fileVar = canonicalVariableName(stringOperandAtIp(instr, ip_));
+                const std::string id = valueToString(pop());
+                const std::string value = valueToString(pop());
+                const auto fit = openFiles_.find(fileVar);
+                if (fit == openFiles_.end()) {
+                    throw makeIoError("WRITEU", IoErrorKind::FileVarNotOpen, fileVar);
+                }
+                if (!fileSystem_) {
+                    throw makeIoError("WRITEU", IoErrorKind::BackendUnavailable, "filesystem backend not configured");
+                }
+                try {
+                    fileSystem_->writeU(fit->second.name, PickFS::Record{id, value});
+                    fileSystem_->resetReadNextCursor(fit->second);
+                } catch (const PickFS::FileSystemError &ex) {
+                    if (isRecordLockConflict(ex)) {
+                        if (handleRecordLockConflict("WRITEU")) {
+                            return ip_ < program_.size();
+                        }
+                    }
+                    throw;
+                }
+                break;
+            }
+
+            case OpCode::WriteRecUTry: {
+                const std::string fileVar = canonicalVariableName(stringOperandAtIp(instr, ip_));
+                const std::string id = valueToString(pop());
+                const std::string value = valueToString(pop());
+                const auto fit = openFiles_.find(fileVar);
+                if (fit == openFiles_.end()) {
+                    push(0);
+                    break;
+                }
+                if (!fileSystem_) {
+                    push(0);
+                    break;
+                }
+                try {
+                    fileSystem_->writeU(fit->second.name, PickFS::Record{id, value});
+                    fileSystem_->resetReadNextCursor(fit->second);
+                    push(1);
+                } catch (const PickFS::FileSystemError &ex) {
+                    if (isRecordLockConflict(ex)) {
+                        push(0);
+                        break;
+                    }
+                    throw;
+                } catch (const std::exception &) {
+                    push(0);
+                }
+                break;
+            }
+
+            case OpCode::ReleaseRec: {
+                const std::string fileVar = canonicalVariableName(stringOperandAtIp(instr, ip_));
+                const std::string id = valueToString(pop());
+                const auto fit = openFiles_.find(fileVar);
+                if (fit == openFiles_.end()) {
+                    throw makeIoError("RELEASE", IoErrorKind::FileVarNotOpen, fileVar);
+                }
+                if (!fileSystem_) {
+                    throw makeIoError("RELEASE", IoErrorKind::BackendUnavailable, "filesystem backend not configured");
+                }
+                (void) fileSystem_->releaseRecord(fit->second.name, id);
+                break;
+            }
+
+            case OpCode::SetOnErrorHandler: {
+                const int targetIp = intOperandAtIp(instr, ip_);
+                if (targetIp <= 0) {
+                    onErrorIp_.reset();
+                } else {
+                    onErrorIp_ = static_cast<std::size_t>(targetIp);
                 }
                 break;
             }

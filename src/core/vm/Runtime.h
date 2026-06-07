@@ -70,8 +70,13 @@ namespace PickVM {
         OpenFileTry,
         ReadRec,
         ReadRecTry,
+        ReadRecU,
+        ReadRecUTry,
         WriteRec,
         WriteRecTry,
+        WriteRecU,
+        WriteRecUTry,
+        ReleaseRec,
         ReadNext,
         ReadNextTry,
         ReadV,
@@ -82,9 +87,13 @@ namespace PickVM {
         ResolveDictAttr,
         Chain,
         CloseFile,
+        SetOnErrorHandler,
         LoadVar,
         StoreVar
     };
+
+    /// BASIC STATUS() value when a record lock conflict is handled or raised (Milestone 10).
+    constexpr int kStatusRecordLocked = 1;
 
     using Value = std::variant<int, double, std::string>;
 
@@ -158,6 +167,8 @@ namespace PickVM {
         // Read-only stack view for tests and diagnostics
         const std::vector<Value> &stack() const { return stack_; }
 
+        [[nodiscard]] int statusCode() const { return statusCode_; }
+
     private:
         std::vector<Instruction> program_;
         std::vector<int> sourceLinePerInstr_; // parallel to program_; 0 means "no source line"
@@ -175,9 +186,13 @@ namespace PickVM {
         PickFS::FileSystem *fileSystem_{nullptr};
         SystemVarReaderFn systemVarReader_;
         BuiltinSystemCallFn builtinSystemCallHandler_;
+        int statusCode_{0};
+        std::optional<std::size_t> onErrorIp_;
 
         std::ostream &out() const;
         std::istream &in() const;
+
+        [[nodiscard]] bool handleRecordLockConflict(const char *op);
 
         // Helpers
         void push(const Value &v);

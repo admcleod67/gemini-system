@@ -191,7 +191,21 @@ namespace PickShell::BasicAst {
         std::optional<BranchArm> elseArm;
     };
 
+    struct ReadUStmt {
+        std::string targetVar;
+        std::string fileVar;
+        std::unique_ptr<Expr> idExpr;
+        std::optional<BranchArm> elseArm;
+    };
+
     struct WriteStmt {
+        std::unique_ptr<Expr> valueExpr;
+        std::string fileVar;
+        std::unique_ptr<Expr> idExpr;
+        std::optional<BranchArm> elseArm;
+    };
+
+    struct WriteUStmt {
         std::unique_ptr<Expr> valueExpr;
         std::string fileVar;
         std::unique_ptr<Expr> idExpr;
@@ -226,6 +240,16 @@ namespace PickShell::BasicAst {
         std::string fileVar;
     };
 
+    struct ReleaseStmt {
+        std::string fileVar;
+        std::unique_ptr<Expr> idExpr;
+    };
+
+    struct OnErrorStmt {
+        bool stop{false};
+        int targetLine{0};
+    };
+
     // MAT <arr> = <scalar-expr>  (rhsExpr non-null, rhsSourceArray empty)
     // MAT <arr> = MAT <arr-src>  (rhsExpr null, rhsSourceArray populated, canonical uppercased)
     struct MatAssignStmt {
@@ -248,7 +272,7 @@ namespace PickShell::BasicAst {
         std::optional<BranchArm> elseArm;
     };
 
-    using StatementNode = std::variant<LetStmt, InputStmt, ChainStmt, GotoStmt, GosubStmt, ReturnStmt, ForStmt, NextStmt, IfStmt, PrintStmt, RemStmt, StopStmt, EndStmt, DimStmt, LetArrayStmt, ClearStmt, OpenStmt, ReadStmt, WriteStmt, ReadNextStmt, ReadVStmt, WriteVStmt, CloseStmt, MatAssignStmt, MatReadStmt, MatWriteStmt>;
+    using StatementNode = std::variant<LetStmt, InputStmt, ChainStmt, GotoStmt, GosubStmt, ReturnStmt, ForStmt, NextStmt, IfStmt, PrintStmt, RemStmt, StopStmt, EndStmt, DimStmt, LetArrayStmt, ClearStmt, OpenStmt, ReadStmt, ReadUStmt, WriteStmt, WriteUStmt, ReadNextStmt, ReadVStmt, WriteVStmt, CloseStmt, ReleaseStmt, OnErrorStmt, MatAssignStmt, MatReadStmt, MatWriteStmt>;
 
     struct InlineStatement {
         StatementNode statement;

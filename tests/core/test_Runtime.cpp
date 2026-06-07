@@ -11,6 +11,7 @@
 
 #include "Runtime.h"
 #include "FileSystem.h"
+#include "LockTable.h"
 
 using PickVM::Instruction;
 using PickVM::OpCode;
@@ -3083,4 +3084,161 @@ TEST_CASE("runtime file op taxonomy wording remains classified") {
         rt.loadProgram(prog);
         CHECK_THROWS_WITH(rt.run(), doctest::Contains("READ: FILE.VAR.NOT.OPEN"));
     }
+}
+
+TEST_CASE("runtime ReadRecU reads record with lock context") {
+    const std::filesystem::path root = std::filesystem::temp_directory_path() / "pick-runtime-readrecu-test";
+    std::error_code ec;
+    std::filesystem::remove_all(root, ec);
+    const auto locks = std::make_shared<PickCore::Locking::LockTable>();
+    PickFS::FileSystem fs(root);
+    fs.setLockContext(locks, "S1");
+    fs.createFile("DATA");
+    fs.write("DATA", PickFS::Record("R1", "LOCKED-VAL"));
+
+    Runtime rt;
+    rt.setFileSystem(&fs);
+
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"DATA"}},
+        {OpCode::OpenFile, std::string{"FVAR"}},
+        {OpCode::PushStr, std::string{"R1"}},
+        {OpCode::ReadRecU, std::string{"FVAR"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<std::string>(rt.stack()[0]) == "LOCKED-VAL");
+    std::filesystem::remove_all(root, ec);
+}
+
+TEST_CASE("runtime ReadRecU lock conflict throws ERR_RECORD_LOCKED without ON ERROR") {
+    const std::filesystem::path root = std::filesystem::temp_directory_path() / "pick-runtime-readrecu-conflict-test";
+    std::error_code ec;
+    std::filesystem::remove_all(root, ec);
+    const auto locks = std::make_shared<PickCore::Locking::LockTable>();
+    PickFS::FileSystem fsA(root);
+    PickFS::FileSystem fsB(root);
+    fsA.setLockContext(locks, "S1");
+    fsB.setLockContext(locks, "S2");
+    fsA.createFile("DATA");
+    fsA.write("DATA", PickFS::Record("R1", "VAL"));
+    REQUIRE(fsA.readU("DATA", "R1").has_value());
+
+    Runtime rt;
+    rt.setFileSystem(&fsB);
+
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"DATA"}},
+        {OpCode::OpenFile, std::string{"FVAR"}},
+        {OpCode::PushStr, std::string{"R1"}},
+        {OpCode::ReadRecU, std::string{"FVAR"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    CHECK_THROWS_WITH(rt.run(), doctest::Contains("ERR_RECORD_LOCKED"));
+    std::filesystem::remove_all(root, ec);
+}
+
+TEST_CASE("runtime ON ERROR GOTO routes ReadRecU lock conflict and STATUS returns code") {
+    const std::filesystem::path root = std::filesystem::temp_directory_path() / "pick-runtime-onerror-test";
+    std::error_code ec;
+    std::filesystem::remove_all(root, ec);
+    const auto locks = std::make_shared<PickCore::Locking::LockTable>();
+    PickFS::FileSystem fsA(root);
+    PickFS::FileSystem fsB(root);
+    fsA.setLockContext(locks, "S1");
+    fsB.setLockContext(locks, "S2");
+    fsA.createFile("DATA");
+    fsA.write("DATA", PickFS::Record("R1", "VAL"));
+    REQUIRE(fsA.readU("DATA", "R1").has_value());
+
+    Runtime rt;
+    rt.setFileSystem(&fsB);
+
+    std::vector<Instruction> prog = {
+        {OpCode::SetOnErrorHandler, 6},
+        {OpCode::PushStr, std::string{"DATA"}},
+        {OpCode::OpenFile, std::string{"FVAR"}},
+        {OpCode::PushStr, std::string{"R1"}},
+        {OpCode::ReadRecU, std::string{"FVAR"}},
+        {OpCode::PushInt, 999},
+        {OpCode::InvokeBuiltin, std::string{"STATUS"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<int>(rt.stack()[0]) == PickVM::kStatusRecordLocked);
+    CHECK(rt.statusCode() == PickVM::kStatusRecordLocked);
+    std::filesystem::remove_all(root, ec);
+}
+
+TEST_CASE("runtime ReleaseRec clears lock so peer ReadRecU succeeds") {
+    const std::filesystem::path root = std::filesystem::temp_directory_path() / "pick-runtime-release-test";
+    std::error_code ec;
+    std::filesystem::remove_all(root, ec);
+    const auto locks = std::make_shared<PickCore::Locking::LockTable>();
+    PickFS::FileSystem fsA(root);
+    PickFS::FileSystem fsB(root);
+    fsA.setLockContext(locks, "S1");
+    fsB.setLockContext(locks, "S2");
+    fsA.createFile("DATA");
+    fsA.write("DATA", PickFS::Record("R1", "VAL"));
+    REQUIRE(fsA.readU("DATA", "R1").has_value());
+
+    Runtime rt;
+    rt.setFileSystem(&fsB);
+
+    std::vector<Instruction> blocked = {
+        {OpCode::PushStr, std::string{"DATA"}},
+        {OpCode::OpenFile, std::string{"FVAR"}},
+        {OpCode::PushStr, std::string{"R1"}},
+        {OpCode::ReadRecU, std::string{"FVAR"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(blocked);
+    CHECK_THROWS_WITH(rt.run(), doctest::Contains("ERR_RECORD_LOCKED"));
+
+    fsA.releaseRecord("DATA", "R1");
+
+    rt.loadProgram(blocked);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<std::string>(rt.stack()[0]) == "VAL");
+    std::filesystem::remove_all(root, ec);
+}
+
+TEST_CASE("runtime ReadRec lock conflict uses ON ERROR when lock context active") {
+    const std::filesystem::path root = std::filesystem::temp_directory_path() / "pick-runtime-read-lock-test";
+    std::error_code ec;
+    std::filesystem::remove_all(root, ec);
+    const auto locks = std::make_shared<PickCore::Locking::LockTable>();
+    PickFS::FileSystem fsA(root);
+    PickFS::FileSystem fsB(root);
+    fsA.setLockContext(locks, "S1");
+    fsB.setLockContext(locks, "S2");
+    fsA.createFile("DATA");
+    fsA.write("DATA", PickFS::Record("R1", "VAL"));
+    REQUIRE(fsA.readU("DATA", "R1").has_value());
+
+    Runtime rt;
+    rt.setFileSystem(&fsB);
+
+    std::vector<Instruction> prog = {
+        {OpCode::SetOnErrorHandler, 6},
+        {OpCode::PushStr, std::string{"DATA"}},
+        {OpCode::OpenFile, std::string{"FVAR"}},
+        {OpCode::PushStr, std::string{"R1"}},
+        {OpCode::ReadRec, std::string{"FVAR"}},
+        {OpCode::PushInt, 999},
+        {OpCode::InvokeBuiltin, std::string{"STATUS"}},
+        {OpCode::Halt, Value{}},
+    };
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<int>(rt.stack()[0]) == PickVM::kStatusRecordLocked);
+    std::filesystem::remove_all(root, ec);
 }

@@ -64,6 +64,12 @@ For non-`.tbc` loaders (for example, handwritten instruction vectors), source-li
 | `READ_REC_TRY name` | Try form of `READ_REC`: pushes record value (or `""`) and then success flag (`1`/`0`) instead of throwing for expected read failures. |
 | `WRITE_REC name` | Pop record id, then value; write to currently open file variable `name`. Throws on unopened handle or backend write failure. |
 | `WRITE_REC_TRY name` | Try form of `WRITE_REC`: pushes success flag (`1`/`0`) instead of throwing for expected write failures. |
+| `READ_REC_U name` | Pop record id, read with update lock via session lock context, push record value. Lock conflict sets `STATUS()` and routes to `ON ERROR` when set, else throws `ERR_RECORD_LOCKED`. |
+| `READ_REC_U_TRY name` | Try form of `READ_REC_U`: pushes record value (or `""`) and success flag; lock conflict is a try failure (`0`), no `ON ERROR` branch. |
+| `WRITE_REC_U name` | Pop record id, then value; write with update lock. Same lock-conflict dispatch as `READ_REC_U`. |
+| `WRITE_REC_U_TRY name` | Try form of `WRITE_REC_U`; lock conflict pushes `0`. |
+| `RELEASE_REC name` | Pop record id and release session lock on that record (silent if not held). |
+| `SET_ON_ERROR_HANDLER ip` | Set instruction pointer for `ON ERROR GOTO` (`0` disables). |
 | `CLOSE_FILE name` | Release binding for file variable `name`. No-op if `name` is not currently open. |
 
 Jump targets must refer to defined labels and resolve to valid instruction indices; the parser validates range.

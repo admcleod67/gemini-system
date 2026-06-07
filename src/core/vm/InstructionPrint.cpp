@@ -58,8 +58,13 @@ namespace PickVM {
             case OpCode::OpenFileTry: return "OPEN_FILE_TRY";
             case OpCode::ReadRec: return "READ_REC";
             case OpCode::ReadRecTry: return "READ_REC_TRY";
+            case OpCode::ReadRecU: return "READ_REC_U";
+            case OpCode::ReadRecUTry: return "READ_REC_U_TRY";
             case OpCode::WriteRec: return "WRITE_REC";
             case OpCode::WriteRecTry: return "WRITE_REC_TRY";
+            case OpCode::WriteRecU: return "WRITE_REC_U";
+            case OpCode::WriteRecUTry: return "WRITE_REC_U_TRY";
+            case OpCode::ReleaseRec: return "RELEASE_REC";
             case OpCode::ReadNext: return "READ_NEXT";
             case OpCode::ReadNextTry: return "READ_NEXT_TRY";
             case OpCode::ReadV: return "READ_V";
@@ -70,6 +75,7 @@ namespace PickVM {
             case OpCode::ResolveDictAttr: return "RESOLVE_DICT_ATTR";
             case OpCode::Chain: return "CHAIN";
             case OpCode::CloseFile: return "CLOSE_FILE";
+            case OpCode::SetOnErrorHandler: return "SET_ON_ERROR_HANDLER";
             case OpCode::LoadVar: return "LOAD_VAR";
             case OpCode::StoreVar: return "STORE_VAR";
         }
@@ -126,6 +132,7 @@ namespace PickVM {
             case OpCode::Jump:
             case OpCode::JumpIfZero:
             case OpCode::Call:
+            case OpCode::SetOnErrorHandler:
                 oss << ' ' << intOperandAtIp(instr, ip);
                 break;
             case OpCode::LoadVar:
@@ -143,8 +150,13 @@ namespace PickVM {
             case OpCode::OpenFileTry:
             case OpCode::ReadRec:
             case OpCode::ReadRecTry:
+            case OpCode::ReadRecU:
+            case OpCode::ReadRecUTry:
             case OpCode::WriteRec:
             case OpCode::WriteRecTry:
+            case OpCode::WriteRecU:
+            case OpCode::WriteRecUTry:
+            case OpCode::ReleaseRec:
             case OpCode::ReadNext:
             case OpCode::ReadNextTry:
             case OpCode::ReadV:

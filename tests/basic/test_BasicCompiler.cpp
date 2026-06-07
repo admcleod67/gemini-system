@@ -1003,6 +1003,44 @@ TEST_CASE("basic compiler compiles OPEN READ WRITE CLOSE") {
     CHECK(hasClose);
 }
 
+TEST_CASE("basic compiler compiles READU WRITEU RELEASE ON ERROR and STATUS") {
+    BasicProgram program;
+    program.setLine(10, "OPEN \"CUSTOMERS\" TO FVAR");
+    program.setLine(20, "ON ERROR GOTO 100");
+    program.setLine(30, "READU REC FROM FVAR, \"KEY\" ELSE 100");
+    program.setLine(40, "WRITEU REC ON FVAR, \"KEY\"");
+    program.setLine(50, "RELEASE FVAR, \"KEY\"");
+    program.setLine(60, "LET X = STATUS()");
+    program.setLine(70, "ON ERROR STOP");
+    program.setLine(80, "END");
+    program.setLine(100, "END");
+
+    BasicCompiler compiler;
+    const auto result = compiler.compile(program);
+    REQUIRE(result.success);
+
+    bool hasReadUTry = false;
+    bool hasWriteU = false;
+    bool hasRelease = false;
+    bool hasOnError = false;
+    bool hasStatus = false;
+    for (const auto &ins : result.program) {
+        if (ins.op == OpCode::ReadRecUTry) hasReadUTry = true;
+        if (ins.op == OpCode::WriteRecU) hasWriteU = true;
+        if (ins.op == OpCode::ReleaseRec) hasRelease = true;
+        if (ins.op == OpCode::SetOnErrorHandler) hasOnError = true;
+        if (ins.op == OpCode::InvokeBuiltin && std::holds_alternative<std::string>(ins.operand) &&
+            std::get<std::string>(ins.operand) == "STATUS") {
+            hasStatus = true;
+        }
+    }
+    CHECK(hasReadUTry);
+    CHECK(hasWriteU);
+    CHECK(hasRelease);
+    CHECK(hasOnError);
+    CHECK(hasStatus);
+}
+
 TEST_CASE("basic compiler uses try opcode for OPEN ELSE line") {
     BasicProgram program;
     program.setLine(10, "OPEN \"CUSTOMERS\" TO FVAR ELSE 40");

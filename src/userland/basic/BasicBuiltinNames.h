@@ -15,12 +15,12 @@ namespace PickShell::BasicBuiltins {
                upper == "RND" || upper == "SIN" || upper == "COS" || upper == "TAN" || upper == "EXP" ||
                upper == "LOG" || upper == "DATE" || upper == "TIME" || upper == "SYSTEM" || upper == "INDEX" ||
                upper == "FIELD" || upper == "STR" || upper == "OCONV" || upper == "ICONV" ||
-               upper == "NUM" || upper == "CONVERT";
+               upper == "NUM" || upper == "CONVERT" || upper == "STATUS";
     }
 
     /// Inclusive (minArgs, maxArgs) for whitelisted builtin calls; std::nullopt if not a builtin call name.
     [[nodiscard]] inline std::optional<std::pair<int, int>> builtinArityBounds(const std::string_view upper) {
-        if (upper == "DATE" || upper == "TIME") {
+        if (upper == "DATE" || upper == "TIME" || upper == "STATUS") {
             return std::make_pair(0, 0);
         }
         if (upper == "RND") {

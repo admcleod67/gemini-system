@@ -46,6 +46,7 @@ namespace PickVM {
                 case OpCode::Jump:
                 case OpCode::JumpIfZero:
                 case OpCode::Call:
+                case OpCode::SetOnErrorHandler:
                     out << ' ' << std::get<int>(instr.operand);
                     break;
                 case OpCode::PushFlt:
@@ -69,8 +70,13 @@ namespace PickVM {
                 case OpCode::OpenFileTry:
                 case OpCode::ReadRec:
                 case OpCode::ReadRecTry:
+                case OpCode::ReadRecU:
+                case OpCode::ReadRecUTry:
                 case OpCode::WriteRec:
                 case OpCode::WriteRecTry:
+                case OpCode::WriteRecU:
+                case OpCode::WriteRecUTry:
+                case OpCode::ReleaseRec:
                 case OpCode::ReadNext:
                 case OpCode::ReadNextTry:
                 case OpCode::ReadV:

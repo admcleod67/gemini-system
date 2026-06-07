@@ -413,6 +413,44 @@ TEST_CASE("basic statement parser parses READ WRITE and CLOSE") {
     CHECK(std::holds_alternative<BasicAst::CloseStmt>(result.lines[2].statement));
 }
 
+TEST_CASE("basic statement parser parses READU WRITEU RELEASE and ON ERROR") {
+    BasicProgram program;
+    program.setLine(10, "READU REC FROM FVAR, ID ELSE 40");
+    program.setLine(20, "WRITEU REC ON FVAR, ID");
+    program.setLine(30, "RELEASE FVAR, ID");
+    program.setLine(40, "ON ERROR GOTO 100");
+    program.setLine(50, "ON ERROR STOP");
+
+    const BasicAst::StatementParseResult result = BasicStatementParser::parse(program);
+    CHECK(result.success);
+    REQUIRE(result.lines.size() == 5);
+    CHECK(std::holds_alternative<BasicAst::ReadUStmt>(result.lines[0].statement));
+    const auto &readU = std::get<BasicAst::ReadUStmt>(result.lines[0].statement);
+    CHECK(readU.targetVar == "REC");
+    CHECK(readU.fileVar == "FVAR");
+    CHECK(readU.elseArm.has_value());
+    CHECK(std::holds_alternative<BasicAst::WriteUStmt>(result.lines[1].statement));
+    CHECK(std::holds_alternative<BasicAst::ReleaseStmt>(result.lines[2].statement));
+    REQUIRE(std::holds_alternative<BasicAst::OnErrorStmt>(result.lines[3].statement));
+    const auto &onErrGoto = std::get<BasicAst::OnErrorStmt>(result.lines[3].statement);
+    CHECK_FALSE(onErrGoto.stop);
+    CHECK(onErrGoto.targetLine == 100);
+    REQUIRE(std::holds_alternative<BasicAst::OnErrorStmt>(result.lines[4].statement));
+    CHECK(std::get<BasicAst::OnErrorStmt>(result.lines[4].statement).stop);
+}
+
+TEST_CASE("basic statement parser rejects malformed ON ERROR") {
+    BasicProgram program;
+    program.setLine(10, "ON ERROR");
+    program.setLine(20, "ON ERROR RESUME 10");
+
+    const BasicAst::StatementParseResult result = BasicStatementParser::parse(program);
+    CHECK_FALSE(result.success);
+    REQUIRE(result.errors.size() == 2);
+    CHECK(result.errors[0].message.find("ON ERROR") != std::string::npos);
+    CHECK(result.errors[1].message.find("ON ERROR") != std::string::npos);
+}
+
 TEST_CASE("basic statement parser parses READNEXT READV and WRITEV") {
     BasicProgram program;
     program.setLine(10, "READNEXT ID FROM FVAR ELSE 90");
