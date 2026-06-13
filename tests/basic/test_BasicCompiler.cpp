@@ -1,3 +1,4 @@
+#include "BasicLanguageIds.h"
 #include <doctest/doctest.h>
 
 #include "BasicCompiler.h"
@@ -7,6 +8,17 @@
 using PickShell::BasicCompiler;
 using PickShell::BasicProgram;
 using PickVM::OpCode;
+
+
+namespace {
+bool isBasicCallFunc(const PickVM::Instruction &instr,
+                     const PickCore::Languages::FunctionId fnId,
+                     const int argCount) {
+    return instr.op == PickVM::OpCode::CallFunc && instr.callFunc.namespaceId ==
+               PickCore::Languages::Basic::kNamespaceId &&
+           instr.callFunc.functionId == fnId && instr.callFunc.argCount == argCount;
+}
+} // namespace
 
 TEST_CASE("basic compiler compiles LET PRINT END") {
     BasicProgram program;
@@ -766,8 +778,7 @@ TEST_CASE("basic compiler compiles ABS function") {
     REQUIRE(result.success);
     bool found = false;
     for (const auto &instr : result.program) {
-        if (instr.op == OpCode::InvokeBuiltin && std::holds_alternative<std::string>(instr.operand) &&
-            std::get<std::string>(instr.operand) == "ABS") {
+        if (isBasicCallFunc(instr, PickCore::Languages::Basic::kFnAbs, 1)) {
             found = true;
             break;
         }
@@ -785,8 +796,7 @@ TEST_CASE("basic compiler compiles SGN function") {
     REQUIRE(result.success);
     bool found = false;
     for (const auto &instr : result.program) {
-        if (instr.op == OpCode::InvokeBuiltin && std::holds_alternative<std::string>(instr.operand) &&
-            std::get<std::string>(instr.operand) == "SGN") {
+        if (isBasicCallFunc(instr, PickCore::Languages::Basic::kFnSgn, 1)) {
             found = true;
             break;
         }
@@ -804,8 +814,7 @@ TEST_CASE("basic compiler compiles SEQ function") {
     REQUIRE(result.success);
     bool found = false;
     for (const auto &instr : result.program) {
-        if (instr.op == OpCode::InvokeBuiltin && std::holds_alternative<std::string>(instr.operand) &&
-            std::get<std::string>(instr.operand) == "SEQ") {
+        if (isBasicCallFunc(instr, PickCore::Languages::Basic::kFnSeq, 1)) {
             found = true;
             break;
         }
@@ -823,8 +832,7 @@ TEST_CASE("basic compiler compiles MOD function") {
     REQUIRE(result.success);
     bool found = false;
     for (const auto &instr : result.program) {
-        if (instr.op == OpCode::InvokeBuiltin && std::holds_alternative<std::string>(instr.operand) &&
-            std::get<std::string>(instr.operand) == "MOD") {
+        if (isBasicCallFunc(instr, PickCore::Languages::Basic::kFnMod, 2)) {
             found = true;
             break;
         }
@@ -842,8 +850,7 @@ TEST_CASE("basic compiler compiles DATE function") {
     REQUIRE(result.success);
     bool found = false;
     for (const auto &instr : result.program) {
-        if (instr.op == OpCode::InvokeBuiltin && std::holds_alternative<std::string>(instr.operand) &&
-            std::get<std::string>(instr.operand) == "DATE") {
+        if (isBasicCallFunc(instr, PickCore::Languages::Basic::kFnDate, 0)) {
             found = true;
             break;
         }
@@ -861,8 +868,7 @@ TEST_CASE("basic compiler compiles LEN function") {
     REQUIRE(result.success);
     bool found = false;
     for (const auto &instr : result.program) {
-        if (instr.op == OpCode::InvokeBuiltin && std::holds_alternative<std::string>(instr.operand) &&
-            std::get<std::string>(instr.operand) == "LEN") {
+        if (isBasicCallFunc(instr, PickCore::Languages::Basic::kFnLen, 1)) {
             found = true;
             break;
         }
@@ -884,17 +890,13 @@ TEST_CASE("basic compiler compiles INDEX FIELD and STR functions") {
     bool foundField = false;
     bool foundStr = false;
     for (const auto &instr : result.program) {
-        if (instr.op != OpCode::InvokeBuiltin || !std::holds_alternative<std::string>(instr.operand)) {
-            continue;
-        }
-        const std::string &name = std::get<std::string>(instr.operand);
-        if (name == "INDEX") {
+        if (isBasicCallFunc(instr, PickCore::Languages::Basic::kFnIndex, 3)) {
             foundIndex = true;
         }
-        if (name == "FIELD") {
+        if (isBasicCallFunc(instr, PickCore::Languages::Basic::kFnField, 3)) {
             foundField = true;
         }
-        if (name == "STR") {
+        if (isBasicCallFunc(instr, PickCore::Languages::Basic::kFnStr, 1)) {
             foundStr = true;
         }
     }
@@ -920,15 +922,21 @@ TEST_CASE("basic compiler compiles OCONV ICONV NUM CONVERT functions") {
     bool foundConvert = false;
     bool foundDate = false;
     for (const auto &instr : result.program) {
-        if (instr.op != OpCode::InvokeBuiltin || !std::holds_alternative<std::string>(instr.operand)) {
-            continue;
+        if (isBasicCallFunc(instr, PickCore::Languages::Basic::kFnOconv, 2)) {
+            foundOconv = true;
         }
-        const std::string &name = std::get<std::string>(instr.operand);
-        if (name == "OCONV") foundOconv = true;
-        if (name == "ICONV") foundIconv = true;
-        if (name == "NUM") foundNum = true;
-        if (name == "CONVERT") foundConvert = true;
-        if (name == "DATE") foundDate = true;
+        if (isBasicCallFunc(instr, PickCore::Languages::Basic::kFnIconv, 2)) {
+            foundIconv = true;
+        }
+        if (isBasicCallFunc(instr, PickCore::Languages::Basic::kFnNum, 1)) {
+            foundNum = true;
+        }
+        if (isBasicCallFunc(instr, PickCore::Languages::Basic::kFnConvert, 3)) {
+            foundConvert = true;
+        }
+        if (isBasicCallFunc(instr, PickCore::Languages::Basic::kFnDate, 0)) {
+            foundDate = true;
+        }
     }
     CHECK(foundOconv);
     CHECK(foundIconv);
@@ -1029,8 +1037,7 @@ TEST_CASE("basic compiler compiles READU WRITEU RELEASE ON ERROR and STATUS") {
         if (ins.op == OpCode::WriteRecU) hasWriteU = true;
         if (ins.op == OpCode::ReleaseRec) hasRelease = true;
         if (ins.op == OpCode::SetOnErrorHandler) hasOnError = true;
-        if (ins.op == OpCode::InvokeBuiltin && std::holds_alternative<std::string>(ins.operand) &&
-            std::get<std::string>(ins.operand) == "STATUS") {
+        if (isBasicCallFunc(ins, PickCore::Languages::Basic::kFnStatus, 0)) {
             hasStatus = true;
         }
     }

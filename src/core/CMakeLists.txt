@@ -75,6 +75,16 @@ add_library(gemini-core
         languages/LanguageModuleAbi.h
         languages/LanguageModuleLoader.cpp
         languages/LanguageModuleLoader.h
+        languages/basic/BasicLanguageIds.h
+        languages/basic/BasicBuiltinSupport.cpp
+        languages/basic/BasicBuiltinSupport.h
+        languages/basic/BasicBuiltinHandlers.cpp
+        languages/basic/BasicBuiltinHandlers.h
+        languages/basic/BasicLanguageRegistration.cpp
+        languages/basic/BasicLanguageRegistration.h
+        languages/basic/BasicBuiltinShim.cpp
+        languages/basic/BasicBuiltinShim.h
+        languages/basic/BasicBuiltinLookup.h
 )
 
 target_include_directories(
@@ -93,6 +103,7 @@ target_include_directories(
         "${CMAKE_CURRENT_SOURCE_DIR}/conversion"
         "${CMAKE_CURRENT_SOURCE_DIR}/locking"
         "${CMAKE_CURRENT_SOURCE_DIR}/languages"
+        "${CMAKE_CURRENT_SOURCE_DIR}/languages/basic"
 )
 
 target_link_libraries(gemini-core PUBLIC nlohmann_json::nlohmann_json)

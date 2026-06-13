@@ -10,6 +10,7 @@
 #include <filesystem>
 
 #include "Runtime.h"
+#include "BasicLanguageTestFixture.h"
 #include "FileSystem.h"
 #include "LockTable.h"
 
@@ -734,16 +735,16 @@ TEST_CASE("runtime PrintVal output matches STR builtin string for int") {
     rtPrint.loadProgram(progPrint);
     rtPrint.run();
 
-    Runtime rtStr;
+    BasicRuntimeFixture fixture;
     std::vector<Instruction> progStr = {
         {OpCode::PushInt, 42},
         {OpCode::InvokeBuiltin, std::string{"STR"}},
         {OpCode::Halt, Value{}},
     };
-    rtStr.loadProgram(progStr);
-    rtStr.run();
-    REQUIRE(rtStr.stack().size() == 1);
-    CHECK(fromPrint.str() == std::get<std::string>(rtStr.stack()[0]));
+    fixture.rt.loadProgram(progStr);
+    fixture.rt.run();
+    REQUIRE(fixture.rt.stack().size() == 1);
+    CHECK(fromPrint.str() == std::get<std::string>(fixture.rt.stack()[0]));
     CHECK(fromPrint.str() == "42");
 }
 
@@ -1410,79 +1411,79 @@ TEST_CASE("runtime SeqStr stringifies integer operand") {
 }
 
 TEST_CASE("runtime InvokeBuiltin ABS matches AbsInt") {
-    Runtime rt;
+    BasicRuntimeFixture fixture;
     std::vector<Instruction> prog = {
         {OpCode::PushInt, -7},
         {OpCode::InvokeBuiltin, std::string{"ABS"}},
         {OpCode::Halt, Value{}},
     };
-    rt.loadProgram(prog);
-    rt.run();
-    REQUIRE(rt.stack().size() == 1);
-    CHECK(std::get<int>(rt.stack()[0]) == 7);
+    fixture.rt.loadProgram(prog);
+    fixture.rt.run();
+    REQUIRE(fixture.rt.stack().size() == 1);
+    CHECK(std::get<int>(fixture.rt.stack()[0]) == 7);
 }
 
 TEST_CASE("runtime InvokeBuiltin LEN returns byte length") {
-    Runtime rt;
+    BasicRuntimeFixture fixture;
     std::vector<Instruction> prog = {
         {OpCode::PushStr, std::string{"abc"}},
         {OpCode::InvokeBuiltin, std::string{"LEN"}},
         {OpCode::Halt, Value{}},
     };
-    rt.loadProgram(prog);
-    rt.run();
-    REQUIRE(rt.stack().size() == 1);
-    CHECK(std::get<int>(rt.stack()[0]) == 3);
+    fixture.rt.loadProgram(prog);
+    fixture.rt.run();
+    REQUIRE(fixture.rt.stack().size() == 1);
+    CHECK(std::get<int>(fixture.rt.stack()[0]) == 3);
 }
 
 TEST_CASE("runtime InvokeBuiltin TRIM strips whitespace") {
-    Runtime rt;
+    BasicRuntimeFixture fixture;
     std::vector<Instruction> prog = {
         {OpCode::PushStr, std::string{"  hi  "}},
         {OpCode::InvokeBuiltin, std::string{"TRIM"}},
         {OpCode::Halt, Value{}},
     };
-    rt.loadProgram(prog);
-    rt.run();
-    REQUIRE(rt.stack().size() == 1);
-    CHECK(std::get<std::string>(rt.stack()[0]) == "hi");
+    fixture.rt.loadProgram(prog);
+    fixture.rt.run();
+    REQUIRE(fixture.rt.stack().size() == 1);
+    CHECK(std::get<std::string>(fixture.rt.stack()[0]) == "hi");
 }
 
 TEST_CASE("runtime InvokeBuiltin SPACE with negative count yields empty string") {
-    Runtime rt;
+    BasicRuntimeFixture fixture;
     std::vector<Instruction> prog = {
         {OpCode::PushInt, -3},
         {OpCode::InvokeBuiltin, std::string{"SPACE"}},
         {OpCode::Halt, Value{}},
     };
-    rt.loadProgram(prog);
-    rt.run();
-    REQUIRE(rt.stack().size() == 1);
-    CHECK(std::get<std::string>(rt.stack()[0]).empty());
+    fixture.rt.loadProgram(prog);
+    fixture.rt.run();
+    REQUIRE(fixture.rt.stack().size() == 1);
+    CHECK(std::get<std::string>(fixture.rt.stack()[0]).empty());
 }
 
 TEST_CASE("runtime InvokeBuiltin SPACE rejects count above limit") {
-    Runtime rt;
+    BasicRuntimeFixture fixture;
     std::vector<Instruction> prog = {
         {OpCode::PushInt, 65537},
         {OpCode::InvokeBuiltin, std::string{"SPACE"}},
         {OpCode::Halt, Value{}},
     };
-    rt.loadProgram(prog);
-    CHECK_THROWS_AS(rt.run(), std::runtime_error);
+    fixture.rt.loadProgram(prog);
+    CHECK_THROWS_AS(fixture.rt.run(), std::runtime_error);
 }
 
 TEST_CASE("runtime InvokeBuiltin unknown name throws with BUILTIN prefix") {
-    Runtime rt;
+    BasicRuntimeFixture fixture;
     std::vector<Instruction> prog = {
         {OpCode::PushInt, 1},
         {OpCode::InvokeBuiltin, std::string{"NOT_A_BUILTIN"}},
         {OpCode::Halt, Value{}},
     };
-    rt.loadProgram(prog);
+    fixture.rt.loadProgram(prog);
     bool threw = false;
     try {
-        rt.run();
+        fixture.rt.run();
     } catch (const std::runtime_error &e) {
         threw = true;
         CHECK(std::string(e.what()).find("BUILTIN:") != std::string::npos);
@@ -1491,123 +1492,123 @@ TEST_CASE("runtime InvokeBuiltin unknown name throws with BUILTIN prefix") {
 }
 
 TEST_CASE("runtime InvokeBuiltin INT truncates toward zero") {
-    Runtime rt;
+    BasicRuntimeFixture fixture;
     std::vector<Instruction> prog = {
         {OpCode::PushFlt, -2.7},
         {OpCode::InvokeBuiltin, std::string{"INT"}},
         {OpCode::Halt, Value{}},
     };
-    rt.loadProgram(prog);
-    rt.run();
-    REQUIRE(rt.stack().size() == 1);
-    CHECK(std::get<int>(rt.stack()[0]) == -2);
+    fixture.rt.loadProgram(prog);
+    fixture.rt.run();
+    REQUIRE(fixture.rt.stack().size() == 1);
+    CHECK(std::get<int>(fixture.rt.stack()[0]) == -2);
 }
 
 TEST_CASE("runtime InvokeBuiltin MOD uses fmod-style remainder") {
-    Runtime rt;
+    BasicRuntimeFixture fixture;
     std::vector<Instruction> prog = {
         {OpCode::PushInt, 7},
         {OpCode::PushInt, 3},
         {OpCode::InvokeBuiltin, std::string{"MOD"}},
         {OpCode::Halt, Value{}},
     };
-    rt.loadProgram(prog);
-    rt.run();
-    REQUIRE(rt.stack().size() == 1);
-    CHECK(std::abs(std::get<double>(rt.stack()[0]) - 1.0) < 1e-9);
+    fixture.rt.loadProgram(prog);
+    fixture.rt.run();
+    REQUIRE(fixture.rt.stack().size() == 1);
+    CHECK(std::abs(std::get<double>(fixture.rt.stack()[0]) - 1.0) < 1e-9);
 }
 
 TEST_CASE("runtime InvokeBuiltin MOD division by zero throws") {
-    Runtime rt;
+    BasicRuntimeFixture fixture;
     std::vector<Instruction> prog = {
         {OpCode::PushInt, 1},
         {OpCode::PushInt, 0},
         {OpCode::InvokeBuiltin, std::string{"MOD"}},
         {OpCode::Halt, Value{}},
     };
-    rt.loadProgram(prog);
-    CHECK_THROWS_AS(rt.run(), std::runtime_error);
+    fixture.rt.loadProgram(prog);
+    CHECK_THROWS_AS(fixture.rt.run(), std::runtime_error);
 }
 
 TEST_CASE("runtime InvokeBuiltin LOG rejects non positive") {
-    Runtime rt;
+    BasicRuntimeFixture fixture;
     std::vector<Instruction> prog = {
         {OpCode::PushInt, 0},
         {OpCode::InvokeBuiltin, std::string{"LOG"}},
         {OpCode::Halt, Value{}},
     };
-    rt.loadProgram(prog);
-    CHECK_THROWS_AS(rt.run(), std::runtime_error);
+    fixture.rt.loadProgram(prog);
+    CHECK_THROWS_AS(fixture.rt.run(), std::runtime_error);
 }
 
 TEST_CASE("runtime InvokeBuiltin RND with no arguments returns double in zero one") {
-    Runtime rt;
+    BasicRuntimeFixture fixture;
     std::vector<Instruction> prog = {
         {OpCode::InvokeBuiltin, std::string{"RND"}},
         {OpCode::Halt, Value{}},
     };
-    rt.loadProgram(prog);
-    rt.run();
-    REQUIRE(rt.stack().size() == 1);
-    const double x = std::get<double>(rt.stack()[0]);
+    fixture.rt.loadProgram(prog);
+    fixture.rt.run();
+    REQUIRE(fixture.rt.stack().size() == 1);
+    const double x = std::get<double>(fixture.rt.stack()[0]);
     CHECK(x >= 0.0);
     CHECK(x < 1.0);
 }
 
 TEST_CASE("runtime InvokeBuiltin SIN of pi over two is one radians") {
-    Runtime rt;
+    BasicRuntimeFixture fixture;
     std::vector<Instruction> prog = {
         {OpCode::PushFlt, 1.5707963267948966},
         {OpCode::InvokeBuiltin, std::string{"SIN"}},
         {OpCode::Halt, Value{}},
     };
-    rt.loadProgram(prog);
-    rt.run();
-    REQUIRE(rt.stack().size() == 1);
-    CHECK(std::abs(std::get<double>(rt.stack()[0]) - 1.0) < 1e-6);
+    fixture.rt.loadProgram(prog);
+    fixture.rt.run();
+    REQUIRE(fixture.rt.stack().size() == 1);
+    CHECK(std::abs(std::get<double>(fixture.rt.stack()[0]) - 1.0) < 1e-6);
 }
 
 TEST_CASE("runtime InvokeBuiltin DATE returns int not less than pick epoch day") {
-    Runtime rt;
+    BasicRuntimeFixture fixture;
     std::vector<Instruction> prog = {
         {OpCode::InvokeBuiltin, std::string{"DATE"}},
         {OpCode::Halt, Value{}},
     };
-    rt.loadProgram(prog);
-    rt.run();
-    REQUIRE(rt.stack().size() == 1);
-    CHECK(std::get<int>(rt.stack()[0]) >= 732);
+    fixture.rt.loadProgram(prog);
+    fixture.rt.run();
+    REQUIRE(fixture.rt.stack().size() == 1);
+    CHECK(std::get<int>(fixture.rt.stack()[0]) >= 732);
 }
 
 TEST_CASE("runtime InvokeBuiltin TIME returns eight character HH colon MM colon SS") {
-    Runtime rt;
+    BasicRuntimeFixture fixture;
     std::vector<Instruction> prog = {
         {OpCode::InvokeBuiltin, std::string{"TIME"}},
         {OpCode::Halt, Value{}},
     };
-    rt.loadProgram(prog);
-    rt.run();
-    REQUIRE(rt.stack().size() == 1);
-    const std::string t = std::get<std::string>(rt.stack()[0]);
+    fixture.rt.loadProgram(prog);
+    fixture.rt.run();
+    REQUIRE(fixture.rt.stack().size() == 1);
+    const std::string t = std::get<std::string>(fixture.rt.stack()[0]);
     CHECK(t.size() == 8);
     CHECK(t[2] == ':');
     CHECK(t[5] == ':');
 }
 
 TEST_CASE("runtime InvokeBuiltin SYSTEM throws when handler not set") {
-    Runtime rt;
+    BasicRuntimeFixture fixture;
     std::vector<Instruction> prog = {
         {OpCode::PushInt, 1},
         {OpCode::InvokeBuiltin, std::string{"SYSTEM"}},
         {OpCode::Halt, Value{}},
     };
-    rt.loadProgram(prog);
-    CHECK_THROWS_AS(rt.run(), std::runtime_error);
+    fixture.rt.loadProgram(prog);
+    CHECK_THROWS_AS(fixture.rt.run(), std::runtime_error);
 }
 
 TEST_CASE("runtime InvokeBuiltin SYSTEM uses handler when set") {
-    Runtime rt;
-    rt.setBuiltinSystemCallHandler([](const int n) -> Value {
+    BasicRuntimeFixture fixture;
+    fixture.rt.setBuiltinSystemCallHandler([](const int n) -> Value {
         if (n == 42) {
             return 99;
         }
@@ -1618,14 +1619,14 @@ TEST_CASE("runtime InvokeBuiltin SYSTEM uses handler when set") {
         {OpCode::InvokeBuiltin, std::string{"SYSTEM"}},
         {OpCode::Halt, Value{}},
     };
-    rt.loadProgram(prog);
-    rt.run();
-    REQUIRE(rt.stack().size() == 1);
-    CHECK(std::get<int>(rt.stack()[0]) == 99);
+    fixture.rt.loadProgram(prog);
+    fixture.rt.run();
+    REQUIRE(fixture.rt.stack().size() == 1);
+    CHECK(std::get<int>(fixture.rt.stack()[0]) == 99);
 }
 
 TEST_CASE("runtime InvokeBuiltin INDEX first occurrence 1 based") {
-    Runtime rt;
+    BasicRuntimeFixture fixture;
     std::vector<Instruction> prog = {
         {OpCode::PushStr, std::string{"abcabc"}},
         {OpCode::PushStr, std::string{"abc"}},
@@ -1633,14 +1634,14 @@ TEST_CASE("runtime InvokeBuiltin INDEX first occurrence 1 based") {
         {OpCode::InvokeBuiltin, std::string{"INDEX"}},
         {OpCode::Halt, Value{}},
     };
-    rt.loadProgram(prog);
-    rt.run();
-    REQUIRE(rt.stack().size() == 1);
-    CHECK(std::get<int>(rt.stack()[0]) == 1);
+    fixture.rt.loadProgram(prog);
+    fixture.rt.run();
+    REQUIRE(fixture.rt.stack().size() == 1);
+    CHECK(std::get<int>(fixture.rt.stack()[0]) == 1);
 }
 
 TEST_CASE("runtime InvokeBuiltin INDEX second occurrence overlapping") {
-    Runtime rt;
+    BasicRuntimeFixture fixture;
     std::vector<Instruction> prog = {
         {OpCode::PushStr, std::string{"abcabc"}},
         {OpCode::PushStr, std::string{"abc"}},
@@ -1648,14 +1649,14 @@ TEST_CASE("runtime InvokeBuiltin INDEX second occurrence overlapping") {
         {OpCode::InvokeBuiltin, std::string{"INDEX"}},
         {OpCode::Halt, Value{}},
     };
-    rt.loadProgram(prog);
-    rt.run();
-    REQUIRE(rt.stack().size() == 1);
-    CHECK(std::get<int>(rt.stack()[0]) == 4);
+    fixture.rt.loadProgram(prog);
+    fixture.rt.run();
+    REQUIRE(fixture.rt.stack().size() == 1);
+    CHECK(std::get<int>(fixture.rt.stack()[0]) == 4);
 }
 
 TEST_CASE("runtime InvokeBuiltin INDEX returns zero when not found") {
-    Runtime rt;
+    BasicRuntimeFixture fixture;
     std::vector<Instruction> prog = {
         {OpCode::PushStr, std::string{"abc"}},
         {OpCode::PushStr, std::string{"z"}},
@@ -1663,14 +1664,14 @@ TEST_CASE("runtime InvokeBuiltin INDEX returns zero when not found") {
         {OpCode::InvokeBuiltin, std::string{"INDEX"}},
         {OpCode::Halt, Value{}},
     };
-    rt.loadProgram(prog);
-    rt.run();
-    REQUIRE(rt.stack().size() == 1);
-    CHECK(std::get<int>(rt.stack()[0]) == 0);
+    fixture.rt.loadProgram(prog);
+    fixture.rt.run();
+    REQUIRE(fixture.rt.stack().size() == 1);
+    CHECK(std::get<int>(fixture.rt.stack()[0]) == 0);
 }
 
 TEST_CASE("runtime InvokeBuiltin INDEX rejects empty substring") {
-    Runtime rt;
+    BasicRuntimeFixture fixture;
     std::vector<Instruction> prog = {
         {OpCode::PushStr, std::string{"abc"}},
         {OpCode::PushStr, std::string{""}},
@@ -1678,9 +1679,9 @@ TEST_CASE("runtime InvokeBuiltin INDEX rejects empty substring") {
         {OpCode::InvokeBuiltin, std::string{"INDEX"}},
         {OpCode::Halt, Value{}},
     };
-    rt.loadProgram(prog);
+    fixture.rt.loadProgram(prog);
     try {
-        rt.run();
+        fixture.rt.run();
         FAIL("expected throw");
     } catch (const std::runtime_error &e) {
         CHECK(std::string(e.what()).find("BUILTIN: INDEX empty substring") != std::string::npos);
@@ -1688,7 +1689,7 @@ TEST_CASE("runtime InvokeBuiltin INDEX rejects empty substring") {
 }
 
 TEST_CASE("runtime InvokeBuiltin INDEX rejects occurrence less than one") {
-    Runtime rt;
+    BasicRuntimeFixture fixture;
     std::vector<Instruction> prog = {
         {OpCode::PushStr, std::string{"abc"}},
         {OpCode::PushStr, std::string{"a"}},
@@ -1696,9 +1697,9 @@ TEST_CASE("runtime InvokeBuiltin INDEX rejects occurrence less than one") {
         {OpCode::InvokeBuiltin, std::string{"INDEX"}},
         {OpCode::Halt, Value{}},
     };
-    rt.loadProgram(prog);
+    fixture.rt.loadProgram(prog);
     try {
-        rt.run();
+        fixture.rt.run();
         FAIL("expected throw");
     } catch (const std::runtime_error &e) {
         CHECK(std::string(e.what()).find("BUILTIN: INDEX occurrence") != std::string::npos);
@@ -1706,7 +1707,7 @@ TEST_CASE("runtime InvokeBuiltin INDEX rejects occurrence less than one") {
 }
 
 TEST_CASE("runtime InvokeBuiltin FIELD extracts delimited fields") {
-    Runtime rt;
+    BasicRuntimeFixture fixture;
     std::vector<Instruction> prog = {
         {OpCode::PushStr, std::string{"a,b,c"}},
         {OpCode::PushStr, std::string{","}},
@@ -1714,14 +1715,14 @@ TEST_CASE("runtime InvokeBuiltin FIELD extracts delimited fields") {
         {OpCode::InvokeBuiltin, std::string{"FIELD"}},
         {OpCode::Halt, Value{}},
     };
-    rt.loadProgram(prog);
-    rt.run();
-    REQUIRE(rt.stack().size() == 1);
-    CHECK(std::get<std::string>(rt.stack()[0]) == "b");
+    fixture.rt.loadProgram(prog);
+    fixture.rt.run();
+    REQUIRE(fixture.rt.stack().size() == 1);
+    CHECK(std::get<std::string>(fixture.rt.stack()[0]) == "b");
 }
 
 TEST_CASE("runtime InvokeBuiltin FIELD returns empty past end") {
-    Runtime rt;
+    BasicRuntimeFixture fixture;
     std::vector<Instruction> prog = {
         {OpCode::PushStr, std::string{"a,b"}},
         {OpCode::PushStr, std::string{","}},
@@ -1729,14 +1730,14 @@ TEST_CASE("runtime InvokeBuiltin FIELD returns empty past end") {
         {OpCode::InvokeBuiltin, std::string{"FIELD"}},
         {OpCode::Halt, Value{}},
     };
-    rt.loadProgram(prog);
-    rt.run();
-    REQUIRE(rt.stack().size() == 1);
-    CHECK(std::get<std::string>(rt.stack()[0]).empty());
+    fixture.rt.loadProgram(prog);
+    fixture.rt.run();
+    REQUIRE(fixture.rt.stack().size() == 1);
+    CHECK(std::get<std::string>(fixture.rt.stack()[0]).empty());
 }
 
 TEST_CASE("runtime InvokeBuiltin FIELD rejects empty delimiter") {
-    Runtime rt;
+    BasicRuntimeFixture fixture;
     std::vector<Instruction> prog = {
         {OpCode::PushStr, std::string{"ab"}},
         {OpCode::PushStr, std::string{""}},
@@ -1744,9 +1745,9 @@ TEST_CASE("runtime InvokeBuiltin FIELD rejects empty delimiter") {
         {OpCode::InvokeBuiltin, std::string{"FIELD"}},
         {OpCode::Halt, Value{}},
     };
-    rt.loadProgram(prog);
+    fixture.rt.loadProgram(prog);
     try {
-        rt.run();
+        fixture.rt.run();
         FAIL("expected throw");
     } catch (const std::runtime_error &e) {
         CHECK(std::string(e.what()).find("BUILTIN: FIELD empty delimiter") != std::string::npos);
@@ -1754,7 +1755,7 @@ TEST_CASE("runtime InvokeBuiltin FIELD rejects empty delimiter") {
 }
 
 TEST_CASE("runtime InvokeBuiltin FIELD rejects field index less than one") {
-    Runtime rt;
+    BasicRuntimeFixture fixture;
     std::vector<Instruction> prog = {
         {OpCode::PushStr, std::string{"a,b"}},
         {OpCode::PushStr, std::string{","}},
@@ -1762,9 +1763,9 @@ TEST_CASE("runtime InvokeBuiltin FIELD rejects field index less than one") {
         {OpCode::InvokeBuiltin, std::string{"FIELD"}},
         {OpCode::Halt, Value{}},
     };
-    rt.loadProgram(prog);
+    fixture.rt.loadProgram(prog);
     try {
-        rt.run();
+        fixture.rt.run();
         FAIL("expected throw");
     } catch (const std::runtime_error &e) {
         CHECK(std::string(e.what()).find("BUILTIN: FIELD field index") != std::string::npos);
@@ -1772,16 +1773,16 @@ TEST_CASE("runtime InvokeBuiltin FIELD rejects field index less than one") {
 }
 
 TEST_CASE("runtime InvokeBuiltin STR stringifies int") {
-    Runtime rt;
+    BasicRuntimeFixture fixture;
     std::vector<Instruction> prog = {
         {OpCode::PushInt, 42},
         {OpCode::InvokeBuiltin, std::string{"STR"}},
         {OpCode::Halt, Value{}},
     };
-    rt.loadProgram(prog);
-    rt.run();
-    REQUIRE(rt.stack().size() == 1);
-    CHECK(std::get<std::string>(rt.stack()[0]) == "42");
+    fixture.rt.loadProgram(prog);
+    fixture.rt.run();
+    REQUIRE(fixture.rt.stack().size() == 1);
+    CHECK(std::get<std::string>(fixture.rt.stack()[0]) == "42");
 }
 
 TEST_CASE("runtime MatInit broadcasts scalar into every slot of a DIM'd array") {
@@ -2068,49 +2069,49 @@ TEST_CASE("runtime MAT WRITE + MAT READ round-trip through filesystem") {
 }
 
 TEST_CASE("runtime InvokeBuiltin OCONV D formats Pick day 732 as 01 Jan 1970") {
-    Runtime rt;
+    BasicRuntimeFixture fixture;
     std::vector<Instruction> prog = {
         {OpCode::PushInt, 732},
         {OpCode::PushStr, std::string{"D"}},
         {OpCode::InvokeBuiltin, std::string{"OCONV"}},
         {OpCode::Halt, Value{}},
     };
-    rt.loadProgram(prog);
-    rt.run();
-    REQUIRE(rt.stack().size() == 1);
-    CHECK(std::get<std::string>(rt.stack()[0]) == "01 Jan 1970");
+    fixture.rt.loadProgram(prog);
+    fixture.rt.run();
+    REQUIRE(fixture.rt.stack().size() == 1);
+    CHECK(std::get<std::string>(fixture.rt.stack()[0]) == "01 Jan 1970");
 }
 
 TEST_CASE("runtime InvokeBuiltin OCONV D formats Pick day 0 as 31 Dec 1967") {
-    Runtime rt;
+    BasicRuntimeFixture fixture;
     std::vector<Instruction> prog = {
         {OpCode::PushInt, 0},
         {OpCode::PushStr, std::string{"D"}},
         {OpCode::InvokeBuiltin, std::string{"OCONV"}},
         {OpCode::Halt, Value{}},
     };
-    rt.loadProgram(prog);
-    rt.run();
-    REQUIRE(rt.stack().size() == 1);
-    CHECK(std::get<std::string>(rt.stack()[0]) == "31 Dec 1967");
+    fixture.rt.loadProgram(prog);
+    fixture.rt.run();
+    REQUIRE(fixture.rt.stack().size() == 1);
+    CHECK(std::get<std::string>(fixture.rt.stack()[0]) == "31 Dec 1967");
 }
 
 TEST_CASE("runtime InvokeBuiltin ICONV D parses dd MMM yyyy back to Pick day") {
-    Runtime rt;
+    BasicRuntimeFixture fixture;
     std::vector<Instruction> prog = {
         {OpCode::PushStr, std::string{"01 Jan 1970"}},
         {OpCode::PushStr, std::string{"D"}},
         {OpCode::InvokeBuiltin, std::string{"ICONV"}},
         {OpCode::Halt, Value{}},
     };
-    rt.loadProgram(prog);
-    rt.run();
-    REQUIRE(rt.stack().size() == 1);
-    CHECK(std::get<int>(rt.stack()[0]) == 732);
+    fixture.rt.loadProgram(prog);
+    fixture.rt.run();
+    REQUIRE(fixture.rt.stack().size() == 1);
+    CHECK(std::get<int>(fixture.rt.stack()[0]) == 732);
 }
 
 TEST_CASE("runtime InvokeBuiltin ICONV D accepts case-insensitive month name") {
-    Runtime rt;
+    BasicRuntimeFixture fixture;
     std::vector<Instruction> prog = {
         {OpCode::PushStr, std::string{"26 may 2026"}},
         {OpCode::PushStr, std::string{"D"}},
@@ -2119,23 +2120,23 @@ TEST_CASE("runtime InvokeBuiltin ICONV D accepts case-insensitive month name") {
         {OpCode::InvokeBuiltin, std::string{"OCONV"}},
         {OpCode::Halt, Value{}},
     };
-    rt.loadProgram(prog);
-    rt.run();
-    REQUIRE(rt.stack().size() == 1);
-    CHECK(std::get<std::string>(rt.stack()[0]) == "26 May 2026");
+    fixture.rt.loadProgram(prog);
+    fixture.rt.run();
+    REQUIRE(fixture.rt.stack().size() == 1);
+    CHECK(std::get<std::string>(fixture.rt.stack()[0]) == "26 May 2026");
 }
 
 TEST_CASE("runtime InvokeBuiltin ICONV D rejects garbage with stable error substring") {
-    Runtime rt;
+    BasicRuntimeFixture fixture;
     std::vector<Instruction> prog = {
         {OpCode::PushStr, std::string{"not a date"}},
         {OpCode::PushStr, std::string{"D"}},
         {OpCode::InvokeBuiltin, std::string{"ICONV"}},
         {OpCode::Halt, Value{}},
     };
-    rt.loadProgram(prog);
+    fixture.rt.loadProgram(prog);
     try {
-        rt.run();
+        fixture.rt.run();
         FAIL("expected runtime_error");
     } catch (const std::runtime_error &e) {
         const std::string msg = e.what();
@@ -2144,72 +2145,72 @@ TEST_CASE("runtime InvokeBuiltin ICONV D rejects garbage with stable error subst
 }
 
 TEST_CASE("runtime InvokeBuiltin OCONV MT formats seconds since midnight as HH:MM") {
-    Runtime rt;
+    BasicRuntimeFixture fixture;
     std::vector<Instruction> prog = {
         {OpCode::PushInt, 3600},
         {OpCode::PushStr, std::string{"MT"}},
         {OpCode::InvokeBuiltin, std::string{"OCONV"}},
         {OpCode::Halt, Value{}},
     };
-    rt.loadProgram(prog);
-    rt.run();
-    REQUIRE(rt.stack().size() == 1);
-    CHECK(std::get<std::string>(rt.stack()[0]) == "01:00");
+    fixture.rt.loadProgram(prog);
+    fixture.rt.run();
+    REQUIRE(fixture.rt.stack().size() == 1);
+    CHECK(std::get<std::string>(fixture.rt.stack()[0]) == "01:00");
 }
 
 TEST_CASE("runtime InvokeBuiltin OCONV MTS formats seconds since midnight with seconds") {
-    Runtime rt;
+    BasicRuntimeFixture fixture;
     std::vector<Instruction> prog = {
         {OpCode::PushInt, 3661},
         {OpCode::PushStr, std::string{"MTS"}},
         {OpCode::InvokeBuiltin, std::string{"OCONV"}},
         {OpCode::Halt, Value{}},
     };
-    rt.loadProgram(prog);
-    rt.run();
-    REQUIRE(rt.stack().size() == 1);
-    CHECK(std::get<std::string>(rt.stack()[0]) == "01:01:01");
+    fixture.rt.loadProgram(prog);
+    fixture.rt.run();
+    REQUIRE(fixture.rt.stack().size() == 1);
+    CHECK(std::get<std::string>(fixture.rt.stack()[0]) == "01:01:01");
 }
 
 TEST_CASE("runtime InvokeBuiltin ICONV MT round-trips MT format") {
-    Runtime rt;
+    BasicRuntimeFixture fixture;
     std::vector<Instruction> prog = {
         {OpCode::PushStr, std::string{"09:30"}},
         {OpCode::PushStr, std::string{"MT"}},
         {OpCode::InvokeBuiltin, std::string{"ICONV"}},
         {OpCode::Halt, Value{}},
     };
-    rt.loadProgram(prog);
-    rt.run();
-    REQUIRE(rt.stack().size() == 1);
-    CHECK(std::get<int>(rt.stack()[0]) == 9 * 3600 + 30 * 60);
+    fixture.rt.loadProgram(prog);
+    fixture.rt.run();
+    REQUIRE(fixture.rt.stack().size() == 1);
+    CHECK(std::get<int>(fixture.rt.stack()[0]) == 9 * 3600 + 30 * 60);
 }
 
 TEST_CASE("runtime InvokeBuiltin ICONV MTS round-trips MTS format") {
-    Runtime rt;
+    BasicRuntimeFixture fixture;
     std::vector<Instruction> prog = {
         {OpCode::PushStr, std::string{"23:59:59"}},
         {OpCode::PushStr, std::string{"MTS"}},
         {OpCode::InvokeBuiltin, std::string{"ICONV"}},
         {OpCode::Halt, Value{}},
     };
-    rt.loadProgram(prog);
-    rt.run();
-    REQUIRE(rt.stack().size() == 1);
-    CHECK(std::get<int>(rt.stack()[0]) == 86399);
+    fixture.rt.loadProgram(prog);
+    fixture.rt.run();
+    REQUIRE(fixture.rt.stack().size() == 1);
+    CHECK(std::get<int>(fixture.rt.stack()[0]) == 86399);
 }
 
 TEST_CASE("runtime InvokeBuiltin ICONV MT rejects malformed time") {
-    Runtime rt;
+    BasicRuntimeFixture fixture;
     std::vector<Instruction> prog = {
         {OpCode::PushStr, std::string{"99:99"}},
         {OpCode::PushStr, std::string{"MT"}},
         {OpCode::InvokeBuiltin, std::string{"ICONV"}},
         {OpCode::Halt, Value{}},
     };
-    rt.loadProgram(prog);
+    fixture.rt.loadProgram(prog);
     try {
-        rt.run();
+        fixture.rt.run();
         FAIL("expected runtime_error");
     } catch (const std::runtime_error &e) {
         const std::string msg = e.what();
@@ -2218,128 +2219,128 @@ TEST_CASE("runtime InvokeBuiltin ICONV MT rejects malformed time") {
 }
 
 TEST_CASE("runtime InvokeBuiltin OCONV MCU uppercases the string") {
-    Runtime rt;
+    BasicRuntimeFixture fixture;
     std::vector<Instruction> prog = {
         {OpCode::PushStr, std::string{"hello"}},
         {OpCode::PushStr, std::string{"MCU"}},
         {OpCode::InvokeBuiltin, std::string{"OCONV"}},
         {OpCode::Halt, Value{}},
     };
-    rt.loadProgram(prog);
-    rt.run();
-    REQUIRE(rt.stack().size() == 1);
-    CHECK(std::get<std::string>(rt.stack()[0]) == "HELLO");
+    fixture.rt.loadProgram(prog);
+    fixture.rt.run();
+    REQUIRE(fixture.rt.stack().size() == 1);
+    CHECK(std::get<std::string>(fixture.rt.stack()[0]) == "HELLO");
 }
 
 TEST_CASE("runtime InvokeBuiltin OCONV MCL lowercases the string") {
-    Runtime rt;
+    BasicRuntimeFixture fixture;
     std::vector<Instruction> prog = {
         {OpCode::PushStr, std::string{"WORLD"}},
         {OpCode::PushStr, std::string{"MCL"}},
         {OpCode::InvokeBuiltin, std::string{"OCONV"}},
         {OpCode::Halt, Value{}},
     };
-    rt.loadProgram(prog);
-    rt.run();
-    REQUIRE(rt.stack().size() == 1);
-    CHECK(std::get<std::string>(rt.stack()[0]) == "world");
+    fixture.rt.loadProgram(prog);
+    fixture.rt.run();
+    REQUIRE(fixture.rt.stack().size() == 1);
+    CHECK(std::get<std::string>(fixture.rt.stack()[0]) == "world");
 }
 
 TEST_CASE("runtime InvokeBuiltin OCONV MD2 inserts implicit two decimal places") {
-    Runtime rt;
+    BasicRuntimeFixture fixture;
     std::vector<Instruction> prog = {
         {OpCode::PushInt, 1234},
         {OpCode::PushStr, std::string{"MD2"}},
         {OpCode::InvokeBuiltin, std::string{"OCONV"}},
         {OpCode::Halt, Value{}},
     };
-    rt.loadProgram(prog);
-    rt.run();
-    REQUIRE(rt.stack().size() == 1);
-    CHECK(std::get<std::string>(rt.stack()[0]) == "12.34");
+    fixture.rt.loadProgram(prog);
+    fixture.rt.run();
+    REQUIRE(fixture.rt.stack().size() == 1);
+    CHECK(std::get<std::string>(fixture.rt.stack()[0]) == "12.34");
 }
 
 TEST_CASE("runtime InvokeBuiltin OCONV MD2 keeps leading zeros for small negative") {
-    Runtime rt;
+    BasicRuntimeFixture fixture;
     std::vector<Instruction> prog = {
         {OpCode::PushInt, -5},
         {OpCode::PushStr, std::string{"MD2"}},
         {OpCode::InvokeBuiltin, std::string{"OCONV"}},
         {OpCode::Halt, Value{}},
     };
-    rt.loadProgram(prog);
-    rt.run();
-    REQUIRE(rt.stack().size() == 1);
-    CHECK(std::get<std::string>(rt.stack()[0]) == "-0.05");
+    fixture.rt.loadProgram(prog);
+    fixture.rt.run();
+    REQUIRE(fixture.rt.stack().size() == 1);
+    CHECK(std::get<std::string>(fixture.rt.stack()[0]) == "-0.05");
 }
 
 TEST_CASE("runtime InvokeBuiltin OCONV MD prints integer without decimal") {
-    Runtime rt;
+    BasicRuntimeFixture fixture;
     std::vector<Instruction> prog = {
         {OpCode::PushInt, 7},
         {OpCode::PushStr, std::string{"MD"}},
         {OpCode::InvokeBuiltin, std::string{"OCONV"}},
         {OpCode::Halt, Value{}},
     };
-    rt.loadProgram(prog);
-    rt.run();
-    REQUIRE(rt.stack().size() == 1);
-    CHECK(std::get<std::string>(rt.stack()[0]) == "7");
+    fixture.rt.loadProgram(prog);
+    fixture.rt.run();
+    REQUIRE(fixture.rt.stack().size() == 1);
+    CHECK(std::get<std::string>(fixture.rt.stack()[0]) == "7");
 }
 
 TEST_CASE("runtime InvokeBuiltin ICONV MD2 scales decimal back to integer") {
-    Runtime rt;
+    BasicRuntimeFixture fixture;
     std::vector<Instruction> prog = {
         {OpCode::PushStr, std::string{"12.34"}},
         {OpCode::PushStr, std::string{"MD2"}},
         {OpCode::InvokeBuiltin, std::string{"ICONV"}},
         {OpCode::Halt, Value{}},
     };
-    rt.loadProgram(prog);
-    rt.run();
-    REQUIRE(rt.stack().size() == 1);
-    CHECK(std::get<int>(rt.stack()[0]) == 1234);
+    fixture.rt.loadProgram(prog);
+    fixture.rt.run();
+    REQUIRE(fixture.rt.stack().size() == 1);
+    CHECK(std::get<int>(fixture.rt.stack()[0]) == 1234);
 }
 
 TEST_CASE("runtime InvokeBuiltin ICONV MD2 rounds half away from zero") {
-    Runtime rt;
+    BasicRuntimeFixture fixture;
     std::vector<Instruction> prog = {
         {OpCode::PushStr, std::string{"1.005"}},
         {OpCode::PushStr, std::string{"MD2"}},
         {OpCode::InvokeBuiltin, std::string{"ICONV"}},
         {OpCode::Halt, Value{}},
     };
-    rt.loadProgram(prog);
-    rt.run();
-    REQUIRE(rt.stack().size() == 1);
-    CHECK(std::get<int>(rt.stack()[0]) == 101);
+    fixture.rt.loadProgram(prog);
+    fixture.rt.run();
+    REQUIRE(fixture.rt.stack().size() == 1);
+    CHECK(std::get<int>(fixture.rt.stack()[0]) == 101);
 }
 
 TEST_CASE("runtime InvokeBuiltin ICONV MD parses plain integer") {
-    Runtime rt;
+    BasicRuntimeFixture fixture;
     std::vector<Instruction> prog = {
         {OpCode::PushStr, std::string{"12"}},
         {OpCode::PushStr, std::string{"MD"}},
         {OpCode::InvokeBuiltin, std::string{"ICONV"}},
         {OpCode::Halt, Value{}},
     };
-    rt.loadProgram(prog);
-    rt.run();
-    REQUIRE(rt.stack().size() == 1);
-    CHECK(std::get<int>(rt.stack()[0]) == 12);
+    fixture.rt.loadProgram(prog);
+    fixture.rt.run();
+    REQUIRE(fixture.rt.stack().size() == 1);
+    CHECK(std::get<int>(fixture.rt.stack()[0]) == 12);
 }
 
 TEST_CASE("runtime InvokeBuiltin ICONV MD2 rejects non numeric junk") {
-    Runtime rt;
+    BasicRuntimeFixture fixture;
     std::vector<Instruction> prog = {
         {OpCode::PushStr, std::string{"12abc"}},
         {OpCode::PushStr, std::string{"MD2"}},
         {OpCode::InvokeBuiltin, std::string{"ICONV"}},
         {OpCode::Halt, Value{}},
     };
-    rt.loadProgram(prog);
+    fixture.rt.loadProgram(prog);
     try {
-        rt.run();
+        fixture.rt.run();
         FAIL("expected runtime_error");
     } catch (const std::runtime_error &e) {
         const std::string msg = e.what();
@@ -2348,16 +2349,16 @@ TEST_CASE("runtime InvokeBuiltin ICONV MD2 rejects non numeric junk") {
 }
 
 TEST_CASE("runtime InvokeBuiltin OCONV rejects unknown code with stable substring") {
-    Runtime rt;
+    BasicRuntimeFixture fixture;
     std::vector<Instruction> prog = {
         {OpCode::PushInt, 0},
         {OpCode::PushStr, std::string{"D2"}},
         {OpCode::InvokeBuiltin, std::string{"OCONV"}},
         {OpCode::Halt, Value{}},
     };
-    rt.loadProgram(prog);
+    fixture.rt.loadProgram(prog);
     try {
-        rt.run();
+        fixture.rt.run();
         FAIL("expected runtime_error");
     } catch (const std::runtime_error &e) {
         const std::string msg = e.what();
@@ -2367,16 +2368,16 @@ TEST_CASE("runtime InvokeBuiltin OCONV rejects unknown code with stable substrin
 }
 
 TEST_CASE("runtime InvokeBuiltin ICONV rejects unknown code with stable substring") {
-    Runtime rt;
+    BasicRuntimeFixture fixture;
     std::vector<Instruction> prog = {
         {OpCode::PushStr, std::string{"x"}},
         {OpCode::PushStr, std::string{"WTF"}},
         {OpCode::InvokeBuiltin, std::string{"ICONV"}},
         {OpCode::Halt, Value{}},
     };
-    rt.loadProgram(prog);
+    fixture.rt.loadProgram(prog);
     try {
-        rt.run();
+        fixture.rt.run();
         FAIL("expected runtime_error");
     } catch (const std::runtime_error &e) {
         const std::string msg = e.what();
@@ -2386,72 +2387,72 @@ TEST_CASE("runtime InvokeBuiltin ICONV rejects unknown code with stable substrin
 }
 
 TEST_CASE("runtime InvokeBuiltin NUM returns 1 for fully numeric string") {
-    Runtime rt;
+    BasicRuntimeFixture fixture;
     std::vector<Instruction> prog = {
         {OpCode::PushStr, std::string{"123"}},
         {OpCode::InvokeBuiltin, std::string{"NUM"}},
         {OpCode::Halt, Value{}},
     };
-    rt.loadProgram(prog);
-    rt.run();
-    REQUIRE(rt.stack().size() == 1);
-    CHECK(std::get<int>(rt.stack()[0]) == 1);
+    fixture.rt.loadProgram(prog);
+    fixture.rt.run();
+    REQUIRE(fixture.rt.stack().size() == 1);
+    CHECK(std::get<int>(fixture.rt.stack()[0]) == 1);
 }
 
 TEST_CASE("runtime InvokeBuiltin NUM returns 0 for trailing junk") {
-    Runtime rt;
+    BasicRuntimeFixture fixture;
     std::vector<Instruction> prog = {
         {OpCode::PushStr, std::string{"12ABC"}},
         {OpCode::InvokeBuiltin, std::string{"NUM"}},
         {OpCode::Halt, Value{}},
     };
-    rt.loadProgram(prog);
-    rt.run();
-    REQUIRE(rt.stack().size() == 1);
-    CHECK(std::get<int>(rt.stack()[0]) == 0);
+    fixture.rt.loadProgram(prog);
+    fixture.rt.run();
+    REQUIRE(fixture.rt.stack().size() == 1);
+    CHECK(std::get<int>(fixture.rt.stack()[0]) == 0);
 }
 
 TEST_CASE("runtime InvokeBuiltin NUM returns 0 for empty string") {
-    Runtime rt;
+    BasicRuntimeFixture fixture;
     std::vector<Instruction> prog = {
         {OpCode::PushStr, std::string{}},
         {OpCode::InvokeBuiltin, std::string{"NUM"}},
         {OpCode::Halt, Value{}},
     };
-    rt.loadProgram(prog);
-    rt.run();
-    REQUIRE(rt.stack().size() == 1);
-    CHECK(std::get<int>(rt.stack()[0]) == 0);
+    fixture.rt.loadProgram(prog);
+    fixture.rt.run();
+    REQUIRE(fixture.rt.stack().size() == 1);
+    CHECK(std::get<int>(fixture.rt.stack()[0]) == 0);
 }
 
 TEST_CASE("runtime InvokeBuiltin NUM returns 1 for signed decimal") {
-    Runtime rt;
+    BasicRuntimeFixture fixture;
     std::vector<Instruction> prog = {
         {OpCode::PushStr, std::string{"-3.14"}},
         {OpCode::InvokeBuiltin, std::string{"NUM"}},
         {OpCode::Halt, Value{}},
     };
-    rt.loadProgram(prog);
-    rt.run();
-    REQUIRE(rt.stack().size() == 1);
-    CHECK(std::get<int>(rt.stack()[0]) == 1);
+    fixture.rt.loadProgram(prog);
+    fixture.rt.run();
+    REQUIRE(fixture.rt.stack().size() == 1);
+    CHECK(std::get<int>(fixture.rt.stack()[0]) == 1);
 }
 
 TEST_CASE("runtime InvokeBuiltin NUM returns 1 for int values") {
-    Runtime rt;
+    BasicRuntimeFixture fixture;
     std::vector<Instruction> prog = {
         {OpCode::PushInt, 42},
         {OpCode::InvokeBuiltin, std::string{"NUM"}},
         {OpCode::Halt, Value{}},
     };
-    rt.loadProgram(prog);
-    rt.run();
-    REQUIRE(rt.stack().size() == 1);
-    CHECK(std::get<int>(rt.stack()[0]) == 1);
+    fixture.rt.loadProgram(prog);
+    fixture.rt.run();
+    REQUIRE(fixture.rt.stack().size() == 1);
+    CHECK(std::get<int>(fixture.rt.stack()[0]) == 1);
 }
 
 TEST_CASE("runtime InvokeBuiltin CONVERT maps chars per position") {
-    Runtime rt;
+    BasicRuntimeFixture fixture;
     std::vector<Instruction> prog = {
         {OpCode::PushStr, std::string{"hello"}},
         {OpCode::PushStr, std::string{"el"}},
@@ -2459,14 +2460,14 @@ TEST_CASE("runtime InvokeBuiltin CONVERT maps chars per position") {
         {OpCode::InvokeBuiltin, std::string{"CONVERT"}},
         {OpCode::Halt, Value{}},
     };
-    rt.loadProgram(prog);
-    rt.run();
-    REQUIRE(rt.stack().size() == 1);
-    CHECK(std::get<std::string>(rt.stack()[0]) == "hippo");
+    fixture.rt.loadProgram(prog);
+    fixture.rt.run();
+    REQUIRE(fixture.rt.stack().size() == 1);
+    CHECK(std::get<std::string>(fixture.rt.stack()[0]) == "hippo");
 }
 
 TEST_CASE("runtime InvokeBuiltin CONVERT drops chars when to is shorter") {
-    Runtime rt;
+    BasicRuntimeFixture fixture;
     std::vector<Instruction> prog = {
         {OpCode::PushStr, std::string{"abc"}},
         {OpCode::PushStr, std::string{"b"}},
@@ -2474,14 +2475,14 @@ TEST_CASE("runtime InvokeBuiltin CONVERT drops chars when to is shorter") {
         {OpCode::InvokeBuiltin, std::string{"CONVERT"}},
         {OpCode::Halt, Value{}},
     };
-    rt.loadProgram(prog);
-    rt.run();
-    REQUIRE(rt.stack().size() == 1);
-    CHECK(std::get<std::string>(rt.stack()[0]) == "ac");
+    fixture.rt.loadProgram(prog);
+    fixture.rt.run();
+    REQUIRE(fixture.rt.stack().size() == 1);
+    CHECK(std::get<std::string>(fixture.rt.stack()[0]) == "ac");
 }
 
 TEST_CASE("runtime InvokeBuiltin CONVERT leaves input unchanged when from is empty") {
-    Runtime rt;
+    BasicRuntimeFixture fixture;
     std::vector<Instruction> prog = {
         {OpCode::PushStr, std::string{"abc"}},
         {OpCode::PushStr, std::string{}},
@@ -2489,10 +2490,10 @@ TEST_CASE("runtime InvokeBuiltin CONVERT leaves input unchanged when from is emp
         {OpCode::InvokeBuiltin, std::string{"CONVERT"}},
         {OpCode::Halt, Value{}},
     };
-    rt.loadProgram(prog);
-    rt.run();
-    REQUIRE(rt.stack().size() == 1);
-    CHECK(std::get<std::string>(rt.stack()[0]) == "abc");
+    fixture.rt.loadProgram(prog);
+    fixture.rt.run();
+    REQUIRE(fixture.rt.stack().size() == 1);
+    CHECK(std::get<std::string>(fixture.rt.stack()[0]) == "abc");
 }
 
 TEST_CASE("runtime OpenFile binds existing file handle") {
@@ -3154,8 +3155,8 @@ TEST_CASE("runtime ON ERROR GOTO routes ReadRecU lock conflict and STATUS return
     fsA.write("DATA", PickFS::Record("R1", "VAL"));
     REQUIRE(fsA.readU("DATA", "R1").has_value());
 
-    Runtime rt;
-    rt.setFileSystem(&fsB);
+    BasicRuntimeFixture fixture;
+    fixture.rt.setFileSystem(&fsB);
 
     std::vector<Instruction> prog = {
         {OpCode::SetOnErrorHandler, 6},
@@ -3167,11 +3168,11 @@ TEST_CASE("runtime ON ERROR GOTO routes ReadRecU lock conflict and STATUS return
         {OpCode::InvokeBuiltin, std::string{"STATUS"}},
         {OpCode::Halt, Value{}},
     };
-    rt.loadProgram(prog);
-    rt.run();
-    REQUIRE(rt.stack().size() == 1);
-    CHECK(std::get<int>(rt.stack()[0]) == PickVM::kStatusRecordLocked);
-    CHECK(rt.statusCode() == PickVM::kStatusRecordLocked);
+    fixture.rt.loadProgram(prog);
+    fixture.rt.run();
+    REQUIRE(fixture.rt.stack().size() == 1);
+    CHECK(std::get<int>(fixture.rt.stack()[0]) == PickVM::kStatusRecordLocked);
+    CHECK(fixture.rt.statusCode() == PickVM::kStatusRecordLocked);
     std::filesystem::remove_all(root, ec);
 }
 
@@ -3223,8 +3224,8 @@ TEST_CASE("runtime ReadRec lock conflict uses ON ERROR when lock context active"
     fsA.write("DATA", PickFS::Record("R1", "VAL"));
     REQUIRE(fsA.readU("DATA", "R1").has_value());
 
-    Runtime rt;
-    rt.setFileSystem(&fsB);
+    BasicRuntimeFixture fixture;
+    fixture.rt.setFileSystem(&fsB);
 
     std::vector<Instruction> prog = {
         {OpCode::SetOnErrorHandler, 6},
@@ -3236,9 +3237,9 @@ TEST_CASE("runtime ReadRec lock conflict uses ON ERROR when lock context active"
         {OpCode::InvokeBuiltin, std::string{"STATUS"}},
         {OpCode::Halt, Value{}},
     };
-    rt.loadProgram(prog);
-    rt.run();
-    REQUIRE(rt.stack().size() == 1);
-    CHECK(std::get<int>(rt.stack()[0]) == PickVM::kStatusRecordLocked);
+    fixture.rt.loadProgram(prog);
+    fixture.rt.run();
+    REQUIRE(fixture.rt.stack().size() == 1);
+    CHECK(std::get<int>(fixture.rt.stack()[0]) == PickVM::kStatusRecordLocked);
     std::filesystem::remove_all(root, ec);
 }

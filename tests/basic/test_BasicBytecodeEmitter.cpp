@@ -3,6 +3,7 @@
 #include "BasicBytecodeEmitter.h"
 #include "BasicNormalizedIr.h"
 #include "Runtime.h"
+#include "BasicLanguageIds.h"
 
 #include <optional>
 #include <string>
@@ -467,9 +468,17 @@ namespace {
         args.push_back(std::move(arg));
         return makeCall(name, std::move(args));
     }
+
+    bool isBasicCallFunc(const PickVM::Instruction &instr,
+                         const PickCore::Languages::FunctionId fnId,
+                         const int argCount) {
+        return instr.op == PickVM::OpCode::CallFunc && instr.callFunc.namespaceId ==
+                   PickCore::Languages::Basic::kNamespaceId &&
+               instr.callFunc.functionId == fnId && instr.callFunc.argCount == argCount;
+    }
 } // namespace
 
-TEST_CASE("basic bytecode emitter emits argument + InvokeBuiltin for ABS") {
+TEST_CASE("basic bytecode emitter emits CALL_FUNC for ABS") {
     BasicIr::NormalizedProgram program;
     BasicIr::PrintStmt stmt{};
     stmt.expression = makeCall("ABS", makeInt(-5));
@@ -479,8 +488,7 @@ TEST_CASE("basic bytecode emitter emits argument + InvokeBuiltin for ABS") {
     REQUIRE(emitted.success);
     bool found = false;
     for (const auto &instr : emitted.program) {
-        if (instr.op == OpCode::InvokeBuiltin && std::holds_alternative<std::string>(instr.operand) &&
-            std::get<std::string>(instr.operand) == "ABS") {
+        if (isBasicCallFunc(instr, PickCore::Languages::Basic::kFnAbs, 1)) {
             found = true;
             break;
         }
@@ -488,7 +496,7 @@ TEST_CASE("basic bytecode emitter emits argument + InvokeBuiltin for ABS") {
     CHECK(found);
 }
 
-TEST_CASE("basic bytecode emitter emits argument + InvokeBuiltin for SGN") {
+TEST_CASE("basic bytecode emitter emits argument + CALL_FUNC for SGN") {
     BasicIr::NormalizedProgram program;
     BasicIr::PrintStmt stmt{};
     stmt.expression = makeCall("SGN", makeInt(3));
@@ -499,14 +507,13 @@ TEST_CASE("basic bytecode emitter emits argument + InvokeBuiltin for SGN") {
     REQUIRE(emitted.program.size() == 5);
     CHECK(emitted.program[0].op == OpCode::PushInt);
     CHECK(std::get<int>(emitted.program[0].operand) == 3);
-    CHECK(emitted.program[1].op == OpCode::InvokeBuiltin);
-    CHECK(std::get<std::string>(emitted.program[1].operand) == "SGN");
+    CHECK(isBasicCallFunc(emitted.program[1], PickCore::Languages::Basic::kFnSgn, 1));
     CHECK(emitted.program[2].op == OpCode::PrintVal);
     CHECK(emitted.program[3].op == OpCode::PrintEol);
     CHECK(emitted.program[4].op == OpCode::Halt);
 }
 
-TEST_CASE("basic bytecode emitter emits argument + InvokeBuiltin for SEQ") {
+TEST_CASE("basic bytecode emitter emits argument + CALL_FUNC for SEQ") {
     BasicIr::NormalizedProgram program;
     BasicIr::PrintStmt stmt{};
     stmt.expression = makeCall("SEQ", makeStr("A"));
@@ -517,8 +524,7 @@ TEST_CASE("basic bytecode emitter emits argument + InvokeBuiltin for SEQ") {
     REQUIRE(emitted.program.size() == 5);
     CHECK(emitted.program[0].op == OpCode::PushStr);
     CHECK(std::get<std::string>(emitted.program[0].operand) == "A");
-    CHECK(emitted.program[1].op == OpCode::InvokeBuiltin);
-    CHECK(std::get<std::string>(emitted.program[1].operand) == "SEQ");
+    CHECK(isBasicCallFunc(emitted.program[1], PickCore::Languages::Basic::kFnSeq, 1));
     CHECK(emitted.program[2].op == OpCode::PrintVal);
     CHECK(emitted.program[3].op == OpCode::PrintEol);
     CHECK(emitted.program[4].op == OpCode::Halt);
@@ -544,11 +550,10 @@ TEST_CASE("basic bytecode emitter allows dollar variable in SEQ") {
     CHECK(emitted.success);
     REQUIRE(emitted.program.size() == 5);
     CHECK(emitted.program[0].op == OpCode::LoadVar);
-    CHECK(emitted.program[1].op == OpCode::InvokeBuiltin);
-    CHECK(std::get<std::string>(emitted.program[1].operand) == "SEQ");
+    CHECK(isBasicCallFunc(emitted.program[1], PickCore::Languages::Basic::kFnSeq, 1));
 }
 
-TEST_CASE("basic bytecode emitter emits InvokeBuiltin for MOD with two arguments") {
+TEST_CASE("basic bytecode emitter emits CALL_FUNC for MOD with two arguments") {
     BasicIr::NormalizedProgram program;
     BasicIr::PrintStmt stmt{};
     std::vector<std::unique_ptr<BasicAst::Expr>> args;
@@ -562,11 +567,10 @@ TEST_CASE("basic bytecode emitter emits InvokeBuiltin for MOD with two arguments
     REQUIRE(emitted.program.size() >= 3);
     CHECK(emitted.program[0].op == OpCode::PushInt);
     CHECK(emitted.program[1].op == OpCode::PushInt);
-    CHECK(emitted.program[2].op == OpCode::InvokeBuiltin);
-    CHECK(std::get<std::string>(emitted.program[2].operand) == "MOD");
+    CHECK(isBasicCallFunc(emitted.program[2], PickCore::Languages::Basic::kFnMod, 2));
 }
 
-TEST_CASE("basic bytecode emitter emits InvokeBuiltin for LEN") {
+TEST_CASE("basic bytecode emitter emits CALL_FUNC for LEN") {
     BasicIr::NormalizedProgram program;
     BasicIr::PrintStmt stmt{};
     stmt.expression = makeCall("LEN", makeStr("abc"));
@@ -576,8 +580,7 @@ TEST_CASE("basic bytecode emitter emits InvokeBuiltin for LEN") {
     REQUIRE(emitted.success);
     REQUIRE(emitted.program.size() >= 2);
     CHECK(emitted.program[0].op == OpCode::PushStr);
-    CHECK(emitted.program[1].op == OpCode::InvokeBuiltin);
-    CHECK(std::get<std::string>(emitted.program[1].operand) == "LEN");
+    CHECK(isBasicCallFunc(emitted.program[1], PickCore::Languages::Basic::kFnLen, 1));
 }
 
 TEST_CASE("basic bytecode emitter rejects ABS with zero arguments") {
@@ -624,8 +627,7 @@ TEST_CASE("basic bytecode emitter injects default occurrence for INDEX with two 
     CHECK(emitted.program[i++].op == OpCode::PushStr);
     CHECK(emitted.program[i].op == OpCode::PushInt);
     CHECK(std::get<int>(emitted.program[i++].operand) == 1);
-    CHECK(emitted.program[i].op == OpCode::InvokeBuiltin);
-    CHECK(std::get<std::string>(emitted.program[i++].operand) == "INDEX");
+    CHECK(isBasicCallFunc(emitted.program[i++], PickCore::Languages::Basic::kFnIndex, 3));
 }
 
 TEST_CASE("basic bytecode emitter does not inject occurrence when INDEX has three arguments") {
@@ -644,11 +646,10 @@ TEST_CASE("basic bytecode emitter does not inject occurrence when INDEX has thre
     CHECK(emitted.program[i++].op == OpCode::PushStr);
     CHECK(emitted.program[i++].op == OpCode::PushStr);
     CHECK(emitted.program[i++].op == OpCode::PushInt);
-    CHECK(emitted.program[i++].op == OpCode::InvokeBuiltin);
-    CHECK(std::get<std::string>(emitted.program[i - 1].operand) == "INDEX");
+    CHECK(isBasicCallFunc(emitted.program[i++], PickCore::Languages::Basic::kFnIndex, 3));
 }
 
-TEST_CASE("basic bytecode emitter emits InvokeBuiltin for FIELD with three arguments") {
+TEST_CASE("basic bytecode emitter emits CALL_FUNC for FIELD with three arguments") {
     BasicIr::NormalizedProgram program;
     BasicIr::PrintStmt stmt{};
     std::vector<std::unique_ptr<BasicAst::Expr>> args;
@@ -663,11 +664,10 @@ TEST_CASE("basic bytecode emitter emits InvokeBuiltin for FIELD with three argum
     CHECK(emitted.program[0].op == OpCode::PushStr);
     CHECK(emitted.program[1].op == OpCode::PushStr);
     CHECK(emitted.program[2].op == OpCode::PushInt);
-    CHECK(emitted.program[3].op == OpCode::InvokeBuiltin);
-    CHECK(std::get<std::string>(emitted.program[3].operand) == "FIELD");
+    CHECK(isBasicCallFunc(emitted.program[3], PickCore::Languages::Basic::kFnField, 3));
 }
 
-TEST_CASE("basic bytecode emitter emits InvokeBuiltin for STR") {
+TEST_CASE("basic bytecode emitter emits CALL_FUNC for STR") {
     BasicIr::NormalizedProgram program;
     BasicIr::PrintStmt stmt{};
     stmt.expression = makeCall("STR", makeInt(7));
@@ -676,11 +676,10 @@ TEST_CASE("basic bytecode emitter emits InvokeBuiltin for STR") {
     const BasicBytecodeEmissionResult emitted = BasicBytecodeEmitter::emit(program);
     REQUIRE(emitted.success);
     CHECK(emitted.program[0].op == OpCode::PushInt);
-    CHECK(emitted.program[1].op == OpCode::InvokeBuiltin);
-    CHECK(std::get<std::string>(emitted.program[1].operand) == "STR");
+    CHECK(isBasicCallFunc(emitted.program[1], PickCore::Languages::Basic::kFnStr, 1));
 }
 
-TEST_CASE("basic bytecode emitter emits InvokeBuiltin for OCONV with two arguments") {
+TEST_CASE("basic bytecode emitter emits CALL_FUNC for OCONV with two arguments") {
     BasicIr::NormalizedProgram program;
     BasicIr::PrintStmt stmt{};
     std::vector<std::unique_ptr<BasicAst::Expr>> args;
@@ -693,11 +692,10 @@ TEST_CASE("basic bytecode emitter emits InvokeBuiltin for OCONV with two argumen
     REQUIRE(emitted.success);
     CHECK(emitted.program[0].op == OpCode::PushInt);
     CHECK(emitted.program[1].op == OpCode::PushStr);
-    CHECK(emitted.program[2].op == OpCode::InvokeBuiltin);
-    CHECK(std::get<std::string>(emitted.program[2].operand) == "OCONV");
+    CHECK(isBasicCallFunc(emitted.program[2], PickCore::Languages::Basic::kFnOconv, 2));
 }
 
-TEST_CASE("basic bytecode emitter emits InvokeBuiltin for ICONV with two arguments") {
+TEST_CASE("basic bytecode emitter emits CALL_FUNC for ICONV with two arguments") {
     BasicIr::NormalizedProgram program;
     BasicIr::PrintStmt stmt{};
     std::vector<std::unique_ptr<BasicAst::Expr>> args;
@@ -710,11 +708,10 @@ TEST_CASE("basic bytecode emitter emits InvokeBuiltin for ICONV with two argumen
     REQUIRE(emitted.success);
     CHECK(emitted.program[0].op == OpCode::PushStr);
     CHECK(emitted.program[1].op == OpCode::PushStr);
-    CHECK(emitted.program[2].op == OpCode::InvokeBuiltin);
-    CHECK(std::get<std::string>(emitted.program[2].operand) == "ICONV");
+    CHECK(isBasicCallFunc(emitted.program[2], PickCore::Languages::Basic::kFnIconv, 2));
 }
 
-TEST_CASE("basic bytecode emitter emits InvokeBuiltin for NUM") {
+TEST_CASE("basic bytecode emitter emits CALL_FUNC for NUM") {
     BasicIr::NormalizedProgram program;
     BasicIr::PrintStmt stmt{};
     stmt.expression = makeCall("NUM", makeStr("123"));
@@ -723,11 +720,10 @@ TEST_CASE("basic bytecode emitter emits InvokeBuiltin for NUM") {
     const BasicBytecodeEmissionResult emitted = BasicBytecodeEmitter::emit(program);
     REQUIRE(emitted.success);
     CHECK(emitted.program[0].op == OpCode::PushStr);
-    CHECK(emitted.program[1].op == OpCode::InvokeBuiltin);
-    CHECK(std::get<std::string>(emitted.program[1].operand) == "NUM");
+    CHECK(isBasicCallFunc(emitted.program[1], PickCore::Languages::Basic::kFnNum, 1));
 }
 
-TEST_CASE("basic bytecode emitter emits InvokeBuiltin for CONVERT with three arguments") {
+TEST_CASE("basic bytecode emitter emits CALL_FUNC for CONVERT with three arguments") {
     BasicIr::NormalizedProgram program;
     BasicIr::PrintStmt stmt{};
     std::vector<std::unique_ptr<BasicAst::Expr>> args;
@@ -742,8 +738,7 @@ TEST_CASE("basic bytecode emitter emits InvokeBuiltin for CONVERT with three arg
     CHECK(emitted.program[0].op == OpCode::PushStr);
     CHECK(emitted.program[1].op == OpCode::PushStr);
     CHECK(emitted.program[2].op == OpCode::PushStr);
-    CHECK(emitted.program[3].op == OpCode::InvokeBuiltin);
-    CHECK(std::get<std::string>(emitted.program[3].operand) == "CONVERT");
+    CHECK(isBasicCallFunc(emitted.program[3], PickCore::Languages::Basic::kFnConvert, 3));
 }
 
 TEST_CASE("basic bytecode emitter lowers MAT scalar assignment to expression + MatInit") {

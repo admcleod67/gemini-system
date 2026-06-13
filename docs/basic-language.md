@@ -421,7 +421,7 @@ CLEAR
 
 ## Built-in Functions
 
-Built-in functions use the form `NAME(expr [, expr …])`. Arity is fixed per function (some accept zero arguments, e.g. `DATE()`). Function names are case-insensitive. Exact numeric/string rules for builtins that depend on coercion are documented in comments next to the **`InvokeBuiltin`** handlers in [`src/core/vm/Runtime.cpp`](src/core/vm/Runtime.cpp).
+Built-in functions use the form `NAME(expr [, expr …])`. Arity is fixed per function (some accept zero arguments, e.g. `DATE()`). Function names are case-insensitive. The BASIC compiler emits **`CALL_FUNC`** into namespace **`0x00000002`** (stable function IDs in [`BasicLanguageIds.h`](../src/core/languages/basic/BasicLanguageIds.h)); implementations live in the **`gemini-module-basic`** shared library registered at boot. The legacy **`INVOKE_BUILTIN`** VM opcode remains as a compatibility shim that forwards name-based calls to the same registry. Handlers and coercion helpers are in [`src/core/languages/basic/`](../src/core/languages/basic/).
 
 ### ABS
 

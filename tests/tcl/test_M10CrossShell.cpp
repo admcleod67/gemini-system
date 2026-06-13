@@ -6,7 +6,9 @@
 #include <sstream>
 #include <string>
 
+#include "BasicLanguageRegistration.h"
 #include "FileSystem.h"
+#include "LanguageRegistry.h"
 #include "Shell.h"
 #include "ShellTestFsUtil.h"
 #include "UserSession.h"
@@ -18,6 +20,7 @@ using PickTests::writeRecord;
 namespace {
     struct LoggedInShellPair {
         std::filesystem::path pickRoot;
+        PickCore::Languages::LanguageRegistry languageRegistry;
         std::unique_ptr<PickVM::Runtime> rtA;
         std::unique_ptr<PickVM::Runtime> rtB;
         std::unique_ptr<PickShell::Shell> shellA;
@@ -28,6 +31,9 @@ namespace {
               rtB(std::make_unique<PickVM::Runtime>()),
               shellA(std::make_unique<PickShell::Shell>(*rtA)),
               shellB(std::make_unique<PickShell::Shell>(*rtB)) {
+            PickCore::Languages::Basic::registerBasicLanguage(languageRegistry);
+            rtA->setLanguageRegistry(&languageRegistry);
+            rtB->setLanguageRegistry(&languageRegistry);
         }
     };
 

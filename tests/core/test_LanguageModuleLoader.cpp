@@ -2,6 +2,7 @@
 
 #include "LanguageModuleLoader.h"
 #include "Runtime.h"
+#include "BasicLanguageIds.h"
 
 #include <chrono>
 #include <filesystem>
@@ -36,6 +37,16 @@ namespace {
         return {};
 #endif
     }
+
+    std::filesystem::path basicModulePath() {
+#if defined(GEMINI_BASIC_MODULE_PATH)
+        return std::filesystem::path(GEMINI_BASIC_MODULE_PATH);
+#else
+        return {};
+#endif
+    }
+
+    constexpr NamespaceId kBasicNamespaceId = PickCore::Languages::Basic::kNamespaceId;
 
     Instruction makeCallFunc(const std::uint32_t namespaceId,
                              const std::uint32_t functionId,
@@ -192,4 +203,79 @@ TEST_CASE("LanguageModuleLoader logs boot-style lines") {
     CHECK(output.find("LOADING LANGUAGE MODULES") != std::string::npos);
     CHECK(output.find("MODULE ") != std::string::npos);
     CHECK(output.find(": OK") != std::string::npos);
+}
+
+TEST_CASE("LanguageModuleLoader loads built basic module") {
+    const std::filesystem::path basicPath = basicModulePath();
+    if (basicPath.empty() || !std::filesystem::exists(basicPath)) {
+        MESSAGE("GEMINI_BASIC_MODULE_PATH not configured; skipping");
+        return;
+    }
+
+    const auto modulesDir = uniqueTempDir() / "modules";
+    std::filesystem::create_directories(modulesDir);
+    std::filesystem::copy_file(basicPath, modulesDir / basicPath.filename());
+
+    LanguageRegistry registry;
+    const LanguageModuleLoadReport report = loadLanguageModules(registry, modulesDir);
+    CHECK(report.attempted == 1);
+    CHECK(report.loaded == 1);
+    CHECK(report.failed == 0);
+    CHECK(registry.isFrozen());
+
+    const auto meta = registry.metadata(kBasicNamespaceId);
+    REQUIRE(meta.has_value());
+    CHECK(meta->name == "basic");
+    CHECK(meta->version == "1");
+}
+
+TEST_CASE("LanguageModuleLoader dispatches basic LEN and ABS after load") {
+    const std::filesystem::path basicPath = basicModulePath();
+    if (basicPath.empty() || !std::filesystem::exists(basicPath)) {
+        MESSAGE("GEMINI_BASIC_MODULE_PATH not configured; skipping");
+        return;
+    }
+
+    const auto modulesDir = uniqueTempDir() / "modules";
+    std::filesystem::create_directories(modulesDir);
+    std::filesystem::copy_file(basicPath, modulesDir / basicPath.filename());
+
+    LanguageRegistry registry;
+    loadLanguageModules(registry, modulesDir);
+
+    std::vector<Value> lenStack{std::string{"abc"}};
+    registry.dispatch(kBasicNamespaceId, PickCore::Languages::Basic::kFnLen, lenStack, 1);
+    REQUIRE(lenStack.size() == 1);
+    CHECK(std::get<int>(lenStack.back()) == 3);
+
+    std::vector<Value> absStack{-7};
+    registry.dispatch(kBasicNamespaceId, PickCore::Languages::Basic::kFnAbs, absStack, 1);
+    REQUIRE(absStack.size() == 1);
+    CHECK(std::get<int>(absStack.back()) == 7);
+}
+
+TEST_CASE("LanguageModuleLoader basic CALL_FUNC end-to-end with loaded registry") {
+    const std::filesystem::path basicPath = basicModulePath();
+    if (basicPath.empty() || !std::filesystem::exists(basicPath)) {
+        MESSAGE("GEMINI_BASIC_MODULE_PATH not configured; skipping");
+        return;
+    }
+
+    const auto modulesDir = uniqueTempDir() / "modules";
+    std::filesystem::create_directories(modulesDir);
+    std::filesystem::copy_file(basicPath, modulesDir / basicPath.filename());
+
+    LanguageRegistry registry;
+    loadLanguageModules(registry, modulesDir);
+
+    Runtime rt;
+    rt.setLanguageRegistry(&registry);
+    rt.loadProgram({
+        {OpCode::PushStr, std::string{"hello"}},
+        makeCallFunc(kBasicNamespaceId, PickCore::Languages::Basic::kFnLen, 1),
+        {OpCode::Halt, Value{}},
+    });
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<int>(rt.stack()[0]) == 5);
 }

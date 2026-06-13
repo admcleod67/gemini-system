@@ -51,12 +51,13 @@ add_executable(
 )
 target_include_directories(pick-tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(pick-tests PRIVATE gemini-tcl doctest_headers)
-add_dependencies(pick-tests gemini-module-stub)
+add_dependencies(pick-tests gemini-module-stub gemini-module-basic)
 target_compile_definitions(
         pick-tests
         PRIVATE "PICK_SYSTEM_VERSION=\"${PROJECT_VERSION}\""
                 "PICK_SYSTEM_GEMINI_SYSPROG_FIXTURE=\"${CMAKE_SOURCE_DIR}/gemini/accounts/SYSPROG\""
                 "GEMINI_STUB_MODULE_PATH=\"$<TARGET_FILE:gemini-module-stub>\""
+                "GEMINI_BASIC_MODULE_PATH=\"$<TARGET_FILE:gemini-module-basic>\""
 )
 pick_system_enable_warnings(pick-tests)
 

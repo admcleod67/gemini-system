@@ -259,7 +259,17 @@ namespace PickShell {
             if (node.name == "INDEX" && got == 2) {
                 out_.push_back(PickVM::Instruction{PickVM::OpCode::PushInt, 1});
             }
-            out_.push_back(PickVM::Instruction{PickVM::OpCode::InvokeBuiltin, node.name});
+            const int effectiveArgCount = (node.name == "INDEX" && got == 2) ? 3 : got;
+            const std::optional<PickCore::Languages::FunctionId> fnId =
+                BasicBuiltins::functionIdForCall(node.name, effectiveArgCount);
+            if (!fnId.has_value()) {
+                error_ = "Internal error: unsupported builtin " + node.name;
+                return false;
+            }
+            PickVM::Instruction call{};
+            call.op = PickVM::OpCode::CallFunc;
+            call.callFunc = {BasicBuiltins::kNamespaceId, *fnId, effectiveArgCount};
+            out_.push_back(call);
             return true;
         }
 

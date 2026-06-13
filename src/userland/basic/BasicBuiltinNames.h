@@ -3,11 +3,17 @@
 
 #pragma once
 
+#include "BasicBuiltinLookup.h"
+#include "BasicLanguageIds.h"
+
 #include <optional>
 #include <string_view>
 #include <utility>
 
 namespace PickShell::BasicBuiltins {
+
+    using PickCore::Languages::Basic::functionIdForCall;
+    using PickCore::Languages::Basic::kNamespaceId;
 
     [[nodiscard]] inline bool isBuiltinCallName(const std::string_view upper) {
         return upper == "ABS" || upper == "SGN" || upper == "SEQ" || upper == "LEN" || upper == "TRIM" ||

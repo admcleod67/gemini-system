@@ -221,7 +221,7 @@ Milestone 11 is complete when:
 - [ ] **`CALL_FUNC`** opcode is implemented and documented.
 - [ ] **`LanguageRegistry`** is implemented and populated at boot.
 - [ ] Dynamic module loader loads and registers modules.
-- [ ] BASIC built‑ins are migrated to the new dispatch mechanism.
+- [x] BASIC built‑ins are migrated to the new dispatch mechanism.
 - [ ] External compilers can target Gemini using namespace/function IDs.
 - [ ] Existing bytecode remains fully compatible.
 - [ ] Documentation and tooling are updated.
@@ -238,7 +238,7 @@ Implementation is sequenced into vertical stages. Each stage ships a test‑lock
 
 - **Stage 3 — Dynamic module loader**: boot‑time scan of configurable **`gemini/modules/`** (or host‑configured path); **`dlopen`** / **`LoadLibrary`**; **`register_language(LanguageRegistry&)`** C ABI; failed modules logged, not fatal; registry immutable after boot. Ship a **minimal stub module** proving load + registration. No BASIC migration yet. Implementation: [`LanguageModuleLoader`](../../src/core/languages/LanguageModuleLoader.h), [`LanguageModuleAbi.h`](../../src/core/languages/LanguageModuleAbi.h), [`LanguageRegistry::instance()`](../../src/core/languages/LanguageRegistry.h), stub [`modules/gemini-stub/`](../../modules/gemini-stub/), tests in [`tests/core/test_LanguageModuleLoader.cpp`](../../tests/core/test_LanguageModuleLoader.cpp). *Status: implemented.*
 
-- **Stage 4 — BASIC module + compiler migration**: create **BASIC** namespace with stable IDs; move [Milestone 7](07-basic-functions-mat-operations.md) built‑ins (**`LEN`**, **`TRIM`**, **`FIELD`**, **`ABS`**, **`DATE`**, etc.) into a BASIC shared module; update compiler to emit **`CALL_FUNC`**; remove **`InvokeBuiltin`** lowering paths once tests are green; preserve all BASIC source semantics. *Status: pending.*
+- **Stage 4 — BASIC module + compiler migration**: create **BASIC** namespace with stable IDs; move [Milestone 7](07-basic-functions-mat-operations.md) built‑ins (**`LEN`**, **`TRIM`**, **`FIELD`**, **`ABS`**, **`DATE`**, etc.) into a BASIC shared module; update compiler to emit **`CALL_FUNC`**; keep **`INVOKE_BUILTIN`** as a VM shim forwarding to the registry (handwritten bytecode compatibility). Implementation: [`src/core/languages/basic/`](../../src/core/languages/basic/) (`BasicLanguageIds.h`, `BasicBuiltinHandlers`, `BasicLanguageRegistration`, `BasicBuiltinShim`), [`modules/gemini-basic/`](../../modules/gemini-basic/), compiler changes in [`BasicBytecodeEmitter.cpp`](../../src/userland/basic/BasicBytecodeEmitter.cpp), tests in [`tests/core/BasicLanguageTestFixture.h`](../../tests/core/BasicLanguageTestFixture.h), [`tests/core/test_Runtime.cpp`](../../tests/core/test_Runtime.cpp), [`tests/basic/test_BasicBytecodeEmitter.cpp`](../../tests/basic/test_BasicBytecodeEmitter.cpp), [`tests/basic/test_BasicCompiler.cpp`](../../tests/basic/test_BasicCompiler.cpp), [`tests/core/test_LanguageModuleLoader.cpp`](../../tests/core/test_LanguageModuleLoader.cpp). *Status: implemented.*
 
 - **Stage 5 — External ABI + reference docs**: publish namespace/function ID constants (header or schema); document **`CALL_FUNC`** operand layout and module ABI; update [`docs/vm.md`](../vm.md) and compiler/bytecode contract (**[`docs/compiler.md`](../compiler.md)** or **`docs/bytecode.md`**); optional **stub modules** for Pascal/COMAL/COBOL (registration only, no compilers). *Status: pending.*
 
