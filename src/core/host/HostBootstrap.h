@@ -12,6 +12,7 @@ namespace PickCore {
     struct DefaultHostPaths {
         std::optional<std::filesystem::path> pickFilesystemRoot;
         std::optional<std::filesystem::path> geminiCatalogRoot;
+        std::optional<std::filesystem::path> geminiModulesRoot;
     };
 
     /// Mirrors prior `applyDefaultFileSystemRoot` path rules without touching `Shell`.

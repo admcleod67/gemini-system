@@ -1,6 +1,8 @@
 #include "BootMonitor.h"
 
 #include "GeminiCatalog.h"
+#include "LanguageModuleLoader.h"
+#include "LanguageRegistry.h"
 
 #include <pick_system/version.hpp>
 #include <Runtime.h>
@@ -9,7 +11,6 @@
 
 namespace PickCore {
     void BootMonitor::runColdStart(std::ostream &out, const BootContext &ctx) {
-        (void) ctx.runtime;
         out << pick_system::system_title << ' ' << pick_system::version_string << '\n';
         out << "INITIALIZING SYSTEM...\n";
         out << "MEMORY: (host n/a)\n";
@@ -90,6 +91,14 @@ namespace PickCore {
                     }
                 }
             }
+        }
+
+        if (ctx.hostPaths.geminiModulesRoot.has_value()) {
+            Languages::loadLanguageModules(
+                Languages::LanguageRegistry::instance(), *ctx.hostPaths.geminiModulesRoot, &out, ctx.runtime);
+        } else {
+            out << "MODULES: (skip — no modules path)\n";
+            Languages::LanguageRegistry::instance().freeze();
         }
 
         out << "PORT MANAGER: (stub)\n";

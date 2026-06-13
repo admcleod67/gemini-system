@@ -93,3 +93,33 @@ TEST_CASE("BootMonitor cold start reports account root VOC and MD directory diag
     CHECK(s.find("ACCOUNT A1: (root not present)") != std::string::npos);
     CHECK(s.find("ACCOUNT A2: (MD not present)") != std::string::npos);
 }
+
+TEST_CASE("BootMonitor cold start loads language modules when modules path is set") {
+#if !defined(GEMINI_STUB_MODULE_PATH)
+    MESSAGE("GEMINI_STUB_MODULE_PATH not configured; skipping");
+    return;
+#endif
+    const std::filesystem::path stubPath = GEMINI_STUB_MODULE_PATH;
+    if (!std::filesystem::exists(stubPath)) {
+        MESSAGE("stub module not built; skipping");
+        return;
+    }
+
+    PickVM::Runtime rt;
+    const auto root = uniqueTempDir();
+    const auto gem = root / "gemini";
+    const auto modules = gem / "modules";
+    std::filesystem::create_directories(modules);
+    std::filesystem::copy_file(stubPath, modules / stubPath.filename());
+
+    PickCore::BootContext ctx;
+    ctx.runtime = &rt;
+    ctx.hostPaths.geminiModulesRoot = modules;
+
+    std::ostringstream out;
+    PickCore::BootMonitor::runColdStart(out, ctx);
+    const std::string s = out.str();
+    CHECK(s.find("LOADING LANGUAGE MODULES") != std::string::npos);
+    CHECK(s.find("MODULE ") != std::string::npos);
+    CHECK(s.find(": OK") != std::string::npos);
+}

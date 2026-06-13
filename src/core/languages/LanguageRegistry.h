@@ -11,6 +11,11 @@
 namespace PickCore::Languages {
     class LanguageRegistry {
     public:
+        [[nodiscard]] static LanguageRegistry &instance() {
+            static LanguageRegistry registry;
+            return registry;
+        }
+
         void registerNamespace(LanguageNamespaceDescriptor descriptor, void *hostContext = nullptr);
         void freeze();
         [[nodiscard]] bool isFrozen() const { return frozen_; }

@@ -2,6 +2,7 @@ include(${CMAKE_SOURCE_DIR}/cmake/PickSystemWarnings.cmake)
 
 add_subdirectory(core)
 add_subdirectory(userland)
+add_subdirectory(${CMAKE_SOURCE_DIR}/modules ${CMAKE_BINARY_DIR}/modules)
 
 add_custom_target(
         gemini-bootstrap-copy
@@ -13,7 +14,7 @@ add_custom_target(
 add_executable(gemini-system Main.cpp)
 target_link_libraries(gemini-system PRIVATE gemini-tcl)
 pick_system_enable_warnings(gemini-system)
-add_dependencies(gemini-system gemini-bootstrap-copy)
+add_dependencies(gemini-system gemini-bootstrap-copy gemini-module-stub)
 
 target_compile_definitions(
         gemini-system

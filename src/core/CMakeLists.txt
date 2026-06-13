@@ -72,6 +72,9 @@ add_library(gemini-core
         languages/LanguageRegistry.cpp
         languages/LanguageRegistry.h
         languages/LanguageTypes.h
+        languages/LanguageModuleAbi.h
+        languages/LanguageModuleLoader.cpp
+        languages/LanguageModuleLoader.h
 )
 
 target_include_directories(

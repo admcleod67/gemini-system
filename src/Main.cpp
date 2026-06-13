@@ -5,6 +5,7 @@
 #include <BootMonitor.h>
 #include <DefaultFileSystemRoot.h>
 #include <HostBootstrap.h>
+#include <LanguageRegistry.h>
 #include <LoginService.h>
 #include <Shell.h>
 
@@ -17,6 +18,7 @@ int main() {
     bootCtx.runtime = &vm;
     bootCtx.hostPaths = PickCore::resolveDefaultHostPaths();
     PickCore::BootMonitor::runColdStart(std::cout, bootCtx);
+    vm.setLanguageRegistry(&PickCore::Languages::LanguageRegistry::instance());
 
     const auto &catalog = shell.geminiCatalogRoot();
     if (!catalog.has_value()) {

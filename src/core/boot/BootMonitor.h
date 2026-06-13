@@ -15,7 +15,7 @@ namespace PickVM {
 
 namespace PickCore {
     struct BootContext {
-        const PickVM::Runtime *runtime{nullptr};
+        PickVM::Runtime *runtime{nullptr};
         DefaultHostPaths hostPaths;
     };
 
