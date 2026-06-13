@@ -3,6 +3,7 @@
 #include "LanguageModuleLoader.h"
 #include "Runtime.h"
 #include "BasicLanguageIds.h"
+#include "LanguageModuleBootLog.h"
 
 #include <gemini/namespace_ids.hpp>
 
@@ -14,6 +15,7 @@
 #include <vector>
 
 using PickCore::Languages::FunctionId;
+using PickCore::Languages::LanguageModuleBootLog;
 using PickCore::Languages::LanguageModuleLoadReport;
 using PickCore::Languages::LanguageRegistry;
 using PickCore::Languages::NamespaceId;
@@ -191,6 +193,14 @@ TEST_CASE("LanguageModuleLoader bad shared library is non-fatal") {
     CHECK(report.failed == 1);
     CHECK(registry.isFrozen());
     CHECK(log.str().find("MODULE broken.so:") != std::string::npos);
+    CHECK(log.str().find("MODULES: 0 loaded, 1 failed (1 attempted)") != std::string::npos);
+
+    const LanguageModuleBootLog &bootLog = LanguageModuleBootLog::instance();
+    CHECK(bootLog.attemptedCount() == 1);
+    CHECK(bootLog.failedCount() == 1);
+    REQUIRE(bootLog.entries().size() == 1);
+    CHECK(bootLog.entries()[0].fileName == "broken.so");
+    CHECK_FALSE(bootLog.entries()[0].loaded);
 }
 
 TEST_CASE("LanguageModuleLoader duplicate namespace keeps first module") {

@@ -219,12 +219,12 @@ These belong to future extensibility, performance, and security milestones.
 Milestone 11 is complete when:
 
 - [x] **`CALL_FUNC`** opcode is implemented and documented.
-- [ ] **`LanguageRegistry`** is implemented and populated at boot.
-- [ ] Dynamic module loader loads and registers modules.
+- [x] **`LanguageRegistry`** is implemented and populated at boot.
+- [x] Dynamic module loader loads and registers modules.
 - [x] BASIC built‑ins are migrated to the new dispatch mechanism.
 - [x] External compilers can target Gemini using namespace/function IDs.
-- [ ] Existing bytecode remains fully compatible.
-- [ ] Documentation and tooling are updated.
+- [x] Existing bytecode remains fully compatible.
+- [x] Documentation and tooling are updated.
 
 ---
 
@@ -242,7 +242,7 @@ Implementation is sequenced into vertical stages. Each stage ships a test‑lock
 
 - **Stage 5 — External ABI + reference docs**: publish namespace/function ID constants (header or schema); document **`CALL_FUNC`** operand layout and module ABI; update [`docs/vm.md`](../vm.md) and compiler/bytecode contract (**[`docs/bytecode.md`](../bytecode.md)**, [`docs/language-modules.md`](../language-modules.md)); optional **stub modules** for Pascal/COMAL/COBOL (registration only, no compilers). Implementation: [`include/gemini/`](../../include/gemini/) (`namespace_ids.hpp`, `basic_function_ids.hpp`, `language_abi.hpp`), [`docs/schemas/language-namespaces.json`](../schemas/language-namespaces.json), stub modules [`modules/gemini-pascal/`](../../modules/gemini-pascal/), [`gemini-comal/`](../../modules/gemini-comal/), [`gemini-cobol/`](../../modules/gemini-cobol/), tests in [`tests/core/test_LanguageAbi.cpp`](../../tests/core/test_LanguageAbi.cpp). *Status: implemented.*
 
-- **Stage 6 — Tooling + docs — closes M11**: operator/developer surface to inspect loaded languages (**`SYSTEM LANGUAGES`** or **`SHOW MODULES`**); boot diagnostics for module failures; milestone index cross‑links; reference BASIC module documented as canonical example. **Closes Milestone 11.** *Status: pending.*
+- **Stage 6 — Tooling + docs — closes M11**: operator/developer surface to inspect loaded languages (**`SYSTEM LANGUAGES`**, **`SHOW-MODULES`** alias); boot diagnostics retained for module failures; milestone index cross-links; reference BASIC module documented as canonical example. Implementation: [`LanguageRegistry::listNamespaces`](../../src/core/languages/LanguageRegistry.h), [`LanguageModuleBootLog`](../../src/core/languages/LanguageModuleBootLog.h), [`LanguageRegistryFormat`](../../src/core/languages/LanguageRegistryFormat.h), Tcl commands in [`Shell.cpp`](../../src/userland/tcl/Shell.cpp), tests in [`tests/core/test_LanguageRegistryFormat.cpp`](../../tests/core/test_LanguageRegistryFormat.cpp), [`tests/tcl/test_Shell.cpp`](../../tests/tcl/test_Shell.cpp). *Status: implemented. **Closes Milestone 11.***
 
 Only Stage 6's exit criteria should claim "Closes Milestone 11".
 

@@ -6,6 +6,12 @@ Technical reference for Gemini System. Paths below are relative to this director
 
 - **[Bytecode VM](vm.md)** — text `.tbc` format, opcodes, stack, parser output (`LoadedBytecode`), C++ runtime API.
 
+## Multi-language runtime
+
+- **[Bytecode contract for external compilers](bytecode.md)** — **`CALL_FUNC`** encoding, namespace/function IDs, stack semantics.
+- **[Language module ABI](language-modules.md)** — **`register_language`**, building shared modules, reference BASIC walkthrough.
+- **[Language namespace schema](schemas/language-namespaces.json)** — machine-readable ID catalogue.
+
 ## Shells and host commands
 
 - **[Developer shell (TCL)](tcl-shell.md)** — system-level TCL commands (`BASIC`, `PROC`, `ASM`, filesystem, variables, VOC-backed `RUN`/`EDIT`, …).

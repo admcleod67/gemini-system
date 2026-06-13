@@ -33,6 +33,7 @@ add_executable(
         core/test_LanguageRegistry.cpp
         core/test_CallFunc.cpp
         core/test_LanguageAbi.cpp
+        core/test_LanguageRegistryFormat.cpp
         core/test_LanguageModuleLoader.cpp
         core/test_FileSystemLocking.cpp
         basic/test_BasicBytecodeEmitter.cpp

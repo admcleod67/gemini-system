@@ -149,7 +149,8 @@ namespace PickShell {
         [[nodiscard]] std::string generatedHelpCommandsBody();
 
         void cmdVersion(std::ostream &out);
-        void cmdSystem(std::ostream &out);
+        void cmdSystem(const Tokens &tokens, std::ostream &out);
+        void cmdShowModules(std::ostream &out);
         void cmdWho(std::ostream &out);
 
         void cmdDumpStack(std::ostream &out);

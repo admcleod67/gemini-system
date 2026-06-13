@@ -33,6 +33,7 @@ Status labels:
   - Resolution precedence is topic-first, then command help; unknown lookups emit stable `No help available`.
 - **SYSTEM/ABOUT introspection** — `Intentional deviation`
   - `SYSTEM`/`ABOUT` are Gemini extensions for structured environment introspection.
+  - **`SYSTEM LANGUAGES`** and **`SHOW-MODULES`** list boot-registered language namespaces and module load failures (classic Pick `SYSTEM` differs).
   - `VERSION` remains the original short identity output.
 - **Tokenizer/quoting** — `Implemented`
   - Tcl command tokenization supports quoted strings, escaped characters, and preserved quoted empty tokens.

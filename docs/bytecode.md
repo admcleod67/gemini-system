@@ -138,7 +138,7 @@ The VM forwards name-based calls to the same registry (BASIC shim). **New compil
 
 ## See also
 
-- [`language-modules.md`](language-modules.md) — writing a shared module
+- [`language-modules.md`](language-modules.md) — writing a shared module; canonical BASIC module walkthrough
 - [`vm.md`](vm.md) — VM opcode listing
 - [`compiler-architecture.md`](compiler-architecture.md) — in-tree BASIC pipeline
 - [`milestones/11-multi-language-runtime-infrastructure.md`](milestones/11-multi-language-runtime-infrastructure.md) — milestone context

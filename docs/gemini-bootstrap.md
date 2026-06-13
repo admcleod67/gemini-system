@@ -112,6 +112,8 @@ Building `gemini-system` triggers a **`gemini-bootstrap-copy`** step that copies
 
 At cold start, **`BootMonitor`** scans **`gemini/modules/`** for shared libraries (`.dylib` / `.so` / `.dll`) and loads each via **`register_language`**. Override the directory with **`GEMINI_MODULES_PATH`**. When a catalogue root is configured, the default modules path is **`<catalogue-root>/modules`** (i.e. `gemini/modules/` next to `ACCOUNTS.json`). Failed modules are logged during boot and do not abort startup.
 
+After loading, boot emits **`MODULES: N loaded, M failed (K attempted)`**. Inspect registered namespaces and retained boot failures at the Tcl prompt with **`SYSTEM LANGUAGES`** or **`SHOW-MODULES`** (see [Developer shell](tcl-shell.md)).
+
 See **[Language module ABI](language-modules.md)** and **[Bytecode contract](bytecode.md)** for the module entry point, namespace IDs, and **`CALL_FUNC`** encoding.
 
 ## VOC bootstrap records

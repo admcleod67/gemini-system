@@ -567,11 +567,36 @@ TEST_CASE("shell strict no-arg command arity checks") {
 
     out.str("");
     sh.handleLine("SYSTEM extra", out, quit);
-    CHECK(out.str() == "SYSTEM takes no arguments\n");
+    CHECK(out.str() == "SYSTEM: unknown subcommand \"extra\"\n");
 
     out.str("");
     sh.handleLine("ABOUT extra", out, quit);
     CHECK(out.str() == "ABOUT takes no arguments\n");
+}
+
+TEST_CASE("shell SYSTEM LANGUAGES and SHOW-MODULES list language namespaces") {
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("SYSTEM LANGUAGES", out, quit);
+    CHECK(out.str().find("Language namespaces (") != std::string::npos);
+    const std::string languagesOutput = out.str();
+
+    out.str("");
+    sh.handleLine("SHOW-MODULES", out, quit);
+    CHECK(out.str() == languagesOutput);
+}
+
+TEST_CASE("shell SYSTEM LANGUAGES VERBOSE reports unknown extra token") {
+    PickVM::Runtime rt;
+    PickShell::Shell sh(rt);
+    std::ostringstream out;
+    bool quit = false;
+
+    sh.handleLine("SYSTEM LANGUAGES VERBOSE EXTRA", out, quit);
+    CHECK(out.str() == "SYSTEM LANGUAGES takes at most one argument\n");
 }
 
 TEST_CASE("shell SYSTEM and ABOUT introspection output") {

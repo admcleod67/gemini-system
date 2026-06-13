@@ -149,3 +149,40 @@ TEST_CASE("LanguageRegistry onInit hook at registration") {
     registry.registerNamespace(std::move(descriptor), &state);
     CHECK(initCount == 1);
 }
+
+TEST_CASE("LanguageRegistry listNamespaces sorted with function counts") {
+    LanguageRegistry registry;
+    registerTestNamespace(registry);
+
+    LanguageNamespaceDescriptor second{};
+    second.id = 0x00000099;
+    second.metadata.name = "other";
+    second.metadata.version = "2";
+    second.functions = {
+        LanguageFunctionEntry{0, nullptr},
+        LanguageFunctionEntry{1, nullptr},
+    };
+    registry.registerNamespace(std::move(second));
+
+    const auto summaries = registry.listNamespaces();
+    REQUIRE(summaries.size() == 2);
+    CHECK(summaries[0].id == kTestNamespaceId);
+    CHECK(summaries[0].functionCount == 3);
+    CHECK(summaries[1].id == 0x00000099);
+    CHECK(summaries[1].metadata.name == "other");
+    CHECK(summaries[1].functionCount == 2);
+}
+
+TEST_CASE("LanguageRegistry functionSlotSummaries reports arity and implementation") {
+    LanguageRegistry registry;
+    registerTestNamespace(registry);
+
+    const auto slots = registry.functionSlotSummaries(kTestNamespaceId);
+    REQUIRE(slots.size() == 3);
+    CHECK(slots[0].id == 0);
+    CHECK(slots[0].arity == 1);
+    CHECK(slots[0].implemented);
+    CHECK(slots[2].id == 2);
+    CHECK(slots[2].arity == 0);
+    CHECK(slots[2].implemented);
+}

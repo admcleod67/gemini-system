@@ -9,6 +9,9 @@
 #include "LineRecordEditor.h"
 #include "LoginService.h"
 #include "LockRegistry.h"
+#include "LanguageModuleBootLog.h"
+#include "LanguageRegistry.h"
+#include "LanguageRegistryFormat.h"
 
 #include <pick_system/version.hpp>
 
@@ -381,18 +384,21 @@ namespace PickShell {
             cmdVersion(out);
         };
         tclCommands_["SYSTEM"] = [this](const Tokens &tokens, std::ostream &out, bool &) {
-            if (tokens.size() != 1) {
-                out << "SYSTEM takes no arguments\n";
-                return;
-            }
-            cmdSystem(out);
+            cmdSystem(tokens, out);
         };
         tclCommands_["ABOUT"] = [this](const Tokens &tokens, std::ostream &out, bool &) {
             if (tokens.size() != 1) {
                 out << "ABOUT takes no arguments\n";
                 return;
             }
-            cmdSystem(out);
+            cmdSystem(tokens, out);
+        };
+        tclCommands_["SHOW-MODULES"] = [this](const Tokens &tokens, std::ostream &out, bool &) {
+            if (tokens.size() != 1) {
+                out << "SHOW-MODULES takes no arguments\n";
+                return;
+            }
+            cmdShowModules(out);
         };
         tclCommands_["WHO"] = [this](const Tokens &tokens, std::ostream &out, bool &) {
             if (tokens.size() != 1) {
@@ -1495,19 +1501,54 @@ namespace PickShell {
         out << "Build: " << __DATE__ << "\n";
     }
 
-    void Shell::cmdSystem(std::ostream &out) {
-        out << "System: " << pick_system::system_title << "\n";
-        out << "Version: " << pick_system::version_string << "\n";
-        out << "Build: " << __DATE__ << "\n";
-        if (session_.loggedIn()) {
-            out << "Session: " << session_.whoPort() << ' ' << session_.sessionUsername() << ' ' << session_.sessionAccount() << "\n";
-        } else {
-            out << "Session: 0 - -\n";
+    void Shell::cmdSystem(const Tokens &tokens, std::ostream &out) {
+        if (tokens.size() == 1) {
+            out << "System: " << pick_system::system_title << "\n";
+            out << "Version: " << pick_system::version_string << "\n";
+            out << "Build: " << __DATE__ << "\n";
+            if (session_.loggedIn()) {
+                out << "Session: " << session_.whoPort() << ' ' << session_.sessionUsername() << ' '
+                    << session_.sessionAccount() << "\n";
+            } else {
+                out << "Session: 0 - -\n";
+            }
+            out << "Pick root: " << session_.fileSystemRoot().string() << "\n";
+            out << "Account context: " << (session_.loggedIn() ? session_.sessionAccount() : "(none)") << "\n";
+            out << "Catalogue root: "
+                << (session_.geminiCatalogRoot().has_value() ? session_.geminiCatalogRoot()->string() : "(none)")
+                << "\n";
+            return;
         }
-        out << "Pick root: " << session_.fileSystemRoot().string() << "\n";
-        out << "Account context: " << (session_.loggedIn() ? session_.sessionAccount() : "(none)") << "\n";
-        out << "Catalogue root: "
-            << (session_.geminiCatalogRoot().has_value() ? session_.geminiCatalogRoot()->string() : "(none)") << "\n";
+
+        if (tokens.size() >= 2 && tokens[1] == "LANGUAGES") {
+            bool verbose = false;
+            if (tokens.size() == 3) {
+                if (tokens[2] == "VERBOSE") {
+                    verbose = true;
+                } else {
+                    out << "SYSTEM: unknown subcommand \"" << tokens[2] << "\"\n";
+                    return;
+                }
+            } else if (tokens.size() > 3) {
+                out << "SYSTEM LANGUAGES takes at most one argument\n";
+                return;
+            }
+
+            PickCore::Languages::formatLanguagesReport(out,
+                                                         PickCore::Languages::LanguageRegistry::instance(),
+                                                         PickCore::Languages::LanguageModuleBootLog::instance(),
+                                                         verbose);
+            return;
+        }
+
+        out << "SYSTEM: unknown subcommand \"" << tokens[1] << "\"\n";
+    }
+
+    void Shell::cmdShowModules(std::ostream &out) {
+        PickCore::Languages::formatLanguagesReport(out,
+                                                   PickCore::Languages::LanguageRegistry::instance(),
+                                                   PickCore::Languages::LanguageModuleBootLog::instance(),
+                                                   false);
     }
 
     void Shell::cmdWho(std::ostream &out) {

@@ -1,6 +1,7 @@
 #include "LanguageModuleLoader.h"
 
 #include "LanguageModuleAbi.h"
+#include "LanguageModuleBootLog.h"
 
 #include <algorithm>
 #include <exception>
@@ -126,6 +127,8 @@ namespace PickCore::Languages {
                                                  void *const /*hostContext*/) {
         LanguageModuleLoadReport report{};
 
+        LanguageModuleBootLog::instance().clear();
+
         std::error_code ec;
         if (!std::filesystem::is_directory(modulesDir, ec) || ec) {
             logLine(log, "MODULES: (skip — directory not present)");
@@ -145,6 +148,7 @@ namespace PickCore::Languages {
             if (handle == nullptr) {
                 ++report.failed;
                 logLine(log, "MODULE " + fileName + ": (" + openError + ')');
+                LanguageModuleBootLog::instance().append(fileName, false, openError);
                 continue;
             }
 
@@ -153,6 +157,7 @@ namespace PickCore::Languages {
             if (registerLanguage == nullptr) {
                 ++report.failed;
                 logLine(log, "MODULE " + fileName + ": (" + symbolError + ')');
+                LanguageModuleBootLog::instance().append(fileName, false, symbolError);
                 closeModule(handle);
                 continue;
             }
@@ -162,6 +167,7 @@ namespace PickCore::Languages {
             } catch (const std::exception &error) {
                 ++report.failed;
                 logLine(log, std::string("MODULE ") + fileName + ": (" + error.what() + ')');
+                LanguageModuleBootLog::instance().append(fileName, false, error.what());
                 closeModule(handle);
                 continue;
             }
@@ -169,6 +175,13 @@ namespace PickCore::Languages {
             retainedModuleHandles().push_back(handle);
             ++report.loaded;
             logLine(log, "MODULE " + fileName + ": OK");
+            LanguageModuleBootLog::instance().append(fileName, true);
+        }
+
+        if (report.attempted > 0) {
+            logLine(log,
+                    "MODULES: " + std::to_string(report.loaded) + " loaded, " + std::to_string(report.failed) +
+                        " failed (" + std::to_string(report.attempted) + " attempted)");
         }
 
         registry.freeze();

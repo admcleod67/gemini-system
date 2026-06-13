@@ -75,6 +75,10 @@ add_library(gemini-core
         languages/LanguageModuleAbi.h
         languages/LanguageModuleLoader.cpp
         languages/LanguageModuleLoader.h
+        languages/LanguageModuleBootLog.cpp
+        languages/LanguageModuleBootLog.h
+        languages/LanguageRegistryFormat.cpp
+        languages/LanguageRegistryFormat.h
         languages/basic/BasicLanguageIds.h
         languages/basic/BasicBuiltinSupport.cpp
         languages/basic/BasicBuiltinSupport.h

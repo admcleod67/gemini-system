@@ -28,6 +28,7 @@ Artifacts include **`gemini-system`** (host entry point with boot and Tcl REPL),
 More detail lives under **[`docs/`](docs/README.md)**:
 
 - **[Bytecode VM](docs/vm.md)** — `.tbc` format, opcodes, parser and runtime.
+- **[Bytecode contract & language modules](docs/bytecode.md)** — **`CALL_FUNC`** ABI for external compilers; [module author guide](docs/language-modules.md).
 - **[Developer shell (TCL)](docs/tcl-shell.md)** — host shell commands and mode entry (`BASIC`, `PROC`, `ASM`).
 - **[Assembler shell (ASM)](docs/assembler-shell.md)** — VM-level debugger workflow and command set.
 - **[ENGLISH query core](docs/english.md)** — `LIST`, `SORT`, `COUNT`, `SELECT`, file-scoped `DICT-*` lookup, **`RESOLVE-FIELD`**, **`DEFINE-FIELD`**; active-list commands (`LIST-LIST`, `CLEAR-LIST`).

@@ -75,16 +75,31 @@ Mirror [`modules/gemini-basic/`](../modules/gemini-basic/):
 
 Register the subdirectory in [`modules/CMakeLists.txt`](../modules/CMakeLists.txt). Add **`add_dependencies(gemini-system gemini-module-<name>)`** in [`src/CMakeLists.txt`](../src/CMakeLists.txt) so the copy runs before the host starts.
 
-## Reference implementation
+## Reference implementation (canonical BASIC module)
 
-**[`gemini-module-basic`](../modules/gemini-basic/)** is the canonical example:
+**[`gemini-module-basic`](../modules/gemini-basic/)** is the canonical end-to-end example. Use it as a template when adding a new language module.
 
-- Namespace **`Gemini::kNamespaceIdBasic`** (`2`)
-- 28 handlers in [`BasicBuiltinHandlers.cpp`](../src/core/languages/basic/BasicBuiltinHandlers.cpp)
-- Registration in [`BasicLanguageRegistration.cpp`](../src/core/languages/basic/BasicLanguageRegistration.cpp)
-- Function IDs in [`include/gemini/basic_function_ids.hpp`](../include/gemini/basic_function_ids.hpp)
+### File map
 
-Stub modules (**`gemini-module-pascal`**, **`-comal`**, **`-cobol`**) register metadata only and reserve namespace IDs for future compilers.
+| File | Role |
+|------|------|
+| [`BasicModule.cpp`](../modules/gemini-basic/BasicModule.cpp) | Exports **`register_language`** → calls **`registerBasicLanguage`** |
+| [`BasicLanguageRegistration.cpp`](../src/core/languages/basic/BasicLanguageRegistration.cpp) | Builds **`LanguageNamespaceDescriptor`** with dense function table |
+| [`BasicBuiltinHandlers.cpp`](../src/core/languages/basic/BasicBuiltinHandlers.cpp) | Handler implementations (pop stack, push result) |
+| [`include/gemini/basic_function_ids.hpp`](../include/gemini/basic_function_ids.hpp) | Published stable function IDs for external compilers |
+| [`include/gemini/namespace_ids.hpp`](../include/gemini/namespace_ids.hpp) | Namespace ID **`Gemini::kNamespaceIdBasic`** (`2`) |
+
+### Verify at boot and from Tcl
+
+1. Cold start should log **`MODULE libgemini-module-basic.*: OK`** and **`MODULES: N loaded, …`** (see [`gemini-bootstrap.md`](gemini-bootstrap.md)).
+2. At the Tcl prompt, **`SYSTEM LANGUAGES`** should include a line like **`2 basic 1 28`** (namespace id, name, version, function count).
+3. **`SYSTEM LANGUAGES VERBOSE`** lists arity for each function slot (`0`–`27` for BASIC).
+
+The in-tree BASIC compiler emits **`CALL_FUNC`** using these IDs; see [`bytecode.md`](bytecode.md) and [`basic-language.md`](basic-language.md).
+
+### Stub modules
+
+Stub modules (**`gemini-module-pascal`**, **`-comal`**, **`-cobol`**) register metadata only and reserve namespace IDs for future compilers. They appear in **`SYSTEM LANGUAGES`** with function count **`0`** until a compiler and handler table ship.
 
 ## See also
 

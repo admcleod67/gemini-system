@@ -28,6 +28,8 @@ namespace PickCore::Languages {
 
         [[nodiscard]] std::optional<LanguageNamespaceMetadata> metadata(NamespaceId nsId) const;
         [[nodiscard]] std::size_t namespaceCount() const { return namespaces_.size(); }
+        [[nodiscard]] std::vector<LanguageNamespaceSummary> listNamespaces() const;
+        [[nodiscard]] std::vector<LanguageFunctionSlotSummary> functionSlotSummaries(NamespaceId nsId) const;
 
     private:
         struct RegisteredNamespace {

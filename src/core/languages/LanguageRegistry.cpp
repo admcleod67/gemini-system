@@ -1,5 +1,6 @@
 #include "LanguageRegistry.h"
 
+#include <algorithm>
 #include <stdexcept>
 #include <utility>
 
@@ -80,5 +81,41 @@ namespace PickCore::Languages {
             return std::nullopt;
         }
         return it->second.metadata;
+    }
+
+    std::vector<LanguageNamespaceSummary> LanguageRegistry::listNamespaces() const {
+        std::vector<LanguageNamespaceSummary> summaries;
+        summaries.reserve(namespaces_.size());
+        for (const auto &[id, ns]: namespaces_) {
+            LanguageNamespaceSummary summary{};
+            summary.id = id;
+            summary.metadata = ns.metadata;
+            summary.functionCount = ns.functions.size();
+            summaries.push_back(std::move(summary));
+        }
+        std::sort(summaries.begin(), summaries.end(), [](const LanguageNamespaceSummary &a,
+                                                          const LanguageNamespaceSummary &b) {
+            return a.id < b.id;
+        });
+        return summaries;
+    }
+
+    std::vector<LanguageFunctionSlotSummary> LanguageRegistry::functionSlotSummaries(const NamespaceId nsId) const {
+        const auto it = namespaces_.find(nsId);
+        if (it == namespaces_.end()) {
+            return {};
+        }
+
+        const std::vector<LanguageFunctionEntry> &functions = it->second.functions;
+        std::vector<LanguageFunctionSlotSummary> slots;
+        slots.reserve(functions.size());
+        for (FunctionId i = 0; i < functions.size(); ++i) {
+            LanguageFunctionSlotSummary slot{};
+            slot.id = i;
+            slot.arity = functions[i].arity;
+            slot.implemented = functions[i].fn != nullptr;
+            slots.push_back(slot);
+        }
+        return slots;
     }
 } // namespace PickCore::Languages

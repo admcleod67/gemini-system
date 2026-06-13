@@ -35,6 +35,18 @@ namespace PickCore::Languages {
         LanguageNamespaceHooks hooks{};
     };
 
+    struct LanguageNamespaceSummary {
+        NamespaceId id{0};
+        LanguageNamespaceMetadata metadata;
+        std::size_t functionCount{0};
+    };
+
+    struct LanguageFunctionSlotSummary {
+        FunctionId id{0};
+        int arity{0};
+        bool implemented{false};
+    };
+
     [[noreturn]] void throwLanguageRegistryError(const char *kind, const std::string &detail = {});
 } // namespace PickCore::Languages
 
