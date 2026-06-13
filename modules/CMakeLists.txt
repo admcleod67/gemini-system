@@ -1,2 +1,5 @@
 add_subdirectory(gemini-stub)
 add_subdirectory(gemini-basic)
+add_subdirectory(gemini-pascal)
+add_subdirectory(gemini-comal)
+add_subdirectory(gemini-cobol)

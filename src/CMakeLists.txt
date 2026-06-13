@@ -14,7 +14,8 @@ add_custom_target(
 add_executable(gemini-system Main.cpp)
 target_link_libraries(gemini-system PRIVATE gemini-tcl)
 pick_system_enable_warnings(gemini-system)
-add_dependencies(gemini-system gemini-bootstrap-copy gemini-module-stub gemini-module-basic)
+add_dependencies(gemini-system gemini-bootstrap-copy gemini-module-stub gemini-module-basic
+        gemini-module-pascal gemini-module-comal gemini-module-cobol)
 
 target_compile_definitions(
         gemini-system

@@ -4,22 +4,10 @@
 
 #include <gemini/namespace_ids.hpp>
 
-#include <string>
-#include <vector>
-
-namespace {
-    void stubNoOp(std::vector<PickVM::Value> &stack, void * /*hostContext*/) {
-        stack.push_back(std::string("stub-ok"));
-    }
-} // namespace
-
 GEMINI_LANGUAGE_MODULE_EXPORT void register_language(PickCore::Languages::LanguageRegistry &registry) {
     PickCore::Languages::LanguageNamespaceDescriptor descriptor{};
-    descriptor.id = Gemini::kNamespaceIdStub;
-    descriptor.metadata.name = "stub";
+    descriptor.id = Gemini::kNamespaceIdPascal;
+    descriptor.metadata.name = "pascal";
     descriptor.metadata.version = "1";
-    descriptor.functions = {
-        PickCore::Languages::LanguageFunctionEntry{0, stubNoOp},
-    };
     registry.registerNamespace(std::move(descriptor));
 }

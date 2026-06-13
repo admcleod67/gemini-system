@@ -3,39 +3,47 @@
 
 #include "../LanguageTypes.h"
 
+#include <gemini/basic_function_ids.hpp>
+#include <gemini/namespace_ids.hpp>
+
 namespace PickCore::Languages::Basic {
-    constexpr NamespaceId kNamespaceId = 0x00000002;
+    constexpr NamespaceId kNamespaceId = Gemini::kNamespaceIdBasic;
 
-    constexpr FunctionId kFnAbs = 0;
-    constexpr FunctionId kFnSgn = 1;
-    constexpr FunctionId kFnSeq = 2;
-    constexpr FunctionId kFnLen = 3;
-    constexpr FunctionId kFnTrim = 4;
-    constexpr FunctionId kFnLcase = 5;
-    constexpr FunctionId kFnUcase = 6;
-    constexpr FunctionId kFnSpace = 7;
-    constexpr FunctionId kFnInt = 8;
-    constexpr FunctionId kFnMod = 9;
-    constexpr FunctionId kFnSin = 10;
-    constexpr FunctionId kFnCos = 11;
-    constexpr FunctionId kFnTan = 12;
-    constexpr FunctionId kFnExp = 13;
-    constexpr FunctionId kFnLog = 14;
-    constexpr FunctionId kFnDate = 15;
-    constexpr FunctionId kFnTime = 16;
-    constexpr FunctionId kFnSystem = 17;
-    constexpr FunctionId kFnIndex = 18;
-    constexpr FunctionId kFnField = 19;
-    constexpr FunctionId kFnStr = 20;
-    constexpr FunctionId kFnOconv = 21;
-    constexpr FunctionId kFnIconv = 22;
-    constexpr FunctionId kFnNum = 23;
-    constexpr FunctionId kFnConvert = 24;
-    constexpr FunctionId kFnRnd0 = 25;
-    constexpr FunctionId kFnRnd1 = 26;
-    constexpr FunctionId kFnStatus = 27;
+    constexpr FunctionId kFnAbs = Gemini::Basic::kFnAbs;
+    constexpr FunctionId kFnSgn = Gemini::Basic::kFnSgn;
+    constexpr FunctionId kFnSeq = Gemini::Basic::kFnSeq;
+    constexpr FunctionId kFnLen = Gemini::Basic::kFnLen;
+    constexpr FunctionId kFnTrim = Gemini::Basic::kFnTrim;
+    constexpr FunctionId kFnLcase = Gemini::Basic::kFnLcase;
+    constexpr FunctionId kFnUcase = Gemini::Basic::kFnUcase;
+    constexpr FunctionId kFnSpace = Gemini::Basic::kFnSpace;
+    constexpr FunctionId kFnInt = Gemini::Basic::kFnInt;
+    constexpr FunctionId kFnMod = Gemini::Basic::kFnMod;
+    constexpr FunctionId kFnSin = Gemini::Basic::kFnSin;
+    constexpr FunctionId kFnCos = Gemini::Basic::kFnCos;
+    constexpr FunctionId kFnTan = Gemini::Basic::kFnTan;
+    constexpr FunctionId kFnExp = Gemini::Basic::kFnExp;
+    constexpr FunctionId kFnLog = Gemini::Basic::kFnLog;
+    constexpr FunctionId kFnDate = Gemini::Basic::kFnDate;
+    constexpr FunctionId kFnTime = Gemini::Basic::kFnTime;
+    constexpr FunctionId kFnSystem = Gemini::Basic::kFnSystem;
+    constexpr FunctionId kFnIndex = Gemini::Basic::kFnIndex;
+    constexpr FunctionId kFnField = Gemini::Basic::kFnField;
+    constexpr FunctionId kFnStr = Gemini::Basic::kFnStr;
+    constexpr FunctionId kFnOconv = Gemini::Basic::kFnOconv;
+    constexpr FunctionId kFnIconv = Gemini::Basic::kFnIconv;
+    constexpr FunctionId kFnNum = Gemini::Basic::kFnNum;
+    constexpr FunctionId kFnConvert = Gemini::Basic::kFnConvert;
+    constexpr FunctionId kFnRnd0 = Gemini::Basic::kFnRnd0;
+    constexpr FunctionId kFnRnd1 = Gemini::Basic::kFnRnd1;
+    constexpr FunctionId kFnStatus = Gemini::Basic::kFnStatus;
 
-    constexpr FunctionId kFunctionCount = 28;
+    constexpr FunctionId kFunctionCount = Gemini::Basic::kFunctionCount;
+
+    static_assert(kNamespaceId == Gemini::kNamespaceIdBasic);
+    static_assert(kFnAbs == Gemini::Basic::kFnAbs);
+    static_assert(kFnStatus == Gemini::Basic::kFnStatus);
+    static_assert(kFunctionCount == Gemini::Basic::kFunctionCount);
 } // namespace PickCore::Languages::Basic
 
 #endif // PICK_SYSTEM_CORE_LANGUAGES_BASIC_BASIC_LANGUAGE_IDS_H

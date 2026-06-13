@@ -1,0 +1,95 @@
+{
+  "abiVersion": 1,
+  "namespaces": [
+    {
+      "id": 1,
+      "idHex": "0x00000001",
+      "name": "(reserved)",
+      "module": null,
+      "version": null,
+      "shipped": false,
+      "note": "Internal unit-test namespace only",
+      "functions": []
+    },
+    {
+      "id": 2,
+      "idHex": "0x00000002",
+      "name": "basic",
+      "module": "gemini-module-basic",
+      "version": "1",
+      "shipped": true,
+      "functions": [
+        { "id": 0, "name": "ABS", "arity": 1 },
+        { "id": 1, "name": "SGN", "arity": 1 },
+        { "id": 2, "name": "SEQ", "arity": 1 },
+        { "id": 3, "name": "LEN", "arity": 1 },
+        { "id": 4, "name": "TRIM", "arity": 1 },
+        { "id": 5, "name": "LCASE", "arity": 1 },
+        { "id": 6, "name": "UCASE", "arity": 1 },
+        { "id": 7, "name": "SPACE", "arity": 1 },
+        { "id": 8, "name": "INT", "arity": 1 },
+        { "id": 9, "name": "MOD", "arity": 2 },
+        { "id": 10, "name": "SIN", "arity": 1 },
+        { "id": 11, "name": "COS", "arity": 1 },
+        { "id": 12, "name": "TAN", "arity": 1 },
+        { "id": 13, "name": "EXP", "arity": 1 },
+        { "id": 14, "name": "LOG", "arity": 1 },
+        { "id": 15, "name": "DATE", "arity": 0 },
+        { "id": 16, "name": "TIME", "arity": 0 },
+        { "id": 17, "name": "SYSTEM", "arity": 1 },
+        { "id": 18, "name": "INDEX", "arity": 3 },
+        { "id": 19, "name": "FIELD", "arity": 3 },
+        { "id": 20, "name": "STR", "arity": 1 },
+        { "id": 21, "name": "OCONV", "arity": 2 },
+        { "id": 22, "name": "ICONV", "arity": 2 },
+        { "id": 23, "name": "NUM", "arity": 1 },
+        { "id": 24, "name": "CONVERT", "arity": 3 },
+        { "id": 25, "name": "RND", "arity": 0 },
+        { "id": 26, "name": "RND", "arity": 1 },
+        { "id": 27, "name": "STATUS", "arity": 0 }
+      ]
+    },
+    {
+      "id": 3,
+      "idHex": "0x00000003",
+      "name": "pascal",
+      "module": "gemini-module-pascal",
+      "version": "1",
+      "shipped": true,
+      "note": "Registration-only stub",
+      "functions": []
+    },
+    {
+      "id": 4,
+      "idHex": "0x00000004",
+      "name": "comal",
+      "module": "gemini-module-comal",
+      "version": "1",
+      "shipped": true,
+      "note": "Registration-only stub",
+      "functions": []
+    },
+    {
+      "id": 5,
+      "idHex": "0x00000005",
+      "name": "cobol",
+      "module": "gemini-module-cobol",
+      "version": "1",
+      "shipped": true,
+      "note": "Registration-only stub",
+      "functions": []
+    },
+    {
+      "id": 256,
+      "idHex": "0x00000100",
+      "name": "stub",
+      "module": "gemini-module-stub",
+      "version": "1",
+      "shipped": true,
+      "note": "Integration-test stub with one no-op function",
+      "functions": [
+        { "id": 0, "name": "(no-op)", "arity": 0 }
+      ]
+    }
+  ]
+}

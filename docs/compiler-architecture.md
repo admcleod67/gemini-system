@@ -26,6 +26,7 @@ flowchart LR
 - `BasicBytecodeEmitter`
   - Lowers normalized IR into VM instructions.
   - Resolves jump addresses and appends implicit trailing `HALT` when required.
+  - Emits **`CALL_FUNC`** for built-in function calls (namespace **`2`**, stable function IDs — see [`bytecode.md`](bytecode.md) and [`include/gemini/basic_function_ids.hpp`](../include/gemini/basic_function_ids.hpp)).
   - Enforces Pick BASIC type-suffix rules:
     - `$`-suffix variables used as arithmetic operands are rejected with a compile-time error.
     - `%`-suffix variables get a `COERCE_INT` instruction emitted after the value is produced (on `LET` assignment and `INPUT`).

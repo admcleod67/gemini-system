@@ -71,6 +71,8 @@ For non-`.tbc` loaders (for example, handwritten instruction vectors), source-li
 | `RELEASE_REC name` | Pop record id and release session lock on that record (silent if not held). |
 | `SET_ON_ERROR_HANDLER ip` | Set instruction pointer for `ON ERROR GOTO` (`0` disables). |
 | `CLOSE_FILE name` | Release binding for file variable `name`. No-op if `name` is not currently open. |
+| `CALL_FUNC ns-id, fn-id, arg-count` | Pop **`arg-count`** stack values (last argument on top), dispatch to the boot-time **`LanguageRegistry`** for namespace **`ns-id`**, function **`fn-id`**. Push the handler's return value. Requires a configured language registry. See [`bytecode.md`](bytecode.md) for encoding, stack order, namespace/function IDs, and **`LANG:`** errors. |
+| `INVOKE_BUILTIN "name"` | Legacy name-based built-in dispatch (BASIC shim → registry). Prefer **`CALL_FUNC`** for new bytecode; see [`basic-language.md`](basic-language.md). |
 
 Jump targets must refer to defined labels and resolve to valid instruction indices; the parser validates range.
 
@@ -115,3 +117,5 @@ See the **`programs/`** directory (e.g. `hello.tbc`, `stacktest.tbc`) for runnab
 ## See also
 
 - [Concurrency and record locking](concurrency.md) — lock opcodes in context of the session lock model.
+- [Bytecode contract for external compilers](bytecode.md) — **`CALL_FUNC`** ABI, namespace/function IDs, stack semantics.
+- [Language module ABI](language-modules.md) — writing shared modules for **`register_language`**.

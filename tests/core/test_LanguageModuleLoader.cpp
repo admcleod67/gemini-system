@@ -4,6 +4,8 @@
 #include "Runtime.h"
 #include "BasicLanguageIds.h"
 
+#include <gemini/namespace_ids.hpp>
+
 #include <chrono>
 #include <filesystem>
 #include <fstream>
@@ -22,7 +24,7 @@ using PickVM::Runtime;
 using PickVM::Value;
 
 namespace {
-    constexpr NamespaceId kStubNamespaceId = 0x00000100;
+    constexpr NamespaceId kStubNamespaceId = Gemini::kNamespaceIdStub;
     constexpr FunctionId kStubFnNoOp = 0;
 
     std::filesystem::path uniqueTempDir() {
@@ -44,6 +46,36 @@ namespace {
 #else
         return {};
 #endif
+    }
+
+    std::filesystem::path pascalModulePath() {
+#if defined(GEMINI_PASCAL_MODULE_PATH)
+        return std::filesystem::path(GEMINI_PASCAL_MODULE_PATH);
+#else
+        return {};
+#endif
+    }
+
+    std::filesystem::path comalModulePath() {
+#if defined(GEMINI_COMAL_MODULE_PATH)
+        return std::filesystem::path(GEMINI_COMAL_MODULE_PATH);
+#else
+        return {};
+#endif
+    }
+
+    std::filesystem::path cobolModulePath() {
+#if defined(GEMINI_COBOL_MODULE_PATH)
+        return std::filesystem::path(GEMINI_COBOL_MODULE_PATH);
+#else
+        return {};
+#endif
+    }
+
+    void copyModuleIfPresent(const std::filesystem::path &src, const std::filesystem::path &modulesDir) {
+        if (!src.empty() && std::filesystem::exists(src)) {
+            std::filesystem::copy_file(src, modulesDir / src.filename());
+        }
     }
 
     constexpr NamespaceId kBasicNamespaceId = PickCore::Languages::Basic::kNamespaceId;
@@ -278,4 +310,62 @@ TEST_CASE("LanguageModuleLoader basic CALL_FUNC end-to-end with loaded registry"
     rt.run();
     REQUIRE(rt.stack().size() == 1);
     CHECK(std::get<int>(rt.stack()[0]) == 5);
+}
+
+TEST_CASE("LanguageModuleLoader loads pascal comal cobol stub modules") {
+    const std::filesystem::path pascalPath = pascalModulePath();
+    const std::filesystem::path comalPath = comalModulePath();
+    const std::filesystem::path cobolPath = cobolModulePath();
+    if (pascalPath.empty() || comalPath.empty() || cobolPath.empty() ||
+        !std::filesystem::exists(pascalPath) || !std::filesystem::exists(comalPath) ||
+        !std::filesystem::exists(cobolPath)) {
+        MESSAGE("GEMINI_* stub module paths not configured; skipping");
+        return;
+    }
+
+    const auto modulesDir = uniqueTempDir() / "modules";
+    std::filesystem::create_directories(modulesDir);
+    copyModuleIfPresent(pascalPath, modulesDir);
+    copyModuleIfPresent(comalPath, modulesDir);
+    copyModuleIfPresent(cobolPath, modulesDir);
+
+    LanguageRegistry registry;
+    const LanguageModuleLoadReport report = loadLanguageModules(registry, modulesDir);
+    CHECK(report.attempted == 3);
+    CHECK(report.loaded == 3);
+    CHECK(report.failed == 0);
+
+    const auto pascalMeta = registry.metadata(Gemini::kNamespaceIdPascal);
+    REQUIRE(pascalMeta.has_value());
+    CHECK(pascalMeta->name == "pascal");
+    CHECK(pascalMeta->version == "1");
+
+    const auto comalMeta = registry.metadata(Gemini::kNamespaceIdComal);
+    REQUIRE(comalMeta.has_value());
+    CHECK(comalMeta->name == "comal");
+
+    const auto cobolMeta = registry.metadata(Gemini::kNamespaceIdCobol);
+    REQUIRE(cobolMeta.has_value());
+    CHECK(cobolMeta->name == "cobol");
+}
+
+TEST_CASE("LanguageModuleLoader loads basic and language stubs together") {
+    const std::filesystem::path basicPath = basicModulePath();
+    const std::filesystem::path pascalPath = pascalModulePath();
+    if (basicPath.empty() || pascalPath.empty() || !std::filesystem::exists(basicPath) ||
+        !std::filesystem::exists(pascalPath)) {
+        MESSAGE("GEMINI_BASIC_MODULE_PATH or GEMINI_PASCAL_MODULE_PATH not configured; skipping");
+        return;
+    }
+
+    const auto modulesDir = uniqueTempDir() / "modules";
+    std::filesystem::create_directories(modulesDir);
+    copyModuleIfPresent(basicPath, modulesDir);
+    copyModuleIfPresent(pascalPath, modulesDir);
+
+    LanguageRegistry registry;
+    const LanguageModuleLoadReport report = loadLanguageModules(registry, modulesDir);
+    CHECK(report.loaded == 2);
+    CHECK(registry.metadata(kBasicNamespaceId).has_value());
+    CHECK(registry.metadata(Gemini::kNamespaceIdPascal).has_value());
 }

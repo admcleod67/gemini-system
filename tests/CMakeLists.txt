@@ -32,6 +32,7 @@ add_executable(
         core/test_LockTable.cpp
         core/test_LanguageRegistry.cpp
         core/test_CallFunc.cpp
+        core/test_LanguageAbi.cpp
         core/test_LanguageModuleLoader.cpp
         core/test_FileSystemLocking.cpp
         basic/test_BasicBytecodeEmitter.cpp
@@ -51,13 +52,17 @@ add_executable(
 )
 target_include_directories(pick-tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(pick-tests PRIVATE gemini-tcl doctest_headers)
-add_dependencies(pick-tests gemini-module-stub gemini-module-basic)
+add_dependencies(pick-tests gemini-module-stub gemini-module-basic gemini-module-pascal gemini-module-comal
+        gemini-module-cobol)
 target_compile_definitions(
         pick-tests
         PRIVATE "PICK_SYSTEM_VERSION=\"${PROJECT_VERSION}\""
                 "PICK_SYSTEM_GEMINI_SYSPROG_FIXTURE=\"${CMAKE_SOURCE_DIR}/gemini/accounts/SYSPROG\""
                 "GEMINI_STUB_MODULE_PATH=\"$<TARGET_FILE:gemini-module-stub>\""
                 "GEMINI_BASIC_MODULE_PATH=\"$<TARGET_FILE:gemini-module-basic>\""
+                "GEMINI_PASCAL_MODULE_PATH=\"$<TARGET_FILE:gemini-module-pascal>\""
+                "GEMINI_COMAL_MODULE_PATH=\"$<TARGET_FILE:gemini-module-comal>\""
+                "GEMINI_COBOL_MODULE_PATH=\"$<TARGET_FILE:gemini-module-cobol>\""
 )
 pick_system_enable_warnings(pick-tests)
 
