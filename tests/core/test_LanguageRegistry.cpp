@@ -1,6 +1,7 @@
 #include <doctest/doctest.h>
 
 #include "LanguageRegistry.h"
+#include "TestLanguageNamespace.h"
 
 #include <functional>
 #include <stdexcept>
@@ -11,47 +12,15 @@ using PickCore::Languages::LanguageFunctionEntry;
 using PickCore::Languages::LanguageNamespaceDescriptor;
 using PickCore::Languages::LanguageRegistry;
 using PickCore::Languages::NamespaceId;
+using PickSystemTest::kFnAddOne;
+using PickSystemTest::kFnEchoInt;
+using PickSystemTest::kFnNoOp;
+using PickSystemTest::kTestNamespaceId;
+using PickSystemTest::makeTestNamespaceDescriptor;
+using PickSystemTest::registerTestNamespace;
 using PickVM::Value;
 
 namespace {
-    constexpr NamespaceId kTestNamespaceId = 0x00000001;
-    constexpr FunctionId kFnEchoInt = 0;
-    constexpr FunctionId kFnAddOne = 1;
-    constexpr FunctionId kFnNoOp = 2;
-
-    void fnEchoInt(std::vector<Value> &stack, void * /*hostContext*/) {
-        const int value = std::get<int>(stack.back());
-        stack.pop_back();
-        stack.push_back(value);
-    }
-
-    void fnAddOne(std::vector<Value> &stack, void * /*hostContext*/) {
-        const int value = std::get<int>(stack.back());
-        stack.pop_back();
-        stack.push_back(value + 1);
-    }
-
-    void fnNoOp(std::vector<Value> &stack, void * /*hostContext*/) {
-        stack.push_back(std::string("ok"));
-    }
-
-    LanguageNamespaceDescriptor makeTestNamespaceDescriptor() {
-        LanguageNamespaceDescriptor descriptor{};
-        descriptor.id = kTestNamespaceId;
-        descriptor.metadata.name = "test";
-        descriptor.metadata.version = "1";
-        descriptor.functions = {
-            LanguageFunctionEntry{1, fnEchoInt},
-            LanguageFunctionEntry{1, fnAddOne},
-            LanguageFunctionEntry{0, fnNoOp},
-        };
-        return descriptor;
-    }
-
-    void registerTestNamespace(LanguageRegistry &registry) {
-        registry.registerNamespace(makeTestNamespaceDescriptor());
-    }
-
     bool throwsWithMessage(const std::function<void()> &fn, const std::string &substring) {
         try {
             fn();

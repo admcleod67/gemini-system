@@ -8,6 +8,8 @@
 
 #include "Parser.h"
 
+#include "BytecodeText.h"
+
 using PickVM::LoadedBytecode;
 using PickVM::OpCode;
 using PickVM::Parser;
@@ -305,6 +307,49 @@ TEST_CASE("parser INVOKE_BUILTIN parses quoted builtin name") {
     REQUIRE(lb.program.size() == 3);
     CHECK(lb.program[1].op == OpCode::InvokeBuiltin);
     CHECK(std::get<std::string>(lb.program[1].operand) == "LEN");
+}
+
+TEST_CASE("parser CALL_FUNC parses three operands") {
+    Parser parser;
+    std::istringstream in(
+        "PUSH_INT 42\n"
+        "CALL_FUNC 1, 0, 1\n"
+        "HALT\n");
+    LoadedBytecode lb = parser.parse(in);
+    REQUIRE(lb.program.size() == 3);
+    CHECK(lb.program[1].op == OpCode::CallFunc);
+    CHECK(lb.program[1].callFunc.namespaceId == 1);
+    CHECK(lb.program[1].callFunc.functionId == 0);
+    CHECK(lb.program[1].callFunc.argCount == 1);
+}
+
+TEST_CASE("parser CALL_FUNC rejects missing operands") {
+    Parser parser;
+    std::istringstream in("CALL_FUNC\nHALT\n");
+    CHECK_THROWS_AS(parser.parse(in), std::runtime_error);
+}
+
+TEST_CASE("parser CALL_FUNC rejects extra operands") {
+    Parser parser;
+    std::istringstream in("CALL_FUNC 1, 0, 1, 2\nHALT\n");
+    CHECK_THROWS_AS(parser.parse(in), std::runtime_error);
+}
+
+TEST_CASE("parser CALL_FUNC round-trips through bytecode text") {
+    Parser parser;
+    std::istringstream in(
+        "PUSH_INT 7\n"
+        "CALL_FUNC 1, 1, 1\n"
+        "HALT\n");
+    LoadedBytecode lb = parser.parse(in);
+    const std::string text = serializeBytecodeText(lb.program, lb.sourceLinePerInstr);
+    std::istringstream roundTrip(text);
+    LoadedBytecode again = parser.parse(roundTrip);
+    REQUIRE(again.program.size() == lb.program.size());
+    CHECK(again.program[1].op == OpCode::CallFunc);
+    CHECK(again.program[1].callFunc.namespaceId == 1);
+    CHECK(again.program[1].callFunc.functionId == 1);
+    CHECK(again.program[1].callFunc.argCount == 1);
 }
 
 TEST_CASE("parser record lock opcodes round-trip") {

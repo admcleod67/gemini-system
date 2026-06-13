@@ -6,6 +6,7 @@
 #define PICK_SYSTEM_VM_RUNTIME_H
 
 #include <atomic>
+#include <cstdint>
 #include <functional>
 #include <iosfwd>
 #include <optional>
@@ -14,6 +15,10 @@
 #include <unordered_map>
 #include <variant>
 #include <vector>
+
+namespace PickCore::Languages {
+    class LanguageRegistry;
+}
 
 namespace PickFS {
     class FileSystem;
@@ -66,6 +71,7 @@ namespace PickVM {
         SgnInt,
         SeqStr,
         InvokeBuiltin,
+        CallFunc,
         OpenFile,
         OpenFileTry,
         ReadRec,
@@ -112,9 +118,16 @@ namespace PickVM {
         std::size_t bodyIP{0};
     };
 
+    struct CallFuncOperand {
+        std::uint32_t namespaceId{0};
+        std::uint32_t functionId{0};
+        int argCount{0};
+    };
+
     struct Instruction {
         OpCode op;
-        Value operand; // Only used for PUSH_INT, PUSH_STR, JUMP targets, etc.
+        Value operand{};           // Only used for PUSH_INT, PUSH_STR, JUMP targets, etc.
+        CallFuncOperand callFunc{}; // Valid when op == CallFunc
     };
 
     class Runtime {
@@ -161,6 +174,9 @@ namespace PickVM {
         /// Invoked from builtin dispatch for `SYSTEM`; throws if no handler was set.
         [[nodiscard]] Value evalBuiltinSystemCall(int n);
 
+        /// Optional language registry for `CALL_FUNC` dispatch (Milestone 11). Cleared with nullptr.
+        void setLanguageRegistry(const PickCore::Languages::LanguageRegistry *registry);
+
         // Debug helper (optional)
         void dumpStack() const;
 
@@ -186,6 +202,7 @@ namespace PickVM {
         PickFS::FileSystem *fileSystem_{nullptr};
         SystemVarReaderFn systemVarReader_;
         BuiltinSystemCallFn builtinSystemCallHandler_;
+        const PickCore::Languages::LanguageRegistry *languageRegistry_{nullptr};
         int statusCode_{0};
         std::optional<std::size_t> onErrorIp_;
 

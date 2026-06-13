@@ -54,6 +54,7 @@ namespace PickVM {
             case OpCode::SgnInt: return "SGN_INT";
             case OpCode::SeqStr: return "SEQ_STR";
             case OpCode::InvokeBuiltin: return "INVOKE_BUILTIN";
+            case OpCode::CallFunc: return "CALL_FUNC";
             case OpCode::OpenFile: return "OPEN_FILE";
             case OpCode::OpenFileTry: return "OPEN_FILE_TRY";
             case OpCode::ReadRec: return "READ_REC";
@@ -172,6 +173,10 @@ namespace PickVM {
                 oss << " \"" << s << '"';
                 break;
             }
+            case OpCode::CallFunc:
+                oss << ' ' << instr.callFunc.namespaceId << ", " << instr.callFunc.functionId << ", "
+                    << instr.callFunc.argCount;
+                break;
             case OpCode::Add:
             case OpCode::Sub:
             case OpCode::Mul:

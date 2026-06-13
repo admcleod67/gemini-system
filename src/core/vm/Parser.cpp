@@ -8,6 +8,8 @@
 #include <limits>
 #include <sstream>
 #include <stdexcept>
+#include <vector>
+#include <cstdint>
 
 namespace PickVM {
     namespace {
@@ -32,6 +34,57 @@ namespace PickVM {
             } catch (const std::exception &) {
                 return false;
             }
+        }
+
+        bool parseUint32(const std::string &text, std::uint32_t &value) {
+            try {
+                std::size_t pos = 0;
+                const unsigned long long v = std::stoull(text, &pos);
+                if (pos != text.size() || v > std::numeric_limits<std::uint32_t>::max()) {
+                    return false;
+                }
+                value = static_cast<std::uint32_t>(v);
+                return true;
+            } catch (const std::exception &) {
+                return false;
+            }
+        }
+
+        CallFuncOperand parseCallFuncOperands(const std::string &operand, const int line) {
+            if (operand.empty()) {
+                throw std::runtime_error(
+                    "CALL_FUNC requires namespace-id, function-id, arg-count at line " + std::to_string(line));
+            }
+
+            std::vector<std::string> parts;
+            std::istringstream iss(operand);
+            std::string item;
+            while (std::getline(iss, item, ',')) {
+                item = trimLocal(item);
+                if (!item.empty()) {
+                    parts.push_back(item);
+                }
+            }
+
+            if (parts.size() != 3) {
+                throw std::runtime_error(
+                    "CALL_FUNC requires namespace-id, function-id, arg-count at line " + std::to_string(line));
+            }
+
+            CallFuncOperand out{};
+            if (!parseUint32(parts[0], out.namespaceId)) {
+                throw std::runtime_error("Invalid CALL_FUNC namespace-id at line " + std::to_string(line) + ": '" +
+                                         parts[0] + '\'');
+            }
+            if (!parseUint32(parts[1], out.functionId)) {
+                throw std::runtime_error("Invalid CALL_FUNC function-id at line " + std::to_string(line) + ": '" +
+                                         parts[1] + '\'');
+            }
+            if (!parseNonNegativeInt(parts[2], out.argCount)) {
+                throw std::runtime_error("Invalid CALL_FUNC arg-count at line " + std::to_string(line) + ": '" +
+                                         parts[2] + '\'');
+            }
+            return out;
         }
 
         std::string parseQuotedString(const std::string &token, const int line) {
@@ -386,6 +439,9 @@ namespace PickVM {
                         "INVOKE_BUILTIN requires a quoted builtin name at line " + std::to_string(pl.sourceLine));
                 }
                 inst.operand = parseQuotedString(pl.operand, pl.sourceLine);
+            } else if (pl.opcode == "CALL_FUNC") {
+                inst.op = OpCode::CallFunc;
+                inst.callFunc = parseCallFuncOperands(pl.operand, pl.sourceLine);
             } else if (pl.opcode == "OPEN_FILE") {
                 inst.op = OpCode::OpenFile;
                 if (pl.operand.empty()) {

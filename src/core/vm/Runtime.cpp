@@ -12,6 +12,7 @@
 #include "../english/EnglishTypes.h"
 #include "../conversion/PickOconv.h"
 #include "../conversion/PickIconv.h"
+#include "../languages/LanguageRegistry.h"
 
 #include <algorithm>
 #include <cctype>
@@ -984,6 +985,10 @@ namespace PickVM {
         builtinSystemCallHandler_ = std::move(fn);
     }
 
+    void Runtime::setLanguageRegistry(const PickCore::Languages::LanguageRegistry *const registry) {
+        languageRegistry_ = registry;
+    }
+
     Value Runtime::evalBuiltinSystemCall(const int n) {
         if (!builtinSystemCallHandler_) {
             throw std::runtime_error("BUILTIN: SYSTEM not configured");
@@ -1432,6 +1437,19 @@ namespace PickVM {
             case OpCode::InvokeBuiltin: {
                 const std::string name = stringOperandAtIp(instr, ip_);
                 invokeBuiltinOnStack(name, stack_, this);
+                break;
+            }
+
+            case OpCode::CallFunc: {
+                if (languageRegistry_ == nullptr) {
+                    throw std::runtime_error("LANG: registry not configured");
+                }
+                const CallFuncOperand &call = instr.callFunc;
+                if (static_cast<int>(stack_.size()) < call.argCount) {
+                    throw std::runtime_error("LANG: arity mismatch");
+                }
+                languageRegistry_->dispatch(
+                    call.namespaceId, call.functionId, stack_, call.argCount, this);
                 break;
             }
 

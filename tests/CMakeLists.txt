@@ -31,6 +31,7 @@ add_executable(
         core/test_PickIconv.cpp
         core/test_LockTable.cpp
         core/test_LanguageRegistry.cpp
+        core/test_CallFunc.cpp
         core/test_FileSystemLocking.cpp
         basic/test_BasicBytecodeEmitter.cpp
         basic/test_BasicCompiler.cpp

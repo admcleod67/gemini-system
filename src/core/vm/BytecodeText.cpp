@@ -90,6 +90,10 @@ namespace PickVM {
                 case OpCode::InvokeBuiltin:
                     out << " \"" << escapeQuoted(std::get<std::string>(instr.operand)) << '"';
                     break;
+                case OpCode::CallFunc:
+                    out << ' ' << instr.callFunc.namespaceId << ", " << instr.callFunc.functionId << ", "
+                        << instr.callFunc.argCount;
+                    break;
                 default:
                     break;
             }
