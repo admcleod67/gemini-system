@@ -48,33 +48,46 @@ Introduce a new session type (working name: **`GeminiSession`**) that owns all s
 - **Session I/O channels** — replace direct **`std::cin`** / **`std::cout`** in **`LoginService`**, **`Shell::runTclRepl`**, and related paths (build on existing optional stream hooks in **`Shell`** / **`Runtime`** where appropriate)
 - **Account binding** — fields currently carried in **`UserSession`** and applied via **`attachUserSession`**
 
-**Type migration (TBD):** prefer **absorption** of **`UserSession`** / **`ShellSession`** into **`GeminiSession`** rather than a wrapper hierarchy; familiar internal names may remain where they reduce churn, but ownership and lifecycle move to the session boundary.
-
 **Lock binding:** the session exposes the per-session lock context today wired through **`ShellSession`** (shared **`LockTable`**, session lock id on login per [Milestone 10](10-record-locking-multi-user.md)). M12 must not break per-session lock identity.
 
-#### 2.2 Session lifecycle
+#### 2.2 Type migration plan
+
+Milestone 12 removes the historical split between **`UserSession`**, **`ShellSession`**, and the process-level **`Runtime`**. The migration path is explicit absorption — not a wrapper hierarchy — so a single point of ownership exists for all session-scoped state:
+
+- **`UserSession`** becomes a lightweight account-metadata struct owned by **`GeminiSession`**. No independent lifecycle for bound account state; no separate owner. It may remain the login DTO returned by **`LoginService`** and passed to **`attach()`**.
+- **`ShellSession` is removed.** Its mutable fields (filesystem root, Tcl environment, lock identity, active list, login flags, breakpoint/suspend state, etc.) migrate directly into **`GeminiSession`**.
+- **`Runtime`** is owned by **`GeminiSession`** for the session lifetime (today allocated in **`Main.cpp`**).
+- **`Shell`** remains the interpreter front-end but **no longer owns session state**; it receives a reference to the session (today it embeds **`ShellSession session_`**).
+
+#### 2.3 Session lifecycle
 
 Define explicit, deterministic lifecycle transitions (later driven by the daemon in M13):
 
 | Transition | Semantics |
 |------------|-----------|
-| **create** | Allocate VM, initialise interpreters, create I/O channels |
-| **attach** | Bind an authenticated account |
-| **detach** | Remove account binding without destroying the session |
-| **reset** | Clear interpreter state and VM state while retaining I/O |
-| **destroy** | Full teardown of the session |
+| **create** | Allocate **one** **`Runtime`**, initialise interpreters, create I/O channels |
+| **attach** | Bind an authenticated account (today: **`applyUserSession`**) |
+| **detach** | Remove account binding without destroying the session (today: **`clearLoginSession`**) |
+| **reset** | Clear interpreter and VM *program* state while retaining the same **`Runtime`** instance and I/O channels |
+| **destroy** | Full teardown of the session; **`Runtime`** destroyed with the session |
 
-#### 2.3 I/O boundary
+**VM lifetime vs reset:** **`create`** allocates a single **`Runtime`** for the session’s entire lifetime. **`reset`** does **not** destroy or reallocate the VM — it performs an in-process clear equivalent to today’s **`ShellSession::resetForQuit()`** (release locks where applicable, clear Tcl env, active lists, breakpoints, and call **`Runtime::loadProgram({})`**). **`destroy`** tears down the session object and its **`Runtime`**. **`detach`** is narrower than **`reset`** (login/lock identity cleared; aligns with LOGOFF paths); **`reset`** aligns with QUIT / end-of-session cleanup that clears interpreter state for a fresh REPL cycle.
 
-Replace all direct use of **`std::cin`** / **`std::cout`** on **production paths** with a session-owned I/O interface. This includes:
+#### 2.4 I/O boundary
 
-- **`LoginService`**
-- **`Shell::runTclRepl`**
-- Any interpreter path that currently writes directly to the console
+Replace all direct use of **`std::cin`** / **`std::cout`** on **production paths** with a session-owned I/O interface. This includes **`LoginService`**, **`Shell::runTclRepl`**, and any interpreter path that currently writes directly to the console. Tests may continue to inject streams directly (existing **`Shell`** / **`Runtime`** stream hooks). This is the most important architectural seam for future multi-session support.
 
-Tests may continue to inject streams directly (existing **`Shell`** / **`Runtime`** stream hooks). This is the most important architectural seam for future multi-session support.
+#### 2.5 I/O channel definition
 
-#### 2.4 Standalone mode
+A session exposes a minimal, well-defined I/O interface:
+
+- **Input channel** — synchronous; **one underlying stream** shared by interpreters. Line-oriented for the Tcl REPL (**`getline`**); VM/BASIC **`INPUT`** uses the same stream (today: optional **`Shell::inputStream_`** / **`Runtime`** input stream).
+- **Output channel** — synchronous byte stream for command results, banners, and interpreter **`Error: …`** lines (unchanged from today: errors go to the primary output channel in M12).
+- **Error/diagnostic channel (optional)** — separate stderr-like stream for login failures and host diagnostics (today: **`std::cerr`** in **`Main.cpp`**), not for relocating interpreter **`Error: …`** output unless explicitly changed in a later milestone.
+
+Standalone mode binds these channels to in-process streams; M14 will replace the transport with remote console IPC. Implementation may use **`std::istream`** / **`std::ostream`** (or thin wrappers) — no new wire protocol in M12. **Synchronous, blocking I/O for M12** — no async multiplexing (cooperative scheduling is M15).
+
+#### 2.6 Standalone mode
 
 Standalone **`gemini-system`** becomes:
 
@@ -86,7 +99,13 @@ Standalone **`gemini-system`** becomes:
 
 ---
 
-### 3. Invariants
+### 3. Invariants and error boundaries
+
+#### 3.1 Error handling boundary
+
+Error formatting and reporting remain **interpreter-local**. **`GeminiSession` does not catch, reformat, or aggregate interpreter errors in M12** — it routes interpreter output through the session’s I/O channels without introducing new error-handling semantics. Today **`Shell`** and language runtimes catch exceptions and write **`Error: …`** to the output channel; that behaviour is unchanged. **`GeminiSession` does not introduce a new error envelope or cross-interpreter error policy.** Transport-level error framing for remote consoles is M14 scope.
+
+#### 3.2 Session invariants
 
 A session guarantees:
 
@@ -122,6 +141,7 @@ External behaviour of **`gemini-system`** remains unchanged — only internal co
 - Login flow unchanged
 - Command semantics unchanged
 - Interpreter behaviour unchanged
+- Error messages and formatting unchanged (see §3.1)
 - Locking semantics unchanged ([Milestone 10](10-record-locking-multi-user.md))
 - Multi-language runtime behaviour unchanged ([Milestone 11](11-multi-language-runtime-infrastructure.md))
 
@@ -153,5 +173,25 @@ External behaviour of **`gemini-system`** remains unchanged — only internal co
 - **`gemini-system`** manual smoke unchanged: login → Tcl → BASIC → LOGOFF
 - All existing tests pass
 - Per-session lock identity and M11 language dispatch unchanged from an operator perspective
+
+---
+
+### Delivery plan
+
+Implementation is sequenced into vertical stages. Each stage ships a test-locked slice before the next starts; the full test suite must remain green after every stage. Introduce **`GeminiSession`** and **`Runtime`** ownership first; move **`Shell`** under session ownership and update the host early; add session I/O channels second; route login and REPL through session I/O third; absorb **`ShellSession`** and fold **`UserSession`** fourth; expose explicit lifecycle APIs fifth; finish with documentation and milestone close sixth. Detailed per-stage plans may live in `~/.cursor/plans/m12_stage_*.plan.md` during implementation; status is summarised here as each stage lands (matching the M8 / M9 / M10 / M11 precedent).
+
+- **Stage 1 — Session skeleton + ownership**: introduce **`GeminiSession`**; own **`Runtime`** and construct or own **`Shell`** (interpreter front-end under session ownership, not duplicated inside the session type). Update [`Main.cpp`](../../src/Main.cpp) to host exactly one session after process-level boot ([`BootMonitor`](../../src/core/boot/BootMonitor.h), **`LanguageRegistry`** attach). External behaviour unchanged; may temporarily delegate to existing **`ShellSession`** internals. Tests: existing shell and integration tests green. *Status: planned.*
+
+- **Stage 2 — Session I/O channels**: add session-owned I/O (input, output, optional diagnostic stream per §2.5); default to process **`std::cin`** / **`std::cout`** / **`std::cerr`**; wire existing **`Shell`** / **`Runtime`** stream hooks through the session. No login/REPL path migration yet beyond defaults. Tests: session I/O injectable in unit tests. *Status: planned.*
+
+- **Stage 3 — Login + REPL on session I/O**: refactor [`LoginService`](../../src/core/login/LoginService.h) and [`Shell::runTclRepl`](../../src/userland/tcl/Shell.cpp) (and related interpreter output paths) to use session channels; remove direct **`std::cin`** / **`std::cout`** on production login/REPL paths (tests excepted). Tests: existing [`tests/tcl/test_Shell.cpp`](../../tests/tcl/test_Shell.cpp) and login flows green. *Status: planned.*
+
+- **Stage 4 — Absorb `ShellSession`**: migrate mutable **`ShellSession`** fields into **`GeminiSession`** (filesystem root, Tcl env, lock binding, active list, login flags, breakpoint/suspend state); **`Shell`** holds **`GeminiSession&`** instead of embedding **`ShellSession`**; implement **`attach(const UserSession&)`** on the session; delete **`ShellSession`** type. Preserve per-session lock identity ([`tests/tcl/test_ShellSessionLocks.cpp`](../../tests/tcl/test_ShellSessionLocks.cpp), [`tests/tcl/test_ShellLocking.cpp`](../../tests/tcl/test_ShellLocking.cpp)). *Status: planned.*
+
+- **Stage 5 — Lifecycle API**: explicit **`create`** / **`attach`** / **`detach`** / **`reset`** / **`destroy`** on **`GeminiSession`**; align **`reset`** with today’s **`ShellSession::resetForQuit()`** and **`detach`** with **`clearLoginSession()`** semantics (§2.3). Session lifecycle unit tests. *Status: planned.*
+
+- **Stage 6 — Docs + closes M12**: satisfy §8 completion criteria; update milestone status; optional architecture cross-links in [`docs/`](../). Manual smoke: login → Tcl → BASIC → LOGOFF unchanged. **Closes Milestone 12.** *Status: planned.*
+
+Only Stage 6's exit criteria should claim "Closes Milestone 12".
 
 *Status: planned.*
