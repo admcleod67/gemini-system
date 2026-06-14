@@ -9,7 +9,7 @@ The implementation remains intentionally incremental, but the platform is now br
 filesystem-backed Pick file semantics, BASIC compiler/shell workflows, and ENGLISH/DICT query foundations. The goal is
 still to grow the system in **small, verifiable steps** (tests, clear boundaries) rather than landing a large stack at once.
 
-A phased **roadmap** (Milestone 1 onward) is summarized in **[`docs/milestones.md`](docs/milestones.md)** (hub); long-form text for each milestone lives under **[`docs/milestones/`](docs/milestones/)**. **Milestones 1–4** track what is implemented today (core stack, multi-account session and VOC, ENGLISH + filesystem maturation, and BASIC language fidelity stages), and later milestones remain subject to refinement.
+A phased **roadmap** (Milestone 1 onward) is summarized in **[`docs/milestones.md`](docs/milestones.md)** (hub); long-form text for each milestone lives under **[`docs/milestones/`](docs/milestones/)**. **Milestones 1–11** are implemented through multi-language runtime infrastructure; **milestones 12–18** describe the path to **Version 1.0** as a Linux-hosted, multi-session Gemini System Service (with a single-session application edition on the same architecture).
 
 ## Building
 
