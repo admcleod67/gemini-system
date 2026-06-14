@@ -13,7 +13,7 @@ A phased **roadmap** (Milestone 1 onward) is summarized in **[`docs/milestones.m
 
 ## Building
 
-Requires **CMake 3.16+** and a **C++17** toolchain.
+Requires **CMake 3.16+** and a **C++20** toolchain (GCC 11+, Clang 14+, or equivalent).
 
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
