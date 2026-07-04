@@ -10,7 +10,7 @@ An in-memory [`LockTable`](../src/core/locking/LockTable.h) maps `(fileId, recor
 - lock type (`READU` or `WRITEU`)
 - acquisition timestamp
 
-Locks are **not persisted** across process restarts.
+Locks are **not persisted** across process restarts. The daemon owns one shared lock table per process; each session binds a distinct lock session id at login. See [Service daemon architecture](daemon.md).
 
 ## Filesystem enforcement
 
@@ -63,6 +63,7 @@ These belong to later milestones.
 ## See also
 
 - [Session model](session.md) — `GeminiSession` lifecycle and I/O
+- [Service daemon architecture](daemon.md) — process-scope lock table and session table
 - [Milestone 10 — Record locking](milestones/10-record-locking-multi-user.md)
 - [Tcl shell locking commands](tcl-shell.md)
 - [BASIC READU / WRITEU](basic-language.md)

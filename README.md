@@ -9,7 +9,7 @@ The implementation remains intentionally incremental, but the platform is now br
 filesystem-backed Pick file semantics, BASIC compiler/shell workflows, and ENGLISH/DICT query foundations. The goal is
 still to grow the system in **small, verifiable steps** (tests, clear boundaries) rather than landing a large stack at once.
 
-A phased **roadmap** (Milestone 1 onward) is summarized in **[`docs/milestones.md`](docs/milestones.md)** (hub); long-form text for each milestone lives under **[`docs/milestones/`](docs/milestones/)**. **Milestones 1–12** are implemented (through session model foundation); **milestones 13–18** describe the path to **Version 1.0** as a Linux-hosted, multi-session Gemini System Service (with a single-session application edition on the same architecture).
+A phased **roadmap** (Milestone 1 onward) is summarized in **[`docs/milestones.md`](docs/milestones.md)** (hub); long-form text for each milestone lives under **[`docs/milestones/`](docs/milestones/)**. **Milestones 1–13** are implemented (through service daemon architecture); **milestones 14–18** describe the path to **Version 1.0** as a Linux-hosted, multi-session Gemini System Service (with a single-session application edition on the same architecture).
 
 ## Building
 
@@ -21,7 +21,7 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
-Artifacts include **`gemini-system`** (host entry point with boot and Tcl REPL), and **`pick-tests`** (unit tests).
+Artifacts include **`gemini-system`** (embedded host with boot and Tcl REPL), **`gemini-daemon`** (long-running service host with IPC), and **`pick-tests`** (unit tests).
 
 ## Documentation
 
@@ -29,6 +29,8 @@ More detail lives under **[`docs/`](docs/README.md)**:
 
 - **[Bytecode VM](docs/vm.md)** — `.tbc` format, opcodes, parser and runtime.
 - **[Bytecode contract & language modules](docs/bytecode.md)** — **`CALL_FUNC`** ABI for external compilers; [module author guide](docs/language-modules.md).
+- **[Session model](docs/session.md)** — `GeminiSession` lifecycle, I/O channels, embedded vs daemon hosting.
+- **[Service daemon](docs/daemon.md)** — `GeminiServiceDaemon`, `gemini-daemon`, configuration, IPC v1.
 - **[Developer shell (TCL)](docs/tcl-shell.md)** — host shell commands and mode entry (`BASIC`, `PROC`, `ASM`).
 - **[Assembler shell (ASM)](docs/assembler-shell.md)** — VM-level debugger workflow and command set.
 - **[ENGLISH query core](docs/english.md)** — `LIST`, `SORT`, `COUNT`, `SELECT`, file-scoped `DICT-*` lookup, **`RESOLVE-FIELD`**, **`DEFINE-FIELD`**; active-list commands (`LIST-LIST`, `CLEAR-LIST`).

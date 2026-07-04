@@ -2,7 +2,7 @@
 
 ## Milestone 13 — Service Daemon Architecture
 
-Introduce the **Gemini Service Daemon (GSD)** as a long-running process that owns the VM substrate, Pick filesystem, boot-time **language registry**, shared **lock table**, and a **session table**. Add a minimal **IPC layer** (Unix domain sockets) for future console attachment, plus daemon lifecycle (start, stop, configuration). Sessions may be created and held in the table, but only one runs at a time—no cooperative scheduling yet. Security is minimal: host file permissions and socket access control. *Status: planned.*
+Introduce the **Gemini Service Daemon (GSD)** as a long-running process that owns the VM substrate, Pick filesystem, boot-time **language registry**, shared **lock table**, and a **session table**. Add a minimal **IPC layer** (Unix domain sockets) for future console attachment, plus daemon lifecycle (start, stop, configuration). Sessions may be created and held in the table, but only one runs at a time—no cooperative scheduling yet. Security is minimal: host file permissions and socket access control. *Status: implemented.*
 
 This milestone is the architectural hinge between the M12 session object and the multi-console service introduced in M14–M17. A correct daemon host makes later milestones largely mechanical; an incorrect one forces parallel execution paths.
 
@@ -90,7 +90,7 @@ Without this distinction, “multi-session” in M13 can be mistaken for M14 or 
 
 | Scope | Owned by | Examples |
 |-------|----------|----------|
-| **Process (GSD)** | `GeminiServiceDaemon` | [`BootMonitor`](../../src/core/boot/BootMonitor.h), frozen [`LanguageRegistry`](../../src/core/languages/LanguageRegistry.h), shared [`LockTable`](../../src/core/locking/LockTable.h), [`PortManager`](../../src/core/daemon/PortManager.h) (planned), session table, IPC server |
+| **Process (GSD)** | `GeminiServiceDaemon` | [`BootMonitor`](../../src/core/boot/BootMonitor.h), frozen [`LanguageRegistry`](../../src/core/languages/LanguageRegistry.h), shared [`LockTable`](../../src/core/locking/LockTable.h), [`PortManager`](../../src/core/daemon/PortManager.h), session table, IPC server |
 | **Session** | [`GeminiSession`](../../src/userland/tcl/GeminiSession.h) | [`Runtime`](../../src/core/vm/Runtime.h), [`Shell`](../../src/userland/tcl/Shell.h), account binding, per-session filesystem root, lock session id, I/O channels |
 
 #### 3.2 Entry points
@@ -177,7 +177,7 @@ External behaviour of **`gemini-system`** remains unchanged — only internal co
 **Code (anticipated paths):**
 
 - **`GeminiServiceDaemon`** — `src/core/daemon/` (daemon host, config, lifecycle)
-- **`SessionTable`**, **`SerialSessionRunner`**, **`PortManager`** — `src/core/daemon/`
+- **`SessionTable`**, **`SerialSessionRunner`**, **`PortManager`** — `src/core/daemon/` (`SessionTable` in `src/userland/tcl/`)
 - **`gemini-daemon`** executable — `src/daemon/Main.cpp` (or equivalent); CMake sibling to [`gemini-system`](../../src/CMakeLists.txt)
 - Refactored [`Main.cpp`](../../src/Main.cpp) — embedded daemon + single session + login loop
 - Minimal IPC server and protocol types — `src/core/daemon/`
@@ -191,7 +191,7 @@ External behaviour of **`gemini-system`** remains unchanged — only internal co
 
 **Documentation:**
 
-- [`docs/daemon.md`](../daemon.md) — GSD architecture, embedded vs `gemini-daemon`, IPC boundary vs M14 (Stage 6)
+- [`docs/daemon.md`](../daemon.md) — GSD architecture, embedded vs `gemini-daemon`, IPC boundary vs M14
 - Updates to [`docs/session.md`](../session.md), [`docs/gemini-bootstrap.md`](../gemini-bootstrap.md)
 
 ---
@@ -231,6 +231,8 @@ Implementation is sequenced into vertical stages. Each stage ships a test-locked
 
 - **Stage 5 — IPC foundation**: Unix domain socket server inside GSD; minimal protocol (version/handshake, ping, shutdown request; optional “reserve session slot” stub — **no** login or REPL byte stream); filesystem permissions on socket. **Exit criterion:** test client connects, handshakes, disconnects; daemon remains stable. Tests: `tests/core/test_DaemonIpc.cpp`. *Status: implemented.*
 
-- **Stage 6 — Docs + closes M13**: add [`docs/daemon.md`](../daemon.md); update [`docs/session.md`](../session.md) and [`docs/gemini-bootstrap.md`](../gemini-bootstrap.md); link from [`docs/milestones.md`](../milestones.md); audit §9 completion criteria; run full test suite + M12 smoke. **Closes Milestone 13.** *Status: planned.*
+- **Stage 6 — Docs + closes M13**: add [`docs/daemon.md`](../daemon.md); update [`docs/session.md`](../session.md) and [`docs/gemini-bootstrap.md`](../gemini-bootstrap.md); link from [`docs/milestones.md`](../milestones.md); audit §9 completion criteria; run full test suite + M12 smoke. **Closes Milestone 13.** *Status: implemented.*
 
 Only Stage 6's exit criteria should claim "Closes Milestone 13".
+
+*Status: implemented.*

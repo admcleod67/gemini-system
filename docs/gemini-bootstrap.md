@@ -84,9 +84,17 @@ Programmatic **`stdout`** for auto-login is therefore **`LOGON PLEASE: `** plus 
 
 **`LOGTO account`** and **`LOGOFF`** remain **Tcl commands** after login. **`LOGOFF`** clears the session and **`runTclRepl()`** returns to **`main`**, which repeats **`runCatalogLogin`** in **`InteractiveOnly`** phase (no **`MD`** / env auto-logon).
 
-**`WHO`** prints `port username account` when logged in (port is `0` for now). With account-only logon, **`username`** and **`account`** match. When not logged in (e.g. tests without a catalogue), **`WHO`** prints **`0 - -`**.
+**`WHO`** prints `port username account` when logged in. The port is assigned by the daemon at session create (typically **1** for embedded `gemini-system` with a single session). When not logged in (e.g. tests without a catalogue), **`WHO`** prints **`0 - -`**.
 
 **Breaking change:** logon is **account-based** (`ACCOUNTS.json` only). The previous **`USERS.json` username + defaultAccount** logon path has been removed.
+
+## `gemini-daemon` (service host)
+
+Building the project also produces **`gemini-daemon`**, a long-running process host that shares the same [`GeminiServiceDaemon`](../src/core/daemon/GeminiServiceDaemon.h) implementation as embedded `gemini-system`. It runs cold start to stdout, listens on a Unix domain socket for minimal IPC (handshake, ping, shutdown, reserve-session stub), and does **not** start an interactive login/REPL in M13 — console attachment is [Milestone 14](milestones/14-multi-session-console-support.md).
+
+Configuration uses CLI flags and environment variables (`GEMINI_DAEMON_SOCKET`, `GEMINI_MAX_SESSIONS`, and the same host path variables as `gemini-system`). See [Service daemon architecture](daemon.md).
+
+The **`gemini-bootstrap-copy`** CMake step copies the `gemini/` tree next to both executables when the run working directory is the build output directory.
 
 ## `GEMINI_AUTO_LOGON` and `GEMINI_AUTO_LOGIN`
 
@@ -106,7 +114,7 @@ The **smoke** test sets **`GEMINI_AUTO_LOGON=SYSPROG`** so `echo QUIT | gemini-s
 
 ## CMake copy
 
-Building `gemini-system` triggers a **`gemini-bootstrap-copy`** step that copies the entire `gemini/` tree from the source tree into **`CMAKE_CURRENT_BINARY_DIR`/gemini** (typically `<build>/src/gemini` when using the project’s `src/CMakeLists.txt`). That keeps `gemini/` next to the built binaries when the run **working directory** is set to that same directory (e.g. CLion default for targets defined under `src/`). The build also copies language modules (**`libgemini-module-basic`**, **`-pascal`**, **`-comal`**, **`-cobol`**, **`-stub`**, or platform equivalents) into **`gemini/modules/`** under that same tree.
+Building **`gemini-system`** or **`gemini-daemon`** triggers a **`gemini-bootstrap-copy`** step that copies the entire `gemini/` tree from the source tree into **`CMAKE_CURRENT_BINARY_DIR`/gemini** (typically `<build>/src/gemini` when using the project’s `src/CMakeLists.txt`). That keeps `gemini/` next to the built binaries when the run **working directory** is set to that same directory (e.g. CLion default for targets defined under `src/`). The build also copies language modules (**`libgemini-module-basic`**, **`-pascal`**, **`-comal`**, **`-cobol`**, **`-stub`**, or platform equivalents) into **`gemini/modules/`** under that same tree.
 
 ## Language modules (Milestone 11)
 
