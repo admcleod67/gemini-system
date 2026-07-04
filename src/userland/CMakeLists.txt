@@ -33,8 +33,6 @@ add_library(gemini-tcl
         tcl/DefaultFileSystemRoot.h
         tcl/GeminiSession.cpp
         tcl/GeminiSession.h
-        tcl/ShellSession.cpp
-        tcl/ShellSession.h
         tcl/TclEnvironment.cpp
         tcl/TclEnvironment.h
 )

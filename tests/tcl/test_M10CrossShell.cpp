@@ -9,6 +9,7 @@
 #include "BasicLanguageRegistration.h"
 #include "FileSystem.h"
 #include "LanguageRegistry.h"
+#include "GeminiSession.h"
 #include "Shell.h"
 #include "ShellTestFsUtil.h"
 #include "UserSession.h"
@@ -21,19 +22,19 @@ namespace {
     struct LoggedInShellPair {
         std::filesystem::path pickRoot;
         PickCore::Languages::LanguageRegistry languageRegistry;
-        std::unique_ptr<PickVM::Runtime> rtA;
-        std::unique_ptr<PickVM::Runtime> rtB;
-        std::unique_ptr<PickShell::Shell> shellA;
-        std::unique_ptr<PickShell::Shell> shellB;
+        std::unique_ptr<PickShell::GeminiSession> sessionA;
+        std::unique_ptr<PickShell::GeminiSession> sessionB;
+        PickShell::Shell *shellA{nullptr};
+        PickShell::Shell *shellB{nullptr};
 
         LoggedInShellPair()
-            : rtA(std::make_unique<PickVM::Runtime>()),
-              rtB(std::make_unique<PickVM::Runtime>()),
-              shellA(std::make_unique<PickShell::Shell>(*rtA)),
-              shellB(std::make_unique<PickShell::Shell>(*rtB)) {
+            : sessionA(std::make_unique<PickShell::GeminiSession>()),
+              sessionB(std::make_unique<PickShell::GeminiSession>()),
+              shellA(&sessionA->shell()),
+              shellB(&sessionB->shell()) {
             PickCore::Languages::Basic::registerBasicLanguage(languageRegistry);
-            rtA->setLanguageRegistry(&languageRegistry);
-            rtB->setLanguageRegistry(&languageRegistry);
+            sessionA->runtime().setLanguageRegistry(&languageRegistry);
+            sessionB->runtime().setLanguageRegistry(&languageRegistry);
         }
     };
 

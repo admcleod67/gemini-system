@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "ShellSession.h"
+#include <pickvm/core.hpp>
 
 #include <iosfwd>
 #include <optional>
@@ -11,6 +11,8 @@
 #include <vector>
 
 namespace PickShell {
+    class GeminiSession;
+
     class VmDebugService {
     public:
         enum class StepOutcome {
@@ -26,8 +28,7 @@ namespace PickShell {
             std::string runtimeError;
         };
 
-        explicit VmDebugService(ShellSession &session)
-            : session_(session) {}
+        explicit VmDebugService(GeminiSession &session);
 
         [[nodiscard]] bool hasProgramLoaded() const;
         void setTrace(bool traceEnabled);
@@ -48,7 +49,7 @@ namespace PickShell {
                                const PickVM::LoadedBytecode *loadedView = nullptr) const;
 
     private:
-        ShellSession &session_;
+        GeminiSession &session_;
     };
 } // namespace PickShell
 

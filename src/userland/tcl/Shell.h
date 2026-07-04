@@ -11,7 +11,6 @@
 #include "BasicShell.h"
 #include "EnglishService.h"
 #include "ProcInterpreter.h"
-#include "ShellSession.h"
 #include "UserSession.h"
 
 #include <filesystem>
@@ -25,6 +24,8 @@
 #include <vector>
 
 namespace PickShell {
+    class GeminiSession;
+
     enum class ShellRunResult {
         ExitProcess,
         EndSession,
@@ -32,22 +33,22 @@ namespace PickShell {
 
     class Shell {
     public:
-        explicit Shell(PickVM::Runtime &runtime);
+        explicit Shell(GeminiSession &session);
 
         // Legacy host root setting retained for compatibility.
         void setProgramsRoot(std::filesystem::path root);
 
-        const std::filesystem::path &programsRoot() const { return session_.programsRoot(); }
+        const std::filesystem::path &programsRoot() const;
 
         // Root for CREATE-FILE / DELETE-FILE / LIST-FILES / READ / WRITE (default "filesystem").
         void setFileSystemRoot(std::filesystem::path root);
 
-        const std::filesystem::path &fileSystemRoot() const { return session_.fileSystemRoot(); }
+        const std::filesystem::path &fileSystemRoot() const;
 
         /// Parent directory of ACCOUNTS.json / USERS.json. When set, the host (`main`) runs core login before the Tcl REPL.
         void setGeminiCatalogRoot(std::optional<std::filesystem::path> root);
 
-        [[nodiscard]] const std::optional<std::filesystem::path> &geminiCatalogRoot() const { return session_.geminiCatalogRoot(); }
+        [[nodiscard]] const std::optional<std::filesystem::path> &geminiCatalogRoot() const;
 
         /// Apply a successful core login (filesystem root, identity, Tcl `@*` variables).
         void attachUserSession(const PickCore::UserSession &session);
@@ -73,7 +74,7 @@ namespace PickShell {
             std::optional<std::string> error;
         };
 
-        ShellSession session_;
+        GeminiSession &session_;
         VmDebugService vmDebugService_;
         AssemblerShell assemblerShell_;
         BasicShell basicShell_;

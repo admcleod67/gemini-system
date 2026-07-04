@@ -4,8 +4,9 @@
 #include <filesystem>
 #include <memory>
 
+#include "FileSystem.h"
+#include "GeminiSession.h"
 #include "LockTable.h"
-#include "ShellSession.h"
 
 using PickCore::Locking::LockTable;
 
@@ -15,9 +16,8 @@ static std::filesystem::path uniqueFsTempDir() {
     return base / ("pick-shell-lock-test-" + std::to_string(tick));
 }
 
-TEST_CASE("ShellSession clearLoginSession releases record locks") {
-    PickVM::Runtime rt;
-    PickShell::ShellSession session(rt);
+TEST_CASE("GeminiSession clearLoginSession releases record locks") {
+    PickShell::GeminiSession session;
     const auto locks = std::make_shared<LockTable>();
     session.setSharedLockTable(locks);
 
@@ -25,9 +25,9 @@ TEST_CASE("ShellSession clearLoginSession releases record locks") {
     session.setFileSystemRoot(root);
     session.bindLockSession("S1");
 
-    session.fileSystem_.createFile("DATA");
-    session.fileSystem_.write("DATA", PickFS::Record("R1", "X"));
-    REQUIRE(session.fileSystem_.readU("DATA", "R1").has_value());
+    session.fileSystem().createFile("DATA");
+    session.fileSystem().write("DATA", PickFS::Record("R1", "X"));
+    REQUIRE(session.fileSystem().readU("DATA", "R1").has_value());
     REQUIRE(locks->lookup("DATA", "R1").has_value());
 
     session.clearLoginSession();
@@ -39,9 +39,8 @@ TEST_CASE("ShellSession clearLoginSession releases record locks") {
     CHECK(fsOther.readU("DATA", "R1").has_value());
 }
 
-TEST_CASE("ShellSession resetForQuit releases record locks") {
-    PickVM::Runtime rt;
-    PickShell::ShellSession session(rt);
+TEST_CASE("GeminiSession resetForQuit releases record locks") {
+    PickShell::GeminiSession session;
     const auto locks = std::make_shared<LockTable>();
     session.setSharedLockTable(locks);
 
@@ -49,14 +48,14 @@ TEST_CASE("ShellSession resetForQuit releases record locks") {
     session.setFileSystemRoot(root);
     session.bindLockSession("S1");
 
-    session.fileSystem_.createFile("DATA");
-    session.fileSystem_.write("DATA", PickFS::Record("R1", "X"));
-    REQUIRE(session.fileSystem_.readU("DATA", "R1").has_value());
+    session.fileSystem().createFile("DATA");
+    session.fileSystem().write("DATA", PickFS::Record("R1", "X"));
+    REQUIRE(session.fileSystem().readU("DATA", "R1").has_value());
 
     session.resetForQuit();
     CHECK_FALSE(locks->lookup("DATA", "R1").has_value());
 }
 
-TEST_CASE("ShellSession makeSessionLockId format") {
-    CHECK(PickShell::ShellSession::makeSessionLockId(23, "ACCT", "USER") == "S:23:ACCT:USER");
+TEST_CASE("GeminiSession makeSessionLockId format") {
+    CHECK(PickShell::GeminiSession::makeSessionLockId(23, "ACCT", "USER") == "S:23:ACCT:USER");
 }

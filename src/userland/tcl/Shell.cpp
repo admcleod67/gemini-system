@@ -5,6 +5,7 @@
 #include "DictItemClassifier.h"
 #include "EnglishTypes.h"
 #include "GeminiCatalog.h"
+#include "GeminiSession.h"
 #include "HelpTopics.h"
 #include "LineRecordEditor.h"
 #include "LoginService.h"
@@ -38,7 +39,7 @@ namespace PickShell {
 
         struct SystemVarReaderScope {
             PickVM::Runtime &rt;
-            explicit SystemVarReaderScope(PickVM::Runtime &r, ShellSession &s) : rt(r) {
+            explicit SystemVarReaderScope(PickVM::Runtime &r, GeminiSession &s) : rt(r) {
                 rt.setSystemVariableReader([&s](const std::string_view n) -> std::optional<PickVM::Value> {
                     const std::optional<std::string> v = s.resolveSystemVariable(n);
                     if (!v.has_value()) {
@@ -84,13 +85,13 @@ namespace PickShell {
             return false;
         }
 
-        bool activeListReady(const ShellSession &session) {
+        bool activeListReady(const GeminiSession &session) {
             return !session.activeList().empty() && session.activeListSourceFile().has_value();
         }
 
-        [[nodiscard]] bool logicalPickFileExists(const ShellSession &session, const std::string &name) {
+        [[nodiscard]] bool logicalPickFileExists(const GeminiSession &session, const std::string &name) {
             try {
-                (void) session.fileSystem_.listRecordNames(name);
+                (void) session.fileSystem().listRecordNames(name);
                 return true;
             } catch (const PickFS::FileSystemError &) {
                 return false;
@@ -98,7 +99,7 @@ namespace PickShell {
         }
 
         /// Returns empty optional on success, or error message when implicit scope is required but unavailable.
-        [[nodiscard]] std::optional<std::string> englishImplicitSetup(const ShellSession &session,
+        [[nodiscard]] std::optional<std::string> englishImplicitSetup(const GeminiSession &session,
                                                                      const std::vector<std::string> &tokens,
                                                                      PickCore::English::ParseContext &pc,
                                                                      PickCore::English::EnglishRunOptions &eo) {
@@ -127,7 +128,7 @@ namespace PickShell {
             return std::nullopt;
         }
 
-        bool shellIsEnglishList(const std::vector<std::string> &t, ShellSession &session) {
+        bool shellIsEnglishList(const std::vector<std::string> &t, GeminiSession &session) {
             if (t.empty() || !kwEq(t[0], "LIST")) {
                 return false;
             }
@@ -143,7 +144,7 @@ namespace PickShell {
             return false;
         }
 
-        bool shellIsEnglishCount(const std::vector<std::string> &t, ShellSession &session) {
+        bool shellIsEnglishCount(const std::vector<std::string> &t, GeminiSession &session) {
             if (t.empty() || !kwEq(t[0], "COUNT")) {
                 return false;
             }
@@ -153,7 +154,7 @@ namespace PickShell {
             return activeListReady(session);
         }
 
-        bool shellIsEnglishSort(const std::vector<std::string> &t, ShellSession &session) {
+        bool shellIsEnglishSort(const std::vector<std::string> &t, GeminiSession &session) {
             if (t.empty() || !kwEq(t[0], "SORT")) {
                 return false;
             }
@@ -172,7 +173,7 @@ namespace PickShell {
             return false;
         }
 
-        void expandSessionAtOperands(ShellSession &sess, std::vector<std::string> &tokens) {
+        void expandSessionAtOperands(GeminiSession &sess, std::vector<std::string> &tokens) {
             if (tokens.size() < 2) {
                 return;
             }
@@ -188,7 +189,7 @@ namespace PickShell {
                 if (tok.empty() || tok[0] != '@') {
                     continue;
                 }
-                if (!ShellSession::isSessionSystemVariableName(tok)) {
+                if (!GeminiSession::isSessionSystemVariableName(tok)) {
                     continue;
                 }
                 const std::optional<std::string> v = sess.resolveSystemVariable(tok);
@@ -200,16 +201,16 @@ namespace PickShell {
 
     } // namespace
 
-    Shell::Shell(PickVM::Runtime &runtime)
-        : session_(runtime),
+    Shell::Shell(GeminiSession &session)
+        : session_(session),
           vmDebugService_(session_),
           assemblerShell_(vmDebugService_) {
         const std::shared_ptr<PickCore::Locking::LockTable> lockTable =
             PickCore::Locking::LockRegistry::instance().table();
         session_.setSharedLockTable(lockTable);
-        session_.runtime_.setFileSystem(&session_.fileSystem_);
+        session_.runtime().setFileSystem(&session_.fileSystem());
         basicShell_.setResolveProgramLocationFn([this](const std::string &programName) {
-            const PickVoc::VocResolver::ProgramLocation resolved = session_.vocResolver_.resolveProgramLocation(programName);
+            const PickVoc::VocResolver::ProgramLocation resolved = session_.vocResolver().resolveProgramLocation(programName);
             return BasicShell::ProgramLocation{resolved.fileName, resolved.recordKey};
         });
         basicShell_.setReadRecordFn([this](const BasicShell::ProgramLocation &location, const bool objectRecord) {
@@ -240,16 +241,28 @@ namespace PickShell {
         session_.setProgramsRoot(std::move(root));
     }
 
+    const std::filesystem::path &Shell::programsRoot() const {
+        return session_.programsRoot();
+    }
+
     void Shell::setFileSystemRoot(std::filesystem::path root) {
         session_.setFileSystemRoot(std::move(root));
+    }
+
+    const std::filesystem::path &Shell::fileSystemRoot() const {
+        return session_.fileSystemRoot();
     }
 
     void Shell::setGeminiCatalogRoot(std::optional<std::filesystem::path> root) {
         session_.setGeminiCatalogRoot(std::move(root));
     }
 
-    void Shell::attachUserSession(const PickCore::UserSession &session) {
-        session_.applyUserSession(session);
+    const std::optional<std::filesystem::path> &Shell::geminiCatalogRoot() const {
+        return session_.geminiCatalogRoot();
+    }
+
+    void Shell::attachUserSession(const PickCore::UserSession &userSession) {
+        session_.attach(userSession);
     }
 
     Shell::TokenizeResult Shell::tokenize(const std::string &line) {
@@ -515,7 +528,7 @@ namespace PickShell {
     void Shell::handleTclCommand(const Tokens &tokensIn, bool &quit, std::ostream &out) {
         Tokens work = tokensIn;
         if (!work.empty()) {
-            work[0] = session_.vocResolver_.resolveVerbName(work[0]);
+            work[0] = session_.vocResolver().resolveVerbName(work[0]);
             asciiUpperInPlace(work[0]);
         }
         expandSessionAtOperands(session_, work);
@@ -535,13 +548,13 @@ namespace PickShell {
         basicResumePastLine_.reset();
         basicTrace_ = false;
 
-        session_.runtime_.setOutputStream(&out);
-        session_.runtime_.setInputStream(inputStream_);
-        session_.runtime_.loadProgram(program, sourceLinePerInstr); // also clears interrupted_ flag
+        session_.runtime().setOutputStream(&out);
+        session_.runtime().setInputStream(inputStream_);
+        session_.runtime().loadProgram(program, sourceLinePerInstr); // also clears interrupted_ flag
 
-        const SystemVarReaderScope sysScope(session_.runtime_, session_);
+        const SystemVarReaderScope sysScope(session_.runtime(), session_);
 
-        g_interruptRuntime.store(&session_.runtime_);
+        g_interruptRuntime.store(&session_.runtime());
         const auto previousHandler = std::signal(SIGINT, [](int) {
             if (auto *rt = g_interruptRuntime.load()) {
                 rt->interrupt();
@@ -549,7 +562,7 @@ namespace PickShell {
         });
 
         try {
-            session_.runtime_.run();
+            session_.runtime().run();
         } catch (const PickVM::ChainRequest &req) {
             const std::string chainProgram = req.programName;
             if (chainProgram.empty()) {
@@ -560,7 +573,7 @@ namespace PickShell {
                 // ensureProgramObjectExistsForRun writes concrete errors.
             } else {
                 try {
-                    const PickVoc::VocResolver::ProgramLocation resolved = session_.vocResolver_.resolveProgramLocation(chainProgram);
+                    const PickVoc::VocResolver::ProgramLocation resolved = session_.vocResolver().resolveProgramLocation(chainProgram);
                     const BasicShell::ProgramLocation location{resolved.fileName, resolved.recordKey};
                     const std::optional<std::string> objectText = readProgramRecord(location, true);
                     if (!objectText.has_value()) {
@@ -606,14 +619,14 @@ namespace PickShell {
             }
         } catch (const PickVM::UserInterrupt &) {
             out << "\nBreak\n";
-            session_.runtime_.clearInterrupt();
+            session_.runtime().clearInterrupt();
             bool done = false;
-            while (!done && session_.runtime_.instructionPointer() < program.size()) {
+            while (!done && session_.runtime().instructionPointer() < program.size()) {
                 out << "* " << std::flush;
                 std::string line;
                 std::istream &in = input();
                 if (!std::getline(in, line)) {
-                    session_.runtime_.setInstructionPointer(program.size());
+                    session_.runtime().setInstructionPointer(program.size());
                     break;
                 }
                 const std::vector<std::string> tokens = tokenizeDebuggerLine(line);
@@ -622,12 +635,12 @@ namespace PickShell {
         } catch (const std::runtime_error &e) {
             out << "\nRuntime error: " << e.what() << '\n';
             bool done = false;
-            while (!done && session_.runtime_.instructionPointer() < program.size()) {
+            while (!done && session_.runtime().instructionPointer() < program.size()) {
                 out << "* " << std::flush;
                 std::string line;
                 std::istream &in = input();
                 if (!std::getline(in, line)) {
-                    session_.runtime_.setInstructionPointer(program.size());
+                    session_.runtime().setInstructionPointer(program.size());
                     break;
                 }
                 const std::vector<std::string> tokens = tokenizeDebuggerLine(line);
@@ -637,19 +650,19 @@ namespace PickShell {
 
         std::signal(SIGINT, previousHandler); // restores SIG_IGN
         g_interruptRuntime.store(nullptr);
-        session_.runtime_.setOutputStream(nullptr);
-        session_.runtime_.setInputStream(nullptr);
+        session_.runtime().setOutputStream(nullptr);
+        session_.runtime().setInputStream(nullptr);
     }
 
     bool Shell::runBasicUntilStop(const std::vector<PickVM::Instruction> &program,
                                   const std::vector<int> &sourceLinePerInstr,
                                   std::ostream &out,
                                   const bool stopAtNextBasicLine) {
-        const SystemVarReaderScope sysScope(session_.runtime_, session_);
+        const SystemVarReaderScope sysScope(session_.runtime(), session_);
         bool steppedAny = false;
-        const int initialLine = session_.runtime_.currentSourceLine();
-        while (session_.runtime_.instructionPointer() < program.size()) {
-            const std::size_t ip = session_.runtime_.instructionPointer();
+        const int initialLine = session_.runtime().currentSourceLine();
+        while (session_.runtime().instructionPointer() < program.size()) {
+            const std::size_t ip = session_.runtime().instructionPointer();
             const int sourceLine = (ip < sourceLinePerInstr.size()) ? sourceLinePerInstr[ip] : 0;
             const bool skipLineBreakpointOnce =
                 basicResumePastLine_.has_value() && sourceLine > 0 && *basicResumePastLine_ == sourceLine;
@@ -667,7 +680,7 @@ namespace PickShell {
             }
             if (stepResult.outcome == VmDebugService::StepOutcome::Interrupted) {
                 out << "\nBreak\n";
-                session_.runtime_.clearInterrupt();
+                session_.runtime().clearInterrupt();
                 return false;
             }
             if (stepResult.outcome == VmDebugService::StepOutcome::RuntimeError) {
@@ -677,7 +690,7 @@ namespace PickShell {
 
             steppedAny = true;
             if (stopAtNextBasicLine) {
-                const int currentLine = session_.runtime_.currentSourceLine();
+                const int currentLine = session_.runtime().currentSourceLine();
                 if (currentLine > 0 && currentLine != initialLine && steppedAny) {
                     return false;
                 }
@@ -877,11 +890,11 @@ namespace PickShell {
                 out << "No such BASIC line in compiled program\n";
                 return false;
             }
-            session_.runtime_.setInstructionPointer(*ip);
+            session_.runtime().setInstructionPointer(*ip);
             return false;
         }
         if (cmd == "QUIT" || cmd == "END") {
-            session_.runtime_.setInstructionPointer(program.size());
+            session_.runtime().setInstructionPointer(program.size());
             return true;
         }
         if (cmd == "HELP") {
@@ -928,10 +941,10 @@ namespace PickShell {
                 }
                 if (j > i + 1) {
                     const std::string name(token.data() + i + 1, j - i - 1);
-                    const std::optional<std::string> ev = session_.env_.get(name);
+                    const std::optional<std::string> ev = session_.env().get(name);
                     if (ev.has_value()) {
                         out += *ev;
-                    } else if (ShellSession::isSessionSystemVariableName(name)) {
+                    } else if (GeminiSession::isSessionSystemVariableName(name)) {
                         out += session_.resolveSystemVariable(name).value_or("");
                     } else {
                         out += "";
@@ -972,15 +985,15 @@ namespace PickShell {
                 out << "RUN requires a filename\n";
                 return;
             }
-            session_.resumePastBreakpointIp_ = session_.runtime_.instructionPointer();
-            session_.runtime_.setOutputStream(&out);
-            session_.runtime_.setInputStream(inputStream_);
+            session_.resumePastBreakpointIp_ = session_.runtime().instructionPointer();
+            session_.runtime().setOutputStream(&out);
+            session_.runtime().setInputStream(inputStream_);
             {
-                const SystemVarReaderScope sysScope(session_.runtime_, session_);
+                const SystemVarReaderScope sysScope(session_.runtime(), session_);
                 session_.executeVmLoop(out);
             }
-            session_.runtime_.setOutputStream(nullptr);
-            session_.runtime_.setInputStream(nullptr);
+            session_.runtime().setOutputStream(nullptr);
+            session_.runtime().setInputStream(nullptr);
             return;
         }
         if (tokens.size() != 2) {
@@ -1002,7 +1015,7 @@ namespace PickShell {
         }
 
         try {
-            const PickVoc::VocResolver::ProgramLocation resolved = session_.vocResolver_.resolveProgramLocation(programName);
+            const PickVoc::VocResolver::ProgramLocation resolved = session_.vocResolver().resolveProgramLocation(programName);
             const BasicShell::ProgramLocation location{resolved.fileName, resolved.recordKey};
             const std::optional<std::string> objectText = readProgramRecord(location, true);
             if (!objectText.has_value()) {
@@ -1014,20 +1027,20 @@ namespace PickShell {
             PickVM::LoadedBytecode loaded = parser.parse(bytecodeStream);
             session_.pruneBreakpointsForProgram(loaded.program.size(), out);
             session_.lastLoaded_ = std::move(loaded);
-            session_.runtime_.setOutputStream(&out);
-            session_.runtime_.setInputStream(inputStream_);
-            session_.runtime_.loadProgram(session_.lastLoaded_->program, session_.lastLoaded_->sourceLinePerInstr);
+            session_.runtime().setOutputStream(&out);
+            session_.runtime().setInputStream(inputStream_);
+            session_.runtime().loadProgram(session_.lastLoaded_->program, session_.lastLoaded_->sourceLinePerInstr);
             session_.suspended_ = false;
             session_.resumePastBreakpointIp_.reset();
             {
-                const SystemVarReaderScope sysScope(session_.runtime_, session_);
+                const SystemVarReaderScope sysScope(session_.runtime(), session_);
                 session_.executeVmLoop(out);
             }
-            session_.runtime_.setOutputStream(nullptr);
-            session_.runtime_.setInputStream(nullptr);
+            session_.runtime().setOutputStream(nullptr);
+            session_.runtime().setInputStream(nullptr);
         } catch (const std::exception &e) {
-            session_.runtime_.setOutputStream(nullptr);
-            session_.runtime_.setInputStream(nullptr);
+            session_.runtime().setOutputStream(nullptr);
+            session_.runtime().setInputStream(nullptr);
             out << "Error: " << e.what() << "\n";
         }
     }
@@ -1042,7 +1055,7 @@ namespace PickShell {
             return;
         }
 
-        const PickVoc::VocResolver::ProgramLocation resolved = session_.vocResolver_.resolveProcScriptLocation(tokens[1]);
+        const PickVoc::VocResolver::ProgramLocation resolved = session_.vocResolver().resolveProcScriptLocation(tokens[1]);
         const BasicShell::ProgramLocation location{resolved.fileName, resolved.recordKey};
         const std::optional<std::string> scriptText = readProgramRecord(location, false);
         if (!scriptText.has_value()) {
@@ -1102,7 +1115,7 @@ namespace PickShell {
                                      std::string &hardError) {
         try {
             const std::optional<PickFS::Record> record =
-                session_.fileSystem_.readU(fileName, recordKey);
+                session_.fileSystem().readU(fileName, recordKey);
             if (!record.has_value()) {
                 return ProcLockOutcome::MissingRecord;
             }
@@ -1125,9 +1138,9 @@ namespace PickShell {
                                       const std::string &value,
                                       std::string &hardError) {
         try {
-            session_.fileSystem_.writeU(fileName, PickFS::Record(recordKey, value));
+            session_.fileSystem().writeU(fileName, PickFS::Record(recordKey, value));
             if (fileName == "VOC") {
-                session_.vocResolver_.invalidate();
+                session_.vocResolver().invalidate();
             }
             return ProcLockOutcome::Success;
         } catch (const PickFS::FileSystemError &ex) {
@@ -1146,7 +1159,7 @@ namespace PickShell {
                             const std::string &recordKey,
                             std::string &hardError) {
         try {
-            (void) session_.fileSystem_.releaseRecord(fileName, recordKey);
+            (void) session_.fileSystem().releaseRecord(fileName, recordKey);
             return true;
         } catch (const std::exception &ex) {
             hardError = ex.what();
@@ -1159,7 +1172,7 @@ namespace PickShell {
         PickCore::English::ParseContext pc;
         PickCore::English::EnglishRunOptions eo;
         const std::optional<PickCore::English::Result> result =
-            englishService_.run(session_.fileSystem_, tokens, pc, eo, error);
+            englishService_.run(session_.fileSystem(), tokens, pc, eo, error);
         if (!result.has_value()) {
             return false;
         }
@@ -1194,7 +1207,7 @@ namespace PickShell {
         if (tokens.empty()) {
             return;
         }
-        tokens[0] = session_.vocResolver_.resolveVerbName(tokens[0]);
+        tokens[0] = session_.vocResolver().resolveVerbName(tokens[0]);
         bool quit = false;
         handleTclCommand(tokens, quit, out);
     }
@@ -1207,7 +1220,7 @@ namespace PickShell {
                                                         const bool objectRecord) {
         const std::string recordKey = objectRecord ? programObjectRecordKey(location.recordKey) : location.recordKey;
         try {
-            const std::optional<PickFS::Record> rec = session_.fileSystem_.read(location.fileName, recordKey);
+            const std::optional<PickFS::Record> rec = session_.fileSystem().read(location.fileName, recordKey);
             if (!rec.has_value()) {
                 return std::nullopt;
             }
@@ -1224,16 +1237,16 @@ namespace PickShell {
         const std::string recordKey = objectRecord ? programObjectRecordKey(location.recordKey) : location.recordKey;
         try {
             try {
-                (void) session_.fileSystem_.openFile(location.fileName);
+                (void) session_.fileSystem().openFile(location.fileName);
             } catch (const PickFS::FileSystemError &openError) {
                 if (std::string(openError.what()).find("File not found: ") != 0) {
                     throw;
                 }
-                session_.fileSystem_.createFile(location.fileName);
+                session_.fileSystem().createFile(location.fileName);
             }
-            session_.fileSystem_.write(location.fileName, PickFS::Record(recordKey, payload));
+            session_.fileSystem().write(location.fileName, PickFS::Record(recordKey, payload));
             if (location.fileName == "VOC") {
-                session_.vocResolver_.invalidate();
+                session_.vocResolver().invalidate();
             }
             return true;
         } catch (const std::exception &e) {
@@ -1243,7 +1256,7 @@ namespace PickShell {
     }
 
     bool Shell::ensureProgramObjectExistsForRun(const std::string &programName, std::ostream &out) {
-        const PickVoc::VocResolver::ProgramLocation resolved = session_.vocResolver_.resolveProgramLocation(programName);
+        const PickVoc::VocResolver::ProgramLocation resolved = session_.vocResolver().resolveProgramLocation(programName);
         const BasicShell::ProgramLocation location{resolved.fileName, resolved.recordKey};
         if (readProgramRecord(location, true).has_value()) {
             return true;
@@ -1330,7 +1343,7 @@ namespace PickShell {
             session_.setReportPageLength(n);
             return;
         }
-        if (ShellSession::isSessionSystemVariableName(tokens[1])) {
+        if (GeminiSession::isSessionSystemVariableName(tokens[1])) {
             out << "Read-only system variable\n";
             return;
         }
@@ -1341,7 +1354,7 @@ namespace PickShell {
             }
             value += tokens[i];
         }
-        if (!session_.env_.set(tokens[1], std::move(value))) {
+        if (!session_.env().set(tokens[1], std::move(value))) {
             out << "Invalid variable name\n";
         }
     }
@@ -1359,7 +1372,7 @@ namespace PickShell {
             out << *sys << '\n';
             return;
         }
-        const std::optional<std::string> val = session_.env_.get(tokens[1]);
+        const std::optional<std::string> val = session_.env().get(tokens[1]);
         if (!val) {
             out << "No such variable: " << tokens[1] << '\n';
             return;
@@ -1372,7 +1385,7 @@ namespace PickShell {
             out << "LIST-VARS takes no arguments\n";
             return;
         }
-        std::vector<std::string> names = session_.env_.names();
+        std::vector<std::string> names = session_.env().names();
         if (session_.loggedIn()) {
             names.push_back("@ACCOUNT");
             names.push_back("@LOGNAME");
@@ -1398,11 +1411,11 @@ namespace PickShell {
             out << "UNSET requires a variable name\n";
             return;
         }
-        if (ShellSession::isSessionSystemVariableName(tokens[1])) {
+        if (GeminiSession::isSessionSystemVariableName(tokens[1])) {
             out << "Read-only system variable\n";
             return;
         }
-        if (!session_.env_.unset(tokens[1])) {
+        if (!session_.env().unset(tokens[1])) {
             out << "No such variable\n";
         }
     }
@@ -1410,7 +1423,7 @@ namespace PickShell {
     void Shell::cmdHelpLookup(const std::vector<std::string> &tokens, std::ostream &out) {
         if (tokens.size() == 1) {
             if (const std::optional<std::string> zero =
-                    HelpTopics::resolveHelpBody(session_.fileSystem_,
+                    HelpTopics::resolveHelpBody(session_.fileSystem(),
                                                 session_.geminiCatalogRoot(),
                                                 session_.fileSystemRoot(),
                                                 "HELP")) {
@@ -1423,11 +1436,11 @@ namespace PickShell {
 
         const std::string display = HelpTopics::joinOperandsDisplay(tokens, 1);
         std::string canonical =
-            HelpTopics::canonicalTopicKey(session_.vocResolver_, tokens, 1);
+            HelpTopics::canonicalTopicKey(session_.vocResolver(), tokens, 1);
         if (tokens.size() == 2 && kwEq(tokens[1], "COMMANDS")) {
             canonical = "HELP COMMANDS";
         }
-        std::optional<std::string> body = HelpTopics::resolveHelpBody(session_.fileSystem_,
+        std::optional<std::string> body = HelpTopics::resolveHelpBody(session_.fileSystem(),
                                                                       session_.geminiCatalogRoot(),
                                                                       session_.fileSystemRoot(),
                                                                       canonical);
@@ -1452,9 +1465,9 @@ namespace PickShell {
         for (const auto &entry: tclCommands_) {
             names.insert(entry.first);
         }
-        for (const auto &vocPair: session_.vocResolver_.table()) {
+        for (const auto &vocPair: session_.vocResolver().table()) {
             const std::string &vocKey = vocPair.first;
-            std::string resolved = session_.vocResolver_.resolveVerbName(vocKey);
+            std::string resolved = session_.vocResolver().resolveVerbName(vocKey);
             asciiUpperInPlace(resolved);
             if (tclCommands_.find(resolved) != tclCommands_.end()) {
                 names.insert(vocKey);
@@ -1474,7 +1487,7 @@ namespace PickShell {
             out << "HELP-LIST takes no arguments\n";
             return;
         }
-        const std::vector<std::string> topics = HelpTopics::listCanonicalHelpTopicsSorted(session_.fileSystem_);
+        const std::vector<std::string> topics = HelpTopics::listCanonicalHelpTopicsSorted(session_.fileSystem());
         if (topics.empty()) {
             out << "No HELP topics\n";
             return;
@@ -1490,17 +1503,17 @@ namespace PickShell {
             return;
         }
         const std::string canonical =
-            HelpTopics::canonicalTopicKey(session_.vocResolver_, tokens, 1);
+            HelpTopics::canonicalTopicKey(session_.vocResolver(), tokens, 1);
         const std::string storage = HelpTopics::storageRecordIdFromCanonical(canonical);
         try {
             try {
-                (void) session_.fileSystem_.openFile("HELP");
+                (void) session_.fileSystem().openFile("HELP");
             } catch (const PickFS::FileSystemError &openError) {
                 const std::string msg = openError.what();
                 if (msg.find("File not found: ") != 0U) {
                     throw;
                 }
-                session_.fileSystem_.createFile("HELP");
+                session_.fileSystem().createFile("HELP");
             }
             runLineRecordEditorForLocation("HELP", storage, std::nullopt, out);
         } catch (const std::exception &e) {
@@ -1572,17 +1585,17 @@ namespace PickShell {
     }
 
     void Shell::cmdDumpStack(std::ostream &out) {
-        session_.runtime_.setOutputStream(&out);
-        session_.runtime_.dumpStack();
-        session_.runtime_.setOutputStream(nullptr);
+        session_.runtime().setOutputStream(&out);
+        session_.runtime().dumpStack();
+        session_.runtime().setOutputStream(nullptr);
     }
 
     void Shell::cmdListPrograms(std::ostream &out) {
         std::set<std::string> programNames;
-        const std::vector<std::string> files = session_.vocResolver_.listProgramFiles();
+        const std::vector<std::string> files = session_.vocResolver().listProgramFiles();
         for (const std::string &fileName: files) {
             try {
-                const std::vector<std::string> records = session_.fileSystem_.listRecordNames(fileName);
+                const std::vector<std::string> records = session_.fileSystem().listRecordNames(fileName);
                 for (const std::string &recordName: records) {
                     if (recordName.size() >= 4 && recordName.substr(recordName.size() - 4) == "_OBJ") {
                         continue;
@@ -1605,9 +1618,9 @@ namespace PickShell {
             return;
         }
         try {
-            session_.fileSystem_.createFile(tokens[1]);
+            session_.fileSystem().createFile(tokens[1]);
             if (tokens[1] == "VOC") {
-                session_.vocResolver_.invalidate();
+                session_.vocResolver().invalidate();
             }
         } catch (const std::exception &e) {
             out << "Error: " << e.what() << "\n";
@@ -1620,9 +1633,9 @@ namespace PickShell {
             return;
         }
         try {
-            session_.fileSystem_.deleteFile(tokens[1]);
+            session_.fileSystem().deleteFile(tokens[1]);
             if (tokens[1] == "VOC") {
-                session_.vocResolver_.invalidate();
+                session_.vocResolver().invalidate();
             }
         } catch (const std::exception &e) {
             out << "Error: " << e.what() << "\n";
@@ -1635,7 +1648,7 @@ namespace PickShell {
             return;
         }
         try {
-            const std::vector<std::string> names = session_.fileSystem_.listFiles();
+            const std::vector<std::string> names = session_.fileSystem().listFiles();
             if (names.empty()) {
                 out << "No files\n";
                 return;
@@ -1660,7 +1673,7 @@ namespace PickShell {
             }
             std::string error;
             const std::optional<PickCore::English::Result> result =
-                englishService_.run(session_.fileSystem_, tokens, pc, eo, error);
+                englishService_.run(session_.fileSystem(), tokens, pc, eo, error);
             if (!result.has_value()) {
                 out << "Error: " << error << "\n";
                 return;
@@ -1675,7 +1688,7 @@ namespace PickShell {
             return;
         }
         try {
-            const std::vector<std::string> names = session_.fileSystem_.listRecordNames(tokens[1]);
+            const std::vector<std::string> names = session_.fileSystem().listRecordNames(tokens[1]);
             if (names.empty()) {
                 out << "No records\n";
                 return;
@@ -1703,7 +1716,7 @@ namespace PickShell {
         }
         std::string error;
         const std::optional<PickCore::English::Result> result =
-            englishService_.run(session_.fileSystem_, tokens, pc, eo, error);
+            englishService_.run(session_.fileSystem(), tokens, pc, eo, error);
         if (!result.has_value()) {
             out << "Error: " << error << "\n";
             return;
@@ -1723,7 +1736,7 @@ namespace PickShell {
         eo.pageLength = session_.reportPageLength();
         std::string error;
         const std::optional<PickCore::English::Result> result =
-            englishService_.run(session_.fileSystem_, tokens, pc, eo, error);
+            englishService_.run(session_.fileSystem(), tokens, pc, eo, error);
         if (!result.has_value()) {
             out << "Error: " << error << "\n";
             return;
@@ -1748,7 +1761,7 @@ namespace PickShell {
         }
         std::string error;
         const std::optional<PickCore::English::Result> result =
-            englishService_.run(session_.fileSystem_, tokens, pc, eo, error);
+            englishService_.run(session_.fileSystem(), tokens, pc, eo, error);
         if (!result.has_value()) {
             out << "Error: " << error << "\n";
             return;
@@ -1789,20 +1802,20 @@ namespace PickShell {
         }
         const PickCore::English::DictionaryResolver &resolver = englishService_.dictionaryResolver();
         const PickCore::English::FieldRef ref =
-            resolver.resolveField(session_.fileSystem_, tokens[1], tokens[2]);
+            resolver.resolveField(session_.fileSystem(), tokens[1], tokens[2]);
 
         std::optional<PickFS::Record> dictRec;
         const std::string scopedDict =
             PickCore::English::DictionaryResolver::scopedDictLogicalName(tokens[1]);
         try {
-            (void) session_.fileSystem_.openFile(scopedDict);
-            dictRec = session_.fileSystem_.read(scopedDict, tokens[2]);
+            (void) session_.fileSystem().openFile(scopedDict);
+            dictRec = session_.fileSystem().read(scopedDict, tokens[2]);
         } catch (const PickFS::FileSystemError &) {
             // fall through to global DICT
         }
         if (!dictRec.has_value()) {
             try {
-                dictRec = session_.fileSystem_.read("DICT", tokens[2]);
+                dictRec = session_.fileSystem().read("DICT", tokens[2]);
             } catch (const PickFS::FileSystemError &) {
                 // no DICT row for this token
             }
@@ -1869,14 +1882,14 @@ namespace PickShell {
             return;
         }
         try {
-            (void) session_.fileSystem_.openFile(dictFile);
+            (void) session_.fileSystem().openFile(dictFile);
         } catch (const PickFS::FileSystemError &) {
             out << "DEFINE-FIELD requires dictionary file " << dictFile << "; use CREATE-FILE first\n";
             return;
         }
         const std::string body = std::string{"A\n"} + std::to_string(*attrNo) + '\n';
         try {
-            session_.fileSystem_.write(dictFile, PickFS::Record(fieldName, body));
+            session_.fileSystem().write(dictFile, PickFS::Record(fieldName, body));
         } catch (const PickFS::FileSystemError &e) {
             out << "Error: " << e.what() << '\n';
         } catch (const std::exception &e) {
@@ -1891,11 +1904,11 @@ namespace PickShell {
         }
         const std::string &dictFile = tokens[1];
         try {
-            const PickFS::FileSystem::FileHandle handle = session_.fileSystem_.openFile(dictFile);
-            std::vector<std::string> ids = session_.fileSystem_.listRecords(handle);
+            const PickFS::FileSystem::FileHandle handle = session_.fileSystem().openFile(dictFile);
+            std::vector<std::string> ids = session_.fileSystem().listRecords(handle);
             std::sort(ids.begin(), ids.end());
             for (const std::string &id: ids) {
-                const std::optional<PickFS::Record> rec = session_.fileSystem_.readRecord(handle, id);
+                const std::optional<PickFS::Record> rec = session_.fileSystem().readRecord(handle, id);
                 if (!rec.has_value()) {
                     out << id << " INVALID INVALID\n";
                     continue;
@@ -1966,7 +1979,7 @@ namespace PickShell {
             return;
         }
         try {
-            const PickFS::FileSystem::FileHandle voc = session_.fileSystem_.openFile("VOC");
+            const PickFS::FileSystem::FileHandle voc = session_.fileSystem().openFile("VOC");
             std::string value;
             value += *type;
             value += '\n';
@@ -1974,8 +1987,8 @@ namespace PickShell {
                 value += tokens[i];
                 value += '\n';
             }
-            session_.fileSystem_.writeRecord(voc, PickFS::Record(tokens[1], value));
-            session_.vocResolver_.invalidate();
+            session_.fileSystem().writeRecord(voc, PickFS::Record(tokens[1], value));
+            session_.vocResolver().invalidate();
         } catch (const std::exception &e) {
             out << "Error: " << e.what() << "\n";
         }
@@ -1987,9 +2000,9 @@ namespace PickShell {
             return;
         }
         try {
-            const PickFS::FileSystem::FileHandle voc = session_.fileSystem_.openFile("VOC");
-            session_.fileSystem_.deleteRecord(voc, tokens[1]);
-            session_.vocResolver_.invalidate();
+            const PickFS::FileSystem::FileHandle voc = session_.fileSystem().openFile("VOC");
+            session_.fileSystem().deleteRecord(voc, tokens[1]);
+            session_.vocResolver().invalidate();
         } catch (const std::exception &e) {
             out << "Error: " << e.what() << "\n";
         }
@@ -2001,10 +2014,10 @@ namespace PickShell {
             return;
         }
         try {
-            const PickFS::FileSystem::FileHandle voc = session_.fileSystem_.openFile("VOC");
-            const std::vector<std::string> ids = session_.fileSystem_.listRecords(voc);
+            const PickFS::FileSystem::FileHandle voc = session_.fileSystem().openFile("VOC");
+            const std::vector<std::string> ids = session_.fileSystem().listRecords(voc);
             for (const std::string &id: ids) {
-                const std::optional<PickFS::Record> rec = session_.fileSystem_.readRecord(voc, id);
+                const std::optional<PickFS::Record> rec = session_.fileSystem().readRecord(voc, id);
                 const std::string type = rec.has_value() ? detectVocTypeOrInvalid(rec->value()) : "INVALID";
                 out << id << ' ' << type << '\n';
             }
@@ -2080,7 +2093,7 @@ namespace PickShell {
         }
         try {
             const std::optional<PickFS::Record> record =
-                session_.fileSystem_.read(target->fileName, target->recordKey);
+                session_.fileSystem().read(target->fileName, target->recordKey);
             if (!record) {
                 out << "No such record\n";
                 return;
@@ -2099,11 +2112,11 @@ namespace PickShell {
             return;
         }
         try {
-            session_.fileSystem_.write(target->fileName,
+            session_.fileSystem().write(target->fileName,
                                        PickFS::Record(target->recordKey,
                                                         joinTokensFrom(tokens, target->valueStart)));
             if (target->fileName == "VOC") {
-                session_.vocResolver_.invalidate();
+                session_.vocResolver().invalidate();
             }
         } catch (const std::exception &e) {
             out << "Error: " << e.what() << "\n";
@@ -2119,7 +2132,7 @@ namespace PickShell {
         }
         try {
             const std::optional<PickFS::Record> record =
-                session_.fileSystem_.readU(target->fileName, target->recordKey);
+                session_.fileSystem().readU(target->fileName, target->recordKey);
             if (!record) {
                 out << "No such record\n";
                 return;
@@ -2138,11 +2151,11 @@ namespace PickShell {
             return;
         }
         try {
-            session_.fileSystem_.writeU(target->fileName,
+            session_.fileSystem().writeU(target->fileName,
                                         PickFS::Record(target->recordKey,
                                                          joinTokensFrom(tokens, target->valueStart)));
             if (target->fileName == "VOC") {
-                session_.vocResolver_.invalidate();
+                session_.vocResolver().invalidate();
             }
         } catch (const std::exception &e) {
             out << "Error: " << e.what() << "\n";
@@ -2157,7 +2170,7 @@ namespace PickShell {
             return;
         }
         try {
-            (void) session_.fileSystem_.releaseRecord(target->fileName, target->recordKey);
+            (void) session_.fileSystem().releaseRecord(target->fileName, target->recordKey);
         } catch (const std::exception &e) {
             out << "Error: " << e.what() << "\n";
         }
@@ -2169,7 +2182,7 @@ namespace PickShell {
                                                std::ostream &out) {
         std::vector<std::string> lines;
         try {
-            const std::optional<PickFS::Record> rec = session_.fileSystem_.read(fileName, recordKey);
+            const std::optional<PickFS::Record> rec = session_.fileSystem().read(fileName, recordKey);
             if (rec.has_value()) {
                 std::istringstream in(rec->value());
                 std::string line;
@@ -2184,13 +2197,13 @@ namespace PickShell {
 
         std::istream &in = input();
         LineRecordEditor editor(
-            session_.fileSystem_,
+            session_.fileSystem(),
             fileName,
             recordKey,
             std::move(lines),
             [this](const std::string &writtenFile) {
                 if (writtenFile == "VOC") {
-                    session_.vocResolver_.invalidate();
+                    session_.vocResolver().invalidate();
                 }
             });
         editor.run(in, out, highlightPhysicalLine);
@@ -2214,7 +2227,7 @@ namespace PickShell {
                 out << "EDIT expects a program name without extension\n";
                 return;
             }
-            const PickVoc::VocResolver::ProgramLocation resolved = session_.vocResolver_.resolveProgramLocation(programName);
+            const PickVoc::VocResolver::ProgramLocation resolved = session_.vocResolver().resolveProgramLocation(programName);
             fileName = resolved.fileName;
             recordKey = resolved.recordKey;
         } else {
@@ -2278,7 +2291,7 @@ namespace PickShell {
         }
         std::ostringstream err;
         if (const auto sess = PickCore::LoginService::authenticateAccount(*cat, accountName, password, err)) {
-            session_.applyUserSession(*sess);
+            session_.attach(*sess);
             return;
         }
         out << err.str();

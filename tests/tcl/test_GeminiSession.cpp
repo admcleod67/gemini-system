@@ -4,7 +4,9 @@
 
 #include "GeminiSession.h"
 #include "Runtime.h"
+#include "UserSession.h"
 
+#include <filesystem>
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -86,4 +88,47 @@ TEST_CASE("GeminiSession runTclRepl uses session I/O") {
     CHECK(result == PickShell::ShellRunResult::ExitProcess);
     CHECK(out.str().find(pick_system::version_string) != std::string::npos);
     CHECK(out.str().find("Exiting shell") != std::string::npos);
+}
+
+TEST_CASE("GeminiSession attach applies pick root and session identity") {
+    const auto root = std::filesystem::temp_directory_path() / "pick-gemini-attach-test";
+    std::filesystem::create_directories(root / "MD");
+
+    PickCore::UserSession user;
+    user.catalogRoot = root / "gemini";
+    user.pickRoot = root;
+    user.accountName = "TST";
+    user.username = "USERA";
+    user.whoPort = 7;
+    user.userNo = "7";
+
+    PickShell::GeminiSession session;
+    session.attach(user);
+
+    CHECK(session.loggedIn());
+    CHECK(session.whoPort() == 7);
+    CHECK(session.sessionUsername() == "USERA");
+    CHECK(session.sessionAccount() == "TST");
+    CHECK(session.fileSystemRoot() == root);
+    CHECK(session.sessionLockId() == PickShell::GeminiSession::makeSessionLockId(7, "TST", "USERA"));
+}
+
+TEST_CASE("GeminiSession attachUserSession via shell delegates to attach") {
+    const auto root = std::filesystem::temp_directory_path() / "pick-gemini-shell-attach-test";
+    std::filesystem::create_directories(root / "MD");
+
+    PickCore::UserSession user;
+    user.catalogRoot = root / "gemini";
+    user.pickRoot = root;
+    user.accountName = "ACCT";
+    user.username = "BOB";
+    user.whoPort = 3;
+    user.userNo = "3";
+
+    PickShell::GeminiSession session;
+    session.shell().attachUserSession(user);
+
+    CHECK(session.loggedIn());
+    CHECK(session.sessionUsername() == "BOB");
+    CHECK(session.sessionLockId() == PickShell::GeminiSession::makeSessionLockId(3, "ACCT", "BOB"));
 }

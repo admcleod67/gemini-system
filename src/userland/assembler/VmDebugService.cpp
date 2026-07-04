@@ -1,11 +1,14 @@
 #include "VmDebugService.h"
 
+#include "GeminiSession.h"
 #include "InstructionPrint.h"
 
 #include <algorithm>
 #include <stdexcept>
 
 namespace PickShell {
+    VmDebugService::VmDebugService(GeminiSession &session) : session_(session) {}
+
     bool VmDebugService::hasProgramLoaded() const {
         return session_.programImageLoaded();
     }
@@ -40,7 +43,7 @@ namespace PickShell {
         session_.lastLoaded_.reset();
         session_.suspended_ = false;
         session_.resumePastBreakpointIp_.reset();
-        session_.runtime_.loadProgram({});
+        session_.runtime().loadProgram({});
     }
 
     void VmDebugService::dumpProgram(std::ostream &out) const {
@@ -74,30 +77,30 @@ namespace PickShell {
         if (!session_.programImageLoaded()) {
             return {StepOutcome::NoProgramLoaded, {}};
         }
-        if (session_.runtime_.instructionPointer() >= session_.lastLoaded_->program.size()) {
+        if (session_.runtime().instructionPointer() >= session_.lastLoaded_->program.size()) {
             return {StepOutcome::Halted, {}};
         }
 
         session_.suspended_ = false;
         session_.resumePastBreakpointIp_.reset();
-        const std::size_t ip = session_.runtime_.instructionPointer();
+        const std::size_t ip = session_.runtime().instructionPointer();
         const PickVM::Instruction &instr = session_.lastLoaded_->program[ip];
         out << PickVM::formatInstructionLine(ip, instr, &*session_.lastLoaded_) << '\n';
-        session_.runtime_.setOutputStream(&out);
+        session_.runtime().setOutputStream(&out);
         const StepResult result = stepRuntime(false, out, &*session_.lastLoaded_);
-        session_.runtime_.setOutputStream(nullptr);
+        session_.runtime().setOutputStream(nullptr);
         return result;
     }
 
     VmDebugService::StepResult VmDebugService::stepRuntime(const bool traceEnabled,
                                                            std::ostream &out,
                                                            const PickVM::LoadedBytecode *loadedView) const {
-        const std::size_t ip = session_.runtime_.instructionPointer();
+        const std::size_t ip = session_.runtime().instructionPointer();
         if (traceEnabled && loadedView != nullptr && ip < loadedView->program.size()) {
             out << PickVM::formatInstructionLine(ip, loadedView->program[ip], loadedView) << '\n';
         }
         try {
-            if (!session_.runtime_.step()) {
+            if (!session_.runtime().step()) {
                 return {StepOutcome::Halted, {}};
             }
             return {StepOutcome::Advanced, {}};
