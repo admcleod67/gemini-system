@@ -204,7 +204,6 @@ TEST_CASE("shell DELETE-VOC blocked when peer holds READU on VOC entry") {
 
 TEST_CASE("shell READU WRITEU RELEASE arity diagnostics") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::ostringstream out;
     bool quit = false;

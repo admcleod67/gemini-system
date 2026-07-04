@@ -8,7 +8,6 @@
 
 TEST_CASE("assembler shell help and command arity") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::ostringstream out;
     bool quit = false;
@@ -25,7 +24,6 @@ TEST_CASE("assembler shell help and command arity") {
 
 TEST_CASE("assembler shell END clears vm context without leaving mode") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::ostringstream out;
     bool quit = false;

@@ -17,11 +17,9 @@ namespace PickCore::English {
 
         const PickFS::RecordAttribute &attr = dataRecord.attribute(attrNo);
 
-        if (def.selectorKind == FSelectorKind::ConversionRaw) {
-            return Conversion::oconvOutput(attr.firstValue(), def.tailRaw, error);
-        }
-
         switch (def.selectorKind) {
+            case FSelectorKind::ConversionRaw:
+                return Conversion::oconvOutput(attr.firstValue(), def.tailRaw, error);
             case FSelectorKind::ValueIndex: {
                 if (def.valueIndex <= 0) {
                     error = "F-type: invalid value index";

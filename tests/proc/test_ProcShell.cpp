@@ -18,7 +18,6 @@ using PickTests::writeRecord;
 
 TEST_CASE("shell PROC requires program name") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::ostringstream out;
     bool quit = false;
@@ -31,7 +30,6 @@ TEST_CASE("shell PROC missing file") {
     auto fsDir = uniqueTempDir();
     seedVocAndProc(fsDir);
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
@@ -46,7 +44,6 @@ TEST_CASE("shell PROC assignment display and token substitution") {
     seedVocAndProc(fsDir);
     writeProcScriptRecord(fsDir, "FLOW", "MSG = NOOP\nX = HELLO\nDISPLAY X WORLD\nDISPLAY MSG\nEND\n");
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
@@ -61,7 +58,6 @@ TEST_CASE("shell PROC INPUT stores value and can be displayed") {
     seedVocAndProc(fsDir);
     writeProcScriptRecord(fsDir, "ASK", "INPUT USER\nDISPLAY USER\nEND\n");
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(fsDir);
     std::istringstream in("ALICE\n");
@@ -78,7 +74,6 @@ TEST_CASE("shell PROC GO supports forward and backward labels") {
     seedVocAndProc(fsDir);
     writeProcScriptRecord(fsDir, "JUMP", "GO NEXT\nDISPLAY BAD\nNEXT:\nDISPLAY OK\nEND\n");
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
@@ -93,7 +88,6 @@ TEST_CASE("shell PROC IF THEN GO with case-insensitive labels") {
     seedVocAndProc(fsDir);
     writeProcScriptRecord(fsDir, "IFLOW", "X = YES\nIF X = YES THEN GO menu\nDISPLAY FAIL\nMENU:\nDISPLAY PASS\nEND\n");
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
@@ -108,7 +102,6 @@ TEST_CASE("shell PROC positional parameters substitute into TCL command") {
     seedVocAndProc(fsDir);
     writeProcScriptRecord(fsDir, "BRIDGE", "TCL ECHO P1 P2\nEND\n");
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
@@ -123,7 +116,6 @@ TEST_CASE("shell PROC TCL bridge preserves quoted Tcl tokenization") {
     seedVocAndProc(fsDir);
     writeProcScriptRecord(fsDir, "QTCL", "TCL ECHO \"HELLO WORLD\" P1\nEND\n");
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
@@ -138,7 +130,6 @@ TEST_CASE("shell PROC TCL bridge surfaces Tcl tokenizer errors") {
     seedVocAndProc(fsDir);
     writeProcScriptRecord(fsDir, "BADTCL", "TCL ECHO \"BROKEN\nEND\n");
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
@@ -153,7 +144,6 @@ TEST_CASE("shell PROC TCL HELP COMMANDS agrees with interactive HELP COMMANDS") 
     seedVocAndProc(fsDir);
     writeProcScriptRecord(fsDir, "HCMDS", "TCL HELP COMMANDS\nEND\n");
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(fsDir);
     std::ostringstream procOut;
@@ -173,7 +163,6 @@ TEST_CASE("shell PROC TCL HELP agrees with interactive HELP GET") {
     seedVocAndProc(fsDir);
     writeProcScriptRecord(fsDir, "HELPOK", "TCL HELP GET\nEND\n");
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(fsDir);
     std::ostringstream procOut;
@@ -193,7 +182,6 @@ TEST_CASE("shell PROC duplicate labels are rejected") {
     seedVocAndProc(fsDir);
     writeProcScriptRecord(fsDir, "DUP", "A:\nA:\nEND\n");
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
@@ -210,7 +198,6 @@ TEST_CASE("shell PROC malformed IF and unknown label errors") {
     writeProcScriptRecord(fsDir, "BADGO", "GO MISSING\nEND\n");
 
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
@@ -238,7 +225,6 @@ TEST_CASE("shell PROC long and short aliases normalize to same behavior") {
                           "DONE:\n"
                           "E\n");
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(fsDir);
     std::istringstream in("ALICE\n");
@@ -259,7 +245,6 @@ TEST_CASE("shell PROC IF THEN ELSE supports inline statements") {
                           "IF X = NO THEN DISPLAY BAD ELSE DISPLAY GOOD\n"
                           "END\n");
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
@@ -278,7 +263,6 @@ TEST_CASE("shell PROC RETURN exits current script") {
                           "DISPLAY AFTER\n"
                           "END\n");
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
@@ -304,7 +288,6 @@ TEST_CASE("shell PROC LOOP REPEAT EXITIF iterates active list") {
                           "REPEAT\n"
                           "END\n");
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
@@ -319,7 +302,6 @@ TEST_CASE("shell PROC EXIT outside loop errors") {
     seedVocAndProc(fsDir);
     writeProcScriptRecord(fsDir, "BADEXIT", "EXIT\nEND\n");
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
@@ -338,7 +320,6 @@ TEST_CASE("shell PROC uses F mapping for script lookup outside PROC file") {
     fs.write("SCRIPTS", PickFS::Record("FLOW", "DISPLAY OK\nEND\n"));
 
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
@@ -357,7 +338,6 @@ TEST_CASE("shell PROC uses Q chain for script lookup") {
     fs.write("PROC", PickFS::Record("FLOW", "DISPLAY QOK\nEND\n"));
 
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
@@ -375,7 +355,6 @@ TEST_CASE("shell PROC bridge resolves V-type verb aliases") {
     fs.write("PROC", PickFS::Record("SHOW", "TCL SAYWHO\nEND\n"));
 
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
@@ -390,7 +369,6 @@ TEST_CASE("shell PROC TCL EDIT blocks until editor QUIT before next PROC line") 
     std::filesystem::create_directories(fsDir);
 
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(fsDir);
     seedVocAndProc(fsDir);

@@ -224,7 +224,6 @@ TEST_CASE("shell PROC READU rejects malformed arity") {
                           "END\n");
 
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(pickRoot);
     std::ostringstream out;

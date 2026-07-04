@@ -43,7 +43,6 @@ static void writeProgramObjectRecord(const std::filesystem::path &fsRoot,
 
 TEST_CASE("shell HELP") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::ostringstream out;
     bool quit = false;
@@ -55,7 +54,6 @@ TEST_CASE("shell HELP") {
 
 TEST_CASE("shell HELP supports command lookup and topics") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::ostringstream out;
     bool quit = false;
@@ -90,7 +88,6 @@ TEST_CASE("shell HELP precedence and non-executing lookup via VOC alias") {
     fs.write("VOC", PickFS::Record("HVOC", "V\nVOC\n"));
 
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
@@ -111,7 +108,6 @@ TEST_CASE("shell HELP zero-arg uses HELP topic record when present") {
     fs.createFile("HELP");
     fs.write("HELP", PickFS::Record("HELP", "zero arg body\n"));
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
@@ -126,7 +122,6 @@ TEST_CASE("shell HELP multi-word topic maps to underscore record id and HELP-LIS
     fs.createFile("HELP");
     fs.write("HELP", PickFS::Record("HELP_BASIC", "multiword body\n"));
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
@@ -142,7 +137,6 @@ TEST_CASE("shell HELP multi-word topic maps to underscore record id and HELP-LIS
 TEST_CASE("shell HELP COMMANDS lists Tcl verbs with intro") {
     const auto fsDir = uniqueTempDir();
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
@@ -157,7 +151,6 @@ TEST_CASE("shell HELP COMMANDS lists Tcl verbs with intro") {
 TEST_CASE("shell HELP HELP COMMANDS matches HELP COMMANDS") {
     const auto fsDir = uniqueTempDir();
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(fsDir);
     std::ostringstream a;
@@ -177,7 +170,6 @@ TEST_CASE("shell HELP COMMANDS includes VOC aliases that dispatch to Tcl verbs")
     fs.createFile("VOC");
     fs.write("VOC", PickFS::Record("ZALT", "V\nBASIC\n"));
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
@@ -193,7 +185,6 @@ TEST_CASE("shell HELP COMMANDS file record overrides dynamic listing") {
     fs.createFile("HELP");
     fs.write("HELP", PickFS::Record("HELP_COMMANDS", "static override topic\n"));
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
@@ -225,7 +216,6 @@ TEST_CASE("shell HELP resolves topic from SYSPROG when local account has no HELP
         accounts << R"({"accounts":[{"name":"TST","root":"accounts/TST"},{"name":"SYSPROG","root":"accounts/SYSPROG"}]})";
     }
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setGeminiCatalogRoot(gem);
     std::ostringstream err;
@@ -241,7 +231,6 @@ TEST_CASE("shell HELP resolves topic from SYSPROG when local account has no HELP
 TEST_CASE("shell HELP-LIST reports no topics when HELP file is missing") {
     const auto fsDir = uniqueTempDir();
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
@@ -260,7 +249,6 @@ TEST_CASE("shell HELP HELP BASIC maps to committed SYSPROG HELP_BASIC.item") {
     }
     const std::filesystem::path sp(PICK_SYSTEM_GEMINI_SYSPROG_FIXTURE);
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(sp);
     REQUIRE(std::filesystem::exists(sp / "HELP" / "HELP_BASIC.item"));
@@ -272,7 +260,6 @@ TEST_CASE("shell HELP HELP BASIC maps to committed SYSPROG HELP_BASIC.item") {
 
 TEST_CASE("shell WHO returns default port user account line") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::ostringstream out;
     bool quit = false;
@@ -289,7 +276,6 @@ TEST_CASE("shell top-level Tcl resolves VOC verb alias SAYWHO to WHO") {
     fs.write("VOC", PickFS::Record("SAYWHO", "V\nWHO\n"));
 
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
@@ -311,7 +297,6 @@ TEST_CASE("shell top-level Tcl resolves VOC ED alias to EDIT") {
     fs.write("VOC", PickFS::Record("ED", "V\nEDIT\n"));
 
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
@@ -327,7 +312,6 @@ TEST_CASE("shell top-level Tcl resolves VOC ED alias to EDIT") {
 
 TEST_CASE("shell VERSION contains project version string") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::ostringstream out;
     bool quit = false;
@@ -338,7 +322,6 @@ TEST_CASE("shell VERSION contains project version string") {
 
 TEST_CASE("shell ECHO spacing") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::ostringstream out;
     bool quit = false;
@@ -349,7 +332,6 @@ TEST_CASE("shell ECHO spacing") {
 
 TEST_CASE("shell ECHO supports quoted tokens and escapes") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::ostringstream out;
     bool quit = false;
@@ -372,7 +354,6 @@ TEST_CASE("shell ECHO supports quoted tokens and escapes") {
 
 TEST_CASE("shell tokenizer errors on malformed quote and escape") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::ostringstream out;
     bool quit = false;
@@ -387,7 +368,6 @@ TEST_CASE("shell tokenizer errors on malformed quote and escape") {
 
 TEST_CASE("shell ECHO variable substitution") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::ostringstream out;
     bool quit = false;
@@ -399,7 +379,6 @@ TEST_CASE("shell ECHO variable substitution") {
 
 TEST_CASE("shell ECHO two variables and plus") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::ostringstream out;
     bool quit = false;
@@ -412,7 +391,6 @@ TEST_CASE("shell ECHO two variables and plus") {
 
 TEST_CASE("shell ECHO unset variable empty and literal dollar") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::ostringstream out;
     bool quit = false;
@@ -440,7 +418,6 @@ TEST_CASE("shell ECHO unset variable empty and literal dollar") {
 
 TEST_CASE("shell QUIT sets quit") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::ostringstream out;
     bool quit = false;
@@ -451,7 +428,6 @@ TEST_CASE("shell QUIT sets quit") {
 
 TEST_CASE("shell unknown command") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::ostringstream out;
     bool quit = false;
@@ -462,7 +438,6 @@ TEST_CASE("shell unknown command") {
 
 TEST_CASE("shell SET GET multi-token value") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::ostringstream out;
     bool quit = false;
@@ -476,7 +451,6 @@ TEST_CASE("shell SET GET multi-token value") {
 
 TEST_CASE("shell SET empty value GET") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::ostringstream out;
     bool quit = false;
@@ -488,7 +462,6 @@ TEST_CASE("shell SET empty value GET") {
 
 TEST_CASE("shell SET requires name") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::ostringstream out;
     bool quit = false;
@@ -498,7 +471,6 @@ TEST_CASE("shell SET requires name") {
 
 TEST_CASE("shell GET missing and arity") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::ostringstream out;
     bool quit = false;
@@ -515,7 +487,6 @@ TEST_CASE("shell GET missing and arity") {
 
 TEST_CASE("shell LIST-VARS sorted and empty") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::ostringstream out;
     bool quit = false;
@@ -531,7 +502,6 @@ TEST_CASE("shell LIST-VARS sorted and empty") {
 
 TEST_CASE("shell LIST-VARS takes no arguments") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::ostringstream out;
     bool quit = false;
@@ -541,7 +511,6 @@ TEST_CASE("shell LIST-VARS takes no arguments") {
 
 TEST_CASE("shell UNSET") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::ostringstream out;
     bool quit = false;
@@ -566,7 +535,6 @@ TEST_CASE("shell UNSET") {
 
 TEST_CASE("shell strict no-arg command arity checks") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::ostringstream out;
     bool quit = false;
@@ -609,7 +577,6 @@ TEST_CASE("shell strict no-arg command arity checks") {
 
 TEST_CASE("shell SYSTEM LANGUAGES and SHOW-MODULES list language namespaces") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::ostringstream out;
     bool quit = false;
@@ -625,7 +592,6 @@ TEST_CASE("shell SYSTEM LANGUAGES and SHOW-MODULES list language namespaces") {
 
 TEST_CASE("shell SYSTEM LANGUAGES VERBOSE reports unknown extra token") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::ostringstream out;
     bool quit = false;
@@ -636,7 +602,6 @@ TEST_CASE("shell SYSTEM LANGUAGES VERBOSE reports unknown extra token") {
 
 TEST_CASE("shell SYSTEM and ABOUT introspection output") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::ostringstream out;
     bool quit = false;
@@ -655,7 +620,6 @@ TEST_CASE("shell SYSTEM and ABOUT introspection output") {
 
 TEST_CASE("shell QUIT clears variables") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::ostringstream out;
     bool quit = false;
@@ -670,7 +634,6 @@ TEST_CASE("shell QUIT clears variables") {
 
 TEST_CASE("shell RUN requires filename") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::ostringstream out;
     bool quit = false;
@@ -681,7 +644,6 @@ TEST_CASE("shell RUN requires filename") {
 
 TEST_CASE("shell RUN missing file") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     const auto fsDir = uniqueTempDir();
     seedVocAndBp(fsDir);
@@ -712,7 +674,6 @@ TEST_CASE("shell RUN executes bytecode from programs root") {
 
 TEST_CASE("shell RUN rejects extension-bearing names") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::ostringstream out;
     bool quit = false;
@@ -727,7 +688,6 @@ TEST_CASE("shell RUN auto-compiles BASIC source when bytecode missing") {
     writeProgramSourceRecord(fsDir, "HELLO", "10 PRINT \"HI\"\n20 END\n");
 
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
@@ -747,7 +707,6 @@ TEST_CASE("shell RUN compile failure from BASIC source reports diagnostics") {
     writeProgramSourceRecord(fsDir, "BROKEN", "10 ZAP A = 1\n");
 
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
@@ -764,7 +723,6 @@ TEST_CASE("shell LIST-PROGRAMS empty directory") {
     auto fsDir = uniqueTempDir();
     seedVocAndBp(fsDir);
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
@@ -781,7 +739,6 @@ TEST_CASE("shell LIST-PROGRAMS lists logical names from tbc and bas") {
     writeProgramSourceRecord(fsDir, "a", "10 END\n");
     writeProgramSourceRecord(fsDir, "b", "10 END\n");
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
@@ -797,7 +754,6 @@ TEST_CASE("shell LIST-PROGRAMS deduplicates bas and tbc with same basename") {
     writeProgramSourceRecord(fsDir, "HELLO", "10 PRINT \"HI\"\n");
     writeProgramObjectRecord(fsDir, "HELLO", "HALT\n");
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
@@ -814,7 +770,6 @@ TEST_CASE("shell LIST-PROGRAMS matches extension case-insensitively and sorts na
     writeProgramSourceRecord(fsDir, "zeta", "10 END\n");
     writeProgramSourceRecord(fsDir, "alpha", "10 END\n");
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
@@ -826,7 +781,6 @@ TEST_CASE("shell LIST-PROGRAMS matches extension case-insensitively and sorts na
 
 TEST_CASE("shell LIST-PROGRAMS missing directory") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(uniqueTempDir());
     std::ostringstream out;
@@ -839,7 +793,6 @@ TEST_CASE("shell LIST-PROGRAMS missing directory") {
 TEST_CASE("shell CREATE-FILE LIST-FILES DELETE-FILE") {
     auto dir = uniqueTempDir();
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(dir);
     std::ostringstream out;
@@ -870,7 +823,6 @@ TEST_CASE("shell CREATE-FILE LIST-FILES DELETE-FILE") {
 TEST_CASE("shell WRITE READ and overwrite record value") {
     auto dir = uniqueTempDir();
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(dir);
     std::ostringstream out;
@@ -898,7 +850,6 @@ TEST_CASE("shell WRITE READ and overwrite record value") {
 TEST_CASE("shell LIST file shows sorted record names") {
     auto dir = uniqueTempDir();
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(dir);
     std::ostringstream out;
@@ -916,7 +867,6 @@ TEST_CASE("shell LIST file shows sorted record names") {
 TEST_CASE("shell LIST file empty and arity") {
     auto dir = uniqueTempDir();
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(dir);
     std::ostringstream out;
@@ -943,7 +893,6 @@ TEST_CASE("shell LIST with fields routes to ENGLISH while LIST file stays legacy
     fs.write("DATA", PickFS::Record("R2", "BOB"));
 
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(dir);
     std::ostringstream out;
@@ -969,7 +918,6 @@ TEST_CASE("shell LIST with HEADING emits the heading as the first line") {
     fs.write("DATA", PickFS::Record("R2", "BOB"));
 
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(dir);
     std::ostringstream out;
@@ -988,7 +936,6 @@ TEST_CASE("shell LIST with HEADING emits the heading as the first line") {
 TEST_CASE("shell GET PAGE-LENGTH defaults to 24") {
     auto dir = uniqueTempDir();
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(dir);
     std::ostringstream out;
@@ -1001,7 +948,6 @@ TEST_CASE("shell GET PAGE-LENGTH defaults to 24") {
 TEST_CASE("shell SET PAGE-LENGTH validates a positive integer") {
     auto dir = uniqueTempDir();
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(dir);
     std::ostringstream out;
@@ -1043,7 +989,6 @@ TEST_CASE("shell SET PAGE-LENGTH validates a positive integer") {
 TEST_CASE("shell PAGE-LENGTH is not surfaced as a plain env variable") {
     auto dir = uniqueTempDir();
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(dir);
     std::ostringstream out;
@@ -1069,7 +1014,6 @@ TEST_CASE("shell LIST with HEADING paginates per SET PAGE-LENGTH") {
     }
 
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(dir);
     std::ostringstream out;
@@ -1129,7 +1073,6 @@ TEST_CASE("shell builtin HELP LIST SORT SELECT mention formatting clauses") {
 
 TEST_CASE("shell HELP LIST SORT SELECT mention formatting clauses") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::ostringstream out;
     bool quit = false;
@@ -1154,7 +1097,6 @@ TEST_CASE("shell LIST with FOOTING emits footer line") {
     fs.write("DATA", PickFS::Record("R1", "ALICE\n"));
 
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(dir);
     std::ostringstream out;
@@ -1175,7 +1117,6 @@ TEST_CASE("shell HELP LIST uses committed SYSPROG formatting help when fixture s
     }
     const std::filesystem::path sp(PICK_SYSTEM_GEMINI_SYSPROG_FIXTURE);
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(sp);
     std::ostringstream out;
@@ -1195,7 +1136,6 @@ TEST_CASE("shell LIST with ID-SUPP omits record ids") {
     fs.write("DATA", PickFS::Record("R1", "ALICE\n"));
 
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(dir);
     std::ostringstream out;
@@ -1221,7 +1161,6 @@ TEST_CASE("shell LIST with TOTAL emits grand total line") {
     fs.write("DATA", PickFS::Record("R2", "BOB\n50\n"));
 
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(dir);
     std::ostringstream out;
@@ -1250,7 +1189,6 @@ TEST_CASE("shell LIST with BREAK-ON emits full-width hyphen line on group change
     fs.write("DATA", PickFS::Record("R3", "CAROL\nPARIS\n"));
 
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(dir);
     std::ostringstream out;
@@ -1274,7 +1212,6 @@ TEST_CASE("shell LIST with BREAK-ON emits full-width hyphen line on group change
 TEST_CASE("shell COUNT SELECT LIST-LIST CLEAR-LIST") {
     auto dir = uniqueTempDir();
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(dir);
     std::ostringstream out;
@@ -1308,7 +1245,6 @@ TEST_CASE("shell COUNT SELECT LIST-LIST CLEAR-LIST") {
 TEST_CASE("shell SORT ENGLISH sorts and legacy SORT reserved message") {
     auto dir = uniqueTempDir();
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(dir);
     std::ostringstream out;
@@ -1345,7 +1281,6 @@ TEST_CASE("shell RESOLVE-FIELD arity and DICT resolution") {
     fs.write("DICT", PickFS::Record("NM", "A\n1\n"));
 
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(dir);
     std::ostringstream out;
@@ -1370,7 +1305,6 @@ TEST_CASE("shell RESOLVE-FIELD shows F-type DICT layout") {
     fs.write("DICT", PickFS::Record("THIRD", "F\n2\n3\n"));
 
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(dir);
     std::ostringstream out;
@@ -1392,7 +1326,6 @@ TEST_CASE("shell RESOLVE-FIELD shows OCONV on F-type conversion tail") {
     fs.write("DICT", PickFS::Record("PICKDAY", "F\n2\nD\n"));
 
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(dir);
     std::ostringstream out;
@@ -1411,7 +1344,6 @@ TEST_CASE("shell RESOLVE-FIELD shows I-type DICT layout") {
     fs.write("DICT", PickFS::Record("NET", "I\nA + B\n"));
 
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(dir);
     std::ostringstream out;
@@ -1431,7 +1363,6 @@ TEST_CASE("shell RESOLVE-FIELD shows invalid I-type DICT diagnostics") {
     fs.write("DICT", PickFS::Record("BAD", "I\n\n"));
 
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(dir);
     std::ostringstream out;
@@ -1448,7 +1379,6 @@ TEST_CASE("shell RESOLVE-FIELD shows invalid I-type DICT diagnostics") {
 TEST_CASE("shell LIST-DICT arity and missing dict file") {
     auto dir = uniqueTempDir();
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(dir);
     std::ostringstream out;
@@ -1479,7 +1409,6 @@ TEST_CASE("shell LIST-DICT shows stable type and validity output") {
     fs.write("DICT", PickFS::Record("THIRD", "F\n2\n3\n"));
 
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(dir);
     std::ostringstream out;
@@ -1506,7 +1435,6 @@ TEST_CASE("shell LIST with F-type field emits evaluated value") {
     fs.write("DATA", PickFS::Record("R1", body));
 
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(dir);
     std::ostringstream out;
@@ -1526,7 +1454,6 @@ TEST_CASE("shell LIST with F-type OCONV D field") {
     fs.write("DATA", PickFS::Record("R1", "X\n732\n"));
 
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(dir);
     std::ostringstream out;
@@ -1539,7 +1466,6 @@ TEST_CASE("shell LIST with F-type OCONV D field") {
 TEST_CASE("shell DEFINE-FIELD arity missing dict and ENGLISH LIST") {
     auto dir = uniqueTempDir();
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(dir);
     std::ostringstream out;
@@ -1573,7 +1499,6 @@ TEST_CASE("shell DEFINE-FIELD arity missing dict and ENGLISH LIST") {
 TEST_CASE("shell DEFINE-FIELD DICT-DATA overrides global DICT for ENGLISH") {
     auto dir = uniqueTempDir();
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(dir);
     std::ostringstream out;
@@ -1603,7 +1528,6 @@ TEST_CASE("shell VOC verb alias routes ENGLISH LIST") {
     fs.write("DATA", PickFS::Record("R1", "ALICE\n"));
 
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(dir);
     std::ostringstream out;
@@ -1617,7 +1541,6 @@ TEST_CASE("shell CREATE-VOC DELETE-VOC LIST-VOC arity and type checks") {
     PickFS::FileSystem fs(dir);
     fs.createFile("VOC");
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(dir);
     std::ostringstream out;
@@ -1648,7 +1571,6 @@ TEST_CASE("shell CREATE-VOC writes canonical type and target attributes") {
     PickFS::FileSystem fs(dir);
     fs.createFile("VOC");
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(dir);
     std::ostringstream out;
@@ -1666,7 +1588,6 @@ TEST_CASE("shell CREATE-VOC and DELETE-VOC invalidate resolver cache") {
     PickFS::FileSystem fs(dir);
     fs.createFile("VOC");
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(dir);
     std::ostringstream out;
@@ -1700,7 +1621,6 @@ TEST_CASE("shell LIST-VOC shows stable item and type output with INVALID marker"
     fs.write("VOC", PickFS::Record("AREC", "garbage\n"));
     fs.write("VOC", PickFS::Record("MREC", "001 F\n002 BP\n"));
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(dir);
     std::ostringstream out;
@@ -1713,7 +1633,6 @@ TEST_CASE("shell LIST-VOC shows stable item and type output with INVALID marker"
 TEST_CASE("shell COUNT LIST SORT use active list when filename omitted") {
     auto dir = uniqueTempDir();
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(dir);
     std::ostringstream out;
@@ -1744,7 +1663,6 @@ TEST_CASE("shell COUNT LIST SORT use active list when filename omitted") {
 
 TEST_CASE("shell filesystem command arity and missing record") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::ostringstream out;
     bool quit = false;
@@ -1788,7 +1706,6 @@ TEST_CASE("shell READ WRITE use MD DEFDATA default file and GET LIST-VARS SET") 
     fsInit.createFile("DATA");
 
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(dir);
     std::ostringstream out;
@@ -1833,7 +1750,6 @@ TEST_CASE("shell MD DEFDATA reloads when Pick root changes") {
     std::filesystem::create_directories(dirWithout);
 
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::ostringstream out;
     bool quit = false;
@@ -1851,7 +1767,6 @@ TEST_CASE("shell MD DEFDATA reloads when Pick root changes") {
 TEST_CASE("shell filesystem missing file and missing record") {
     auto dir = uniqueTempDir();
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(dir);
     std::ostringstream out;
@@ -1889,7 +1804,6 @@ TEST_CASE("shell DUMP-STACK routes dump to out") {
 
 TEST_CASE("shell ASM mode owns VM debugger commands") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::ostringstream out;
     bool quit = false;
@@ -1913,7 +1827,6 @@ TEST_CASE("shell ASM mode owns VM debugger commands") {
 
 TEST_CASE("shell STEP DUMP-PROGRAM DUMP-LABELS without loaded program") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::ostringstream out;
     bool quit = false;
@@ -1930,7 +1843,6 @@ TEST_CASE("shell STEP DUMP-PROGRAM DUMP-LABELS without loaded program") {
 
 TEST_CASE("shell BREAKPOINT and BREAKPOINTS without RUN") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::ostringstream out;
     bool quit = false;
@@ -1944,7 +1856,6 @@ TEST_CASE("shell BREAKPOINT and BREAKPOINTS without RUN") {
 
 TEST_CASE("shell CLEAR-BREAKPOINT and CLEAR-BREAKPOINTS") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::ostringstream out;
     bool quit = false;
@@ -1964,7 +1875,6 @@ TEST_CASE("shell RUN drops out-of-range breakpoints with message") {
     seedVocAndBp(fsDir);
     writeProgramObjectRecord(fsDir, "tiny", "PUSH_INT 1\nHALT\n");
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
@@ -1981,7 +1891,6 @@ TEST_CASE("shell RUN TRACE ON includes HALT line") {
     seedVocAndBp(fsDir);
     writeProgramObjectRecord(fsDir, "t", "PUSH_INT 7\nHALT\n");
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
@@ -1998,7 +1907,6 @@ TEST_CASE("shell DUMP-PROGRAM and DUMP-LABELS after RUN") {
     seedVocAndBp(fsDir);
     writeProgramObjectRecord(fsDir, "lbl", "start: PUSH_INT 3\nHALT\n");
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
@@ -2044,7 +1952,6 @@ TEST_CASE("shell BREAKPOINT index behavior is unchanged with source metadata pre
     seedVocAndBp(fsDir);
     writeProgramObjectRecord(fsDir, "bp_meta", "PUSH_INT 10\nPUSH_INT 20\nADD\nHALT\n");
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
@@ -2068,7 +1975,6 @@ TEST_CASE("shell BASIC sample session edit flow") {
     seedVocAndBp(fsDir);
 
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(fsDir);
 
@@ -2120,7 +2026,6 @@ TEST_CASE("shell BASIC SAVE requires name when unnamed") {
     std::filesystem::create_directories(dir);
 
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setProgramsRoot(dir);
 
@@ -2137,7 +2042,6 @@ TEST_CASE("shell BASIC SAVE requires name when unnamed") {
 
 TEST_CASE("shell BASIC COMPILE and RUN require name when unnamed") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::ostringstream out;
     bool quit = false;
@@ -2159,7 +2063,6 @@ TEST_CASE("shell BASIC SAVE with explicit name persists and autoloads") {
     seedVocAndBp(fsDir);
 
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(fsDir);
 
@@ -2186,7 +2089,6 @@ TEST_CASE("shell BASIC SAVE writes source only and not bytecode") {
     seedVocAndBp(fsDir);
 
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(fsDir);
 
@@ -2208,7 +2110,6 @@ TEST_CASE("shell BASIC COMPILE writes bytecode and failed COMPILE preserves prio
     seedVocAndBp(fsDir);
 
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(fsDir);
 
@@ -2238,7 +2139,6 @@ TEST_CASE("shell BASIC named entry missing file starts empty and creates on SAVE
     seedVocAndBp(fsDir);
 
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(fsDir);
 
@@ -2263,7 +2163,6 @@ TEST_CASE("shell BASIC named entry missing file starts empty and creates on SAVE
 
 TEST_CASE("shell BASIC EDIT requires existing line") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::ostringstream out;
     bool quit = false;
@@ -2276,7 +2175,6 @@ TEST_CASE("shell BASIC EDIT requires existing line") {
 
 TEST_CASE("shell BASIC DELETE supports line and ranges") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::ostringstream out;
     bool quit = false;
@@ -2303,7 +2201,6 @@ TEST_CASE("shell BASIC DELETE supports line and ranges") {
 
 TEST_CASE("shell BASIC DELETE rejects malformed ranges") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::ostringstream out;
     bool quit = false;
@@ -2323,7 +2220,6 @@ TEST_CASE("shell BASIC DELETE rejects malformed ranges") {
 
 TEST_CASE("shell BASIC SAVE and BASIC command arity errors") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::ostringstream out;
     bool quit = false;
@@ -2342,7 +2238,6 @@ TEST_CASE("shell BASIC LOAD behavior and arity") {
     std::filesystem::create_directories(dir);
 
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setProgramsRoot(dir);
 
@@ -2370,7 +2265,6 @@ TEST_CASE("shell BASIC LOAD loads saved program") {
     std::filesystem::create_directories(dir);
 
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setProgramsRoot(dir);
 
@@ -2392,7 +2286,6 @@ TEST_CASE("shell BASIC COMPILE reports success summary") {
     auto fsDir = uniqueTempDir();
 
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
@@ -2410,7 +2303,6 @@ TEST_CASE("shell BASIC COMPILE reports success summary") {
 
 TEST_CASE("shell BASIC RUN is quiet on compile success and executes output") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::ostringstream out;
     bool quit = false;
@@ -2428,7 +2320,6 @@ TEST_CASE("shell BASIC RUN (C mirrors COMPILE and does not execute") {
     auto fsDir = uniqueTempDir();
 
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
@@ -2444,7 +2335,6 @@ TEST_CASE("shell BASIC RUN (C mirrors COMPILE and does not execute") {
 
 TEST_CASE("shell BASIC compile failures print line diagnostics") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::ostringstream out;
     bool quit = false;
@@ -2459,7 +2349,6 @@ TEST_CASE("shell BASIC compile failures print line diagnostics") {
 
 TEST_CASE("shell BASIC RUN compile failure skips execution") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::ostringstream out;
     bool quit = false;
@@ -2477,7 +2366,6 @@ TEST_CASE("shell BASIC RUN recompiles each time and does not depend on COMPILE c
     auto fsDir = uniqueTempDir();
 
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
@@ -2497,7 +2385,6 @@ TEST_CASE("shell BASIC RUN recompiles each time and does not depend on COMPILE c
 
 TEST_CASE("shell BASIC RUN executes arithmetic expressions") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::ostringstream out;
     bool quit = false;
@@ -2513,7 +2400,6 @@ TEST_CASE("shell BASIC RUN executes arithmetic expressions") {
 
 TEST_CASE("shell BASIC RUN executes INPUT then PRINT with injected input") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::istringstream in("123\n");
     sh.setInputStream(&in);
@@ -2531,7 +2417,6 @@ TEST_CASE("shell BASIC RUN executes INPUT then PRINT with injected input") {
 
 TEST_CASE("shell BASIC RUN supports PRINT semicolon prompt before INPUT") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::istringstream in("123\n");
     sh.setInputStream(&in);
@@ -2550,7 +2435,6 @@ TEST_CASE("shell BASIC RUN supports PRINT semicolon prompt before INPUT") {
 
 TEST_CASE("shell BASIC RUN supports prompted INPUT syntax") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::istringstream in("123\n");
     sh.setInputStream(&in);
@@ -2568,7 +2452,6 @@ TEST_CASE("shell BASIC RUN supports prompted INPUT syntax") {
 
 TEST_CASE("shell BASIC COMPILE reports expression syntax errors") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::ostringstream out;
     bool quit = false;
@@ -2583,7 +2466,6 @@ TEST_CASE("shell BASIC COMPILE reports expression syntax errors") {
 
 TEST_CASE("shell BASIC COMPILE reports malformed INPUT") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::ostringstream out;
     bool quit = false;
@@ -2598,7 +2480,6 @@ TEST_CASE("shell BASIC COMPILE reports malformed INPUT") {
 
 TEST_CASE("shell BASIC COMPILE reports malformed prompted INPUT") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::ostringstream out;
     bool quit = false;
@@ -2613,7 +2494,6 @@ TEST_CASE("shell BASIC COMPILE reports malformed prompted INPUT") {
 
 TEST_CASE("shell BASIC RUN executes IF THEN ELSE and GOTO control flow") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::ostringstream out;
     bool quit = false;
@@ -2634,7 +2514,6 @@ TEST_CASE("shell BASIC RUN executes IF THEN ELSE and GOTO control flow") {
 
 TEST_CASE("shell BASIC RUN executes IF THEN ELSE inline statements") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::ostringstream out;
     bool quit = false;
@@ -2652,7 +2531,6 @@ TEST_CASE("shell BASIC RUN executes IF THEN ELSE inline statements") {
 
 TEST_CASE("shell BASIC COMPILE reports unknown GOTO target line") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::ostringstream out;
     bool quit = false;
@@ -2667,7 +2545,6 @@ TEST_CASE("shell BASIC COMPILE reports unknown GOTO target line") {
 
 TEST_CASE("shell BASIC RENUMBER aliases RENUM") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::ostringstream out;
     bool quit = false;
@@ -2687,7 +2564,6 @@ TEST_CASE("shell BASIC RENUMBER aliases RENUM") {
 
 TEST_CASE("shell BASIC RENUM rewrites GOTO targets") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::ostringstream out;
     bool quit = false;
@@ -2704,7 +2580,6 @@ TEST_CASE("shell BASIC RENUM rewrites GOTO targets") {
 
 TEST_CASE("shell BASIC RENUM rewrites IF THEN ELSE targets") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::ostringstream out;
     bool quit = false;
@@ -2723,7 +2598,6 @@ TEST_CASE("shell BASIC RENUM rewrites IF THEN ELSE targets") {
 
 TEST_CASE("shell BASIC RENUM leaves dangling targets unchanged") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::ostringstream out;
     bool quit = false;
@@ -2743,7 +2617,6 @@ TEST_CASE("shell BASIC EDIT delegates to LineRecordEditor unknown command then Q
     seedVocAndBp(fsDir);
 
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(fsDir);
     std::istringstream in("XYZZY\nQ\n");
@@ -2765,7 +2638,6 @@ TEST_CASE("shell BASIC EDIT delegates to LineRecordEditor unknown command then Q
 
 TEST_CASE("shell BASIC RUN reports runtime error for RETURN without GOSUB") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::istringstream in("QUIT\n");
     sh.setInputStream(&in);
@@ -2786,7 +2658,6 @@ TEST_CASE("shell BASIC RUN reports runtime error for RETURN without GOSUB") {
 
 TEST_CASE("shell BASIC RUN reports runtime error for divide by zero") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::istringstream in("QUIT\n");
     sh.setInputStream(&in);
@@ -2804,7 +2675,6 @@ TEST_CASE("shell BASIC RUN reports runtime error for divide by zero") {
 
 TEST_CASE("shell BASIC debugger supports LIST and QUIT after runtime error") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::istringstream in("LIST\nQUIT\n");
     sh.setInputStream(&in);
@@ -2851,7 +2721,6 @@ TEST_CASE("shell END exits vm debugger context") {
     seedVocAndBp(fsDir);
     writeProgramObjectRecord(fsDir, "bp_end", "PUSH_INT 10\nPUSH_INT 20\nADD\nHALT\n");
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(fsDir);
     std::ostringstream out;
@@ -2878,7 +2747,6 @@ TEST_CASE("shell BASIC RUN executes OPEN WRITE READ CLOSE flow") {
     std::filesystem::create_directories(fsDir);
 
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setProgramsRoot(progDir);
     sh.setFileSystemRoot(fsDir);
@@ -2912,7 +2780,6 @@ TEST_CASE("shell BASIC RUN executes OPEN ELSE inline statement on missing file")
     std::filesystem::create_directories(fsDir);
 
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setProgramsRoot(progDir);
     sh.setFileSystemRoot(fsDir);
@@ -2937,7 +2804,6 @@ TEST_CASE("shell BASIC RUN executes CHAIN to another BASIC program") {
     std::filesystem::create_directories(fsDir);
 
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setProgramsRoot(progDir);
     sh.setFileSystemRoot(fsDir);
@@ -2969,7 +2835,6 @@ TEST_CASE("shell EDIT file record INSERT SAVE QUIT then READ") {
     std::filesystem::create_directories(fsDir);
 
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(fsDir);
 
@@ -2994,7 +2859,6 @@ TEST_CASE("shell EDIT uses aliases and case-insensitive LIST") {
     std::filesystem::create_directories(fsDir);
 
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(fsDir);
 
@@ -3018,7 +2882,6 @@ TEST_CASE("shell EDIT REPLACE multiline and DELETE") {
     std::filesystem::create_directories(fsDir);
 
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(fsDir);
 
@@ -3043,7 +2906,6 @@ TEST_CASE("shell EDIT program name shorthand resolves VOC source record") {
     std::filesystem::create_directories(fsDir);
 
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setFileSystemRoot(fsDir);
     seedVocAndBp(fsDir);
@@ -3063,7 +2925,6 @@ TEST_CASE("shell EDIT program name shorthand resolves VOC source record") {
 
 TEST_CASE("shell EDIT arity errors") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::ostringstream out;
     bool quit = false;
@@ -3078,7 +2939,6 @@ TEST_CASE("shell EDIT arity errors") {
 
 TEST_CASE("shell HELP EDIT shows edit usage line") {
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     std::ostringstream out;
     bool quit = false;
@@ -3100,7 +2960,6 @@ TEST_CASE("shell WHO after attachUserSession shows session") {
     }
 
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setGeminiCatalogRoot(gem);
     std::ostringstream err;
@@ -3129,7 +2988,6 @@ TEST_CASE("shell LOGTO applies catalogue session like fresh logon") {
     }
 
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setGeminiCatalogRoot(gem);
     std::ostringstream err;
@@ -3174,7 +3032,6 @@ TEST_CASE("shell LOGTO reads password line when target account requires it") {
     }
 
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setGeminiCatalogRoot(gem);
     std::ostringstream err;
@@ -3208,7 +3065,6 @@ TEST_CASE("shell session @ system variables Tcl GET SET LIST-VARS PROC and BASIC
     }
 
     PickShell::GeminiSession gs;
-    PickVM::Runtime &rt = gs.runtime();
     PickShell::Shell &sh = gs.shell();
     sh.setGeminiCatalogRoot(gem);
     std::ostringstream err;
