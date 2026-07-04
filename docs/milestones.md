@@ -22,7 +22,7 @@ Detailed scope for each milestone is in [`docs/milestones/`](milestones/) (two-d
 
 Target: a Pick-authentic, multi-session **Linux service** (UniData-style deployment), with a single-session **application edition** built on the same architecture—not a separate codebase.
 
-- [Milestone 12 — Session Model Foundation (planned)](milestones/12-session-model-foundation.md)
+- [Milestone 12 — Session Model Foundation (completed)](milestones/12-session-model-foundation.md)
 - [Milestone 13 — Service Daemon Architecture (planned)](milestones/13-service-daemon-architecture.md)
 - [Milestone 14 — Multi-Session Console Support (planned)](milestones/14-multi-session-console-support.md)
 - [Milestone 15 — Cooperative Multi-Session Execution (planned)](milestones/15-cooperative-multi-session-execution.md)

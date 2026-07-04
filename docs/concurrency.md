@@ -26,7 +26,7 @@ Lock conflicts throw `FileSystemError` with a stable **`RECORD LOCKED`** substri
 
 ## Session lifecycle
 
-After catalogue login, [`ShellSession`](../src/userland/tcl/ShellSession.cpp) binds the shared lock table and a unique session id to the account filesystem handle.
+After catalogue login, [`GeminiSession`](../src/userland/tcl/GeminiSession.cpp) **`attach()`** binds the shared lock table and a unique session id to the account filesystem handle.
 
 Locks are released when:
 
@@ -62,6 +62,7 @@ These belong to later milestones.
 
 ## See also
 
+- [Session model](session.md) — `GeminiSession` lifecycle and I/O
 - [Milestone 10 — Record locking](milestones/10-record-locking-multi-user.md)
 - [Tcl shell locking commands](tcl-shell.md)
 - [BASIC READU / WRITEU](basic-language.md)

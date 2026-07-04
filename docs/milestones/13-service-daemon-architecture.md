@@ -27,4 +27,4 @@ Without this distinction, “multi-session” in M13 can be mistaken for M14 or 
 
 - **PORT MANAGER** (today a boot stub) needs stable **port / session id** assignment for **`WHO`**, **`LISTSESSIONS`**, and lock identity—address in M13 or early M14, not M18.
 - IPC is Unix domain sockets only for v1; no remote telnet/SSH in this milestone.
-- Sessions created here use the unified session type from [**Milestone 12**](12-session-model-foundation.md).
+- Sessions created here use **`GeminiSession`** from [**Milestone 12**](12-session-model-foundation.md) (implemented; see [session.md](../session.md)).

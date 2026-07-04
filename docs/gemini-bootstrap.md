@@ -13,7 +13,7 @@ So `VOC` lives at `<Pick-root>/VOC/` (a directory of `.item` records), not at `f
 
 ## Catalogue root vs Pick root
 
-- **Pick filesystem root** — where logical `VOC`, `BP`, … live (`setFileSystemRoot` / `ShellSession`).
+- **Pick filesystem root** — where logical `VOC`, `BP`, … live (`GeminiSession::setFileSystemRoot` / `Shell::setFileSystemRoot`).
 - **Gemini catalogue root** — the directory that contains **`ACCOUNTS.json`** (and optionally **`USERS.json`** for future or reporting use; it is **not** required for console logon). **`PickCore::LoginService`** (in **`gemini-core`**) reads **`ACCOUNTS.json`** for authentication; the Tcl shell only runs **after** a successful login has produced a **`PickCore::UserSession`**. The catalogue directory is **not** the same path as the Pick root.
 
 When the bootstrap marker `cwd/gemini/accounts/SYSPROG/VOC` is present, `applyDefaultFileSystemRoot` sets **both** the Pick root to `cwd/gemini/accounts/SYSPROG` and the catalogue root to **`cwd/gemini`**.
@@ -79,7 +79,7 @@ Programmatic **`stdout`** for auto-login is therefore **`LOGON PLEASE: `** plus 
 1. **Port cold start only** (`CatalogLoginPhase::ColdStartPortInit`): **`MD,AUTO-LOGON`** then **`GEMINI_AUTO_LOGON`** / deprecated **`GEMINI_AUTO_LOGIN`** are evaluated exactly once after boot. Outputs **`LOGON PLEASE:`** plus resolved account **`endl`**; optional silent password read; **`authenticateAccount`** path; success uses the **same** Tcl boundary (**`println`** = one flushed newline) as interactive (**`authenticateAccount`** + **`printlnLoginToTclBoundary`** in code). If authentication fails, falls through to interactive logon (**`stderr`** may carry diagnostics).
 2. **After `LOGOFF`** (`CatalogLoginPhase::InteractiveOnly`), **`runCatalogLogin` does not** read **`AUTO-LOGON`** or environment auto-logon variables — same interactive **`LOGON PLEASE: `** behaviour only.
 3. **Interactive** (no `Username:` helper): **`LOGON PLEASE: `** is printed with **no** newline; the operator types the **single account id** token and Return (same name rules as Pick file names; reserved words rejected). **Not** Tcl.
-4. On success, **`PickShell::Shell::attachUserSession`** applies **`PickCore::UserSession`**: Pick root for that account, VM/Tcl reset, **`@USERNO`**, **`@ACCOUNT`**, **`@LOGNAME`**. For account-only logon, **`username`** and **`accountName`** are the same string until a distinct user model exists.
+4. On success, **`GeminiSession::attach()`** applies **`PickCore::UserSession`**: Pick root for that account, VM/Tcl reset, **`@USERNO`**, **`@ACCOUNT`**, **`@LOGNAME`**. (`Shell::attachUserSession` delegates to the session.) For account-only logon, **`username`** and **`accountName`** are the same string until a distinct user model exists.
 5. **EOF / Ctrl-D** during the login phase exits the host (no `QUIT` keyword in login phase).
 
 **`LOGTO account`** and **`LOGOFF`** remain **Tcl commands** after login. **`LOGOFF`** clears the session and **`runTclRepl()`** returns to **`main`**, which repeats **`runCatalogLogin`** in **`InteractiveOnly`** phase (no **`MD`** / env auto-logon).

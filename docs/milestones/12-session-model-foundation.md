@@ -2,7 +2,7 @@
 
 ## Milestone 12 — Session Model Foundation (Expanded)
 
-Milestone 12 establishes the formal session abstraction that all later service-oriented milestones (M13–M17) depend on. It unifies today’s fragmented execution model — **`UserSession`**, **`ShellSession`**, **`Runtime`**, and direct console I/O — into a single, coherent boundary that represents one running Gemini System session. No daemon, concurrency, or multi-session scheduling is introduced yet; execution remains strictly single-threaded.
+Milestone 12 established the formal session abstraction that all later service-oriented milestones (M13–M17) depend on. It unified the former fragmented execution model — **`UserSession`**, **`ShellSession`**, **`Runtime`**, and direct console I/O — into a single **`GeminiSession`** boundary representing one running Gemini System session. No daemon, concurrency, or multi-session scheduling was introduced; execution remains strictly single-threaded.
 
 This milestone is the architectural hinge between the prototype and the service. A correct session boundary makes M13–M17 largely mechanical; an incorrect one forces the maintenance of two parallel systems.
 
@@ -10,18 +10,11 @@ This milestone is the architectural hinge between the prototype and the service.
 
 ### 1. Purpose and rationale
 
-The current system distributes session-relevant state across multiple types:
-
-- **`Runtime`** owned by [`Main.cpp`](../../src/Main.cpp)
-- Shell/interpreter state split between **`Shell`** and **`ShellSession`**
-- Account identity carried in **`UserSession`**
-- I/O wired directly to **`std::cin`** / **`std::cout`** in several locations (including [`LoginService`](../../src/core/login/LoginService.h) and [`Shell::runTclRepl`](../../src/userland/tcl/Shell.cpp))
-
-Milestone 12 consolidates these into a single **`GeminiSession`** object (working name) that owns:
+Before M12, session-relevant state was distributed across multiple types. M12 consolidated it into **`GeminiSession`**, which owns:
 
 - The VM (**`Runtime`**)
-- The interpreter stack (Tcl, BASIC, PROC, assembler)
-- The account binding
+- The interpreter stack (Tcl, BASIC, PROC, assembler) via **`Shell`**
+- The account binding (from **`UserSession`** at login)
 - The session’s I/O channels
 - The lifecycle of the session itself
 
@@ -39,39 +32,35 @@ This is the foundation required for:
 
 #### 2.1 Session object definition
 
-Introduce a new session type (working name: **`GeminiSession`**) that owns all state required to execute commands and programs. This unifies the current split between **`UserSession`**, **`ShellSession`**, and the process-level **`Runtime`** — it does **not** introduce a parallel session layer alongside the existing types.
+**`GeminiSession`** owns all state required to execute commands and programs:
 
-**`GeminiSession`** owns:
+- **`Runtime`** — owned for the session lifetime
+- **Shell / interpreter stack** — Tcl, BASIC, PROC, and assembler paths via **`Shell`**
+- **Session I/O channels** — login, REPL, and interpreter output route through session `input()` / `output()` / `diagnostic()` (see [session.md](../session.md))
+- **Account binding** — applied via **`attach(const UserSession&)`**
 
-- **`Runtime`** — today allocated in **`Main.cpp`**, referenced by **`ShellSession`**
-- **Shell / interpreter stack** — Tcl, BASIC, PROC, and assembler paths today split across **`Shell`** + **`ShellSession`**
-- **Session I/O channels** — replace direct **`std::cin`** / **`std::cout`** in **`LoginService`**, **`Shell::runTclRepl`**, and related paths (build on existing optional stream hooks in **`Shell`** / **`Runtime`** where appropriate)
-- **Account binding** — fields currently carried in **`UserSession`** and applied via **`attachUserSession`**
+**Lock binding:** the session exposes per-session lock context (shared **`LockTable`**, session lock id on login per [Milestone 10](10-record-locking-multi-user.md)).
 
-**Lock binding:** the session exposes the per-session lock context today wired through **`ShellSession`** (shared **`LockTable`**, session lock id on login per [Milestone 10](10-record-locking-multi-user.md)). M12 must not break per-session lock identity.
+#### 2.2 Type migration (completed)
 
-#### 2.2 Type migration plan
-
-Milestone 12 removes the historical split between **`UserSession`**, **`ShellSession`**, and the process-level **`Runtime`**. The migration path is explicit absorption — not a wrapper hierarchy — so a single point of ownership exists for all session-scoped state:
-
-- **`UserSession`** becomes a lightweight account-metadata struct owned by **`GeminiSession`**. No independent lifecycle for bound account state; no separate owner. It may remain the login DTO returned by **`LoginService`** and passed to **`attach()`**.
-- **`ShellSession` is removed.** Its mutable fields (filesystem root, Tcl environment, lock identity, active list, login flags, breakpoint/suspend state, etc.) migrate directly into **`GeminiSession`**.
-- **`Runtime`** is owned by **`GeminiSession`** for the session lifetime (today allocated in **`Main.cpp`**).
-- **`Shell`** remains the interpreter front-end but **no longer owns session state**; it receives a reference to the session (today it embeds **`ShellSession session_`**).
+- **`UserSession`** remains the login DTO from **`LoginService`**; account fields are applied via **`GeminiSession::attach()`**.
+- **`ShellSession`** was removed; its fields live on **`GeminiSession`**.
+- **`Runtime`** is owned by **`GeminiSession`**.
+- **`Shell`** holds **`GeminiSession&`** and does not own session state.
 
 #### 2.3 Session lifecycle
 
-Define explicit, deterministic lifecycle transitions (later driven by the daemon in M13):
+Public API on [`GeminiSession`](../../src/userland/tcl/GeminiSession.h) (M13 daemon will drive the same transitions):
 
-| Transition | Semantics |
-|------------|-----------|
-| **create** | Allocate **one** **`Runtime`**, initialise interpreters, create I/O channels |
-| **attach** | Bind an authenticated account (today: **`applyUserSession`**) |
-| **detach** | Remove account binding without destroying the session (today: **`clearLoginSession`**) |
-| **reset** | Clear interpreter and VM *program* state while retaining the same **`Runtime`** instance and I/O channels |
-| **destroy** | Full teardown of the session; **`Runtime`** destroyed with the session |
+| Transition | API | Semantics |
+|------------|-----|-----------|
+| **create** | `GeminiSession::create()` | Allocate one **`Runtime`**, initialise interpreters, wire I/O |
+| **attach** | `attach(UserSession)` | Bind authenticated account |
+| **detach** | `detach()` | Remove account binding without destroying the session |
+| **reset** | `reset()` | Clear interpreter and VM program state; retain same **`Runtime`** and I/O |
+| **destroy** | `destroy()` / destructor | Full session teardown |
 
-**VM lifetime vs reset:** **`create`** allocates a single **`Runtime`** for the session’s entire lifetime. **`reset`** does **not** destroy or reallocate the VM — it performs an in-process clear equivalent to today’s **`ShellSession::resetForQuit()`** (release locks where applicable, clear Tcl env, active lists, breakpoints, and call **`Runtime::loadProgram({})`**). **`destroy`** tears down the session object and its **`Runtime`**. **`detach`** is narrower than **`reset`** (login/lock identity cleared; aligns with LOGOFF paths); **`reset`** aligns with QUIT / end-of-session cleanup that clears interpreter state for a fresh REPL cycle.
+**VM lifetime vs reset:** **`reset`** does not reallocate the VM — it releases locks where applicable, clears Tcl env, active lists, breakpoints, and calls **`Runtime::loadProgram({})`**. **`detach`** is narrower (login/lock identity; used in **`LOGOFF`** before **`reset`**). **`QUIT`** calls **`reset()`** only.
 
 #### 2.4 I/O boundary
 
@@ -150,7 +139,7 @@ External behaviour of **`gemini-system`** remains unchanged — only internal co
 ### 6. Grounding and dependencies
 
 - Builds on [Milestone 2](02-multi-account-single-session.md) (account context) and [Milestone 10](10-record-locking-multi-user.md) (per-session lock identity) — formalize and unify, not reinvent.
-- **Boot ritual stays process-level for M12:** [`BootMonitor`](../../src/core/boot/BootMonitor.h) and the frozen **`LanguageRegistry`** ([Milestone 11](11-multi-language-runtime-infrastructure.md)) remain outside the session. The thin host ([`Main.cpp`](../../src/Main.cpp)) runs cold start and attaches the registry to the VM **before** session creation; daemon scope is M13.
+- **Boot ritual stays process-level for M12:** [`BootMonitor`](../../src/core/boot/BootMonitor.h) and the frozen **`LanguageRegistry`** ([Milestone 11](11-multi-language-runtime-infrastructure.md)) are attached at process scope. [`Main.cpp`](../../src/Main.cpp) creates **`GeminiSession`**, runs cold start against the session **`Runtime`**, then attaches the registry before the login/REPL loop; daemon scope is M13.
 - **External behaviour unchanged:** **`gemini-system`** should look the same to users after M12.
 
 ---
@@ -169,10 +158,18 @@ External behaviour of **`gemini-system`** remains unchanged — only internal co
 
 ### 8. Milestone completion criteria
 
-- No direct **`std::cin`** / **`std::cout`** on login/REPL production code paths (tests excepted)
-- **`gemini-system`** manual smoke unchanged: login → Tcl → BASIC → LOGOFF
-- All existing tests pass
+- No direct **`std::cin`** / **`std::cout`** on login/REPL production code paths (tests excepted; process boot **`stdout`** unchanged)
+- **`gemini-system`** manual smoke: login → Tcl → BASIC → LOGOFF → re-login → QUIT (see checklist below)
+- All tests pass (892+ at close)
 - Per-session lock identity and M11 language dispatch unchanged from an operator perspective
+
+**Manual smoke checklist:**
+
+1. Boot with catalogue → interactive or auto LOGON
+2. Tcl: `VERSION`, `WHO`
+3. Enter BASIC → run a one-line program → `END`
+4. `LOGOFF` → re-login
+5. `QUIT` → clean process exit
 
 ---
 
@@ -186,12 +183,12 @@ Implementation is sequenced into vertical stages. Each stage ships a test-locked
 
 - **Stage 3 — Login + REPL on session I/O**: refactor [`LoginService`](../../src/core/login/LoginService.h) caller and [`Shell::runTclRepl`](../../src/userland/tcl/Shell.cpp) to use session channels; remove direct **`std::cin`** / **`std::cout`** on production login/REPL paths. Implementation: [`Shell::setOutputStream`](../../src/userland/tcl/Shell.h), [`Main.cpp`](../../src/Main.cpp) login via `session.input()` / `output()` / `diagnostic()`, REPL test in [`tests/tcl/test_GeminiSession.cpp`](../../tests/tcl/test_GeminiSession.cpp). *Status: implemented.*
 
-- **Stage 4 — Absorb `ShellSession`**: migrate mutable **`ShellSession`** fields into **`GeminiSession`** (filesystem root, Tcl env, lock binding, active list, login flags, breakpoint/suspend state); **`Shell`** holds **`GeminiSession&`** instead of embedding **`ShellSession`**; implement **`attach(const UserSession&)`** on the session; delete **`ShellSession`** type. Preserve per-session lock identity ([`tests/tcl/test_ShellSessionLocks.cpp`](../../tests/tcl/test_ShellSessionLocks.cpp), [`tests/tcl/test_ShellLocking.cpp`](../../tests/tcl/test_ShellLocking.cpp)). *Status: implemented.*
+- **Stage 4 — Absorb `ShellSession`**: migrate mutable **`ShellSession`** fields into **`GeminiSession`** (filesystem root, Tcl env, lock binding, active list, login flags, breakpoint/suspend state); **`Shell`** holds **`GeminiSession&`** instead of embedding **`ShellSession`**; implement **`attach(const UserSession&)`** on the session; delete **`ShellSession`** type. Preserve per-session lock identity ([`tests/tcl/test_GeminiSessionLocks.cpp`](../../tests/tcl/test_GeminiSessionLocks.cpp), [`tests/tcl/test_ShellLocking.cpp`](../../tests/tcl/test_ShellLocking.cpp)). *Status: implemented.*
 
 - **Stage 5 — Lifecycle API**: explicit **`create`** / **`attach`** / **`detach`** / **`reset`** / **`destroy`** on **`GeminiSession`**; align **`reset`** with today’s **`ShellSession::resetForQuit()`** and **`detach`** with **`clearLoginSession()`** semantics (§2.3). Session lifecycle unit tests. *Status: implemented.*
 
-- **Stage 6 — Docs + closes M12**: satisfy §8 completion criteria; update milestone status; optional architecture cross-links in [`docs/`](../). Manual smoke: login → Tcl → BASIC → LOGOFF unchanged. **Closes Milestone 12.** *Status: planned.*
+- **Stage 6 — Docs + closes M12**: satisfy §8 completion criteria; update milestone status; architecture reference in [`docs/session.md`](../session.md) and cross-links in [`docs/`](../). Manual smoke checklist in §8. **Closes Milestone 12.** *Status: implemented.*
 
 Only Stage 6's exit criteria should claim "Closes Milestone 12".
 
-*Status: planned.*
+*Status: implemented.*

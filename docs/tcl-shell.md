@@ -2,7 +2,7 @@
 
 The Tcl shell is the host REPL for system commands, BASIC/PROC entry, and filesystem commands.
 
-When a **Gemini catalogue root** is configured, **`main`** runs **`PickCore::BootMonitor`** (**`SYSTEM READY`** is followed by one blank **`stdout`** line), then **`PickCore::LoginService::runCatalogLogin`**. **`LOGON PLEASE:`** and the account share one line (**interactive**: prefix flushed, then **`getline`**; **`MD`/env auto**: echoed account **`endl`** so there is no stdin Return). Successful logon emits **exactly one** flushed newline before **`Shell::runTclRepl()`** (Pick/Mentor blank line **before** Tcl — same boundary for both flows; auto adds an extra `\n` when echoing the account). The Tcl banner has **no** leading newline — see [`gemini-bootstrap.md`](gemini-bootstrap.md). After **`LOGOFF`**, only interactive logon is used (**no auto-login**). The Tcl layer receives a **`PickCore::UserSession`** via **`Shell::attachUserSession`** and then runs **`Shell::runTclRepl()`** only (no nested login loop inside the shell).
+When a **Gemini catalogue root** is configured, **`main`** creates a **`PickShell::GeminiSession`** (`GeminiSession::create()`), runs **`PickCore::BootMonitor`** on process **`stdout`** (**`SYSTEM READY`** is followed by one blank **`stdout`** line), then **`PickCore::LoginService::runCatalogLogin`** on the session’s input/output channels. **`LOGON PLEASE:`** and the account share one line (**interactive**: prefix flushed, then **`getline`**; **`MD`/env auto**: echoed account **`endl`** so there is no stdin Return). Successful logon emits **exactly one** flushed newline before **`Shell::runTclRepl()`** (Pick/Mentor blank line **before** Tcl — same boundary for both flows; auto adds an extra `\n` when echoing the account). The Tcl banner has **no** leading newline — see [`gemini-bootstrap.md`](gemini-bootstrap.md). After **`LOGOFF`**, only interactive logon is used (**no auto-login**). On success, **`main`** calls **`GeminiSession::attach()`** with the **`PickCore::UserSession`** from login ( **`Shell::attachUserSession`** is a thin delegate), then **`Shell::runTclRepl()`** only (no nested login loop inside the shell).
 
 - **Prompt:** `TCL> `
 
@@ -19,7 +19,7 @@ The first token of each interactive Tcl line is resolved through logical file **
 
 ## Source layout
 
-- Tcl host shell and filesystem command integration: `src/userland/tcl/` (VOC resolution lives in [`src/core/voc/`](../src/core/voc/), used by [`ShellSession`](../src/userland/tcl/ShellSession.h))
+- Tcl host shell and session state: `src/userland/tcl/` — [`GeminiSession`](../src/userland/tcl/GeminiSession.h) owns runtime, shell, account binding, and I/O; [`Shell`](../src/userland/tcl/Shell.h) is the interpreter front-end (VOC resolution lives in [`src/core/voc/`](../src/core/voc/))
 - BASIC line buffer + BASIC command interpreter (`EDIT` delegates to the system line editor in `src/userland/tcl/LineRecordEditor.*`): `src/userland/basic/`
 - PROC interpreter (host token interpreter): `src/userland/proc/` (language semantics: [PROC language](proc.md))
 - BASIC compiler is implemented in `src/userland/basic/BasicCompiler.*`.
