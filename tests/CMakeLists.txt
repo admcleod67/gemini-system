@@ -24,6 +24,7 @@ add_executable(
         core/test_DaemonLifecycle.cpp
         core/test_DaemonIpc.cpp
         core/test_DaemonIpcSession.cpp
+        core/test_SessionIoBridge.cpp
         core/test_PortManager.cpp
         core/test_SessionTable.cpp
         core/test_FileSystem.cpp

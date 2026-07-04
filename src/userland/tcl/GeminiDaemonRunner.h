@@ -14,6 +14,7 @@
 
 #include <iosfwd>
 #include <iostream>
+#include <unordered_map>
 
 namespace PickShell {
     class GeminiDaemonRunner {
@@ -28,12 +29,16 @@ namespace PickShell {
     private:
         void installSignalHandlers();
         void shutdown();
+        PickCore::AttachSessionResult attachSession(PickCore::SessionId requestedPort,
+                                                    PickCore::IpcSessionChannel &channel);
+        void detachSession(PickCore::SessionId port);
 
         PickCore::GeminiServiceDaemon &daemon_;
         GeminiSessionHost &host_;
         PickCore::DaemonConfig config_;
 #ifndef _WIN32
         PickCore::DaemonIpcServer ipcServer_;
+        std::unordered_map<PickCore::SessionId, int> boundSessionPorts_;
 #endif
     };
 } // namespace PickShell

@@ -6,18 +6,29 @@
 #define PICK_SYSTEM_CORE_DAEMON_DAEMON_IPC_SERVER_H
 
 #include "DaemonIpcProtocol.h"
+#include "IpcSessionChannel.h"
 
 #include <chrono>
 #include <cstddef>
 #include <filesystem>
 #include <functional>
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
 
 namespace PickCore {
+    enum class AttachSessionStatus { Ok, SessionTableFull, SessionNotFound, SessionAlreadyBound };
+
+    struct AttachSessionResult {
+        AttachSessionStatus status{AttachSessionStatus::SessionTableFull};
+        SessionId sessionPort{0};
+    };
+
     struct DaemonIpcHandlers {
         std::function<std::optional<SessionId>()> reserveSession;
+        std::function<AttachSessionResult(SessionId requestedPort, IpcSessionChannel &channel)> attachSession;
+        std::function<void(SessionId port)> detachSession;
         std::function<void()> requestShutdown;
     };
 
@@ -43,6 +54,8 @@ namespace PickCore {
             int fd{-1};
             bool handshaken{false};
             std::vector<std::uint8_t> readBuffer;
+            std::optional<SessionId> attachedPort;
+            std::unique_ptr<IpcSessionChannel> channel;
         };
 
         struct DispatchOutcome {
@@ -51,13 +64,14 @@ namespace PickCore {
         };
 
         void acceptPendingConnections();
-        void removeConnectionAt(std::size_t index);
-        void closeAllConnections();
+        void removeConnectionAt(std::size_t index, const DaemonIpcHandlers &handlers);
+        void closeAllConnections(const DaemonIpcHandlers &handlers);
         [[nodiscard]] bool sendError(int clientFd, DaemonIpcErrorCode code, const std::string &message);
         [[nodiscard]] DispatchOutcome dispatchFrame(Connection &connection,
                                                     const DaemonIpcFrame &frame,
                                                     const DaemonIpcServerConfig &config,
                                                     const DaemonIpcHandlers &handlers);
+        void detachConnection(Connection &connection, const DaemonIpcHandlers &handlers);
 
         std::filesystem::path socketPath_;
         int listenFd_{-1};

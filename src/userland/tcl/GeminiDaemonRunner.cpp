@@ -8,6 +8,7 @@
 #include <iostream>
 #include <optional>
 #include <thread>
+#include <vector>
 
 namespace PickShell {
     namespace {
@@ -41,6 +42,52 @@ namespace PickShell {
         std::signal(SIGINT, handleTerminationSignal);
     }
 
+#ifndef _WIN32
+    PickCore::AttachSessionResult GeminiDaemonRunner::attachSession(const PickCore::SessionId requestedPort,
+                                                                    PickCore::IpcSessionChannel &channel) {
+        PickCore::SessionId port = requestedPort;
+
+        if (port == 0) {
+            try {
+                port = host_.createSession().id;
+            } catch (const std::exception &) {
+                return {PickCore::AttachSessionStatus::SessionTableFull, 0};
+            }
+        } else if (host_.sessions().find(port) == nullptr) {
+            return {PickCore::AttachSessionStatus::SessionNotFound, 0};
+        }
+
+        if (boundSessionPorts_.contains(port)) {
+            return {PickCore::AttachSessionStatus::SessionAlreadyBound, 0};
+        }
+
+        GeminiSession *session = host_.sessions().find(port);
+        if (session == nullptr) {
+            return {PickCore::AttachSessionStatus::SessionNotFound, 0};
+        }
+
+        session->setInputStream(&channel.input());
+        session->setOutputStream(&channel.output());
+        session->setDiagnosticStream(&channel.diagnostic());
+        boundSessionPorts_[port] = 1;
+
+        return {PickCore::AttachSessionStatus::Ok, port};
+    }
+
+    void GeminiDaemonRunner::detachSession(const PickCore::SessionId port) {
+        boundSessionPorts_.erase(port);
+
+        GeminiSession *session = host_.sessions().find(port);
+        if (session == nullptr) {
+            return;
+        }
+
+        session->setInputStream(nullptr);
+        session->setOutputStream(nullptr);
+        session->setDiagnosticStream(nullptr);
+    }
+#endif
+
     int GeminiDaemonRunner::run(std::ostream &bootOut) {
         installSignalHandlers();
         daemon_.coldStart(bootOut);
@@ -60,6 +107,11 @@ namespace PickShell {
                 return std::nullopt;
             }
         };
+        handlers.attachSession = [this](const PickCore::SessionId requestedPort,
+                                        PickCore::IpcSessionChannel &channel) {
+            return attachSession(requestedPort, channel);
+        };
+        handlers.detachSession = [this](const PickCore::SessionId port) { detachSession(port); };
         handlers.requestShutdown = [this] { requestShutdown(); };
 
         while (!shutdownRequested.load(std::memory_order_acquire)) {
@@ -79,6 +131,15 @@ namespace PickShell {
 
     void GeminiDaemonRunner::shutdown() {
 #ifndef _WIN32
+        std::vector<PickCore::SessionId> boundPorts;
+        boundPorts.reserve(boundSessionPorts_.size());
+        for (const auto &entry : boundSessionPorts_) {
+            boundPorts.push_back(entry.first);
+        }
+        for (const PickCore::SessionId port : boundPorts) {
+            detachSession(port);
+        }
+        boundSessionPorts_.clear();
         ipcServer_.stop();
 #endif
         host_.destroyAllSessions();

@@ -27,19 +27,32 @@ namespace PickCore {
             }
         }
 
-        [[nodiscard]] bool isSessionPlaneMessage(const DaemonIpcMessageType type) {
-            switch (type) {
-                case DaemonIpcMessageType::AttachSession:
-                case DaemonIpcMessageType::AttachSessionAck:
-                case DaemonIpcMessageType::DetachSession:
-                case DaemonIpcMessageType::DetachSessionAck:
-                case DaemonIpcMessageType::SessionInput:
-                case DaemonIpcMessageType::SessionOutput:
-                case DaemonIpcMessageType::SessionDiagnostic:
-                    return true;
-                default:
-                    return false;
+        [[nodiscard]] DaemonIpcErrorCode attachStatusToErrorCode(const AttachSessionStatus status) {
+            switch (status) {
+                case AttachSessionStatus::SessionNotFound:
+                    return DaemonIpcErrorCode::SessionNotFound;
+                case AttachSessionStatus::SessionAlreadyBound:
+                    return DaemonIpcErrorCode::SessionAlreadyBound;
+                case AttachSessionStatus::SessionTableFull:
+                    return DaemonIpcErrorCode::SessionTableFull;
+                case AttachSessionStatus::Ok:
+                    return DaemonIpcErrorCode::InvalidMessage;
             }
+            return DaemonIpcErrorCode::InvalidMessage;
+        }
+
+        [[nodiscard]] const char *attachStatusMessage(const AttachSessionStatus status) {
+            switch (status) {
+                case AttachSessionStatus::SessionNotFound:
+                    return "session not found";
+                case AttachSessionStatus::SessionAlreadyBound:
+                    return "session already bound";
+                case AttachSessionStatus::SessionTableFull:
+                    return "session table full";
+                case AttachSessionStatus::Ok:
+                    return "attach failed";
+            }
+            return "attach failed";
         }
     } // namespace
 
@@ -93,7 +106,7 @@ namespace PickCore {
     }
 
     void DaemonIpcServer::stop() {
-        closeAllConnections();
+        closeAllConnections({});
         closeFd(listenFd_);
 
         std::error_code ec;
@@ -102,17 +115,33 @@ namespace PickCore {
         }
     }
 
-    void DaemonIpcServer::closeAllConnections() {
+    void DaemonIpcServer::detachConnection(Connection &connection, const DaemonIpcHandlers &handlers) {
+        if (!connection.attachedPort.has_value()) {
+            return;
+        }
+        if (handlers.detachSession) {
+            handlers.detachSession(*connection.attachedPort);
+        }
+        if (connection.channel) {
+            connection.channel->close();
+        }
+        connection.attachedPort.reset();
+        connection.channel.reset();
+    }
+
+    void DaemonIpcServer::closeAllConnections(const DaemonIpcHandlers &handlers) {
         for (Connection &connection : connections_) {
+            detachConnection(connection, handlers);
             closeFd(connection.fd);
         }
         connections_.clear();
     }
 
-    void DaemonIpcServer::removeConnectionAt(const std::size_t index) {
+    void DaemonIpcServer::removeConnectionAt(const std::size_t index, const DaemonIpcHandlers &handlers) {
         if (index >= connections_.size()) {
             return;
         }
+        detachConnection(connections_[index], handlers);
         closeFd(connections_[index].fd);
         connections_.erase(connections_.begin() + static_cast<std::ptrdiff_t>(index));
     }
@@ -131,7 +160,7 @@ namespace PickCore {
                 break;
             }
             setNonBlocking(clientFd);
-            connections_.push_back(Connection{clientFd, false, {}});
+            connections_.push_back(Connection{clientFd, false, {}, std::nullopt, nullptr});
         }
     }
 
@@ -232,22 +261,84 @@ namespace PickCore {
                 }
                 return outcome;
             }
+            case DaemonIpcMessageType::AttachSession: {
+                if (connection.attachedPort.has_value()) {
+                    (void) sendError(connection.fd, DaemonIpcErrorCode::InvalidMessage, "already attached");
+                    return outcome;
+                }
+                const std::optional<DaemonIpcAttachSessionPayload> attachPayload =
+                    decodeAttachSessionPayload(frame.payload);
+                if (!attachPayload.has_value()) {
+                    (void) sendError(connection.fd, DaemonIpcErrorCode::InvalidMessage, "invalid attach payload");
+                    return outcome;
+                }
+                if (!handlers.attachSession) {
+                    (void) sendError(connection.fd, DaemonIpcErrorCode::InvalidMessage, "session attach unavailable");
+                    return outcome;
+                }
+
+                auto channel = std::make_unique<IpcSessionChannel>();
+                const AttachSessionResult attachResult =
+                    handlers.attachSession(attachPayload->requestedPort, *channel);
+                if (attachResult.status != AttachSessionStatus::Ok) {
+                    (void) sendError(connection.fd, attachStatusToErrorCode(attachResult.status),
+                                    attachStatusMessage(attachResult.status));
+                    return outcome;
+                }
+
+                connection.channel = std::move(channel);
+                connection.attachedPort = attachResult.sessionPort;
+
+                DaemonIpcAttachSessionAckPayload ackPayload{};
+                ackPayload.sessionPort = attachResult.sessionPort;
+                DaemonIpcFrame ack{};
+                ack.type = DaemonIpcMessageType::AttachSessionAck;
+                ack.payload = encodeAttachSessionAckPayload(ackPayload);
+                if (!writeDaemonIpcFrame(connection.fd, ack)) {
+                    detachConnection(connection, handlers);
+                    outcome.closeConnection = true;
+                }
+                return outcome;
+            }
+            case DaemonIpcMessageType::DetachSession: {
+                if (!connection.attachedPort.has_value()) {
+                    (void) sendError(connection.fd, DaemonIpcErrorCode::NotAttached, "session not attached");
+                    return outcome;
+                }
+                detachConnection(connection, handlers);
+                DaemonIpcFrame ack{};
+                ack.type = DaemonIpcMessageType::DetachSessionAck;
+                if (!writeDaemonIpcFrame(connection.fd, ack)) {
+                    outcome.closeConnection = true;
+                }
+                return outcome;
+            }
+            case DaemonIpcMessageType::SessionInput: {
+                if (!connection.attachedPort.has_value() || !connection.channel) {
+                    (void) sendError(connection.fd, DaemonIpcErrorCode::NotAttached, "session not attached");
+                    return outcome;
+                }
+                const std::optional<DaemonIpcSessionDataPayload> inputPayload =
+                    decodeSessionDataPayload(frame.payload);
+                if (!inputPayload.has_value()) {
+                    (void) sendError(connection.fd, DaemonIpcErrorCode::InvalidMessage, "invalid session input");
+                    return outcome;
+                }
+                connection.channel->pushInput(inputPayload->data);
+                return outcome;
+            }
+            case DaemonIpcMessageType::SessionOutput:
+            case DaemonIpcMessageType::SessionDiagnostic: {
+                const DaemonIpcErrorCode code =
+                    connection.attachedPort.has_value() ? DaemonIpcErrorCode::InvalidMessage
+                                                        : DaemonIpcErrorCode::NotAttached;
+                const char *message = connection.attachedPort.has_value() ? "invalid message direction"
+                                                                          : "session not attached";
+                (void) sendError(connection.fd, code, message);
+                return outcome;
+            }
             default:
                 break;
-        }
-
-        if (isSessionPlaneMessage(frame.type)) {
-            const DaemonIpcErrorCode code = frame.type == DaemonIpcMessageType::SessionInput ||
-                                                    frame.type == DaemonIpcMessageType::SessionOutput ||
-                                                    frame.type == DaemonIpcMessageType::SessionDiagnostic
-                                                ? DaemonIpcErrorCode::NotAttached
-                                                : DaemonIpcErrorCode::InvalidMessage;
-            const char *message = code == DaemonIpcErrorCode::NotAttached ? "session not attached"
-                                                                          : "session attach not available";
-            if (!sendError(connection.fd, code, message)) {
-                outcome.closeConnection = true;
-            }
-            return outcome;
         }
 
         (void) sendError(connection.fd, DaemonIpcErrorCode::InvalidMessage, "invalid message type");
@@ -273,11 +364,20 @@ namespace PickCore {
             pollfd clientPoll{};
             clientPoll.fd = connection.fd;
             clientPoll.events = POLLIN;
+            if (connection.channel && connection.channel->hasPendingOutput()) {
+                clientPoll.events |= POLLOUT;
+            }
             pollfds.push_back(clientPoll);
         }
 
-        const int pollResult = ::poll(pollfds.data(), static_cast<nfds_t>(pollfds.size()), static_cast<int>(timeout.count()));
+        const int pollResult =
+            ::poll(pollfds.data(), static_cast<nfds_t>(pollfds.size()), static_cast<int>(timeout.count()));
         if (pollResult <= 0) {
+            for (Connection &connection : connections_) {
+                if (connection.channel && connection.attachedPort.has_value()) {
+                    connection.channel->flushPendingOutput(connection.fd);
+                }
+            }
             return false;
         }
 
@@ -300,41 +400,47 @@ namespace PickCore {
             }
 
             if ((revents & (POLLERR | POLLHUP | POLLNVAL)) != 0) {
-                removeConnectionAt(index);
+                removeConnectionAt(index, handlers);
                 continue;
             }
 
-            if ((revents & POLLIN) == 0) {
-                ++index;
-                continue;
+            if ((revents & POLLOUT) != 0 && connection.channel && connection.attachedPort.has_value()) {
+                connection.channel->flushPendingOutput(connection.fd);
             }
 
-            bool closeConnection = false;
-            for (;;) {
-                const DaemonIpcTryReadResult readResult = tryReadDaemonIpcFrame(connection.fd, connection.readBuffer);
-                if (readResult.status == DaemonIpcTryReadStatus::Incomplete) {
-                    break;
-                }
-                if (readResult.status == DaemonIpcTryReadStatus::ConnectionClosed ||
-                    readResult.status == DaemonIpcTryReadStatus::ProtocolError || !readResult.frame.has_value()) {
-                    closeConnection = true;
-                    break;
+            if ((revents & POLLIN) != 0) {
+                bool closeConnection = false;
+                for (;;) {
+                    const DaemonIpcTryReadResult readResult =
+                        tryReadDaemonIpcFrame(connection.fd, connection.readBuffer);
+                    if (readResult.status == DaemonIpcTryReadStatus::Incomplete) {
+                        break;
+                    }
+                    if (readResult.status == DaemonIpcTryReadStatus::ConnectionClosed ||
+                        readResult.status == DaemonIpcTryReadStatus::ProtocolError || !readResult.frame.has_value()) {
+                        closeConnection = true;
+                        break;
+                    }
+
+                    const DispatchOutcome outcome =
+                        dispatchFrame(connection, *readResult.frame, config, handlers);
+                    if (outcome.shutdownRequested) {
+                        shutdownRequested = true;
+                    }
+                    if (outcome.closeConnection) {
+                        closeConnection = true;
+                        break;
+                    }
                 }
 
-                const DispatchOutcome outcome =
-                    dispatchFrame(connection, *readResult.frame, config, handlers);
-                if (outcome.shutdownRequested) {
-                    shutdownRequested = true;
-                }
-                if (outcome.closeConnection) {
-                    closeConnection = true;
-                    break;
+                if (closeConnection) {
+                    removeConnectionAt(index, handlers);
+                    continue;
                 }
             }
 
-            if (closeConnection) {
-                removeConnectionAt(index);
-                continue;
+            if (connection.channel && connection.attachedPort.has_value()) {
+                connection.channel->flushPendingOutput(connection.fd);
             }
 
             ++index;

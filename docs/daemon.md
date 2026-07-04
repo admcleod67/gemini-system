@@ -162,11 +162,21 @@ Those are [Milestone 14](milestones/14-multi-session-console-support.md). M13 `R
 
 [`DaemonIpcServer`](../src/core/daemon/DaemonIpcServer.cpp) accepts **multiple concurrent** Unix socket clients. Each connection maintains its own handshake state and read buffer; the daemon run loop uses `pollAndDispatch()` to service all connections without blocking on a single client. Control-plane messages (`Handshake`, `Ping`, `ShutdownRequest`, `ReserveSession`) work per connection; clients stay connected after `Ping` or `ReserveSession` until they disconnect or send `ShutdownRequest`.
 
-Session attach and I/O bridging land in M14 Stage 3+; session-plane messages receive `Error` responses until then.
+### Session I/O bridge (M14 Stage 3)
+
+[`IpcSessionChannel`](../src/core/daemon/IpcSessionChannel.h) provides IPC-backed `std::istream` / `std::ostream` adapters. On `AttachSession`, [`GeminiDaemonRunner`](../src/userland/tcl/GeminiDaemonRunner.cpp) binds those streams to the target [`GeminiSession`](../src/userland/tcl/GeminiSession.h) via `setInputStream` / `setOutputStream` / `setDiagnosticStream`.
+
+- **`AttachSession`** with `requestedPort = 0` creates a session (same allocation path as `ReserveSession`); a non-zero port attaches to an existing detached session.
+- **`SessionInput`** frames append to the session input queue; session code reads via blocking `input()` as in embedded mode.
+- Session **`output()`** / **`diagnostic()`** writes are queued and flushed as **`SessionOutput`** / **`SessionDiagnostic`** frames on the next `pollAndDispatch()` cycle (including `POLLOUT` retry when the socket would block).
+- **`DetachSession`** or connection close unbinds the connection from the session; the session object remains in the table.
+- **At most one live console per session** — a second attach to the same port receives `SessionAlreadyBound`.
+
+Login and REPL orchestration over the bridge land in M14 Stage 5–6; Stage 3 wires transport only.
 
 ### Message types (M14 session plane)
 
-Wire types and payload layouts are defined in [`DaemonIpcProtocol.h`](../src/core/daemon/DaemonIpcProtocol.h). Session attach and I/O handlers land in M14 Stage 3+; the wire spec is authoritative in the header.
+Wire types and payload layouts are defined in [`DaemonIpcProtocol.h`](../src/core/daemon/DaemonIpcProtocol.h). Attach, detach, and session I/O are handled server-side in [`DaemonIpcServer`](../src/core/daemon/DaemonIpcServer.cpp); the wire spec is authoritative in the header.
 
 | Type | Direction | Purpose |
 |------|-----------|---------|

@@ -311,46 +311,4 @@ TEST_CASE("GeminiDaemonRunner IPC client disconnect leaves other clients connect
     runner.requestShutdown();
     runnerThread.join();
 }
-
-TEST_CASE("GeminiDaemonRunner rejects AttachSession before session bridge") {
-    PickCore::DaemonConfig config{};
-    config.maxSessions = 2;
-    config.socketPath = uniqueDaemonIpcTempDir() / "gemini.sock";
-    std::filesystem::create_directories(config.socketPath.parent_path());
-
-    PickCore::GeminiServiceDaemon daemon = PickCore::GeminiServiceDaemon::create(config);
-    PickShell::GeminiSessionHost host(daemon, config.maxSessions);
-    PickShell::GeminiDaemonRunner runner(daemon, host, config);
-
-    std::thread runnerThread([&] {
-        std::ostringstream boot;
-        CHECK(runner.run(boot) == 0);
-    });
-
-    REQUIRE(waitForSocket(config.socketPath, std::chrono::milliseconds(2000)));
-
-    const int clientFd = connectUnixSocket(config.socketPath);
-    REQUIRE(clientFd >= 0);
-
-    sendHandshake(clientFd);
-    recvHandshakeAck(clientFd);
-
-    PickCore::DaemonIpcAttachSessionPayload attachPayload{};
-    attachPayload.requestedPort = 0;
-    PickCore::DaemonIpcFrame attach{};
-    attach.type = PickCore::DaemonIpcMessageType::AttachSession;
-    attach.payload = PickCore::encodeAttachSessionPayload(attachPayload);
-    sendFrame(clientFd, attach);
-
-    const PickCore::DaemonIpcFrame errorFrame = recvFrame(clientFd);
-    CHECK(errorFrame.type == PickCore::DaemonIpcMessageType::Error);
-    const std::optional<PickCore::DaemonIpcErrorPayload> errorPayload =
-        PickCore::decodeErrorPayload(errorFrame.payload);
-    REQUIRE(errorPayload.has_value());
-    CHECK(errorPayload->code == PickCore::DaemonIpcErrorCode::InvalidMessage);
-
-    ::close(clientFd);
-    runner.requestShutdown();
-    runnerThread.join();
-}
 #endif
