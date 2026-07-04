@@ -1,25 +1,24 @@
 #include <iostream>
 #include <optional>
 
-#include <pickvm/core.hpp>
 #include <BootMonitor.h>
 #include <DefaultFileSystemRoot.h>
+#include <GeminiSession.h>
 #include <HostBootstrap.h>
 #include <LanguageRegistry.h>
 #include <LoginService.h>
-#include <Shell.h>
 
 int main() {
-    PickVM::Runtime vm;
-    PickShell::Shell shell(vm);
-    applyDefaultFileSystemRoot(shell);
+    PickShell::GeminiSession session;
+    applyDefaultFileSystemRoot(session.shell());
 
     PickCore::BootContext bootCtx;
-    bootCtx.runtime = &vm;
+    bootCtx.runtime = &session.runtime();
     bootCtx.hostPaths = PickCore::resolveDefaultHostPaths();
     PickCore::BootMonitor::runColdStart(std::cout, bootCtx);
-    vm.setLanguageRegistry(&PickCore::Languages::LanguageRegistry::instance());
+    session.runtime().setLanguageRegistry(&PickCore::Languages::LanguageRegistry::instance());
 
+    PickShell::Shell &shell = session.shell();
     const auto &catalog = shell.geminiCatalogRoot();
     if (!catalog.has_value()) {
         (void) shell.runTclRepl();
@@ -28,13 +27,13 @@ int main() {
 
     PickCore::CatalogLoginPhase loginPhase = PickCore::CatalogLoginPhase::ColdStartPortInit;
     for (;;) {
-        std::optional<PickCore::UserSession> session = PickCore::LoginService::runCatalogLogin(
+        std::optional<PickCore::UserSession> userSession = PickCore::LoginService::runCatalogLogin(
             std::cin, std::cout, *catalog, shell.fileSystemRoot(), &std::cerr, loginPhase);
         loginPhase = PickCore::CatalogLoginPhase::InteractiveOnly;
-        if (!session.has_value()) {
+        if (!userSession.has_value()) {
             return 0;
         }
-        shell.attachUserSession(*session);
+        shell.attachUserSession(*userSession);
         const PickShell::ShellRunResult r = shell.runTclRepl();
         if (r == PickShell::ShellRunResult::ExitProcess) {
             return 0;
