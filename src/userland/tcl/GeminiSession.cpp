@@ -33,6 +33,7 @@ namespace PickShell {
 
     void GeminiSession::bindIoToShellAndRuntime() {
         shell_.setInputStream(inputStream_);
+        shell_.setOutputStream(outputStream_);
         runtime_.setInputStream(inputStream_);
         runtime_.setOutputStream(outputStream_);
     }

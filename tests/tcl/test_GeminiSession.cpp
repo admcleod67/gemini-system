@@ -75,3 +75,15 @@ TEST_CASE("GeminiSession setDiagnosticStream overrides diagnostic accessor") {
     CHECK(&session.diagnostic() == &err);
     CHECK(session.diagnosticStream() == &err);
 }
+
+TEST_CASE("GeminiSession runTclRepl uses session I/O") {
+    std::istringstream in("VERSION\nQUIT\n");
+    std::ostringstream out;
+    PickShell::GeminiSession session;
+    session.setInputStream(&in);
+    session.setOutputStream(&out);
+    const PickShell::ShellRunResult result = session.shell().runTclRepl();
+    CHECK(result == PickShell::ShellRunResult::ExitProcess);
+    CHECK(out.str().find(pick_system::version_string) != std::string::npos);
+    CHECK(out.str().find("Exiting shell") != std::string::npos);
+}

@@ -304,8 +304,8 @@ namespace PickShell {
     ShellRunResult Shell::runTclRepl() {
         std::signal(SIGINT, SIG_IGN); // Ctrl-C does nothing outside a running program
         sessionEndRequested_ = false;
-        std::istream &in = inputStream_ != nullptr ? *inputStream_ : std::cin;
-        std::ostream &out = std::cout;
+        std::istream &in = input();
+        std::ostream &out = output();
         // First stdout bytes here are banner text — no leading `\n` (successful login emits one flushed `\n` first).
         static constexpr std::string_view kBanner = "Gemini/TCL Developer Shell\n"
                                                     "Type HELP for usage; HELP-LIST lists HELP topics.\n";
@@ -347,6 +347,18 @@ namespace PickShell {
 
     void Shell::setInputStream(std::istream *in) {
         inputStream_ = in;
+    }
+
+    void Shell::setOutputStream(std::ostream *out) {
+        outputStream_ = out;
+    }
+
+    std::istream &Shell::input() const {
+        return inputStream_ != nullptr ? *inputStream_ : std::cin;
+    }
+
+    std::ostream &Shell::output() const {
+        return outputStream_ != nullptr ? *outputStream_ : std::cout;
     }
 
     std::string Shell::prompt() const {
@@ -599,7 +611,7 @@ namespace PickShell {
             while (!done && session_.runtime_.instructionPointer() < program.size()) {
                 out << "* " << std::flush;
                 std::string line;
-                std::istream &in = inputStream_ ? *inputStream_ : std::cin;
+                std::istream &in = input();
                 if (!std::getline(in, line)) {
                     session_.runtime_.setInstructionPointer(program.size());
                     break;
@@ -613,7 +625,7 @@ namespace PickShell {
             while (!done && session_.runtime_.instructionPointer() < program.size()) {
                 out << "* " << std::flush;
                 std::string line;
-                std::istream &in = inputStream_ ? *inputStream_ : std::cin;
+                std::istream &in = input();
                 if (!std::getline(in, line)) {
                     session_.runtime_.setInstructionPointer(program.size());
                     break;
@@ -2170,7 +2182,7 @@ namespace PickShell {
             return;
         }
 
-        std::istream &in = inputStream_ ? *inputStream_ : std::cin;
+        std::istream &in = input();
         LineRecordEditor editor(
             session_.fileSystem_,
             fileName,
@@ -2258,7 +2270,7 @@ namespace PickShell {
             out << "Unknown account.\n";
             return;
         }
-        std::istream &in = inputStream_ != nullptr ? *inputStream_ : std::cin;
+        std::istream &in = input();
         std::string password;
         if (!PickCore::LoginService::readPasswordLineIfAccountRequires(in, acct, password)) {
             out << "EOF\n";

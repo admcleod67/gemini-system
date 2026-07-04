@@ -58,6 +58,9 @@ namespace PickShell {
         // Optional VM input source for instructions like INPUT_INT. nullptr selects std::cin.
         void setInputStream(std::istream *in);
 
+        // Optional default output for runTclRepl. nullptr selects std::cout.
+        void setOutputStream(std::ostream *out);
+
         /// Tcl REPL only (no login). `LOGOFF` yields `EndSession`; `QUIT` / EOF yields `ExitProcess`.
         [[nodiscard]] ShellRunResult runTclRepl();
 
@@ -78,7 +81,11 @@ namespace PickShell {
         PickCore::English::EnglishService englishService_;
         CommandTable tclCommands_;
         std::istream *inputStream_{nullptr};
+        std::ostream *outputStream_{nullptr};
         bool sessionEndRequested_{false};
+
+        [[nodiscard]] std::istream &input() const;
+        [[nodiscard]] std::ostream &output() const;
 
         static TokenizeResult tokenize(const std::string &line);
 
