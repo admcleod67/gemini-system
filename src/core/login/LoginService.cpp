@@ -142,6 +142,11 @@ namespace PickCore {
             out.flush();
         }
 
+        /// R83 / UniData style — generic message for any failed catalogue logon (no password hint).
+        void printLoginIncorrect(std::ostream &out) {
+            out << "Login incorrect\n";
+        }
+
         /// **`authenticateAccount`** plus successful stdout seal — shared by catalogue auto-login and interactive login.
         std::optional<UserSession>
         authenticateAccountAndSealStdout(std::ostream &out,
@@ -297,9 +302,8 @@ namespace PickCore {
                         authenticateAccountAndSealStdout(out, catalogRoot, *autoName, password, errBuf)) {
                     return sess;
                 }
-                if (err != nullptr) {
-                    *err << errBuf.str();
-                }
+                printLoginIncorrect(out);
+                (void)err;
             }
         }
 
@@ -318,13 +322,13 @@ namespace PickCore {
             trimTrailingAsciiWs(line);
             std::string accountName;
             if (!parseSingleUsernameLine(line, accountName)) {
-                out << '\n';
+                printLoginIncorrect(out);
                 continue;
             }
 
             const auto accounts = GeminiCatalog::loadAccounts(catalogRoot / "ACCOUNTS.json");
             if (!accounts.has_value()) {
-                out << '\n';
+                printLoginIncorrect(out);
                 continue;
             }
             const GeminiAccountRow *acct = nullptr;
@@ -335,7 +339,7 @@ namespace PickCore {
                 }
             }
             if (acct == nullptr) {
-                out << '\n';
+                printLoginIncorrect(out);
                 continue;
             }
 
@@ -347,7 +351,7 @@ namespace PickCore {
             std::ostringstream err;
             const auto sess = authenticateAccountAndSealStdout(out, catalogRoot, accountName, password, err);
             if (!sess.has_value()) {
-                out << '\n';
+                printLoginIncorrect(out);
                 continue;
             }
             return sess;

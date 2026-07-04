@@ -45,8 +45,9 @@ Status labels:
 ## Bootstrap/login diagnostics
 
 - **Catalogue/account diagnostics** — `Implemented`
-  - Login/boot diagnostics distinguish missing vs malformed `ACCOUNTS.json`.
-  - Boot/login now surface account root, `VOC`, and `MD` attachment issues with explicit diagnostics.
+  - Interactive catalogue logon failures print **`Login incorrect`** (R83 / UniData style) and re-prompt **`LOGON PLEASE:`** — no password hint.
+  - Login/boot diagnostics distinguish missing vs malformed `ACCOUNTS.json` (programmatic **`authenticateAccount`** / boot paths).
+  - Boot/login surface account root, `VOC`, and `MD` attachment issues with explicit diagnostics on non-interactive paths.
 
 ## VOC behavior
 

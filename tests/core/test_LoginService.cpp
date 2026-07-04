@@ -112,6 +112,68 @@ TEST_CASE("LoginService runCatalogLogin falls back interactive when MD token inv
     CHECK(out.str() == "LOGON PLEASE: \n");
 }
 
+TEST_CASE("LoginService runConsoleLogin prints Login incorrect for unknown account then succeeds") {
+    const auto root = uniqueTempDir();
+    const auto gem = root / "gemini";
+    std::filesystem::create_directories(gem / "accounts" / "TST" / "VOC");
+    {
+        std::ofstream accounts(gem / "ACCOUNTS.json");
+        accounts << R"({"accounts":[{"name":"TST","root":"accounts/TST"}]})";
+    }
+
+    std::istringstream in("SYSADMIN\nTST\n");
+    std::ostringstream out;
+    const auto s = PickCore::LoginService::runConsoleLogin(in, out, gem);
+    REQUIRE(s.has_value());
+    CHECK(s->accountName == "TST");
+    CHECK(out.str().find("Login incorrect") != std::string::npos);
+    CHECK(out.str().find("LOGON PLEASE: ") != std::string::npos);
+    CHECK(out.str() == "LOGON PLEASE: Login incorrect\nLOGON PLEASE: \n");
+}
+
+TEST_CASE("LoginService runConsoleLogin prints Login incorrect for wrong password") {
+    const auto root = uniqueTempDir();
+    const auto gem = root / "gemini";
+    std::filesystem::create_directories(gem / "accounts" / "X" / "VOC");
+    {
+        std::ofstream accounts(gem / "ACCOUNTS.json");
+        accounts << R"({"accounts":[{"name":"X","root":"accounts/X","passwordHash":"secret"}]})";
+    }
+
+    std::istringstream in("X\nwrong\nX\nsecret\n");
+    std::ostringstream out;
+    const auto s = PickCore::LoginService::runConsoleLogin(in, out, gem);
+    REQUIRE(s.has_value());
+    CHECK(out.str().find("Login incorrect") != std::string::npos);
+    CHECK(out.str() == "LOGON PLEASE: Login incorrect\nLOGON PLEASE: \n");
+}
+
+TEST_CASE("LoginService runCatalogLogin auto-logon failure prints Login incorrect then interactive") {
+    const auto root = uniqueTempDir();
+    const auto gem = root / "gemini";
+    const auto pick = gem / "accounts" / "TST";
+    std::filesystem::create_directories(pick / "MD");
+    std::filesystem::create_directories(pick / "VOC");
+    {
+        std::ofstream md(pick / "MD" / "AUTO-LOGON.item");
+        md << "TST\n";
+    }
+    {
+        std::ofstream accounts(gem / "ACCOUNTS.json");
+        accounts << R"({"accounts":[{"name":"TST","root":"accounts/TST","passwordHash":"secret"}]})";
+    }
+
+    std::istringstream in("wrong\nTST\nsecret\n");
+    std::ostringstream out;
+    std::ostringstream err;
+    const auto s =
+        PickCore::LoginService::runCatalogLogin(in, out, gem, pick, &err, PickCore::CatalogLoginPhase::ColdStartPortInit);
+    REQUIRE(s.has_value());
+    CHECK(out.str().find("Login incorrect") != std::string::npos);
+    CHECK(out.str() == "LOGON PLEASE: TST\nLogin incorrect\nLOGON PLEASE: \n");
+    CHECK(err.str().empty());
+}
+
 TEST_CASE("LoginService runCatalogLogin InteractiveOnly ignores MD AUTO-LOGON") {
     const auto root = uniqueTempDir();
     const auto gem = root / "gemini";
