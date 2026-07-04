@@ -9,6 +9,8 @@
 
 #include "Shell.h"
 
+#include <iosfwd>
+
 namespace PickShell {
     class GeminiSession {
     public:
@@ -20,9 +22,30 @@ namespace PickShell {
         [[nodiscard]] Shell &shell() noexcept { return shell_; }
         [[nodiscard]] const Shell &shell() const noexcept { return shell_; }
 
+        /// nullptr selects process std::cin.
+        void setInputStream(std::istream *in);
+        /// nullptr selects process std::cout.
+        void setOutputStream(std::ostream *out);
+        /// nullptr selects process std::cerr.
+        void setDiagnosticStream(std::ostream *err);
+
+        [[nodiscard]] std::istream &input() const;
+        [[nodiscard]] std::ostream &output() const;
+        [[nodiscard]] std::ostream &diagnostic() const;
+
+        [[nodiscard]] std::istream *inputStream() const noexcept { return inputStream_; }
+        [[nodiscard]] std::ostream *outputStream() const noexcept { return outputStream_; }
+        [[nodiscard]] std::ostream *diagnosticStream() const noexcept { return diagnosticStream_; }
+
     private:
+        void bindIoToShellAndRuntime();
+
         PickVM::Runtime runtime_;
         Shell shell_;
+
+        std::istream *inputStream_{nullptr};
+        std::ostream *outputStream_{nullptr};
+        std::ostream *diagnosticStream_{nullptr};
     };
 } // namespace PickShell
 
