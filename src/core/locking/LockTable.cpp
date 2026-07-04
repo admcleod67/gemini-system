@@ -145,4 +145,8 @@ namespace PickCore::Locking {
         }
         return recordIt->second;
     }
+
+    void LockTable::clearAll() {
+        locks_.clear();
+    }
 } // namespace PickCore::Locking

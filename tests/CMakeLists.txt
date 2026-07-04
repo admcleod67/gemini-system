@@ -17,6 +17,7 @@ target_include_directories(doctest_headers SYSTEM INTERFACE ${doctest_SOURCE_DIR
 add_executable(
         pick-tests
         test_Main.cpp
+        TestProcessReset.cpp
         core/test_BootMonitor.cpp
         core/test_GeminiDaemon.cpp
         core/test_PortManager.cpp

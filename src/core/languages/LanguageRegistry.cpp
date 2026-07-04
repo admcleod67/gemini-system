@@ -118,4 +118,9 @@ namespace PickCore::Languages {
         }
         return slots;
     }
+
+    void LanguageRegistry::resetForTests() {
+        namespaces_.clear();
+        frozen_ = false;
+    }
 } // namespace PickCore::Languages

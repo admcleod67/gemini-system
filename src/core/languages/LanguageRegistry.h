@@ -31,6 +31,8 @@ namespace PickCore::Languages {
         [[nodiscard]] std::vector<LanguageNamespaceSummary> listNamespaces() const;
         [[nodiscard]] std::vector<LanguageFunctionSlotSummary> functionSlotSummaries(NamespaceId nsId) const;
 
+        void resetForTests();
+
     private:
         struct RegisteredNamespace {
             LanguageNamespaceMetadata metadata;

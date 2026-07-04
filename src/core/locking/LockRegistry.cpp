@@ -7,4 +7,8 @@ namespace PickCore::Locking {
         }
         instance().table_ = table;
     }
+
+    void LockRegistry::resetForTests() {
+        instance().table_->clearAll();
+    }
 } // namespace PickCore::Locking

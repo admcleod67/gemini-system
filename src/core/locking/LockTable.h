@@ -28,6 +28,8 @@ namespace PickCore::Locking {
         [[nodiscard]] std::optional<LockEntry> lookup(const std::string &fileName,
                                                       const std::string &recordId) const;
 
+        void clearAll();
+
     private:
         std::unordered_map<std::string, std::unordered_map<std::string, LockEntry>> locks_;
     };

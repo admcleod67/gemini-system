@@ -17,6 +17,8 @@ namespace PickCore::Locking {
 
         static void adoptTable(std::shared_ptr<LockTable> table);
 
+        static void resetForTests();
+
         [[nodiscard]] std::shared_ptr<LockTable> table() const { return table_; }
 
     private:
