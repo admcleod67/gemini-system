@@ -8,10 +8,10 @@ See [Milestone 12](milestones/12-session-model-foundation.md) for rationale and 
 
 | Scope | Owned by | Examples |
 |-------|----------|----------|
-| **Process** | `main` / future daemon | [`BootMonitor`](../src/core/boot/BootMonitor.h), frozen [`LanguageRegistry`](../src/core/languages/LanguageRegistry.h), shared [`LockTable`](../src/core/locking/LockTable.h) |
+| **Process** | `GeminiServiceDaemon` (M13; today ad hoc in [`Main.cpp`](../src/Main.cpp)) | [`BootMonitor`](../src/core/boot/BootMonitor.h), frozen [`LanguageRegistry`](../src/core/languages/LanguageRegistry.h), shared [`LockTable`](../src/core/locking/LockTable.h), port manager, session table |
 | **Session** | [`GeminiSession`](../src/userland/tcl/GeminiSession.h) | [`Runtime`](../src/core/vm/Runtime.h), [`Shell`](../src/userland/tcl/Shell.h), Tcl env, filesystem root, lock session id, I/O channels |
 
-Standalone **`gemini-system`** hosts exactly one session (`GeminiSession::create()`). The same type will live in the M13 daemon session table.
+Standalone **`gemini-system`** embeds the daemon with `maxSessions = 1` and hosts exactly one session. The same `GeminiSession` type lives in the M13 daemon session table. See [Milestone 13](milestones/13-service-daemon-architecture.md) §2.7 and the planned [daemon architecture](daemon.md) reference (Stage 6).
 
 ## Lifecycle API
 
@@ -64,4 +64,4 @@ Tests inject `std::istringstream` / `std::ostringstream` via `setInputStream` / 
 - [Gemini bootstrap](gemini-bootstrap.md) — catalogue login and account roots
 - [Developer shell (TCL)](tcl-shell.md) — Tcl REPL after login
 - [Concurrency and record locking](concurrency.md) — lock binding on `attach()`
-- [Milestone 13 — Service daemon](milestones/13-service-daemon-architecture.md) — session table (planned)
+- [Milestone 13 — Service daemon](milestones/13-service-daemon-architecture.md) — GSD, session table, staged delivery plan (planned)

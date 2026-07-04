@@ -16,7 +16,7 @@ This is the first milestone where Gemini **feels like a multi-user Pick system**
 
 ### Grounding
 
-- Assign stable **port / session id** when a console creates or attaches to a session (ties to PORT MANAGER work from M13).
+- Assign stable **port / session id** when a console creates or attaches to a session — port assignment policy is defined in [**Milestone 13**](13-service-daemon-architecture.md) Stage 3 (`PortManager`); M14 consumes it at console attach time.
 - **Authentication per console (TBD):** each **`gemini-console`** runs full catalogue login over IPC, or the daemon trusts the local socket user—decide before implementation.
 - **Remote access:** Unix socket only for v1; SSH/telnet is post-1.0.
 - Session isolation reuses the M12 session boundary: separate interpreter, VM state, and I/O channels per session.
