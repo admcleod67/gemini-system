@@ -23,3 +23,16 @@ target_compile_definitions(
 )
 
 install(TARGETS gemini-system RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+add_executable(gemini-daemon daemon/Main.cpp)
+target_link_libraries(gemini-daemon PRIVATE gemini-tcl)
+pick_system_enable_warnings(gemini-daemon)
+add_dependencies(gemini-daemon gemini-bootstrap-copy gemini-module-stub gemini-module-basic
+        gemini-module-pascal gemini-module-comal gemini-module-cobol)
+
+target_compile_definitions(
+        gemini-daemon
+        PRIVATE "PICK_SYSTEM_VERSION=\"${PROJECT_VERSION}\""
+)
+
+install(TARGETS gemini-daemon RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})

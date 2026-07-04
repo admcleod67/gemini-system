@@ -16,6 +16,7 @@ namespace PickShell {
 
         [[nodiscard]] SessionHandle createSession();
         void destroySession(PickCore::SessionId id);
+        void destroyAllSessions();
         void runExclusive(PickCore::SessionId id, const std::function<void()> &fn);
 
         [[nodiscard]] PickCore::GeminiServiceDaemon &daemon() noexcept { return daemon_; }

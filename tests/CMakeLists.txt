@@ -20,6 +20,8 @@ add_executable(
         TestProcessReset.cpp
         core/test_BootMonitor.cpp
         core/test_GeminiDaemon.cpp
+        core/test_DaemonConfig.cpp
+        core/test_DaemonLifecycle.cpp
         core/test_PortManager.cpp
         core/test_SessionTable.cpp
         core/test_FileSystem.cpp

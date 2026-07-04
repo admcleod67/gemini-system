@@ -35,6 +35,8 @@ add_library(gemini-tcl
         tcl/GeminiSession.h
         tcl/GeminiSessionHost.cpp
         tcl/GeminiSessionHost.h
+        tcl/GeminiDaemonRunner.cpp
+        tcl/GeminiDaemonRunner.h
         tcl/SessionTable.cpp
         tcl/SessionTable.h
         tcl/TclEnvironment.cpp

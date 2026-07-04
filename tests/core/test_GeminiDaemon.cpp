@@ -106,3 +106,27 @@ TEST_CASE("GeminiServiceDaemon lockTable is adopted by LockRegistry") {
     REQUIRE(table != nullptr);
     CHECK(table == PickCore::Locking::LockRegistry::instance().table());
 }
+
+TEST_CASE("GeminiServiceDaemon create uses configured host paths") {
+    const auto root = uniqueTempDir();
+    const auto gem = root / "gemini";
+    const auto pick = gem / "accounts" / "SY";
+    std::filesystem::create_directories(pick / "MD");
+    std::filesystem::create_directories(pick / "VOC");
+    {
+        std::ofstream acc(gem / "ACCOUNTS.json");
+        acc << R"({"accounts":[{"name":"SY","root":"accounts/SY"}]})";
+    }
+
+    PickCore::DaemonConfig config{};
+    config.hostPaths.pickFilesystemRoot = pick;
+    config.hostPaths.geminiCatalogRoot = gem;
+
+    PickCore::GeminiServiceDaemon daemon = PickCore::GeminiServiceDaemon::create(config);
+    std::ostringstream out;
+    daemon.coldStart(out);
+    const std::string s = out.str();
+    CHECK(s.find("MD ATTACHED") != std::string::npos);
+    CHECK(s.find("VOC ATTACHED") != std::string::npos);
+    CHECK(s.find("CATALOG ATTACHED") != std::string::npos);
+}

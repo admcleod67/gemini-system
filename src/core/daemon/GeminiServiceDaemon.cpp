@@ -9,14 +9,20 @@
 #include <Runtime.h>
 
 namespace PickCore {
-    GeminiServiceDaemon::GeminiServiceDaemon()
-        : hostPaths_(resolveDefaultHostPaths()),
-          lockTable_(std::make_shared<Locking::LockTable>()) {
+    GeminiServiceDaemon::GeminiServiceDaemon(const DaemonConfig &config)
+        : maxSessions_(config.maxSessions < 1 ? 1 : config.maxSessions),
+          hostPaths_(config.hostPaths),
+          lockTable_(std::make_shared<Locking::LockTable>()),
+          portManager_(maxSessions_) {
         Locking::LockRegistry::adoptTable(lockTable_);
     }
 
     GeminiServiceDaemon GeminiServiceDaemon::createEmbedded() {
-        return GeminiServiceDaemon{};
+        return GeminiServiceDaemon(DaemonConfig::embedded());
+    }
+
+    GeminiServiceDaemon GeminiServiceDaemon::create(const DaemonConfig &config) {
+        return GeminiServiceDaemon(config);
     }
 
     void GeminiServiceDaemon::coldStart(std::ostream &out) {

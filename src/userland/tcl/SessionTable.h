@@ -14,6 +14,7 @@
 #include <memory>
 #include <stdexcept>
 #include <unordered_map>
+#include <vector>
 
 namespace PickShell {
     struct SessionHandle {
@@ -29,6 +30,7 @@ namespace PickShell {
         void destroySession(PickCore::SessionId id);
 
         [[nodiscard]] GeminiSession *find(PickCore::SessionId id);
+        [[nodiscard]] std::vector<PickCore::SessionId> sessionIds() const;
         [[nodiscard]] std::size_t count() const { return sessions_.size(); }
         [[nodiscard]] std::size_t maxSessions() const { return maxSessions_; }
 

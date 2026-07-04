@@ -2,6 +2,8 @@
 
 #include "GeminiSession.h"
 
+#include <algorithm>
+
 namespace PickShell {
     SessionTable::SessionTable(const std::size_t maxSessions) : maxSessions_(maxSessions < 1 ? 1 : maxSessions) {}
 
@@ -44,5 +46,16 @@ namespace PickShell {
             return nullptr;
         }
         return it->second.get();
+    }
+
+    std::vector<PickCore::SessionId> SessionTable::sessionIds() const {
+        std::vector<PickCore::SessionId> ids;
+        ids.reserve(sessions_.size());
+        for (const auto &[id, session]: sessions_) {
+            (void) session;
+            ids.push_back(id);
+        }
+        std::sort(ids.begin(), ids.end());
+        return ids;
     }
 } // namespace PickShell

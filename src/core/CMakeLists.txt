@@ -72,6 +72,8 @@ add_library(gemini-core
         locking/LockRegistry.h
         daemon/GeminiServiceDaemon.cpp
         daemon/GeminiServiceDaemon.h
+        daemon/DaemonConfig.cpp
+        daemon/DaemonConfig.h
         daemon/SerialSessionRunner.cpp
         daemon/SerialSessionRunner.h
         daemon/PortManager.cpp

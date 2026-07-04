@@ -9,6 +9,7 @@
 #include <thread>
 
 #include "FileSystem.h"
+#include "DaemonConfig.h"
 #include "GeminiServiceDaemon.h"
 #include "GeminiSessionHost.h"
 #include "SerialSessionRunner.h"
@@ -46,10 +47,16 @@ namespace {
         bool quit = false;
         shell.handleLine(line, out, quit);
     }
+
+    [[nodiscard]] PickCore::GeminiServiceDaemon makeDaemon(const std::size_t maxSessions) {
+        PickCore::DaemonConfig config{};
+        config.maxSessions = maxSessions;
+        return PickCore::GeminiServiceDaemon::create(config);
+    }
 } // namespace
 
 TEST_CASE("SessionTable createSession wires shared lock table") {
-    PickCore::GeminiServiceDaemon daemon = PickCore::GeminiServiceDaemon::createEmbedded();
+    PickCore::GeminiServiceDaemon daemon = makeDaemon(2);
     std::ostringstream boot;
     daemon.coldStart(boot);
 
@@ -66,7 +73,7 @@ TEST_CASE("SessionTable createSession wires shared lock table") {
 }
 
 TEST_CASE("SessionTable destroySession reuses freed port") {
-    PickCore::GeminiServiceDaemon daemon = PickCore::GeminiServiceDaemon::createEmbedded();
+    PickCore::GeminiServiceDaemon daemon = makeDaemon(2);
     std::ostringstream boot;
     daemon.coldStart(boot);
 
@@ -116,7 +123,7 @@ TEST_CASE("SessionTable cross-session READU blocks peer READ") {
     std::filesystem::create_directories(pickRoot / "MD");
     seedDataRecord(pickRoot, "R1", "seed");
 
-    PickCore::GeminiServiceDaemon daemon = PickCore::GeminiServiceDaemon::createEmbedded();
+    PickCore::GeminiServiceDaemon daemon = makeDaemon(2);
     std::ostringstream boot;
     daemon.coldStart(boot);
 
@@ -141,7 +148,7 @@ TEST_CASE("SessionTable destroySession releases locks") {
     std::filesystem::create_directories(pickRoot / "MD");
     seedDataRecord(pickRoot, "R1", "seed");
 
-    PickCore::GeminiServiceDaemon daemon = PickCore::GeminiServiceDaemon::createEmbedded();
+    PickCore::GeminiServiceDaemon daemon = makeDaemon(2);
     std::ostringstream boot;
     daemon.coldStart(boot);
 
@@ -202,7 +209,7 @@ TEST_CASE("SessionTable enforces maxSessions") {
 }
 
 TEST_CASE("GeminiSessionHost runExclusive serialises sessions") {
-    PickCore::GeminiServiceDaemon daemon = PickCore::GeminiServiceDaemon::createEmbedded();
+    PickCore::GeminiServiceDaemon daemon = makeDaemon(2);
     std::ostringstream boot;
     daemon.coldStart(boot);
 

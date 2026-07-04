@@ -7,6 +7,7 @@
 #define PICK_SYSTEM_CORE_DAEMON_GEMINI_SERVICE_DAEMON_H
 
 #include "HostBootstrap.h"
+#include "DaemonConfig.h"
 #include "PortManager.h"
 
 #include <Runtime.h>
@@ -28,9 +29,11 @@ namespace PickCore {
     class GeminiServiceDaemon {
     public:
         [[nodiscard]] static GeminiServiceDaemon createEmbedded();
+        [[nodiscard]] static GeminiServiceDaemon create(const DaemonConfig &config);
 
         void coldStart(std::ostream &out);
         [[nodiscard]] bool isColdStarted() const { return coldStarted_; }
+        [[nodiscard]] std::size_t maxSessions() const { return maxSessions_; }
 
         [[nodiscard]] Languages::LanguageRegistry &languageRegistry();
         [[nodiscard]] const Languages::LanguageRegistry &languageRegistry() const;
@@ -40,8 +43,9 @@ namespace PickCore {
         [[nodiscard]] const PortManager &portManager() const;
 
     private:
-        GeminiServiceDaemon();
+        explicit GeminiServiceDaemon(const DaemonConfig &config);
 
+        std::size_t maxSessions_;
         DefaultHostPaths hostPaths_;
         PickVM::Runtime bootstrapRuntime_;
         std::shared_ptr<Locking::LockTable> lockTable_;
