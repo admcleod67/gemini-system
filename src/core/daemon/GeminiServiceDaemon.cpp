@@ -10,7 +10,9 @@
 namespace PickCore {
     GeminiServiceDaemon::GeminiServiceDaemon()
         : hostPaths_(resolveDefaultHostPaths()),
-          lockTable_(Locking::LockRegistry::instance().table()) {}
+          lockTable_(std::make_shared<Locking::LockTable>()) {
+        Locking::LockRegistry::adoptTable(lockTable_);
+    }
 
     GeminiServiceDaemon GeminiServiceDaemon::createEmbedded() {
         return GeminiServiceDaemon{};

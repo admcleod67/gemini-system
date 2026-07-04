@@ -1,37 +1,41 @@
 #include <iostream>
-#include <memory>
 #include <optional>
 
 #include <DefaultFileSystemRoot.h>
 #include <GeminiServiceDaemon.h>
-#include <GeminiSession.h>
+#include <GeminiSessionHost.h>
 #include <LoginService.h>
 
 int main() {
     PickCore::GeminiServiceDaemon daemon = PickCore::GeminiServiceDaemon::createEmbedded();
-    const auto session = PickShell::GeminiSession::create();
-    applyDefaultFileSystemRoot(session->shell());
-
+    PickShell::GeminiSessionHost host(daemon);
     daemon.coldStart(std::cout);
-    session->runtime().setLanguageRegistry(&daemon.languageRegistry());
 
-    PickShell::Shell &shell = session->shell();
+    const PickShell::SessionHandle handle = host.createSession();
+    PickShell::GeminiSession &session = handle.session;
+    applyDefaultFileSystemRoot(session.shell());
+
+    PickShell::Shell &shell = session.shell();
     const auto &catalog = shell.geminiCatalogRoot();
     if (!catalog.has_value()) {
-        (void) shell.runTclRepl();
+        host.runExclusive(handle.id, [&] { (void) shell.runTclRepl(); });
         return 0;
     }
 
     PickCore::CatalogLoginPhase loginPhase = PickCore::CatalogLoginPhase::ColdStartPortInit;
     for (;;) {
         std::optional<PickCore::UserSession> userSession = PickCore::LoginService::runCatalogLogin(
-            session->input(), session->output(), *catalog, shell.fileSystemRoot(), &session->diagnostic(), loginPhase);
+            session.input(), session.output(), *catalog, shell.fileSystemRoot(), &session.diagnostic(), loginPhase);
         loginPhase = PickCore::CatalogLoginPhase::InteractiveOnly;
         if (!userSession.has_value()) {
             return 0;
         }
-        session->attach(*userSession);
-        const PickShell::ShellRunResult r = shell.runTclRepl();
+        session.attach(*userSession);
+        const PickShell::ShellRunResult r = [&] {
+            PickShell::ShellRunResult result = PickShell::ShellRunResult::ExitProcess;
+            host.runExclusive(handle.id, [&] { result = shell.runTclRepl(); });
+            return result;
+        }();
         if (r == PickShell::ShellRunResult::ExitProcess) {
             return 0;
         }

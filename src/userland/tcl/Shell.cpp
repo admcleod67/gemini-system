@@ -205,9 +205,9 @@ namespace PickShell {
         : session_(session),
           vmDebugService_(session_),
           assemblerShell_(vmDebugService_) {
-        const std::shared_ptr<PickCore::Locking::LockTable> lockTable =
-            PickCore::Locking::LockRegistry::instance().table();
-        session_.setSharedLockTable(lockTable);
+        if (!session_.hasSharedLockTable()) {
+            session_.setSharedLockTable(PickCore::Locking::LockRegistry::instance().table());
+        }
         session_.runtime().setFileSystem(&session_.fileSystem());
         basicShell_.setResolveProgramLocationFn([this](const std::string &programName) {
             const PickVoc::VocResolver::ProgramLocation resolved = session_.vocResolver().resolveProgramLocation(programName);

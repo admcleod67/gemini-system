@@ -68,9 +68,12 @@ add_library(gemini-core
         locking/LockTypes.h
         locking/LockTable.cpp
         locking/LockTable.h
+        locking/LockRegistry.cpp
         locking/LockRegistry.h
         daemon/GeminiServiceDaemon.cpp
         daemon/GeminiServiceDaemon.h
+        daemon/SerialSessionRunner.cpp
+        daemon/SerialSessionRunner.h
         languages/LanguageRegistry.cpp
         languages/LanguageRegistry.h
         languages/LanguageTypes.h

@@ -98,7 +98,7 @@ TEST_CASE("GeminiServiceDaemon coldStart is idempotent") {
     CHECK(out.str() == first);
 }
 
-TEST_CASE("GeminiServiceDaemon lockTable delegates to LockRegistry") {
+TEST_CASE("GeminiServiceDaemon lockTable is adopted by LockRegistry") {
     PickCore::GeminiServiceDaemon daemon = PickCore::GeminiServiceDaemon::createEmbedded();
     const std::shared_ptr<PickCore::Locking::LockTable> table = daemon.lockTable();
     REQUIRE(table != nullptr);

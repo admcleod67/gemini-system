@@ -112,6 +112,8 @@ namespace PickShell {
 
         void setSharedLockTable(std::shared_ptr<PickCore::Locking::LockTable> table);
 
+        [[nodiscard]] bool hasSharedLockTable() const { return lockTable_ != nullptr; }
+
         [[nodiscard]] static std::string makeSessionLockId(int port,
                                                            const std::string &account,
                                                            const std::string &username);

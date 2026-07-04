@@ -7,12 +7,15 @@
 
 namespace PickCore::Locking {
     /// Process-wide shared lock table (Milestone 10 Stage 2).
+    /// GeminiServiceDaemon adopts its table here (M13 Stage 2).
     class LockRegistry {
     public:
         [[nodiscard]] static LockRegistry &instance() {
             static LockRegistry registry;
             return registry;
         }
+
+        static void adoptTable(std::shared_ptr<LockTable> table);
 
         [[nodiscard]] std::shared_ptr<LockTable> table() const { return table_; }
 
@@ -23,4 +26,4 @@ namespace PickCore::Locking {
     };
 } // namespace PickCore::Locking
 
-#endif
+#endif // PICK_SYSTEM_CORE_LOCKING_LOCK_REGISTRY_H
