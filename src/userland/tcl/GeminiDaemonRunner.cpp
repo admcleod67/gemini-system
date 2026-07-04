@@ -1,10 +1,12 @@
 #include "GeminiDaemonRunner.h"
 
+#include <pick_system/version.hpp>
+
 #include <atomic>
 #include <chrono>
 #include <csignal>
-#include <filesystem>
 #include <iostream>
+#include <optional>
 #include <thread>
 
 namespace PickShell {
@@ -19,7 +21,15 @@ namespace PickShell {
     GeminiDaemonRunner::GeminiDaemonRunner(PickCore::GeminiServiceDaemon &daemon,
                                            GeminiSessionHost &host,
                                            const PickCore::DaemonConfig &config)
-        : daemon_(daemon), host_(host), config_(config) {}
+        : daemon_(daemon),
+          host_(host),
+          config_(config)
+#ifndef _WIN32
+          ,
+          ipcServer_(config.socketPath)
+#endif
+    {
+    }
 
     void GeminiDaemonRunner::requestShutdown() {
         shutdownRequested.store(true, std::memory_order_release);
@@ -35,20 +45,44 @@ namespace PickShell {
         installSignalHandlers();
         daemon_.coldStart(bootOut);
 
+#ifndef _WIN32
+        ipcServer_.start();
+
+        PickCore::DaemonIpcServerConfig serverConfig{};
+        serverConfig.maxSessions = config_.maxSessions;
+        serverConfig.buildVersion = pick_system::version_string;
+
+        PickCore::DaemonIpcHandlers handlers{};
+        handlers.reserveSession = [this]() -> std::optional<PickCore::SessionId> {
+            try {
+                return host_.createSession().id;
+            } catch (const std::exception &) {
+                return std::nullopt;
+            }
+        };
+        handlers.requestShutdown = [this] { requestShutdown(); };
+
+        while (!shutdownRequested.load(std::memory_order_acquire)) {
+            if (ipcServer_.pollAccept(std::chrono::milliseconds(100))) {
+                if (ipcServer_.handleConnectedClient(serverConfig, handlers)) {
+                    break;
+                }
+            }
+        }
+#else
         while (!shutdownRequested.load(std::memory_order_acquire)) {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
+#endif
 
         shutdown();
         return 0;
     }
 
     void GeminiDaemonRunner::shutdown() {
+#ifndef _WIN32
+        ipcServer_.stop();
+#endif
         host_.destroyAllSessions();
-
-        std::error_code ec;
-        if (std::filesystem::exists(config_.socketPath, ec) && !ec) {
-            std::filesystem::remove(config_.socketPath, ec);
-        }
     }
 } // namespace PickShell

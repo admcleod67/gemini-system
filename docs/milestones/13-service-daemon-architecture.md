@@ -229,7 +229,7 @@ Implementation is sequenced into vertical stages. Each stage ships a test-locked
 
 - **Stage 4 — Daemon lifecycle + configuration**: implement **`DaemonConfig`** (socket path, `maxSessions`, host paths); add **`gemini-daemon`** executable; foreground run loop; **SIGTERM** graceful shutdown (release locks, destroy sessions, remove socket file). Not systemd/journald (M17). **Exit criterion:** `gemini-daemon` starts, runs idle, stops cleanly; `gemini-system` still works embedded. Tests: lifecycle start/stop, config defaults. *Status: implemented.*
 
-- **Stage 5 — IPC foundation**: Unix domain socket server inside GSD; minimal protocol (version/handshake, ping, shutdown request; optional “reserve session slot” stub — **no** login or REPL byte stream); filesystem permissions on socket. **Exit criterion:** test client connects, handshakes, disconnects; daemon remains stable. Tests: `tests/core/test_DaemonIpc.cpp`. *Status: planned.*
+- **Stage 5 — IPC foundation**: Unix domain socket server inside GSD; minimal protocol (version/handshake, ping, shutdown request; optional “reserve session slot” stub — **no** login or REPL byte stream); filesystem permissions on socket. **Exit criterion:** test client connects, handshakes, disconnects; daemon remains stable. Tests: `tests/core/test_DaemonIpc.cpp`. *Status: implemented.*
 
 - **Stage 6 — Docs + closes M13**: add [`docs/daemon.md`](../daemon.md); update [`docs/session.md`](../session.md) and [`docs/gemini-bootstrap.md`](../gemini-bootstrap.md); link from [`docs/milestones.md`](../milestones.md); audit §9 completion criteria; run full test suite + M12 smoke. **Closes Milestone 13.** *Status: planned.*
 

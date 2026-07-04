@@ -8,7 +8,10 @@
 #include "DaemonConfig.h"
 #include "GeminiSessionHost.h"
 
-#include <atomic>
+#ifndef _WIN32
+    #include "DaemonIpcServer.h"
+#endif
+
 #include <iosfwd>
 #include <iostream>
 
@@ -29,6 +32,9 @@ namespace PickShell {
         PickCore::GeminiServiceDaemon &daemon_;
         GeminiSessionHost &host_;
         PickCore::DaemonConfig config_;
+#ifndef _WIN32
+        PickCore::DaemonIpcServer ipcServer_;
+#endif
     };
 } // namespace PickShell
 
