@@ -209,4 +209,55 @@ namespace PickCore {
         out.message.assign(payload.begin() + 8, payload.begin() + 8 + messageLen);
         return out;
     }
+
+    std::vector<std::uint8_t> encodeAttachSessionPayload(const DaemonIpcAttachSessionPayload &payload) {
+        std::vector<std::uint8_t> bytes;
+        writeU32(payload.requestedPort, bytes);
+        return bytes;
+    }
+
+    std::optional<DaemonIpcAttachSessionPayload> decodeAttachSessionPayload(const std::vector<std::uint8_t> &payload) {
+        if (payload.size() != 4) {
+            return std::nullopt;
+        }
+        DaemonIpcAttachSessionPayload out{};
+        out.requestedPort = readU32(payload.data());
+        return out;
+    }
+
+    std::vector<std::uint8_t> encodeAttachSessionAckPayload(const DaemonIpcAttachSessionAckPayload &payload) {
+        std::vector<std::uint8_t> bytes;
+        writeU32(payload.sessionPort, bytes);
+        return bytes;
+    }
+
+    std::optional<DaemonIpcAttachSessionAckPayload>
+    decodeAttachSessionAckPayload(const std::vector<std::uint8_t> &payload) {
+        if (payload.size() != 4) {
+            return std::nullopt;
+        }
+        DaemonIpcAttachSessionAckPayload out{};
+        out.sessionPort = readU32(payload.data());
+        return out;
+    }
+
+    std::vector<std::uint8_t> encodeSessionDataPayload(const DaemonIpcSessionDataPayload &payload) {
+        std::vector<std::uint8_t> bytes;
+        writeU32(static_cast<std::uint32_t>(payload.data.size()), bytes);
+        bytes.insert(bytes.end(), payload.data.begin(), payload.data.end());
+        return bytes;
+    }
+
+    std::optional<DaemonIpcSessionDataPayload> decodeSessionDataPayload(const std::vector<std::uint8_t> &payload) {
+        if (payload.size() < 4) {
+            return std::nullopt;
+        }
+        const std::uint32_t dataLen = readU32(payload.data());
+        if (dataLen > kDaemonIpcMaxSessionDataSize || payload.size() != 4 + dataLen) {
+            return std::nullopt;
+        }
+        DaemonIpcSessionDataPayload out{};
+        out.data.assign(payload.begin() + 4, payload.begin() + 4 + dataLen);
+        return out;
+    }
 } // namespace PickCore

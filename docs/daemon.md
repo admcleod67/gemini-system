@@ -158,6 +158,33 @@ IPC in M13 is **transport plumbing only**:
 
 Those are [Milestone 14](milestones/14-multi-session-console-support.md). M13 `ReserveSession` only allocates a session slot and returns a port number.
 
+### Message types (M14 session plane)
+
+Wire types and payload layouts are defined in [`DaemonIpcProtocol.h`](../src/core/daemon/DaemonIpcProtocol.h). Server handlers for these messages land in M14 Stage 2+; the wire spec is authoritative in the header.
+
+| Type | Direction | Purpose |
+|------|-----------|---------|
+| `AttachSession` | client → server | Bind connection to session; `requestedPort = 0` creates a new session |
+| `AttachSessionAck` | server → client | Assigned or confirmed `sessionPort` |
+| `DetachSession` | client → server | Graceful console detach (empty payload) |
+| `DetachSessionAck` | server → client | Detach complete (empty payload) |
+| `SessionInput` | client → server | Stdin byte chunk for attached session |
+| `SessionOutput` | server → client | Stdout byte chunk |
+| `SessionDiagnostic` | server → client | Stderr byte chunk |
+
+**Session-plane rules:**
+
+- **Handshake first** (same as M13 control plane)
+- **AttachSession** before any session I/O on that connection
+- Session I/O frames are **connection-scoped** (no port field after attach)
+- **SessionInput** is client → server only; **SessionOutput** and **SessionDiagnostic** are server → client only
+- **DetachSession** or connection close ends the binding; the session object may remain in the table (M14 Stage 6)
+- Max data chunk per session I/O frame: **65532 bytes** (`kDaemonIpcMaxSessionDataSize`)
+
+**M14 error codes** (delivered in `Error` frames): `SessionNotFound`, `SessionAlreadyBound`, `NotAttached`.
+
+`ReserveSession` remains for M13 compatibility; **`gemini-console`** uses `AttachSession` with `requestedPort = 0` instead.
+
 ## M13 vs M14 vs M15
 
 | Milestone | What “multi-session” means |

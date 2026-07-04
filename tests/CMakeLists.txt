@@ -23,6 +23,7 @@ add_executable(
         core/test_DaemonConfig.cpp
         core/test_DaemonLifecycle.cpp
         core/test_DaemonIpc.cpp
+        core/test_DaemonIpcSession.cpp
         core/test_PortManager.cpp
         core/test_SessionTable.cpp
         core/test_FileSystem.cpp

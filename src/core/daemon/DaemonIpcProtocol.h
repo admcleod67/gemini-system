@@ -1,5 +1,5 @@
 //
-// Gemini daemon IPC wire protocol v1 (Milestone 13 Stage 5).
+// Gemini daemon IPC wire protocol v1 (Milestone 13 control plane + M14 session plane).
 //
 // Transport: Unix domain stream socket (AF_UNIX).
 // Byte order: network (big-endian) for all multi-byte fields.
@@ -11,8 +11,18 @@
 //   payloadLen = uint32
 //   payload[]  = type-specific (may be empty)
 //
-// Client must send Handshake first. Further messages on the same connection
-// require a completed handshake. Login/REPL byte streams are Milestone 14.
+// Control plane (M13):
+//   Client must send Handshake first. Further messages on the same connection
+//   require a completed handshake.
+//
+// Session plane (M14):
+//   After handshake, client sends AttachSession before SessionInput/Output/Diagnostic.
+//   requestedPort = 0 creates a new session; non-zero attaches to an existing port.
+//   Session I/O frames are connection-scoped (no port field after attach).
+//   SessionInput is client->server; SessionOutput and SessionDiagnostic are server->client.
+//   DetachSession or connection close ends the binding; session object may remain.
+//
+// Max session data chunk: kDaemonIpcMaxSessionDataSize bytes per SessionInput/Output/Diagnostic.
 //
 
 #ifndef PICK_SYSTEM_CORE_DAEMON_DAEMON_IPC_PROTOCOL_H
@@ -29,6 +39,7 @@
 namespace PickCore {
     inline constexpr std::uint16_t kDaemonIpcProtocolVersion = 1;
     inline constexpr std::size_t kDaemonIpcMaxPayloadSize = 65536;
+    inline constexpr std::size_t kDaemonIpcMaxSessionDataSize = kDaemonIpcMaxPayloadSize - 4;
     inline constexpr char kDaemonIpcMagic[4] = {'G', 'E', 'M', 'I'};
 
     enum class DaemonIpcMessageType : std::uint16_t {
@@ -41,6 +52,13 @@ namespace PickCore {
         ReserveSession = 7,
         ReserveSessionAck = 8,
         Error = 9,
+        AttachSession = 10,
+        AttachSessionAck = 11,
+        DetachSession = 12,
+        DetachSessionAck = 13,
+        SessionInput = 14,
+        SessionOutput = 15,
+        SessionDiagnostic = 16,
     };
 
     enum class DaemonIpcErrorCode : std::uint32_t {
@@ -48,6 +66,9 @@ namespace PickCore {
         InvalidMessage = 2,
         SessionTableFull = 3,
         NotHandshaken = 4,
+        SessionNotFound = 5,
+        SessionAlreadyBound = 6,
+        NotAttached = 7,
     };
 
     struct DaemonIpcFrame {
@@ -70,6 +91,18 @@ namespace PickCore {
         SessionId sessionPort{0};
     };
 
+    struct DaemonIpcAttachSessionPayload {
+        SessionId requestedPort{0};
+    };
+
+    struct DaemonIpcAttachSessionAckPayload {
+        SessionId sessionPort{0};
+    };
+
+    struct DaemonIpcSessionDataPayload {
+        std::vector<std::uint8_t> data;
+    };
+
     struct DaemonIpcErrorPayload {
         DaemonIpcErrorCode code{DaemonIpcErrorCode::InvalidMessage};
         std::string message;
@@ -87,6 +120,16 @@ namespace PickCore {
     [[nodiscard]] std::vector<std::uint8_t> encodeReserveSessionAckPayload(const DaemonIpcReserveSessionAckPayload &payload);
     [[nodiscard]] std::optional<DaemonIpcReserveSessionAckPayload>
     decodeReserveSessionAckPayload(const std::vector<std::uint8_t> &payload);
+
+    [[nodiscard]] std::vector<std::uint8_t> encodeAttachSessionPayload(const DaemonIpcAttachSessionPayload &payload);
+    [[nodiscard]] std::optional<DaemonIpcAttachSessionPayload> decodeAttachSessionPayload(const std::vector<std::uint8_t> &payload);
+
+    [[nodiscard]] std::vector<std::uint8_t> encodeAttachSessionAckPayload(const DaemonIpcAttachSessionAckPayload &payload);
+    [[nodiscard]] std::optional<DaemonIpcAttachSessionAckPayload>
+    decodeAttachSessionAckPayload(const std::vector<std::uint8_t> &payload);
+
+    [[nodiscard]] std::vector<std::uint8_t> encodeSessionDataPayload(const DaemonIpcSessionDataPayload &payload);
+    [[nodiscard]] std::optional<DaemonIpcSessionDataPayload> decodeSessionDataPayload(const std::vector<std::uint8_t> &payload);
 
     [[nodiscard]] std::vector<std::uint8_t> encodeErrorPayload(const DaemonIpcErrorPayload &payload);
     [[nodiscard]] std::optional<DaemonIpcErrorPayload> decodeErrorPayload(const std::vector<std::uint8_t> &payload);
