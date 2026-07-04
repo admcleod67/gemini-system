@@ -2,22 +2,18 @@
 #include <memory>
 #include <optional>
 
-#include <BootMonitor.h>
 #include <DefaultFileSystemRoot.h>
+#include <GeminiServiceDaemon.h>
 #include <GeminiSession.h>
-#include <HostBootstrap.h>
-#include <LanguageRegistry.h>
 #include <LoginService.h>
 
 int main() {
+    PickCore::GeminiServiceDaemon daemon = PickCore::GeminiServiceDaemon::createEmbedded();
     const auto session = PickShell::GeminiSession::create();
     applyDefaultFileSystemRoot(session->shell());
 
-    PickCore::BootContext bootCtx;
-    bootCtx.runtime = &session->runtime();
-    bootCtx.hostPaths = PickCore::resolveDefaultHostPaths();
-    PickCore::BootMonitor::runColdStart(std::cout, bootCtx);
-    session->runtime().setLanguageRegistry(&PickCore::Languages::LanguageRegistry::instance());
+    daemon.coldStart(std::cout);
+    session->runtime().setLanguageRegistry(&daemon.languageRegistry());
 
     PickShell::Shell &shell = session->shell();
     const auto &catalog = shell.geminiCatalogRoot();

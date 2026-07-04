@@ -78,14 +78,9 @@ Only **one** session executes interpreter work (REPL, BASIC, PROC, etc.) at a ti
 
 Without this distinction, “multi-session” in M13 can be mistaken for M14 or M15.
 
-#### 2.9 Open design note (Stage 1)
+#### 2.9 Bootstrap Runtime (Stage 1 — resolved)
 
-[`BootContext`](../../src/core/boot/BootMonitor.h) today passes a session `Runtime*` into [`LanguageModuleLoader`](../../src/core/languages/LanguageModuleLoader.h) during cold start. At daemon scope, Stage 1 must choose either:
-
-- **(a)** a short-lived bootstrap `Runtime` used only for module load at cold start, or
-- **(b)** defer registry attach until the first session exists
-
-Either approach is acceptable provided M11 “load and freeze at cold start” semantics are preserved.
+[`BootContext`](../../src/core/boot/BootMonitor.h) passes a `Runtime*` into [`LanguageModuleLoader`](../../src/core/languages/LanguageModuleLoader.h) during cold start. **Stage 1 adopted option (a):** [`GeminiServiceDaemon`](../../src/core/daemon/GeminiServiceDaemon.h) owns a dedicated **bootstrap `Runtime`** used only for `BootContext` during `coldStart()`. Session VMs remain separate; each session receives the frozen registry via `setLanguageRegistry()` after cold start. M11 “load and freeze at cold start” semantics are unchanged.
 
 ---
 
@@ -226,7 +221,7 @@ External behaviour of **`gemini-system`** remains unchanged — only internal co
 
 Implementation is sequenced into vertical stages. Each stage ships a test-locked slice before the next starts; the full test suite must remain green after every stage. **`gemini-system` external behaviour must not regress** until Stage 6 claims milestone closure. Detailed per-stage plans may live in `~/.cursor/plans/m13_stage_*.plan.md` during implementation; status is summarised here as each stage lands (matching the M8 / M9 / M10 / M11 / M12 precedent).
 
-- **Stage 1 — Daemon core extraction**: introduce **`GeminiServiceDaemon`** under `src/core/daemon/`; move process-scope boot from [`Main.cpp`](../../src/Main.cpp) into daemon `coldStart()` / `initialize()` (`BootMonitor`, `LanguageRegistry` freeze, shared `LockTable`); refactor **`gemini-system`** to create an embedded daemon, create one session, and run the existing login/REPL loop. Resolve the bootstrap `Runtime` design note in §2.9. **Exit criterion:** external `gemini-system` behaviour unchanged; boot banner still correct. Tests: `tests/core/test_GeminiDaemon.cpp`. *Status: planned.*
+- **Stage 1 — Daemon core extraction**: introduce **`GeminiServiceDaemon`** under `src/core/daemon/`; move process-scope boot from [`Main.cpp`](../../src/Main.cpp) into daemon `coldStart()` (`BootMonitor`, `LanguageRegistry` freeze, shared `LockTable` via `LockRegistry` delegation); refactor **`gemini-system`** to create an embedded daemon, create one session, and run the existing login/REPL loop. Bootstrap `Runtime` in daemon per §2.9. **Exit criterion:** external `gemini-system` behaviour unchanged; boot banner still correct. Implementation: [`GeminiServiceDaemon`](../../src/core/daemon/GeminiServiceDaemon.h), [`Main.cpp`](../../src/Main.cpp), tests in [`tests/core/test_GeminiDaemon.cpp`](../../tests/core/test_GeminiDaemon.cpp). *Status: implemented.*
 
 - **Stage 2 — Session table + serial runner**: implement **`SessionTable`** (`createSession()`, `destroySession()`, lookup by id/port) and **`SerialSessionRunner`** (exclusive execution token; second session blocked or queued while first runs REPL); wire every session to the daemon’s shared `LockTable` (replace ad-hoc [`LockRegistry`](../../src/core/locking/LockRegistry.h) wiring in [`Shell.cpp`](../../src/userland/tcl/Shell.cpp) with daemon-owned injection). **Exit criterion:** multi-session object tests pass; standalone still single active session. Tests: `tests/core/test_SessionTable.cpp`. *Status: planned.*
 

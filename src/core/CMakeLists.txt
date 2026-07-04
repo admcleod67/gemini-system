@@ -69,6 +69,8 @@ add_library(gemini-core
         locking/LockTable.cpp
         locking/LockTable.h
         locking/LockRegistry.h
+        daemon/GeminiServiceDaemon.cpp
+        daemon/GeminiServiceDaemon.h
         languages/LanguageRegistry.cpp
         languages/LanguageRegistry.h
         languages/LanguageTypes.h
@@ -106,6 +108,7 @@ target_include_directories(
         "${CMAKE_CURRENT_SOURCE_DIR}/english"
         "${CMAKE_CURRENT_SOURCE_DIR}/conversion"
         "${CMAKE_CURRENT_SOURCE_DIR}/locking"
+        "${CMAKE_CURRENT_SOURCE_DIR}/daemon"
         "${CMAKE_CURRENT_SOURCE_DIR}/languages"
         "${CMAKE_CURRENT_SOURCE_DIR}/languages/basic"
 )
