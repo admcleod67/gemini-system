@@ -145,3 +145,212 @@ TEST_CASE("DaemonIpcSession encodes and decodes M14 error codes") {
         CHECK(decoded->message == error.message);
     }
 }
+
+#ifndef _WIN32
+    #include <fcntl.h>
+    #include <filesystem>
+    #include <sstream>
+    #include <thread>
+    #include <unistd.h>
+
+    #include "DaemonConfig.h"
+    #include "DaemonIpcTestUtil.h"
+    #include "GeminiDaemonRunner.h"
+    #include "GeminiServiceDaemon.h"
+    #include "GeminiSessionHost.h"
+
+using PickTests::connectUnixSocket;
+using PickTests::recvFrame;
+using PickTests::recvHandshakeAck;
+using PickTests::sendFrame;
+using PickTests::sendHandshake;
+using PickTests::uniqueDaemonIpcTempDir;
+using PickTests::waitForSocket;
+
+TEST_CASE("DaemonIpcProtocol tryReadDaemonIpcFrame reads partial then complete frame") {
+    int fds[2] = {-1, -1};
+    REQUIRE(::pipe(fds) == 0);
+
+    const int writeFd = fds[1];
+    const int readFd = fds[0];
+    const int flags = ::fcntl(readFd, F_GETFL, 0);
+    REQUIRE(flags >= 0);
+    REQUIRE(::fcntl(readFd, F_SETFL, flags | O_NONBLOCK) == 0);
+
+    PickCore::DaemonIpcFrame ping{};
+    ping.type = PickCore::DaemonIpcMessageType::Ping;
+    const std::vector<std::uint8_t> bytes = PickCore::encodeDaemonIpcFrame(ping);
+
+    std::vector<std::uint8_t> buffer;
+    PickCore::DaemonIpcTryReadResult incomplete = PickCore::tryReadDaemonIpcFrame(readFd, buffer);
+    CHECK(incomplete.status == PickCore::DaemonIpcTryReadStatus::Incomplete);
+
+    REQUIRE(::write(writeFd, bytes.data(), 3) == 3);
+    incomplete = PickCore::tryReadDaemonIpcFrame(readFd, buffer);
+    CHECK(incomplete.status == PickCore::DaemonIpcTryReadStatus::Incomplete);
+
+    REQUIRE(::write(writeFd, bytes.data() + 3, bytes.size() - 3) ==
+            static_cast<ssize_t>(bytes.size() - 3));
+    const PickCore::DaemonIpcTryReadResult complete = PickCore::tryReadDaemonIpcFrame(readFd, buffer);
+    REQUIRE(complete.status == PickCore::DaemonIpcTryReadStatus::FrameReady);
+    REQUIRE(complete.frame.has_value());
+    CHECK(complete.frame->type == PickCore::DaemonIpcMessageType::Ping);
+
+    ::close(readFd);
+    ::close(writeFd);
+}
+
+TEST_CASE("GeminiDaemonRunner two concurrent IPC clients handshake") {
+    PickCore::DaemonConfig config{};
+    config.maxSessions = 4;
+    config.socketPath = uniqueDaemonIpcTempDir() / "gemini.sock";
+    std::filesystem::create_directories(config.socketPath.parent_path());
+
+    PickCore::GeminiServiceDaemon daemon = PickCore::GeminiServiceDaemon::create(config);
+    PickShell::GeminiSessionHost host(daemon, config.maxSessions);
+    PickShell::GeminiDaemonRunner runner(daemon, host, config);
+
+    std::thread runnerThread([&] {
+        std::ostringstream boot;
+        CHECK(runner.run(boot) == 0);
+    });
+
+    REQUIRE(waitForSocket(config.socketPath, std::chrono::milliseconds(2000)));
+
+    const int clientA = connectUnixSocket(config.socketPath);
+    const int clientB = connectUnixSocket(config.socketPath);
+    REQUIRE(clientA >= 0);
+    REQUIRE(clientB >= 0);
+
+    sendHandshake(clientA);
+    sendHandshake(clientB);
+    recvHandshakeAck(clientA);
+    recvHandshakeAck(clientB);
+
+    ::close(clientA);
+    ::close(clientB);
+    runner.requestShutdown();
+    runnerThread.join();
+}
+
+TEST_CASE("GeminiDaemonRunner concurrent IPC clients ping pong") {
+    PickCore::DaemonConfig config{};
+    config.maxSessions = 4;
+    config.socketPath = uniqueDaemonIpcTempDir() / "gemini.sock";
+    std::filesystem::create_directories(config.socketPath.parent_path());
+
+    PickCore::GeminiServiceDaemon daemon = PickCore::GeminiServiceDaemon::create(config);
+    PickShell::GeminiSessionHost host(daemon, config.maxSessions);
+    PickShell::GeminiDaemonRunner runner(daemon, host, config);
+
+    std::thread runnerThread([&] {
+        std::ostringstream boot;
+        CHECK(runner.run(boot) == 0);
+    });
+
+    REQUIRE(waitForSocket(config.socketPath, std::chrono::milliseconds(2000)));
+
+    const int clientA = connectUnixSocket(config.socketPath);
+    const int clientB = connectUnixSocket(config.socketPath);
+    REQUIRE(clientA >= 0);
+    REQUIRE(clientB >= 0);
+
+    sendHandshake(clientA);
+    sendHandshake(clientB);
+    recvHandshakeAck(clientA);
+    recvHandshakeAck(clientB);
+
+    PickCore::DaemonIpcFrame ping{};
+    ping.type = PickCore::DaemonIpcMessageType::Ping;
+    sendFrame(clientA, ping);
+    sendFrame(clientB, ping);
+    CHECK(recvFrame(clientA).type == PickCore::DaemonIpcMessageType::Pong);
+    CHECK(recvFrame(clientB).type == PickCore::DaemonIpcMessageType::Pong);
+
+    ::close(clientA);
+    ::close(clientB);
+    runner.requestShutdown();
+    runnerThread.join();
+}
+
+TEST_CASE("GeminiDaemonRunner IPC client disconnect leaves other clients connected") {
+    PickCore::DaemonConfig config{};
+    config.maxSessions = 4;
+    config.socketPath = uniqueDaemonIpcTempDir() / "gemini.sock";
+    std::filesystem::create_directories(config.socketPath.parent_path());
+
+    PickCore::GeminiServiceDaemon daemon = PickCore::GeminiServiceDaemon::create(config);
+    PickShell::GeminiSessionHost host(daemon, config.maxSessions);
+    PickShell::GeminiDaemonRunner runner(daemon, host, config);
+
+    std::thread runnerThread([&] {
+        std::ostringstream boot;
+        CHECK(runner.run(boot) == 0);
+    });
+
+    REQUIRE(waitForSocket(config.socketPath, std::chrono::milliseconds(2000)));
+
+    const int clientA = connectUnixSocket(config.socketPath);
+    const int clientB = connectUnixSocket(config.socketPath);
+    REQUIRE(clientA >= 0);
+    REQUIRE(clientB >= 0);
+
+    sendHandshake(clientA);
+    sendHandshake(clientB);
+    recvHandshakeAck(clientA);
+    recvHandshakeAck(clientB);
+
+    ::close(clientA);
+
+    PickCore::DaemonIpcFrame ping{};
+    ping.type = PickCore::DaemonIpcMessageType::Ping;
+    sendFrame(clientB, ping);
+    CHECK(recvFrame(clientB).type == PickCore::DaemonIpcMessageType::Pong);
+
+    ::close(clientB);
+    runner.requestShutdown();
+    runnerThread.join();
+}
+
+TEST_CASE("GeminiDaemonRunner rejects AttachSession before session bridge") {
+    PickCore::DaemonConfig config{};
+    config.maxSessions = 2;
+    config.socketPath = uniqueDaemonIpcTempDir() / "gemini.sock";
+    std::filesystem::create_directories(config.socketPath.parent_path());
+
+    PickCore::GeminiServiceDaemon daemon = PickCore::GeminiServiceDaemon::create(config);
+    PickShell::GeminiSessionHost host(daemon, config.maxSessions);
+    PickShell::GeminiDaemonRunner runner(daemon, host, config);
+
+    std::thread runnerThread([&] {
+        std::ostringstream boot;
+        CHECK(runner.run(boot) == 0);
+    });
+
+    REQUIRE(waitForSocket(config.socketPath, std::chrono::milliseconds(2000)));
+
+    const int clientFd = connectUnixSocket(config.socketPath);
+    REQUIRE(clientFd >= 0);
+
+    sendHandshake(clientFd);
+    recvHandshakeAck(clientFd);
+
+    PickCore::DaemonIpcAttachSessionPayload attachPayload{};
+    attachPayload.requestedPort = 0;
+    PickCore::DaemonIpcFrame attach{};
+    attach.type = PickCore::DaemonIpcMessageType::AttachSession;
+    attach.payload = PickCore::encodeAttachSessionPayload(attachPayload);
+    sendFrame(clientFd, attach);
+
+    const PickCore::DaemonIpcFrame errorFrame = recvFrame(clientFd);
+    CHECK(errorFrame.type == PickCore::DaemonIpcMessageType::Error);
+    const std::optional<PickCore::DaemonIpcErrorPayload> errorPayload =
+        PickCore::decodeErrorPayload(errorFrame.payload);
+    REQUIRE(errorPayload.has_value());
+    CHECK(errorPayload->code == PickCore::DaemonIpcErrorCode::InvalidMessage);
+
+    ::close(clientFd);
+    runner.requestShutdown();
+    runnerThread.join();
+}
+#endif

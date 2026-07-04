@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cerrno>
 #include <cstring>
 #include <unistd.h>
 
@@ -31,6 +32,29 @@ namespace PickCore {
         [[nodiscard]] bool magicMatches(const std::array<char, 4> &magic) {
             return magic[0] == kDaemonIpcMagic[0] && magic[1] == kDaemonIpcMagic[1] &&
                    magic[2] == kDaemonIpcMagic[2] && magic[3] == kDaemonIpcMagic[3];
+        }
+
+        [[nodiscard]] bool magicMatchesBuffer(const std::vector<std::uint8_t> &bytes) {
+            return bytes.size() >= 4 && bytes[0] == kDaemonIpcMagic[0] && bytes[1] == kDaemonIpcMagic[1] &&
+                   bytes[2] == kDaemonIpcMagic[2] && bytes[3] == kDaemonIpcMagic[3];
+        }
+
+        [[nodiscard]] std::optional<std::size_t> completeFrameLength(const std::vector<std::uint8_t> &bytes) {
+            if (bytes.size() < 12) {
+                return std::nullopt;
+            }
+            if (!magicMatchesBuffer(bytes)) {
+                return std::size_t{0};
+            }
+            const std::uint32_t payloadLen = readU32(bytes.data() + 8);
+            if (payloadLen > kDaemonIpcMaxPayloadSize) {
+                return std::size_t{0};
+            }
+            const std::size_t total = 12 + payloadLen;
+            if (bytes.size() < total) {
+                return std::nullopt;
+            }
+            return total;
         }
     } // namespace
 
@@ -131,6 +155,50 @@ namespace PickCore {
     bool writeDaemonIpcFrame(const int fd, const DaemonIpcFrame &frame) {
         const std::vector<std::uint8_t> bytes = encodeDaemonIpcFrame(frame);
         return writeExact(fd, bytes.data(), bytes.size());
+    }
+
+    DaemonIpcTryReadResult tryReadDaemonIpcFrame(const int fd, std::vector<std::uint8_t> &buffer) {
+        DaemonIpcTryReadResult result{};
+
+        std::array<std::uint8_t, 4096> chunk{};
+        for (;;) {
+            const auto readBytes = ::read(fd, chunk.data(), chunk.size());
+            if (readBytes == 0) {
+                result.status = buffer.empty() ? DaemonIpcTryReadStatus::ConnectionClosed
+                                               : DaemonIpcTryReadStatus::ProtocolError;
+                return result;
+            }
+            if (readBytes < 0) {
+                if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                    break;
+                }
+                result.status = DaemonIpcTryReadStatus::ConnectionClosed;
+                return result;
+            }
+            buffer.insert(buffer.end(), chunk.begin(), chunk.begin() + readBytes);
+        }
+
+        const std::optional<std::size_t> frameLen = completeFrameLength(buffer);
+        if (!frameLen.has_value()) {
+            result.status = DaemonIpcTryReadStatus::Incomplete;
+            return result;
+        }
+        if (*frameLen == 0) {
+            result.status = DaemonIpcTryReadStatus::ProtocolError;
+            return result;
+        }
+
+        const std::vector<std::uint8_t> frameBytes(buffer.begin(), buffer.begin() + static_cast<std::ptrdiff_t>(*frameLen));
+        buffer.erase(buffer.begin(), buffer.begin() + static_cast<std::ptrdiff_t>(*frameLen));
+
+        result.frame = decodeDaemonIpcFrame(frameBytes);
+        if (!result.frame.has_value()) {
+            result.status = DaemonIpcTryReadStatus::ProtocolError;
+            return result;
+        }
+
+        result.status = DaemonIpcTryReadStatus::FrameReady;
+        return result;
     }
 
     std::vector<std::uint8_t> encodeHandshakePayload(const DaemonIpcHandshakePayload &payload) {

@@ -158,9 +158,15 @@ IPC in M13 is **transport plumbing only**:
 
 Those are [Milestone 14](milestones/14-multi-session-console-support.md). M13 `ReserveSession` only allocates a session slot and returns a port number.
 
+### Multi-client connections (M14 Stage 2)
+
+[`DaemonIpcServer`](../src/core/daemon/DaemonIpcServer.cpp) accepts **multiple concurrent** Unix socket clients. Each connection maintains its own handshake state and read buffer; the daemon run loop uses `pollAndDispatch()` to service all connections without blocking on a single client. Control-plane messages (`Handshake`, `Ping`, `ShutdownRequest`, `ReserveSession`) work per connection; clients stay connected after `Ping` or `ReserveSession` until they disconnect or send `ShutdownRequest`.
+
+Session attach and I/O bridging land in M14 Stage 3+; session-plane messages receive `Error` responses until then.
+
 ### Message types (M14 session plane)
 
-Wire types and payload layouts are defined in [`DaemonIpcProtocol.h`](../src/core/daemon/DaemonIpcProtocol.h). Server handlers for these messages land in M14 Stage 2+; the wire spec is authoritative in the header.
+Wire types and payload layouts are defined in [`DaemonIpcProtocol.h`](../src/core/daemon/DaemonIpcProtocol.h). Session attach and I/O handlers land in M14 Stage 3+; the wire spec is authoritative in the header.
 
 | Type | Direction | Purpose |
 |------|-----------|---------|

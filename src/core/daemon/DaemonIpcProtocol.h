@@ -108,6 +108,18 @@ namespace PickCore {
         std::string message;
     };
 
+    enum class DaemonIpcTryReadStatus {
+        Incomplete,
+        FrameReady,
+        ConnectionClosed,
+        ProtocolError,
+    };
+
+    struct DaemonIpcTryReadResult {
+        DaemonIpcTryReadStatus status{DaemonIpcTryReadStatus::Incomplete};
+        std::optional<DaemonIpcFrame> frame;
+    };
+
     [[nodiscard]] std::vector<std::uint8_t> encodeDaemonIpcFrame(const DaemonIpcFrame &frame);
     [[nodiscard]] std::optional<DaemonIpcFrame> decodeDaemonIpcFrame(const std::vector<std::uint8_t> &bytes);
 
@@ -137,6 +149,7 @@ namespace PickCore {
     [[nodiscard]] bool readExact(int fd, void *buffer, std::size_t length);
     [[nodiscard]] bool writeExact(int fd, const void *buffer, std::size_t length);
     [[nodiscard]] std::optional<DaemonIpcFrame> readDaemonIpcFrame(int fd);
+    [[nodiscard]] DaemonIpcTryReadResult tryReadDaemonIpcFrame(int fd, std::vector<std::uint8_t> &buffer);
     [[nodiscard]] bool writeDaemonIpcFrame(int fd, const DaemonIpcFrame &frame);
 } // namespace PickCore
 

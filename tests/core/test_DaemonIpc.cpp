@@ -10,21 +10,20 @@
 
 #include "DaemonConfig.h"
 #include "DaemonIpcProtocol.h"
+#include "DaemonIpcTestUtil.h"
 #include "GeminiDaemonRunner.h"
 #include "GeminiServiceDaemon.h"
 #include "GeminiSessionHost.h"
 
 #ifndef _WIN32
-    #include <sys/socket.h>
     #include <sys/stat.h>
-    #include <sys/un.h>
-    #include <unistd.h>
 #endif
 
-static std::filesystem::path uniqueTempDir() {
-    const auto tick = std::chrono::steady_clock::now().time_since_epoch().count();
-    return std::filesystem::temp_directory_path() / ("pick-daemon-ipc-" + std::to_string(tick));
-}
+using PickTests::connectUnixSocket;
+using PickTests::recvFrame;
+using PickTests::sendFrame;
+using PickTests::uniqueDaemonIpcTempDir;
+using PickTests::waitForSocket;
 
 TEST_CASE("DaemonIpcProtocol encodes and decodes handshake frame") {
     PickCore::DaemonIpcFrame frame{};
@@ -86,55 +85,10 @@ TEST_CASE("DaemonIpcProtocol rejects invalid magic") {
 }
 
 #ifndef _WIN32
-namespace {
-    int connectUnixSocket(const std::filesystem::path &socketPath) {
-        const int fd = ::socket(AF_UNIX, SOCK_STREAM, 0);
-        if (fd < 0) {
-            return -1;
-        }
-
-        sockaddr_un address{};
-        address.sun_family = AF_UNIX;
-        const std::string path = socketPath.string();
-        if (path.size() >= sizeof(address.sun_path)) {
-            ::close(fd);
-            return -1;
-        }
-        std::strncpy(address.sun_path, path.c_str(), sizeof(address.sun_path) - 1);
-        if (::connect(fd, reinterpret_cast<sockaddr *>(&address), sizeof(address)) != 0) {
-            ::close(fd);
-            return -1;
-        }
-        return fd;
-    }
-
-    bool waitForSocket(const std::filesystem::path &socketPath, const std::chrono::milliseconds timeout) {
-        const auto deadline = std::chrono::steady_clock::now() + timeout;
-        while (std::chrono::steady_clock::now() < deadline) {
-            std::error_code ec;
-            if (std::filesystem::exists(socketPath, ec) && !ec) {
-                return true;
-            }
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
-        }
-        return false;
-    }
-
-    void sendFrame(const int fd, const PickCore::DaemonIpcFrame &frame) {
-        REQUIRE(PickCore::writeDaemonIpcFrame(fd, frame));
-    }
-
-    PickCore::DaemonIpcFrame recvFrame(const int fd) {
-        const std::optional<PickCore::DaemonIpcFrame> frame = PickCore::readDaemonIpcFrame(fd);
-        REQUIRE(frame.has_value());
-        return *frame;
-    }
-} // namespace
-
 TEST_CASE("GeminiDaemonRunner IPC client handshake ping pong") {
     PickCore::DaemonConfig config{};
     config.maxSessions = 4;
-    config.socketPath = uniqueTempDir() / "gemini.sock";
+    config.socketPath = uniqueDaemonIpcTempDir() / "gemini.sock";
     std::filesystem::create_directories(config.socketPath.parent_path());
 
     PickCore::GeminiServiceDaemon daemon = PickCore::GeminiServiceDaemon::create(config);
@@ -181,7 +135,7 @@ TEST_CASE("GeminiDaemonRunner IPC client handshake ping pong") {
 TEST_CASE("GeminiDaemonRunner IPC reserve session stub") {
     PickCore::DaemonConfig config{};
     config.maxSessions = 2;
-    config.socketPath = uniqueTempDir() / "gemini.sock";
+    config.socketPath = uniqueDaemonIpcTempDir() / "gemini.sock";
     std::filesystem::create_directories(config.socketPath.parent_path());
 
     PickCore::GeminiServiceDaemon daemon = PickCore::GeminiServiceDaemon::create(config);
@@ -223,7 +177,7 @@ TEST_CASE("GeminiDaemonRunner IPC reserve session stub") {
 TEST_CASE("GeminiDaemonRunner IPC shutdown request stops daemon") {
     PickCore::DaemonConfig config{};
     config.maxSessions = 1;
-    config.socketPath = uniqueTempDir() / "gemini.sock";
+    config.socketPath = uniqueDaemonIpcTempDir() / "gemini.sock";
     std::filesystem::create_directories(config.socketPath.parent_path());
 
     PickCore::GeminiServiceDaemon daemon = PickCore::GeminiServiceDaemon::create(config);
@@ -260,7 +214,7 @@ TEST_CASE("GeminiDaemonRunner IPC shutdown request stops daemon") {
 TEST_CASE("DaemonIpcServer socket permissions are owner-only") {
     PickCore::DaemonConfig config{};
     config.maxSessions = 1;
-    config.socketPath = uniqueTempDir() / "gemini.sock";
+    config.socketPath = uniqueDaemonIpcTempDir() / "gemini.sock";
     std::filesystem::create_directories(config.socketPath.parent_path());
 
     PickCore::GeminiServiceDaemon daemon = PickCore::GeminiServiceDaemon::create(config);

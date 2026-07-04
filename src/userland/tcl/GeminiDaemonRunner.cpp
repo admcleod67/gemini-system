@@ -63,10 +63,8 @@ namespace PickShell {
         handlers.requestShutdown = [this] { requestShutdown(); };
 
         while (!shutdownRequested.load(std::memory_order_acquire)) {
-            if (ipcServer_.pollAccept(std::chrono::milliseconds(100))) {
-                if (ipcServer_.handleConnectedClient(serverConfig, handlers)) {
-                    break;
-                }
+            if (ipcServer_.pollAndDispatch(std::chrono::milliseconds(100), serverConfig, handlers)) {
+                break;
             }
         }
 #else
