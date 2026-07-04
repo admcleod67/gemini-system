@@ -16,7 +16,7 @@ static std::filesystem::path uniqueFsTempDir() {
     return base / ("pick-shell-lock-test-" + std::to_string(tick));
 }
 
-TEST_CASE("GeminiSession clearLoginSession releases record locks") {
+TEST_CASE("GeminiSession detach releases record locks") {
     PickShell::GeminiSession session;
     const auto locks = std::make_shared<LockTable>();
     session.setSharedLockTable(locks);
@@ -30,7 +30,7 @@ TEST_CASE("GeminiSession clearLoginSession releases record locks") {
     REQUIRE(session.fileSystem().readU("DATA", "R1").has_value());
     REQUIRE(locks->lookup("DATA", "R1").has_value());
 
-    session.clearLoginSession();
+    session.detach();
     CHECK_FALSE(locks->lookup("DATA", "R1").has_value());
     CHECK(session.sessionLockId().empty());
 
@@ -39,7 +39,7 @@ TEST_CASE("GeminiSession clearLoginSession releases record locks") {
     CHECK(fsOther.readU("DATA", "R1").has_value());
 }
 
-TEST_CASE("GeminiSession resetForQuit releases record locks") {
+TEST_CASE("GeminiSession reset releases record locks") {
     PickShell::GeminiSession session;
     const auto locks = std::make_shared<LockTable>();
     session.setSharedLockTable(locks);
@@ -52,7 +52,7 @@ TEST_CASE("GeminiSession resetForQuit releases record locks") {
     session.fileSystem().write("DATA", PickFS::Record("R1", "X"));
     REQUIRE(session.fileSystem().readU("DATA", "R1").has_value());
 
-    session.resetForQuit();
+    session.reset();
     CHECK_FALSE(locks->lookup("DATA", "R1").has_value());
 }
 

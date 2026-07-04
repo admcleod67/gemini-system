@@ -39,6 +39,18 @@ namespace PickShell {
     public:
         GeminiSession();
 
+        /// Allocate and initialise a session (Runtime, shell, default I/O wiring).
+        [[nodiscard]] static std::unique_ptr<GeminiSession> create();
+
+        /// Remove account binding without destroying the session.
+        void detach();
+
+        /// Clear interpreter and VM program state; retains the same Runtime instance and I/O channels.
+        void reset();
+
+        /// Explicit teardown before destruction (M13 session eviction entry point).
+        void destroy();
+
         [[nodiscard]] PickVM::Runtime &runtime() noexcept { return runtime_; }
         [[nodiscard]] const PickVM::Runtime &runtime() const noexcept { return runtime_; }
 
@@ -85,8 +97,6 @@ namespace PickShell {
 
         void executeVmLoop(std::ostream &out);
 
-        void resetForQuit();
-
         void setGeminiCatalogRoot(std::optional<std::filesystem::path> root);
 
         [[nodiscard]] const std::optional<std::filesystem::path> &geminiCatalogRoot() const { return geminiCatalogRoot_; }
@@ -99,8 +109,6 @@ namespace PickShell {
         void setLoggedIn(bool value) { loggedIn_ = value; }
 
         void setSessionIdentity(int port, std::string username, std::string account);
-
-        void clearLoginSession();
 
         void setSharedLockTable(std::shared_ptr<PickCore::Locking::LockTable> table);
 

@@ -188,7 +188,7 @@ Implementation is sequenced into vertical stages. Each stage ships a test-locked
 
 - **Stage 4 — Absorb `ShellSession`**: migrate mutable **`ShellSession`** fields into **`GeminiSession`** (filesystem root, Tcl env, lock binding, active list, login flags, breakpoint/suspend state); **`Shell`** holds **`GeminiSession&`** instead of embedding **`ShellSession`**; implement **`attach(const UserSession&)`** on the session; delete **`ShellSession`** type. Preserve per-session lock identity ([`tests/tcl/test_ShellSessionLocks.cpp`](../../tests/tcl/test_ShellSessionLocks.cpp), [`tests/tcl/test_ShellLocking.cpp`](../../tests/tcl/test_ShellLocking.cpp)). *Status: implemented.*
 
-- **Stage 5 — Lifecycle API**: explicit **`create`** / **`attach`** / **`detach`** / **`reset`** / **`destroy`** on **`GeminiSession`**; align **`reset`** with today’s **`ShellSession::resetForQuit()`** and **`detach`** with **`clearLoginSession()`** semantics (§2.3). Session lifecycle unit tests. *Status: planned.*
+- **Stage 5 — Lifecycle API**: explicit **`create`** / **`attach`** / **`detach`** / **`reset`** / **`destroy`** on **`GeminiSession`**; align **`reset`** with today’s **`ShellSession::resetForQuit()`** and **`detach`** with **`clearLoginSession()`** semantics (§2.3). Session lifecycle unit tests. *Status: implemented.*
 
 - **Stage 6 — Docs + closes M12**: satisfy §8 completion criteria; update milestone status; optional architecture cross-links in [`docs/`](../). Manual smoke: login → Tcl → BASIC → LOGOFF unchanged. **Closes Milestone 12.** *Status: planned.*
 

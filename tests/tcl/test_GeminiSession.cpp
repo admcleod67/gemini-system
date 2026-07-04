@@ -8,6 +8,7 @@
 
 #include <filesystem>
 #include <iostream>
+#include <memory>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -131,4 +132,144 @@ TEST_CASE("GeminiSession attachUserSession via shell delegates to attach") {
     CHECK(session.loggedIn());
     CHECK(session.sessionUsername() == "BOB");
     CHECK(session.sessionLockId() == PickShell::GeminiSession::makeSessionLockId(3, "ACCT", "BOB"));
+}
+
+TEST_CASE("GeminiSession create returns wired session") {
+    const auto session = PickShell::GeminiSession::create();
+    REQUIRE(session != nullptr);
+    PickVM::Runtime *const runtimeAddr = &session->runtime();
+    CHECK(runtimeAddr == &session->runtime());
+
+    std::ostringstream out;
+    bool quit = false;
+    session->shell().handleLine("VERSION", out, quit);
+    CHECK_FALSE(quit);
+    CHECK(out.str().find(pick_system::version_string) != std::string::npos);
+}
+
+TEST_CASE("GeminiSession attach then detach clears login identity") {
+    const auto root = std::filesystem::temp_directory_path() / "pick-gemini-detach-test";
+    std::filesystem::create_directories(root / "MD");
+
+    PickCore::UserSession user;
+    user.catalogRoot = root / "gemini";
+    user.pickRoot = root;
+    user.accountName = "TST";
+    user.username = "USERA";
+    user.whoPort = 2;
+    user.userNo = "2";
+
+    PickShell::GeminiSession session;
+    session.attach(user);
+    REQUIRE(session.loggedIn());
+
+    session.detach();
+    CHECK_FALSE(session.loggedIn());
+    CHECK(session.sessionLockId().empty());
+    CHECK(session.whoPort() == 0);
+    CHECK(session.sessionUsername().empty());
+    CHECK(session.sessionAccount().empty());
+}
+
+TEST_CASE("GeminiSession reset clears interpreter state but preserves login") {
+    PickShell::GeminiSession session;
+    REQUIRE(session.env().set("X", "1"));
+
+    const std::vector<Instruction> prog = {
+        {OpCode::PushInt, 1},
+        {OpCode::Halt, PickVM::Value{}},
+    };
+    session.runtime().loadProgram(prog);
+    REQUIRE(session.runtime().isLoaded());
+
+    session.setLoggedIn(true);
+    session.setSessionIdentity(1, "U", "A");
+
+    PickVM::Runtime *const runtimeAddr = &session.runtime();
+    session.reset();
+
+    CHECK(runtimeAddr == &session.runtime());
+    CHECK(session.loggedIn());
+    CHECK(session.sessionUsername() == "U");
+    CHECK_FALSE(session.env().get("X").has_value());
+    CHECK_FALSE(session.runtime().isLoaded());
+}
+
+TEST_CASE("GeminiSession detach then reset is LOGOFF-equivalent clean slate") {
+    const auto root = std::filesystem::temp_directory_path() / "pick-gemini-logoff-test";
+    std::filesystem::create_directories(root / "MD");
+
+    PickCore::UserSession user;
+    user.catalogRoot = root / "gemini";
+    user.pickRoot = root;
+    user.accountName = "TST";
+    user.username = "USERA";
+    user.whoPort = 4;
+    user.userNo = "4";
+
+    PickShell::GeminiSession session;
+    session.attach(user);
+    REQUIRE(session.env().set("TOKEN", "abc"));
+
+    session.detach();
+    session.reset();
+
+    CHECK_FALSE(session.loggedIn());
+    CHECK(session.sessionLockId().empty());
+    CHECK_FALSE(session.env().get("TOKEN").has_value());
+}
+
+TEST_CASE("GeminiSession attach detach attach rebinds identity") {
+    const auto root = std::filesystem::temp_directory_path() / "pick-gemini-reattach-test";
+    std::filesystem::create_directories(root / "MD");
+
+    PickCore::UserSession first;
+    first.catalogRoot = root / "gemini";
+    first.pickRoot = root;
+    first.accountName = "TST";
+    first.username = "USERA";
+    first.whoPort = 1;
+    first.userNo = "1";
+
+    PickCore::UserSession second = first;
+    second.username = "USERB";
+    second.whoPort = 2;
+    second.userNo = "2";
+
+    PickShell::GeminiSession session;
+    session.attach(first);
+    CHECK(session.sessionLockId() == PickShell::GeminiSession::makeSessionLockId(1, "TST", "USERA"));
+
+    session.detach();
+    session.attach(second);
+
+    CHECK(session.loggedIn());
+    CHECK(session.sessionUsername() == "USERB");
+    CHECK(session.sessionLockId() == PickShell::GeminiSession::makeSessionLockId(2, "TST", "USERB"));
+}
+
+TEST_CASE("GeminiSession destroy releases login and clears interpreter state") {
+    const auto root = std::filesystem::temp_directory_path() / "pick-gemini-destroy-test";
+    std::filesystem::create_directories(root / "MD");
+
+    PickCore::UserSession user;
+    user.catalogRoot = root / "gemini";
+    user.pickRoot = root;
+    user.accountName = "TST";
+    user.username = "USERA";
+    user.whoPort = 5;
+    user.userNo = "5";
+
+    auto session = PickShell::GeminiSession::create();
+    session->attach(user);
+    REQUIRE(session->env().set("Y", "2"));
+
+    session->destroy();
+
+    CHECK_FALSE(session->loggedIn());
+    CHECK(session->sessionLockId().empty());
+    CHECK_FALSE(session->env().get("Y").has_value());
+    CHECK(session->inputStream() == nullptr);
+    CHECK(session->outputStream() == nullptr);
+    CHECK(session->diagnosticStream() == nullptr);
 }

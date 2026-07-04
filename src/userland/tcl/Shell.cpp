@@ -392,7 +392,7 @@ namespace PickShell {
         tclCommands_["QUIT"] = [this](const Tokens &, std::ostream &out, bool &quit) {
             out << "Exiting shell\n";
             quit = true;
-            session_.resetForQuit();
+            session_.reset();
         };
         tclCommands_["HELP"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdHelpLookup(tokens, out); };
         tclCommands_["HELP-LIST"] = [this](const Tokens &tokens, std::ostream &out, bool &) {
@@ -2306,8 +2306,8 @@ namespace PickShell {
             out << "Not logged in.\n";
             return;
         }
-        session_.clearLoginSession();
-        session_.resetForQuit();
+        session_.detach();
+        session_.reset();
         sessionEndRequested_ = true;
         out << "Logged off.\n";
     }

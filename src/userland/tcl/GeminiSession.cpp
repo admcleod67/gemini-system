@@ -118,14 +118,44 @@ namespace PickShell {
         }
     }
 
-    void GeminiSession::resetForQuit() {
+    void GeminiSession::reset() {
         releaseSessionLocks();
         lastLoaded_.reset();
         suspended_ = false;
         resumePastBreakpointIp_.reset();
+        breakpoints_.clear();
+        trace_ = false;
         env_.clear();
         clearActiveList();
         runtime_.loadProgram({});
+    }
+
+    void GeminiSession::detach() {
+        releaseSessionLocks();
+        bindLockSession("");
+        loggedIn_ = false;
+        whoPort_ = 0;
+        sessionUsername_.clear();
+        sessionAccount_.clear();
+        userNo_ = "0";
+        defaultDataFile_.reset();
+        reportPageLength_ = 24;
+        clearActiveList();
+    }
+
+    void GeminiSession::destroy() {
+        if (loggedIn_) {
+            detach();
+        }
+        reset();
+        inputStream_ = nullptr;
+        outputStream_ = nullptr;
+        diagnosticStream_ = nullptr;
+        bindIoToShellAndRuntime();
+    }
+
+    std::unique_ptr<GeminiSession> GeminiSession::create() {
+        return std::make_unique<GeminiSession>();
     }
 
     void GeminiSession::setGeminiCatalogRoot(std::optional<std::filesystem::path> root) {
@@ -135,7 +165,7 @@ namespace PickShell {
     void GeminiSession::attach(const PickCore::UserSession &session) {
         geminiCatalogRoot_ = session.catalogRoot;
         setFileSystemRoot(session.pickRoot);
-        resetForQuit();
+        reset();
         setSessionIdentity(session.whoPort, session.username, session.accountName);
         loggedIn_ = true;
         userNo_ = session.userNo.empty() ? std::string{"0"} : session.userNo;
@@ -156,19 +186,6 @@ namespace PickShell {
     void GeminiSession::clearActiveList() {
         activeList_.clear();
         activeListSourceFile_.reset();
-    }
-
-    void GeminiSession::clearLoginSession() {
-        releaseSessionLocks();
-        bindLockSession("");
-        loggedIn_ = false;
-        whoPort_ = 0;
-        sessionUsername_.clear();
-        sessionAccount_.clear();
-        userNo_ = "0";
-        defaultDataFile_.reset();
-        reportPageLength_ = 24;
-        clearActiveList();
     }
 
     void GeminiSession::reloadMdDefaultDataFile() {
