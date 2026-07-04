@@ -77,6 +77,8 @@ TEST_CASE("GeminiServiceDaemon coldStart prints boot milestones") {
     CHECK(s.find("VOC ATTACHED") != std::string::npos);
     CHECK(s.find("CATALOG ATTACHED") != std::string::npos);
     CHECK(s.find("PORT MANAGER:") != std::string::npos);
+    CHECK(s.find("PORT MANAGER: READY\n") != std::string::npos);
+    CHECK(s.find("(stub)") == std::string::npos);
     CHECK(s.find("SYSTEM READY\n\n") != std::string::npos);
 }
 

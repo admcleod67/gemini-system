@@ -55,7 +55,7 @@ Optional file (same shape as before). If present and parses, the cold-start **`P
 
 ## Cold start (`PickCore::BootMonitor`)
 
-After `Runtime` and default roots are prepared, **`PickCore::BootMonitor::runColdStart`** prints a short milestone sequence (version line, init, memory line as **`(host n/a)`** until a real policy exists, filesystem / **`MD`** / catalogue probes, **`PORT MANAGER: (stub)`**, **`SYSTEM READY`**) **followed by one blank line**. Each milestone line reflects an actual check where possible; see [`src/core/boot/BootMonitor.cpp`](../src/core/boot/BootMonitor.cpp). [**Milestone 13**](milestones/13-service-daemon-architecture.md) Stage 3 replaces the PORT MANAGER stub with a live port allocator owned by the Gemini Service Daemon.
+After `Runtime` and default roots are prepared, **`PickCore::BootMonitor::runColdStart`** prints a short milestone sequence (version line, init, memory line as **`(host n/a)`** until a real policy exists, filesystem / **`MD`** / catalogue probes, **`PORT MANAGER: READY`** when the daemon supplies a port manager, **`SYSTEM READY`**) **followed by one blank line**. Each milestone line reflects an actual check where possible; see [`src/core/boot/BootMonitor.cpp`](../src/core/boot/BootMonitor.cpp).
 
 ## Interactive login (account-only, core boot stage)
 

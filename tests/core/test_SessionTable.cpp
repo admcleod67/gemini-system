@@ -59,7 +59,54 @@ TEST_CASE("SessionTable createSession wires shared lock table") {
 
     CHECK(a.session.hasSharedLockTable());
     CHECK(b.session.hasSharedLockTable());
-    CHECK(a.id != b.id);
+    CHECK(a.id == 1);
+    CHECK(b.id == 2);
+    CHECK(a.session.whoPort() == 1);
+    CHECK(b.session.whoPort() == 2);
+}
+
+TEST_CASE("SessionTable destroySession reuses freed port") {
+    PickCore::GeminiServiceDaemon daemon = PickCore::GeminiServiceDaemon::createEmbedded();
+    std::ostringstream boot;
+    daemon.coldStart(boot);
+
+    PickShell::SessionTable table(2);
+    const PickShell::SessionHandle first = table.createSession(daemon);
+    CHECK(first.id == 1);
+    table.destroySession(first.id);
+
+    const PickShell::SessionHandle second = table.createSession(daemon);
+    CHECK(second.id == 1);
+    CHECK(second.session.whoPort() == 1);
+}
+
+TEST_CASE("SessionTable attach uses daemon port for WHO identity") {
+    const auto root = uniqueTempDir();
+    const auto gem = root / "gemini";
+    const auto pickRoot = gem / "accounts" / "TST";
+    std::filesystem::create_directories(pickRoot / "MD");
+
+    PickCore::GeminiServiceDaemon daemon = PickCore::GeminiServiceDaemon::createEmbedded();
+    std::ostringstream boot;
+    daemon.coldStart(boot);
+
+    PickShell::SessionTable table(1);
+    const PickShell::SessionHandle handle = table.createSession(daemon);
+    PickCore::UserSession user;
+    user.catalogRoot = gem;
+    user.pickRoot = pickRoot;
+    user.accountName = "TST";
+    user.username = "USERA";
+    user.whoPort = 99;
+    handle.session.attach(user);
+
+    CHECK(handle.session.whoPort() == 1);
+    CHECK(handle.session.sessionLockId() == PickShell::GeminiSession::makeSessionLockId(1, "TST", "USERA"));
+
+    std::ostringstream out;
+    bool quit = false;
+    handle.session.shell().handleLine("WHO", out, quit);
+    CHECK(out.str() == "1 USERA TST\n");
 }
 
 TEST_CASE("SessionTable cross-session READU blocks peer READ") {

@@ -19,6 +19,7 @@ add_executable(
         test_Main.cpp
         core/test_BootMonitor.cpp
         core/test_GeminiDaemon.cpp
+        core/test_PortManager.cpp
         core/test_SessionTable.cpp
         core/test_FileSystem.cpp
         core/test_LoginService.cpp

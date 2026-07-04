@@ -10,14 +10,20 @@ namespace PickShell {
             throw std::runtime_error("session table full");
         }
 
-        const PickCore::SessionId id = nextId_++;
+        daemon_ = &daemon;
+        const std::optional<PickCore::SessionId> port = daemon.portManager().allocate();
+        if (!port.has_value()) {
+            throw std::runtime_error("session table full");
+        }
+
         std::unique_ptr<GeminiSession> session = GeminiSession::create();
         session->setSharedLockTable(daemon.lockTable());
         session->runtime().setLanguageRegistry(&daemon.languageRegistry());
+        session->setDaemonPort(static_cast<int>(*port));
 
         GeminiSession &ref = *session;
-        sessions_.emplace(id, std::move(session));
-        return SessionHandle{id, ref};
+        sessions_.emplace(*port, std::move(session));
+        return SessionHandle{*port, ref};
     }
 
     void SessionTable::destroySession(const PickCore::SessionId id) {
@@ -27,6 +33,9 @@ namespace PickShell {
         }
         it->second->destroy();
         sessions_.erase(it);
+        if (daemon_ != nullptr) {
+            daemon_->portManager().release(id);
+        }
     }
 
     GeminiSession *SessionTable::find(const PickCore::SessionId id) {

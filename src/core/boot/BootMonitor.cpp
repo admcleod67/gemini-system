@@ -3,6 +3,7 @@
 #include "GeminiCatalog.h"
 #include "LanguageModuleLoader.h"
 #include "LanguageRegistry.h"
+#include "PortManager.h"
 
 #include <pick_system/version.hpp>
 #include <Runtime.h>
@@ -101,7 +102,11 @@ namespace PickCore {
             Languages::LanguageRegistry::instance().freeze();
         }
 
-        out << "PORT MANAGER: (stub)\n";
+        if (ctx.portManager != nullptr) {
+            ctx.portManager->formatBootStatus(out);
+        } else {
+            out << "PORT MANAGER: (stub)\n";
+        }
         out << "SYSTEM READY\n\n";
     }
 } // namespace PickCore

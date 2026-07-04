@@ -74,6 +74,8 @@ add_library(gemini-core
         daemon/GeminiServiceDaemon.h
         daemon/SerialSessionRunner.cpp
         daemon/SerialSessionRunner.h
+        daemon/PortManager.cpp
+        daemon/PortManager.h
         languages/LanguageRegistry.cpp
         languages/LanguageRegistry.h
         languages/LanguageTypes.h

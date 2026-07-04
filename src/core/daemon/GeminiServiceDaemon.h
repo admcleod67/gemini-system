@@ -7,6 +7,7 @@
 #define PICK_SYSTEM_CORE_DAEMON_GEMINI_SERVICE_DAEMON_H
 
 #include "HostBootstrap.h"
+#include "PortManager.h"
 
 #include <Runtime.h>
 
@@ -35,6 +36,8 @@ namespace PickCore {
         [[nodiscard]] const Languages::LanguageRegistry &languageRegistry() const;
         [[nodiscard]] std::shared_ptr<Locking::LockTable> lockTable() const;
         [[nodiscard]] const DefaultHostPaths &hostPaths() const { return hostPaths_; }
+        [[nodiscard]] PortManager &portManager();
+        [[nodiscard]] const PortManager &portManager() const;
 
     private:
         GeminiServiceDaemon();
@@ -42,6 +45,7 @@ namespace PickCore {
         DefaultHostPaths hostPaths_;
         PickVM::Runtime bootstrapRuntime_;
         std::shared_ptr<Locking::LockTable> lockTable_;
+        PortManager portManager_;
         bool coldStarted_{false};
     };
 } // namespace PickCore

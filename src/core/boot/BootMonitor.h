@@ -9,6 +9,10 @@
 
 #include <iosfwd>
 
+namespace PickCore {
+    class PortManager;
+}
+
 namespace PickVM {
     class Runtime;
 }
@@ -17,6 +21,7 @@ namespace PickCore {
     struct BootContext {
         PickVM::Runtime *runtime{nullptr};
         DefaultHostPaths hostPaths;
+        PortManager *portManager{nullptr};
     };
 
     class BootMonitor {

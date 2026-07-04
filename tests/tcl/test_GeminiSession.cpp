@@ -171,6 +171,28 @@ TEST_CASE("GeminiSession attach then detach clears login identity") {
     CHECK(session.sessionAccount().empty());
 }
 
+TEST_CASE("GeminiSession daemon port survives attach and detach") {
+    const auto root = std::filesystem::temp_directory_path() / "pick-gemini-daemon-port-test";
+    std::filesystem::create_directories(root / "MD");
+
+    PickCore::UserSession user;
+    user.catalogRoot = root / "gemini";
+    user.pickRoot = root;
+    user.accountName = "TST";
+    user.username = "USERA";
+
+    PickShell::GeminiSession session;
+    session.setDaemonPort(5);
+    session.attach(user);
+    CHECK(session.whoPort() == 5);
+    CHECK(session.sessionLockId() == PickShell::GeminiSession::makeSessionLockId(5, "TST", "USERA"));
+
+    session.detach();
+    CHECK_FALSE(session.loggedIn());
+    CHECK(session.whoPort() == 5);
+    CHECK(session.sessionLockId().empty());
+}
+
 TEST_CASE("GeminiSession reset clears interpreter state but preserves login") {
     PickShell::GeminiSession session;
     REQUIRE(session.env().set("X", "1"));

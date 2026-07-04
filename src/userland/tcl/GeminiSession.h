@@ -110,6 +110,10 @@ namespace PickShell {
 
         void setSessionIdentity(int port, std::string username, std::string account);
 
+        /// Daemon-assigned Pick port at session create; survives LOGOFF until destroy.
+        void setDaemonPort(int port);
+        [[nodiscard]] bool hasDaemonPort() const { return daemonPortAssigned_; }
+
         void setSharedLockTable(std::shared_ptr<PickCore::Locking::LockTable> table);
 
         [[nodiscard]] bool hasSharedLockTable() const { return lockTable_ != nullptr; }
@@ -158,6 +162,7 @@ namespace PickShell {
         std::optional<std::filesystem::path> geminiCatalogRoot_;
         bool loggedIn_{false};
         int whoPort_{0};
+        bool daemonPortAssigned_{false};
         std::string sessionUsername_;
         std::string sessionAccount_;
         std::string userNo_{"0"};

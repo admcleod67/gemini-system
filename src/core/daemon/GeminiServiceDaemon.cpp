@@ -4,6 +4,7 @@
 #include "LanguageRegistry.h"
 #include "LockRegistry.h"
 #include "LockTable.h"
+#include "PortManager.h"
 
 #include <Runtime.h>
 
@@ -26,6 +27,7 @@ namespace PickCore {
         BootContext bootCtx;
         bootCtx.runtime = &bootstrapRuntime_;
         bootCtx.hostPaths = hostPaths_;
+        bootCtx.portManager = &portManager_;
         BootMonitor::runColdStart(out, bootCtx);
         coldStarted_ = true;
     }
@@ -40,5 +42,13 @@ namespace PickCore {
 
     std::shared_ptr<Locking::LockTable> GeminiServiceDaemon::lockTable() const {
         return lockTable_;
+    }
+
+    PortManager &GeminiServiceDaemon::portManager() {
+        return portManager_;
+    }
+
+    const PortManager &GeminiServiceDaemon::portManager() const {
+        return portManager_;
     }
 } // namespace PickCore

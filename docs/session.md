@@ -8,7 +8,7 @@ See [Milestone 12](milestones/12-session-model-foundation.md) for rationale and 
 
 | Scope | Owned by | Examples |
 |-------|----------|----------|
-| **Process** | `GeminiServiceDaemon` (M13; today ad hoc in [`Main.cpp`](../src/Main.cpp)) | [`BootMonitor`](../src/core/boot/BootMonitor.h), frozen [`LanguageRegistry`](../src/core/languages/LanguageRegistry.h), shared [`LockTable`](../src/core/locking/LockTable.h), port manager, session table |
+| **Process** | `GeminiServiceDaemon` (M13; embedded in [`Main.cpp`](../src/Main.cpp)) | [`BootMonitor`](../src/core/boot/BootMonitor.h), frozen [`LanguageRegistry`](../src/core/languages/LanguageRegistry.h), shared [`LockTable`](../src/core/locking/LockTable.h), [`PortManager`](../src/core/daemon/PortManager.h), session table |
 | **Session** | [`GeminiSession`](../src/userland/tcl/GeminiSession.h) | [`Runtime`](../src/core/vm/Runtime.h), [`Shell`](../src/userland/tcl/Shell.h), Tcl env, filesystem root, lock session id, I/O channels |
 
 Standalone **`gemini-system`** embeds the daemon with `maxSessions = 1` and hosts exactly one session. The same `GeminiSession` type lives in the M13 daemon session table. See [Milestone 13](milestones/13-service-daemon-architecture.md) §2.7 and the planned [daemon architecture](daemon.md) reference (Stage 6).
@@ -18,8 +18,8 @@ Standalone **`gemini-system`** embeds the daemon with `maxSessions = 1` and host
 | Method | Purpose |
 |--------|---------|
 | **`create()`** | Allocate session: one `Runtime`, embedded `Shell`, default I/O wiring |
-| **`attach(UserSession)`** | Bind authenticated account: pick root, identity, lock session id |
-| **`detach()`** | Remove account binding (login flags, lock id); does not clear VM program state |
+| **`attach(UserSession)`** | Bind authenticated account: pick root, identity, lock session id (Pick port from daemon when assigned at create) |
+| **`detach()`** | Remove account binding (login flags, lock id); does not clear VM program state; daemon-assigned Pick port survives until session destroy |
 | **`reset()`** | Clear interpreter/VM program state; same `Runtime` instance; releases locks |
 | **`destroy()`** | Explicit teardown: detach if logged in, reset, clear I/O stream pointers |
 
@@ -48,6 +48,7 @@ Tests inject `std::istringstream` / `std::ostringstream` via `setInputStream` / 
 - Exactly one `Runtime` per session for the session lifetime
 - Exactly one interpreter stack (`Shell` and nested BASIC/PROC/ASM modes)
 - At most one active account binding (`loggedIn()` or detached)
+- Daemon-assigned Pick port is set at session create ([`SessionTable`](../src/userland/tcl/SessionTable.cpp)); survives **`LOGOFF`** until **`destroy()`**
 - Session-scoped VM state isolated from other sessions (future M15 scheduling)
 - Interpreter errors remain interpreter-local; the session routes bytes, not error policy
 

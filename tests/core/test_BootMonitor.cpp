@@ -8,6 +8,7 @@
 #include <pickvm/core.hpp>
 
 #include "BootMonitor.h"
+#include "PortManager.h"
 
 static std::filesystem::path uniqueTempDir() {
     const auto tick = std::chrono::steady_clock::now().time_since_epoch().count();
@@ -43,6 +44,21 @@ TEST_CASE("BootMonitor cold start prints ordered milestones") {
     CHECK(s.find("SYSTEM READY\n\n") != std::string::npos);
     CHECK(s.find("INITIALIZING") < s.find("MD ATTACHED"));
     CHECK(s.find("MD ATTACHED") < s.find("SYSTEM READY"));
+}
+
+TEST_CASE("BootMonitor cold start prints live port manager when configured") {
+    PickVM::Runtime rt;
+    PickCore::PortManager portManager;
+
+    PickCore::BootContext ctx;
+    ctx.runtime = &rt;
+    ctx.portManager = &portManager;
+
+    std::ostringstream out;
+    PickCore::BootMonitor::runColdStart(out, ctx);
+    const std::string s = out.str();
+    CHECK(s.find("PORT MANAGER: READY\n") != std::string::npos);
+    CHECK(s.find("(stub)") == std::string::npos);
 }
 
 TEST_CASE("BootMonitor cold start reports missing and malformed catalogue diagnostics") {

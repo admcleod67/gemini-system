@@ -134,7 +134,9 @@ namespace PickShell {
         releaseSessionLocks();
         bindLockSession("");
         loggedIn_ = false;
-        whoPort_ = 0;
+        if (!daemonPortAssigned_) {
+            whoPort_ = 0;
+        }
         sessionUsername_.clear();
         sessionAccount_.clear();
         userNo_ = "0";
@@ -166,10 +168,16 @@ namespace PickShell {
         geminiCatalogRoot_ = session.catalogRoot;
         setFileSystemRoot(session.pickRoot);
         reset();
-        setSessionIdentity(session.whoPort, session.username, session.accountName);
+        const int port = daemonPortAssigned_ ? whoPort_ : session.whoPort;
+        setSessionIdentity(port, session.username, session.accountName);
         loggedIn_ = true;
         userNo_ = session.userNo.empty() ? std::string{"0"} : session.userNo;
-        bindLockSession(makeSessionLockId(session.whoPort, session.accountName, session.username));
+        bindLockSession(makeSessionLockId(port, session.accountName, session.username));
+    }
+
+    void GeminiSession::setDaemonPort(const int port) {
+        whoPort_ = port;
+        daemonPortAssigned_ = true;
     }
 
     void GeminiSession::setSessionIdentity(const int port, std::string username, std::string account) {

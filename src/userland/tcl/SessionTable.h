@@ -33,8 +33,8 @@ namespace PickShell {
         [[nodiscard]] std::size_t maxSessions() const { return maxSessions_; }
 
     private:
+        PickCore::GeminiServiceDaemon *daemon_{nullptr};
         std::size_t maxSessions_;
-        PickCore::SessionId nextId_{1};
         std::unordered_map<PickCore::SessionId, std::unique_ptr<GeminiSession>> sessions_;
     };
 } // namespace PickShell

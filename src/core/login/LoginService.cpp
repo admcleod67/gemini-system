@@ -242,7 +242,6 @@ namespace PickCore {
         s.pickRoot = pickRoot;
         s.username = acct->name;
         s.accountName = acct->name;
-        s.whoPort = 0;
         s.userNo = "0";
         return s;
     }
