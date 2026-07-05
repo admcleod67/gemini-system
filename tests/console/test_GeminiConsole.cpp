@@ -146,6 +146,7 @@ TEST_CASE("DaemonIpcClient re-attaches to detached session port") {
     firstClient.connect();
     firstClient.handshake();
     const PickCore::SessionId port = firstClient.attachSession(0);
+    (void) runIoPumpWithInput(firstClient, "QUIT\n");
     firstClient.detachSession();
     firstClient.disconnect();
 
@@ -153,6 +154,8 @@ TEST_CASE("DaemonIpcClient re-attaches to detached session port") {
     secondClient.connect();
     secondClient.handshake();
     CHECK(secondClient.attachSession(port) == port);
+    (void) runIoPumpWithInput(secondClient, "QUIT\n");
+    secondClient.detachSession();
     secondClient.disconnect();
 
     runner.requestShutdown();

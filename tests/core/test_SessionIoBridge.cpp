@@ -322,6 +322,7 @@ TEST_CASE("GeminiDaemonRunner detach clears attach and rejects further SessionIn
     sendHandshake(clientFd);
     recvHandshakeAck(clientFd);
     attachNewSession(clientFd);
+    (void) drainSessionOutput(clientFd);
 
     PickCore::DaemonIpcFrame detach{};
     detach.type = PickCore::DaemonIpcMessageType::DetachSession;

@@ -196,17 +196,23 @@ namespace PickCore {
         detach.type = DaemonIpcMessageType::DetachSession;
         sendFrame(detach);
 
-        const DaemonIpcFrame response = recvFrameBlocking();
-        if (response.type == DaemonIpcMessageType::Error) {
-            const std::optional<DaemonIpcErrorPayload> error = decodeErrorPayload(response.payload);
-            const std::string message = error.has_value() ? error->message : "detach session failed";
-            throw DaemonIpcClientError(message);
-        }
-        if (response.type != DaemonIpcMessageType::DetachSessionAck) {
+        for (;;) {
+            const DaemonIpcFrame response = recvFrameBlocking();
+            if (response.type == DaemonIpcMessageType::Error) {
+                const std::optional<DaemonIpcErrorPayload> error = decodeErrorPayload(response.payload);
+                const std::string message = error.has_value() ? error->message : "detach session failed";
+                throw DaemonIpcClientError(message);
+            }
+            if (response.type == DaemonIpcMessageType::DetachSessionAck) {
+                attachedPort_.reset();
+                return;
+            }
+            if (response.type == DaemonIpcMessageType::SessionOutput ||
+                response.type == DaemonIpcMessageType::SessionDiagnostic) {
+                continue;
+            }
             throw DaemonIpcClientError("unexpected response to detach session");
         }
-
-        attachedPort_.reset();
     }
 
     void DaemonIpcClient::disconnect() {
