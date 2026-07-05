@@ -263,6 +263,7 @@ TEST_CASE("DaemonIpcClient re-attaches to logged-in session without re-login") {
     CHECK(session->loggedIn());
     CHECK(session->sessionAccount() == "TST");
 
+    secondClient.detachSession();
     secondClient.disconnect();
     runner.requestShutdown();
     runnerThread.join();
