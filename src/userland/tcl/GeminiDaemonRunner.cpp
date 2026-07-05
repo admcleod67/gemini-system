@@ -180,7 +180,9 @@ namespace PickShell {
     void GeminiDaemonRunner::detachSession(const PickCore::SessionId port) {
         const auto channelIt = boundChannels_.find(port);
         if (channelIt != boundChannels_.end()) {
-            host_.clearIpcChannelScheduling(*channelIt->second);
+            PickCore::IpcSessionChannel &channel = *channelIt->second;
+            host_.clearIpcChannelScheduling(channel);
+            channel.close();
             boundChannels_.erase(channelIt);
         }
         joinSessionWorker(port);
