@@ -125,6 +125,86 @@ TEST_CASE("IpcSessionChannel flushPendingOutput sends SessionOutput frames") {
 #endif
 }
 
+TEST_CASE("IpcSessionChannel flushPendingOutput survives write EAGAIN without corrupting payload") {
+#ifndef _WIN32
+    int fds[2] = {-1, -1};
+    REQUIRE(::pipe(fds) == 0);
+
+    const int readFd = fds[0];
+    const int writeFd = fds[1];
+    const int writeFlags = ::fcntl(writeFd, F_GETFL, 0);
+    const int readFlags = ::fcntl(readFd, F_GETFL, 0);
+    REQUIRE(writeFlags >= 0);
+    REQUIRE(readFlags >= 0);
+    REQUIRE(::fcntl(writeFd, F_SETFL, writeFlags | O_NONBLOCK) == 0);
+    REQUIRE(::fcntl(readFd, F_SETFL, readFlags | O_NONBLOCK) == 0);
+
+    std::string expected;
+    expected.reserve(160 * 1024);
+    for (int i = 0; i <= 20000; ++i) {
+        expected += std::to_string(i);
+        expected += '\n';
+    }
+
+    PickCore::IpcSessionChannel channel;
+    channel.output().write(expected.data(), static_cast<std::streamsize>(expected.size()));
+    channel.output().flush();
+
+    std::vector<std::uint8_t> readBuffer;
+    std::string received;
+    auto collectFrames = [&] {
+        for (;;) {
+            const PickCore::DaemonIpcTryReadResult result = PickCore::tryReadDaemonIpcFrame(readFd, readBuffer);
+            if (result.status == PickCore::DaemonIpcTryReadStatus::FrameReady) {
+                REQUIRE(result.frame.has_value());
+                REQUIRE(result.frame->type == PickCore::DaemonIpcMessageType::SessionOutput);
+                const std::optional<PickCore::DaemonIpcSessionDataPayload> payload =
+                    PickCore::decodeSessionDataPayload(result.frame->payload);
+                REQUIRE(payload.has_value());
+                received.append(reinterpret_cast<const char *>(payload->data.data()), payload->data.size());
+                continue;
+            }
+            if (result.status == PickCore::DaemonIpcTryReadStatus::Incomplete) {
+                return;
+            }
+            if (result.status == PickCore::DaemonIpcTryReadStatus::ConnectionClosed) {
+                REQUIRE(readBuffer.empty());
+                return;
+            }
+            FAIL("unexpected IPC read status while draining session output");
+        }
+    };
+
+    int flushAttempts = 0;
+    while (channel.hasPendingOutput()) {
+        channel.flushPendingOutput(writeFd);
+        for (;;) {
+            const std::size_t before = received.size();
+            collectFrames();
+            if (received.size() == before) {
+                break;
+            }
+        }
+        ++flushAttempts;
+        REQUIRE(flushAttempts < 1000);
+    }
+
+    ::close(writeFd);
+    for (int drainAttempts = 0; drainAttempts < 10000; ++drainAttempts) {
+        const std::size_t before = received.size();
+        collectFrames();
+        if (received.size() == before && readBuffer.empty()) {
+            break;
+        }
+    }
+
+    CHECK(received == expected);
+    CHECK(received.find("GEMI") == std::string::npos);
+
+    ::close(readFd);
+#endif
+}
+
 TEST_CASE("IpcSessionChannel close unblocks blocked input reader with EOF") {
     PickCore::IpcSessionChannel channel;
     std::atomic<bool> finished{false};

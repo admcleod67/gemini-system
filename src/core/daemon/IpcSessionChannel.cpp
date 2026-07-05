@@ -124,68 +124,111 @@ namespace PickCore {
 
     bool IpcSessionChannel::hasPendingOutput() const {
         const std::lock_guard lock(mutex_);
-        return hasPendingOutput_;
+        return !outputQueue_.empty() || !diagnosticQueue_.empty() || !pendingOutputWire_.empty() ||
+               !pendingDiagnosticWire_.empty();
     }
 
     void IpcSessionChannel::flushPendingOutput(const int clientFd) {
         for (;;) {
             std::vector<std::uint8_t> outputChunk;
-            std::vector<std::uint8_t> diagnosticChunk;
+            std::vector<std::uint8_t> pendingOutputWire;
+            std::size_t pendingOutputChunkSize = 0;
             {
                 const std::lock_guard lock(mutex_);
-                if (outputQueue_.empty() && diagnosticQueue_.empty()) {
+                if (outputQueue_.empty() && pendingOutputWire_.empty() && diagnosticQueue_.empty() &&
+                    pendingDiagnosticWire_.empty()) {
                     hasPendingOutput_ = false;
                     return;
                 }
                 outputChunk.swap(outputQueue_);
+                pendingOutputWire.swap(pendingOutputWire_);
+                pendingOutputChunkSize = pendingOutputChunkSize_;
+                pendingOutputChunkSize_ = 0;
+            }
+
+            if (!outputChunk.empty() || !pendingOutputWire.empty()) {
+                if (!flushQueue(clientFd, DaemonIpcMessageType::SessionOutput, outputChunk, pendingOutputWire,
+                                pendingOutputChunkSize)) {
+                    const std::lock_guard lock(mutex_);
+                    outputQueue_.insert(outputQueue_.begin(), outputChunk.begin(), outputChunk.end());
+                    pendingOutputWire_.swap(pendingOutputWire);
+                    pendingOutputChunkSize_ = pendingOutputChunkSize;
+                    hasPendingOutput_ = true;
+                    return;
+                }
+            }
+
+            std::vector<std::uint8_t> diagnosticChunk;
+            std::vector<std::uint8_t> pendingDiagnosticWire;
+            std::size_t pendingDiagnosticChunkSize = 0;
+            {
+                const std::lock_guard lock(mutex_);
                 diagnosticChunk.swap(diagnosticQueue_);
+                pendingDiagnosticWire.swap(pendingDiagnosticWire_);
+                pendingDiagnosticChunkSize = pendingDiagnosticChunkSize_;
+                pendingDiagnosticChunkSize_ = 0;
             }
 
-            if (!outputChunk.empty() && !flushQueue(clientFd, DaemonIpcMessageType::SessionOutput, outputChunk)) {
-                const std::lock_guard lock(mutex_);
-                outputQueue_.insert(outputQueue_.begin(), outputChunk.begin(), outputChunk.end());
-                hasPendingOutput_ = true;
-                return;
-            }
-
-            if (!diagnosticChunk.empty() &&
-                !flushQueue(clientFd, DaemonIpcMessageType::SessionDiagnostic, diagnosticChunk)) {
-                const std::lock_guard lock(mutex_);
-                diagnosticQueue_.insert(diagnosticQueue_.begin(), diagnosticChunk.begin(), diagnosticChunk.end());
-                hasPendingOutput_ = true;
-                return;
+            if (!diagnosticChunk.empty() || !pendingDiagnosticWire.empty()) {
+                if (!flushQueue(clientFd, DaemonIpcMessageType::SessionDiagnostic, diagnosticChunk,
+                                pendingDiagnosticWire, pendingDiagnosticChunkSize)) {
+                    const std::lock_guard lock(mutex_);
+                    diagnosticQueue_.insert(diagnosticQueue_.begin(), diagnosticChunk.begin(), diagnosticChunk.end());
+                    pendingDiagnosticWire_.swap(pendingDiagnosticWire);
+                    pendingDiagnosticChunkSize_ = pendingDiagnosticChunkSize;
+                    hasPendingOutput_ = true;
+                    return;
+                }
             }
         }
     }
 
-    bool IpcSessionChannel::flushQueue(const int clientFd,
-                                       const DaemonIpcMessageType type,
-                                       std::vector<std::uint8_t> &queue) {
-        while (!queue.empty()) {
-            const std::size_t chunkSize = std::min(queue.size(), kDaemonIpcMaxSessionDataSize);
-            DaemonIpcSessionDataPayload payload{};
-            payload.data.assign(queue.begin(), queue.begin() + static_cast<std::ptrdiff_t>(chunkSize));
-
-            DaemonIpcFrame frame{};
-            frame.type = type;
-            frame.payload = encodeSessionDataPayload(payload);
-            const std::vector<std::uint8_t> bytes = encodeDaemonIpcFrame(frame);
-
-            std::size_t offset = 0;
-            while (offset < bytes.size()) {
-                const auto written = ::write(clientFd, bytes.data() + offset, bytes.size() - offset);
-                if (written < 0) {
-                    if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                        queue.erase(queue.begin(), queue.begin() + static_cast<std::ptrdiff_t>(chunkSize));
-                        queue.insert(queue.begin(), bytes.begin() + static_cast<std::ptrdiff_t>(offset), bytes.end());
-                        return false;
-                    }
+    bool IpcSessionChannel::flushWireBuffer(const int clientFd, std::vector<std::uint8_t> &wire) {
+        while (!wire.empty()) {
+            const auto written = ::write(clientFd, wire.data(), wire.size());
+            if (written < 0) {
+                if (errno == EAGAIN || errno == EWOULDBLOCK) {
                     return false;
                 }
-                offset += static_cast<std::size_t>(written);
+                return false;
+            }
+            wire.erase(wire.begin(), wire.begin() + static_cast<std::ptrdiff_t>(written));
+        }
+        return true;
+    }
+
+    bool IpcSessionChannel::flushQueue(const int clientFd,
+                                       const DaemonIpcMessageType type,
+                                       std::vector<std::uint8_t> &queue,
+                                       std::vector<std::uint8_t> &pendingWire,
+                                       std::size_t &pendingChunkSize) {
+        if (!flushWireBuffer(clientFd, pendingWire)) {
+            return false;
+        }
+        if (pendingWire.empty() && pendingChunkSize > 0) {
+            queue.erase(queue.begin(), queue.begin() + static_cast<std::ptrdiff_t>(pendingChunkSize));
+            pendingChunkSize = 0;
+        }
+
+        while (!queue.empty()) {
+            if (pendingWire.empty()) {
+                pendingChunkSize = std::min(queue.size(), kDaemonIpcMaxSessionDataSize);
+                DaemonIpcSessionDataPayload payload{};
+                payload.data.assign(queue.begin(), queue.begin() + static_cast<std::ptrdiff_t>(pendingChunkSize));
+
+                DaemonIpcFrame frame{};
+                frame.type = type;
+                frame.payload = encodeSessionDataPayload(payload);
+                pendingWire = encodeDaemonIpcFrame(frame);
             }
 
-            queue.erase(queue.begin(), queue.begin() + static_cast<std::ptrdiff_t>(chunkSize));
+            if (!flushWireBuffer(clientFd, pendingWire)) {
+                return false;
+            }
+            if (pendingWire.empty()) {
+                queue.erase(queue.begin(), queue.begin() + static_cast<std::ptrdiff_t>(pendingChunkSize));
+                pendingChunkSize = 0;
+            }
         }
         return true;
     }

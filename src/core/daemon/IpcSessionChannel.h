@@ -61,13 +61,22 @@ namespace PickCore {
         void writeOutputChar(int ch, bool diagnostic);
         void writeOutputBytes(const char *data, std::streamsize count, bool diagnostic);
         void markPendingOutput();
-        bool flushQueue(int clientFd, DaemonIpcMessageType type, std::vector<std::uint8_t> &queue);
+        bool flushWireBuffer(int clientFd, std::vector<std::uint8_t> &wire);
+        bool flushQueue(int clientFd,
+                        DaemonIpcMessageType type,
+                        std::vector<std::uint8_t> &queue,
+                        std::vector<std::uint8_t> &pendingWire,
+                        std::size_t &pendingChunkSize);
 
         mutable std::mutex mutex_;
         std::condition_variable inputAvailable_;
         std::deque<std::uint8_t> inputQueue_;
         std::vector<std::uint8_t> outputQueue_;
         std::vector<std::uint8_t> diagnosticQueue_;
+        std::vector<std::uint8_t> pendingOutputWire_;
+        std::vector<std::uint8_t> pendingDiagnosticWire_;
+        std::size_t pendingOutputChunkSize_{0};
+        std::size_t pendingDiagnosticChunkSize_{0};
         bool closed_{false};
         bool hasPendingOutput_{false};
         std::optional<SessionInputScheduling> scheduling_;
