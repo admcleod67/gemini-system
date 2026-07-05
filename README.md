@@ -21,7 +21,7 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
-Artifacts include **`gemini-system`** (embedded host with boot and Tcl REPL), **`gemini-daemon`** (long-running service host with IPC), and **`pick-tests`** (unit tests).
+Artifacts include **`gemini-system`** (embedded host with boot and Tcl REPL), **`gemini-daemon`** (long-running service host with IPC), **`gemini-console`** (daemon-attached terminal client), and **`pick-tests`** (unit tests).
 
 ## Documentation
 

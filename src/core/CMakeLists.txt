@@ -78,6 +78,10 @@ add_library(gemini-core
         daemon/DaemonIpcProtocol.h
         daemon/DaemonIpcServer.cpp
         daemon/DaemonIpcServer.h
+        daemon/DaemonIpcClient.cpp
+        daemon/DaemonIpcClient.h
+        daemon/ConsoleConfig.cpp
+        daemon/ConsoleConfig.h
         daemon/IpcSessionChannel.cpp
         daemon/IpcSessionChannel.h
         daemon/SerialSessionRunner.cpp

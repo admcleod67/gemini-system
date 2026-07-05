@@ -174,6 +174,27 @@ Those are [Milestone 14](milestones/14-multi-session-console-support.md). M13 `R
 
 Login and REPL orchestration over the bridge land in M14 Stage 5–6; Stage 3 wires transport only.
 
+### gemini-console skeleton (M14 Stage 4)
+
+[`gemini-console`](../src/console/Main.cpp) is a thin IPC client that connects to a running daemon, handshakes, attaches to a session, and pumps terminal bytes over the session plane until stdin EOF or interrupt. Implementation lives in [`DaemonIpcClient`](../src/core/daemon/DaemonIpcClient.h) (connect, attach/detach, poll-based I/O pump) and [`ConsoleConfig`](../src/core/daemon/ConsoleConfig.h) (CLI parsing).
+
+```bash
+gemini-console [--socket PATH] [--port N]
+```
+
+| Flag / env | Default | Purpose |
+|------------|---------|---------|
+| `--socket PATH` | `GEMINI_DAEMON_SOCKET` or [`defaultDaemonSocketPath()`](../src/core/daemon/DaemonConfig.cpp) | Daemon Unix socket |
+| `--port N` | omitted → create new session | Attach to existing detached session port |
+
+**Behaviour:**
+
+- Handshake, then **`AttachSession`** (`requestedPort = 0` creates; non-zero re-attaches).
+- **`runIoPump`** reads stdin (or injected streams in tests) as **`SessionInput`**; writes **`SessionOutput`** / **`SessionDiagnostic`** to stdout/stderr.
+- After stdin EOF, the client drains pending daemon output briefly before exit.
+- **`DetachSession`** on clean shutdown (including SIGINT/SIGTERM); connection close also unbinds on the daemon side.
+- Catalogue login and REPL on the daemon side land in M14 Stage 5–6; Stage 4 is transport only.
+
 ### Message types (M14 session plane)
 
 Wire types and payload layouts are defined in [`DaemonIpcProtocol.h`](../src/core/daemon/DaemonIpcProtocol.h). Attach, detach, and session I/O are handled server-side in [`DaemonIpcServer`](../src/core/daemon/DaemonIpcServer.cpp); the wire spec is authoritative in the header.

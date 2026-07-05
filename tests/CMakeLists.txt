@@ -25,6 +25,7 @@ add_executable(
         core/test_DaemonIpc.cpp
         core/test_DaemonIpcSession.cpp
         core/test_SessionIoBridge.cpp
+        console/test_GeminiConsole.cpp
         core/test_PortManager.cpp
         core/test_SessionTable.cpp
         core/test_FileSystem.cpp
@@ -61,7 +62,7 @@ add_executable(
         proc/test_ProcShell.cpp
         proc/test_ProcLocking.cpp
 )
-target_include_directories(pick-tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(pick-tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/core)
 target_link_libraries(pick-tests PRIVATE gemini-tcl doctest_headers)
 add_dependencies(pick-tests gemini-module-stub gemini-module-basic gemini-module-pascal gemini-module-comal
         gemini-module-cobol)

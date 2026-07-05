@@ -36,3 +36,9 @@ target_compile_definitions(
 )
 
 install(TARGETS gemini-daemon RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+add_executable(gemini-console console/Main.cpp)
+target_link_libraries(gemini-console PRIVATE gemini-core)
+pick_system_enable_warnings(gemini-console)
+
+install(TARGETS gemini-console RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
