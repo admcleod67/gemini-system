@@ -18,7 +18,7 @@ namespace {
                               PickCore::IpcSessionChannel &channel) {
         channel.setSessionScheduling(PickCore::SessionInputScheduling{
             [&runner, id] { runner.yieldWaitingForInput(id); },
-            [&runner, id] { runner.acquire(id); },
+            [&runner, id] { runner.acquireAfterInputWake(id); },
             [&runner, id] { runner.resume(id); },
         });
     }
@@ -49,7 +49,7 @@ TEST_CASE("Schedulable IpcSessionChannel blocked read releases execution token")
         while (runner.state(1) != PickCore::SessionRunState::WaitingForInput) {
             std::this_thread::yield();
         }
-        CHECK_FALSE(runner.activeSession().has_value());
+        CHECK(runner.activeSession() != std::optional<PickCore::SessionId>{1});
 
         runner.acquire(2);
         sessionTwoAcquired = true;

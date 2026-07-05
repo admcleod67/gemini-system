@@ -271,7 +271,7 @@ Implementation is sequenced into vertical stages. Each stage ships a test-locked
 
 - **Stage 5 — BASIC / VM input yield**: [`Runtime`](../../src/core/vm/Runtime.cpp) `INPUT` / `INPUT_STR` (and int input) yield through session streams; PROC/Tcl paths that block on session input covered as needed. **Exit criterion:** integration or unit test—session A blocked in BASIC **`INPUT`**, session B executes Tcl **`WHO`**. *Status: implemented.*
 
-- **Stage 6 — Fairness policy + debugger yield (stretch)**: round-robin runnable queue; optional assembler **`STEP`** / debug wait yield; starvation regression test. **Exit criterion:** three-session round-robin smoke under synthetic input; debugger yield documented or explicitly deferred with stub. *Status: planned.*
+- **Stage 6 — Fairness policy + debugger yield (stretch)**: round-robin runnable queue; optional assembler **`STEP`** / debug wait yield; starvation regression test. **Exit criterion:** three-session round-robin smoke under synthetic input; debugger yield documented or explicitly deferred with stub. *Status: implemented.* Ships round-robin election in [`CooperativeSessionRunner`](../../src/core/daemon/CooperativeSessionRunner.cpp), three-session unit/integration tests, and debugger **wait** yield via existing IPC transport (ASM> through `readPromptedInputLine`; BASIC `*` through same helper after polish). ASM `STEP`/`RUN`/`CONT` CPU stepping remains out of scope.
 
 - **Stage 7 — Docs + closes M15**: update [`docs/daemon.md`](../daemon.md), [`docs/session.md`](../session.md), [`docs/console.md`](../console.md); milestone index; audit §9 completion criteria; full test suite + both smoke checklists. **Closes Milestone 15.** *Status: planned.*
 

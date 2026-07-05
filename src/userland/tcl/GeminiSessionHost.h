@@ -23,9 +23,11 @@ namespace PickShell {
         void runExclusive(PickCore::SessionId id, const std::function<void()> &fn);
 
         void acquire(PickCore::SessionId id);
+        void acquireAfterInputWake(PickCore::SessionId id);
         void release(PickCore::SessionId id);
         void yieldWaitingForInput(PickCore::SessionId id);
         void resume(PickCore::SessionId id);
+        void retireSession(PickCore::SessionId id);
         [[nodiscard]] PickCore::SessionRunState sessionRunState(PickCore::SessionId id) const;
 
         void bindIpcChannelScheduling(PickCore::SessionId id, PickCore::IpcSessionChannel &channel);

@@ -60,6 +60,12 @@ namespace {
         return config;
     }
 
+    PickCore::DaemonConfig makeCatalogDaemonConfigThreeSession() {
+        PickCore::DaemonConfig config = makeCatalogDaemonConfig();
+        config.maxSessions = 3;
+        return config;
+    }
+
     void seedVocAndBp(const std::filesystem::path &fsRoot) {
         PickFS::FileSystem fs(fsRoot);
         fs.createFile("VOC");
@@ -813,6 +819,153 @@ TEST_CASE("DaemonIpcClient LOGOFF while attached returns to login prompt") {
     CHECK_FALSE(session->loggedIn());
 
     client.disconnect();
+    runner.requestShutdown();
+    runnerThread.join();
+}
+
+TEST_CASE("DaemonIpcClient three consoles display TCL prompt concurrently") {
+    const PickCore::DaemonConfig config = makeCatalogDaemonConfigThreeSession();
+    std::filesystem::create_directories(config.socketPath.parent_path());
+
+    PickCore::GeminiServiceDaemon daemon = PickCore::GeminiServiceDaemon::create(config);
+    PickShell::GeminiSessionHost host(daemon, config.maxSessions);
+    PickShell::GeminiDaemonRunner runner(daemon, host, config);
+
+    std::thread runnerThread([&] {
+        std::ostringstream boot;
+        CHECK(runner.run(boot) == 0);
+    });
+
+    REQUIRE(waitForSocket(config.socketPath, std::chrono::milliseconds(2000)));
+
+    const int clientFdA = connectUnixSocket(config.socketPath);
+    REQUIRE(clientFdA >= 0);
+    sendHandshake(clientFdA);
+    recvHandshakeAck(clientFdA);
+    const PickCore::SessionId portA = attachNewSession(clientFdA);
+
+    const int clientFdB = connectUnixSocket(config.socketPath);
+    REQUIRE(clientFdB >= 0);
+    sendHandshake(clientFdB);
+    recvHandshakeAck(clientFdB);
+    const PickCore::SessionId portB = attachNewSession(clientFdB);
+
+    const int clientFdC = connectUnixSocket(config.socketPath);
+    REQUIRE(clientFdC >= 0);
+    sendHandshake(clientFdC);
+    recvHandshakeAck(clientFdC);
+    const PickCore::SessionId portC = attachNewSession(clientFdC);
+    REQUIRE(portA != portB);
+    REQUIRE(portA != portC);
+    REQUIRE(portB != portC);
+
+    std::string outputA;
+    std::string outputB;
+    std::string outputC;
+    sendSessionInputString(clientFdA, "TST\n");
+    sendSessionInputString(clientFdB, "TST\n");
+    sendSessionInputString(clientFdC, "TST\n");
+    REQUIRE(waitForSessionOutputContaining(clientFdA, "TCL> ", outputA, std::chrono::milliseconds(2000)));
+    REQUIRE(waitForSessionOutputContaining(clientFdB, "TCL> ", outputB, std::chrono::milliseconds(2000)));
+    REQUIRE(waitForSessionOutputContaining(clientFdC, "TCL> ", outputC, std::chrono::milliseconds(2000)));
+    REQUIRE(waitForLoggedIn(host, portA, std::chrono::milliseconds(2000)));
+    REQUIRE(waitForLoggedIn(host, portB, std::chrono::milliseconds(2000)));
+    REQUIRE(waitForLoggedIn(host, portC, std::chrono::milliseconds(2000)));
+    CHECK(host.sessionRunState(portA) == PickCore::SessionRunState::WaitingForInput);
+    CHECK(host.sessionRunState(portB) == PickCore::SessionRunState::WaitingForInput);
+    CHECK(host.sessionRunState(portC) == PickCore::SessionRunState::WaitingForInput);
+
+    detachAndClose(clientFdA);
+    detachAndClose(clientFdB);
+    detachAndClose(clientFdC);
+    runner.requestShutdown();
+    runnerThread.join();
+}
+
+TEST_CASE("DaemonIpcClient three consoles receive distinct WHO ports") {
+    const PickCore::DaemonConfig config = makeCatalogDaemonConfigThreeSession();
+    std::filesystem::create_directories(config.socketPath.parent_path());
+
+    PickCore::GeminiServiceDaemon daemon = PickCore::GeminiServiceDaemon::create(config);
+    PickShell::GeminiSessionHost host(daemon, config.maxSessions);
+    PickShell::GeminiDaemonRunner runner(daemon, host, config);
+
+    std::thread runnerThread([&] {
+        std::ostringstream boot;
+        CHECK(runner.run(boot) == 0);
+    });
+
+    REQUIRE(waitForSocket(config.socketPath, std::chrono::milliseconds(2000)));
+
+    const int clientFdA = connectUnixSocket(config.socketPath);
+    REQUIRE(clientFdA >= 0);
+    sendHandshake(clientFdA);
+    recvHandshakeAck(clientFdA);
+    const PickCore::SessionId portA = attachNewSession(clientFdA);
+
+    const int clientFdB = connectUnixSocket(config.socketPath);
+    REQUIRE(clientFdB >= 0);
+    sendHandshake(clientFdB);
+    recvHandshakeAck(clientFdB);
+    const PickCore::SessionId portB = attachNewSession(clientFdB);
+
+    const int clientFdC = connectUnixSocket(config.socketPath);
+    REQUIRE(clientFdC >= 0);
+    sendHandshake(clientFdC);
+    recvHandshakeAck(clientFdC);
+    const PickCore::SessionId portC = attachNewSession(clientFdC);
+    REQUIRE(portA != portB);
+    REQUIRE(portA != portC);
+    REQUIRE(portB != portC);
+
+    std::string outputA;
+    std::string outputB;
+    std::string outputC;
+    sendSessionInputString(clientFdA, "TST\n");
+    sendSessionInputString(clientFdB, "TST\n");
+    sendSessionInputString(clientFdC, "TST\n");
+    REQUIRE(waitForSessionOutputContaining(clientFdA, "TCL> ", outputA, std::chrono::milliseconds(2000)));
+    REQUIRE(waitForSessionOutputContaining(clientFdB, "TCL> ", outputB, std::chrono::milliseconds(2000)));
+    REQUIRE(waitForSessionOutputContaining(clientFdC, "TCL> ", outputC, std::chrono::milliseconds(2000)));
+    REQUIRE(waitForLoggedIn(host, portA, std::chrono::milliseconds(2000)));
+    REQUIRE(waitForLoggedIn(host, portB, std::chrono::milliseconds(2000)));
+    REQUIRE(waitForLoggedIn(host, portC, std::chrono::milliseconds(2000)));
+
+    PickShell::GeminiSession *sessionA = host.sessions().find(portA);
+    PickShell::GeminiSession *sessionB = host.sessions().find(portB);
+    PickShell::GeminiSession *sessionC = host.sessions().find(portC);
+    REQUIRE(sessionA != nullptr);
+    REQUIRE(sessionB != nullptr);
+    REQUIRE(sessionC != nullptr);
+
+    const std::string whoLineA = std::to_string(sessionA->whoPort()) + " TST TST\n";
+    const std::string whoLineB = std::to_string(sessionB->whoPort()) + " TST TST\n";
+    const std::string whoLineC = std::to_string(sessionC->whoPort()) + " TST TST\n";
+    CHECK(sessionA->whoPort() != sessionB->whoPort());
+    CHECK(sessionA->whoPort() != sessionC->whoPort());
+    CHECK(sessionB->whoPort() != sessionC->whoPort());
+
+    sendSessionInputString(clientFdA, "WHO\n");
+    REQUIRE(waitForSessionOutputContaining(clientFdA, whoLineA, outputA, std::chrono::milliseconds(2000)));
+    REQUIRE(waitForSessionRunState(host, portA, PickCore::SessionRunState::WaitingForInput,
+                                   std::chrono::milliseconds(2000)));
+
+    sendSessionInputString(clientFdB, "WHO\n");
+    REQUIRE(waitForSessionOutputContaining(clientFdB, whoLineB, outputB, std::chrono::milliseconds(2000)));
+    REQUIRE(waitForSessionRunState(host, portB, PickCore::SessionRunState::WaitingForInput,
+                                   std::chrono::milliseconds(2000)));
+
+    sendSessionInputString(clientFdC, "WHO\n");
+    REQUIRE(waitForSessionOutputContaining(clientFdC, whoLineC, outputC, std::chrono::milliseconds(2000)));
+    REQUIRE(waitForSessionRunState(host, portC, PickCore::SessionRunState::WaitingForInput,
+                                   std::chrono::milliseconds(2000)));
+
+    sendSessionInputString(clientFdA, "QUIT\n");
+    sendSessionInputString(clientFdB, "QUIT\n");
+    sendSessionInputString(clientFdC, "QUIT\n");
+    detachAndClose(clientFdA);
+    detachAndClose(clientFdB);
+    detachAndClose(clientFdC);
     runner.requestShutdown();
     runnerThread.join();
 }

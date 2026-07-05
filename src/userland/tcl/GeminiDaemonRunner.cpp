@@ -12,6 +12,7 @@
 #include <iostream>
 #include <optional>
 #include <thread>
+#include <functional>
 #include <vector>
 
 namespace PickShell {
@@ -95,6 +96,16 @@ namespace PickShell {
         joinSessionWorker(port);
 
         std::thread worker([this, port] {
+            const auto retireExecution = [this, port] { host_.retireSession(port); };
+            struct RetireOnExit {
+                std::function<void()> fn;
+                ~RetireOnExit() {
+                    if (fn) {
+                        fn();
+                    }
+                }
+            } retireOnExit{retireExecution};
+
             for (;;) {
                 GeminiSession *activeSession = host_.sessions().find(port);
                 if (activeSession == nullptr) {
@@ -186,6 +197,7 @@ namespace PickShell {
             boundChannels_.erase(channelIt);
         }
         joinSessionWorker(port);
+        host_.retireSession(port);
         boundSessionPorts_.erase(port);
 
         GeminiSession *session = host_.sessions().find(port);

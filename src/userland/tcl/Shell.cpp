@@ -631,10 +631,9 @@ namespace PickShell {
             session_.runtime().clearInterrupt();
             bool done = false;
             while (!done && session_.runtime().instructionPointer() < program.size()) {
-                out << "* " << std::flush;
                 std::string line;
                 std::istream &in = input();
-                if (!std::getline(in, line)) {
+                if (!readPromptedInputLine(in, out, "* ", line)) {
                     session_.runtime().setInstructionPointer(program.size());
                     break;
                 }
@@ -645,10 +644,9 @@ namespace PickShell {
             out << "\nRuntime error: " << e.what() << '\n';
             bool done = false;
             while (!done && session_.runtime().instructionPointer() < program.size()) {
-                out << "* " << std::flush;
                 std::string line;
                 std::istream &in = input();
-                if (!std::getline(in, line)) {
+                if (!readPromptedInputLine(in, out, "* ", line)) {
                     session_.runtime().setInstructionPointer(program.size());
                     break;
                 }

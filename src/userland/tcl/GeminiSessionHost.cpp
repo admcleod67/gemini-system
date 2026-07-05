@@ -29,6 +29,10 @@ namespace PickShell {
         runner_.acquire(id);
     }
 
+    void GeminiSessionHost::acquireAfterInputWake(const PickCore::SessionId id) {
+        runner_.acquireAfterInputWake(id);
+    }
+
     void GeminiSessionHost::release(const PickCore::SessionId id) {
         runner_.release(id);
     }
@@ -41,6 +45,10 @@ namespace PickShell {
         runner_.resume(id);
     }
 
+    void GeminiSessionHost::retireSession(const PickCore::SessionId id) {
+        runner_.retireSession(id);
+    }
+
     PickCore::SessionRunState GeminiSessionHost::sessionRunState(const PickCore::SessionId id) const {
         return runner_.state(id);
     }
@@ -49,7 +57,7 @@ namespace PickShell {
                                                      PickCore::IpcSessionChannel &channel) {
         channel.setSessionScheduling(PickCore::SessionInputScheduling{
             [this, id] { yieldWaitingForInput(id); },
-            [this, id] { acquire(id); },
+            [this, id] { acquireAfterInputWake(id); },
             [this, id] { resume(id); },
         });
     }
