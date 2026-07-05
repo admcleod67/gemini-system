@@ -1,11 +1,13 @@
 //
-// Embedded daemon + session table + serial runner (Milestone 13 Stage 2).
+// Embedded daemon + session table + cooperative runner (Milestone 15 Stage 1).
 //
 
 #ifndef PICK_SYSTEM_TCL_GEMINI_SESSION_HOST_H
 #define PICK_SYSTEM_TCL_GEMINI_SESSION_HOST_H
 
 #include "SessionTable.h"
+
+#include <CooperativeSessionRunner.h>
 
 #include <functional>
 
@@ -19,6 +21,12 @@ namespace PickShell {
         void destroyAllSessions();
         void runExclusive(PickCore::SessionId id, const std::function<void()> &fn);
 
+        void acquire(PickCore::SessionId id);
+        void release(PickCore::SessionId id);
+        void yieldWaitingForInput(PickCore::SessionId id);
+        void resume(PickCore::SessionId id);
+        [[nodiscard]] PickCore::SessionRunState sessionRunState(PickCore::SessionId id) const;
+
         [[nodiscard]] PickCore::GeminiServiceDaemon &daemon() noexcept { return daemon_; }
         [[nodiscard]] const PickCore::GeminiServiceDaemon &daemon() const noexcept { return daemon_; }
 
@@ -28,7 +36,7 @@ namespace PickShell {
     private:
         PickCore::GeminiServiceDaemon &daemon_;
         SessionTable sessions_;
-        PickCore::SerialSessionRunner runner_;
+        PickCore::CooperativeSessionRunner runner_;
     };
 } // namespace PickShell
 

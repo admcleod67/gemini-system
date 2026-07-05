@@ -9,6 +9,7 @@
 #include "DaemonIpcClient.h"
 
 #ifndef _WIN32
+    #include <csignal>
     #include <filesystem>
     #include <fstream>
     #include <unistd.h>
@@ -19,6 +20,13 @@
     #include "GeminiDaemonRunner.h"
     #include "GeminiServiceDaemon.h"
     #include "GeminiSessionHost.h"
+
+namespace {
+    struct IgnoreSigPipe {
+        IgnoreSigPipe() { std::signal(SIGPIPE, SIG_IGN); }
+    };
+    const IgnoreSigPipe kIgnoreSigPipe{};
+} // namespace
 
 using PickTests::connectUnixSocket;
 using PickTests::recvFrame;
@@ -243,12 +251,9 @@ TEST_CASE("DaemonIpcClient re-attaches to logged-in session without re-login") {
     firstClient.handshake();
     const PickCore::SessionId port = firstClient.attachSession(0);
 
-    std::istringstream loginInput("TST\n");
-    std::ostringstream loginOutput;
-    std::ostringstream loginDiagnostic;
-    std::thread loginPump([&] { CHECK(firstClient.runIoPump(loginInput, loginOutput, loginDiagnostic) == 0); });
-    loginPump.join();
+    const std::string loginOutput = runIoPumpWithInput(firstClient, "TST\n");
     REQUIRE(waitForLoggedIn(host, port, std::chrono::milliseconds(2000)));
+    CHECK(loginOutput.find("LOGON PLEASE:") != std::string::npos);
 
     firstClient.detachSession();
     firstClient.disconnect();
@@ -263,6 +268,7 @@ TEST_CASE("DaemonIpcClient re-attaches to logged-in session without re-login") {
     CHECK(session->loggedIn());
     CHECK(session->sessionAccount() == "TST");
 
+    (void) runIoPumpWithInput(secondClient, "QUIT\n");
     secondClient.detachSession();
     secondClient.disconnect();
     runner.requestShutdown();

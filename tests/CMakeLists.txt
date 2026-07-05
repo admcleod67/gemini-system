@@ -28,6 +28,7 @@ add_executable(
         console/test_GeminiConsole.cpp
         core/test_PortManager.cpp
         core/test_SessionTable.cpp
+        core/test_CooperativeSessionRunner.cpp
         core/test_FileSystem.cpp
         core/test_LoginService.cpp
         core/test_Parser.cpp

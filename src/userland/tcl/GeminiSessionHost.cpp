@@ -24,4 +24,24 @@ namespace PickShell {
     void GeminiSessionHost::runExclusive(const PickCore::SessionId id, const std::function<void()> &fn) {
         runner_.runExclusive(id, fn);
     }
+
+    void GeminiSessionHost::acquire(const PickCore::SessionId id) {
+        runner_.acquire(id);
+    }
+
+    void GeminiSessionHost::release(const PickCore::SessionId id) {
+        runner_.release(id);
+    }
+
+    void GeminiSessionHost::yieldWaitingForInput(const PickCore::SessionId id) {
+        runner_.yieldWaitingForInput(id);
+    }
+
+    void GeminiSessionHost::resume(const PickCore::SessionId id) {
+        runner_.resume(id);
+    }
+
+    PickCore::SessionRunState GeminiSessionHost::sessionRunState(const PickCore::SessionId id) const {
+        return runner_.state(id);
+    }
 } // namespace PickShell

@@ -27,6 +27,7 @@ int main(const int argc, char *argv[]) {
     try {
         PickCore::DaemonIpcClient client(resolution.config.socketPath);
         g_activeClient = &client;
+        std::signal(SIGPIPE, SIG_IGN);
         std::signal(SIGINT, handleTerminationSignal);
         std::signal(SIGTERM, handleTerminationSignal);
 

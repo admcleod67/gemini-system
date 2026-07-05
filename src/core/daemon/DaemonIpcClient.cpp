@@ -22,6 +22,13 @@ namespace PickCore {
             }
         }
 
+        void suppressSigPipeOnSocket(const int fd) {
+#ifdef SO_NOSIGPIPE
+            const int enabled = 1;
+            (void) ::setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &enabled, sizeof(enabled));
+#endif
+        }
+
         [[nodiscard]] int inputFileDescriptor(std::istream &in) {
             if (&in == &std::cin) {
                 return STDIN_FILENO;
@@ -68,6 +75,7 @@ namespace PickCore {
         }
 
         setNonBlocking(fd_);
+        suppressSigPipeOnSocket(fd_);
     }
 
     void DaemonIpcClient::sendFrame(const DaemonIpcFrame &frame) {

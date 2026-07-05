@@ -86,6 +86,8 @@ add_library(gemini-core
         daemon/IpcSessionChannel.h
         daemon/SerialSessionRunner.cpp
         daemon/SerialSessionRunner.h
+        daemon/CooperativeSessionRunner.cpp
+        daemon/CooperativeSessionRunner.h
         daemon/PortManager.cpp
         daemon/PortManager.h
         languages/LanguageRegistry.cpp

@@ -27,6 +27,13 @@ namespace PickCore {
             }
         }
 
+        void suppressSigPipeOnSocket(const int fd) {
+#ifdef SO_NOSIGPIPE
+            const int enabled = 1;
+            (void) ::setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &enabled, sizeof(enabled));
+#endif
+        }
+
         [[nodiscard]] DaemonIpcErrorCode attachStatusToErrorCode(const AttachSessionStatus status) {
             switch (status) {
                 case AttachSessionStatus::SessionNotFound:
@@ -160,6 +167,7 @@ namespace PickCore {
                 break;
             }
             setNonBlocking(clientFd);
+            suppressSigPipeOnSocket(clientFd);
             connections_.push_back(Connection{clientFd, false, {}, std::nullopt, nullptr});
         }
     }

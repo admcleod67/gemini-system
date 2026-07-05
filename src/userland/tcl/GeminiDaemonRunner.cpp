@@ -42,6 +42,7 @@ namespace PickShell {
 
     void GeminiDaemonRunner::installSignalHandlers() {
         shutdownRequested.store(false, std::memory_order_release);
+        std::signal(SIGPIPE, SIG_IGN);
         std::signal(SIGTERM, handleTerminationSignal);
         std::signal(SIGINT, handleTerminationSignal);
     }
