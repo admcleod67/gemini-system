@@ -154,3 +154,28 @@ TEST_CASE("IpcSessionChannel pushInput without scheduling does not resume schedu
     CHECK(readComplete.load());
     CHECK(runner.state(1) == PickCore::SessionRunState::Runnable);
 }
+
+TEST_CASE("Schedulable IpcSessionChannel close after yield returns EOF without deadlock") {
+    PickCore::CooperativeSessionRunner runner;
+    PickCore::IpcSessionChannel channel;
+    bindRunnerScheduling(runner, 1, channel);
+
+    std::atomic<bool> finished{false};
+
+    std::thread reader([&] {
+        runner.acquire(1);
+        CHECK(channel.input().peek() == std::char_traits<char>::eof());
+        finished = true;
+        runner.release(1);
+    });
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    while (runner.state(1) != PickCore::SessionRunState::WaitingForInput) {
+        std::this_thread::yield();
+    }
+
+    channel.close();
+    reader.join();
+    CHECK(finished.load());
+    CHECK_FALSE(runner.activeSession().has_value());
+}

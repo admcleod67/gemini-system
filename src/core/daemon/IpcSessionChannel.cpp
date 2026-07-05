@@ -217,19 +217,19 @@ namespace PickCore {
             lock.lock();
             inputAvailable_.wait(lock, [this] { return closed_ || !inputQueue_.empty(); });
 
-            if (scheduling.acquireAfterWake) {
-                lock.unlock();
-                scheduling.acquireAfterWake();
-                lock.lock();
+            if (closed_ && inputQueue_.empty()) {
+                return std::char_traits<char>::eof();
             }
 
             if (!inputQueue_.empty()) {
+                if (scheduling.acquireAfterWake) {
+                    lock.unlock();
+                    scheduling.acquireAfterWake();
+                    lock.lock();
+                }
                 const std::uint8_t value = inputQueue_.front();
                 inputQueue_.pop_front();
                 return static_cast<int>(value);
-            }
-            if (closed_) {
-                return std::char_traits<char>::eof();
             }
         }
     }

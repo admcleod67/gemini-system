@@ -214,21 +214,16 @@ TEST_CASE("DaemonIpcClient completes catalogue login over IPC") {
     client.handshake();
     const PickCore::SessionId port = client.attachSession(0);
 
-    std::istringstream input("TST\n");
-    std::ostringstream output;
-    std::ostringstream diagnostic;
-
-    std::thread pumpThread([&] { CHECK(client.runIoPump(input, output, diagnostic) == 0); });
-    pumpThread.join();
-
+    const std::string output = runIoPumpWithInput(client, "TST\n");
     REQUIRE(waitForLoggedIn(host, port, std::chrono::milliseconds(2000)));
 
     PickShell::GeminiSession *session = host.sessions().find(port);
     REQUIRE(session != nullptr);
     CHECK(session->sessionAccount() == "TST");
     CHECK(session->sessionUsername() == "TST");
-    CHECK(output.str().find("LOGON PLEASE:") != std::string::npos);
+    CHECK(output.find("LOGON PLEASE:") != std::string::npos);
 
+    client.detachSession();
     client.disconnect();
     runner.requestShutdown();
     runnerThread.join();
