@@ -46,6 +46,7 @@ namespace PickShell {
 #ifndef _WIN32
         PickCore::DaemonIpcServer ipcServer_;
         std::unordered_map<PickCore::SessionId, int> boundSessionPorts_;
+        std::unordered_map<PickCore::SessionId, PickCore::IpcSessionChannel *> boundChannels_;
         std::unordered_map<PickCore::SessionId, PickCore::CatalogLoginPhase> loginPhaseByPort_;
         std::unordered_map<PickCore::SessionId, std::thread> sessionWorkerThreads_;
         std::mutex sessionWorkerThreadsMutex_;

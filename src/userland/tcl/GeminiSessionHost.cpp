@@ -44,4 +44,17 @@ namespace PickShell {
     PickCore::SessionRunState GeminiSessionHost::sessionRunState(const PickCore::SessionId id) const {
         return runner_.state(id);
     }
+
+    void GeminiSessionHost::bindIpcChannelScheduling(const PickCore::SessionId id,
+                                                     PickCore::IpcSessionChannel &channel) {
+        channel.setSessionScheduling(PickCore::SessionInputScheduling{
+            [this, id] { yieldWaitingForInput(id); },
+            [this, id] { acquire(id); },
+            [this, id] { resume(id); },
+        });
+    }
+
+    void GeminiSessionHost::clearIpcChannelScheduling(PickCore::IpcSessionChannel &channel) {
+        channel.clearSessionScheduling();
+    }
 } // namespace PickShell

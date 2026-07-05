@@ -8,6 +8,7 @@
 #include "SessionTable.h"
 
 #include <CooperativeSessionRunner.h>
+#include <IpcSessionChannel.h>
 
 #include <functional>
 
@@ -26,6 +27,9 @@ namespace PickShell {
         void yieldWaitingForInput(PickCore::SessionId id);
         void resume(PickCore::SessionId id);
         [[nodiscard]] PickCore::SessionRunState sessionRunState(PickCore::SessionId id) const;
+
+        void bindIpcChannelScheduling(PickCore::SessionId id, PickCore::IpcSessionChannel &channel);
+        void clearIpcChannelScheduling(PickCore::IpcSessionChannel &channel);
 
         [[nodiscard]] PickCore::GeminiServiceDaemon &daemon() noexcept { return daemon_; }
         [[nodiscard]] const PickCore::GeminiServiceDaemon &daemon() const noexcept { return daemon_; }

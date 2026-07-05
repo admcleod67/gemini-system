@@ -11,9 +11,11 @@
 #include <cstddef>
 #include <cstdint>
 #include <deque>
+#include <functional>
 #include <istream>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <ostream>
 #include <span>
 #include <streambuf>
@@ -22,6 +24,12 @@
 namespace PickCore {
     class ChannelInputBuffer;
     class ChannelOutputBuffer;
+
+    struct SessionInputScheduling {
+        std::function<void()> yieldBeforeBlockingRead;
+        std::function<void()> acquireAfterWake;
+        std::function<void()> resumeOnInput;
+    };
 
     class IpcSessionChannel {
     public:
@@ -37,6 +45,10 @@ namespace PickCore {
 
         void pushInput(std::span<const std::uint8_t> bytes);
         void close();
+
+        void setSessionScheduling(SessionInputScheduling scheduling);
+        void clearSessionScheduling();
+        [[nodiscard]] bool hasSessionScheduling() const;
 
         void flushPendingOutput(int clientFd);
         [[nodiscard]] bool hasPendingOutput() const;
@@ -58,6 +70,7 @@ namespace PickCore {
         std::vector<std::uint8_t> diagnosticQueue_;
         bool closed_{false};
         bool hasPendingOutput_{false};
+        std::optional<SessionInputScheduling> scheduling_;
 
         std::unique_ptr<std::streambuf> inputBuffer_;
         std::unique_ptr<std::streambuf> outputBuffer_;

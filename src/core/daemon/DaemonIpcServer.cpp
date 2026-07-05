@@ -127,6 +127,7 @@ namespace PickCore {
             return;
         }
         if (connection.channel) {
+            connection.channel->clearSessionScheduling();
             connection.channel->close();
         }
         if (handlers.detachSession) {

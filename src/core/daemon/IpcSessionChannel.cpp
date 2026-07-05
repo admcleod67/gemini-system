@@ -94,6 +94,24 @@ namespace PickCore {
             inputQueue_.insert(inputQueue_.end(), bytes.begin(), bytes.end());
         }
         inputAvailable_.notify_all();
+        if (scheduling_.has_value() && scheduling_->resumeOnInput) {
+            scheduling_->resumeOnInput();
+        }
+    }
+
+    void IpcSessionChannel::setSessionScheduling(const SessionInputScheduling scheduling) {
+        const std::lock_guard lock(mutex_);
+        scheduling_ = scheduling;
+    }
+
+    void IpcSessionChannel::clearSessionScheduling() {
+        const std::lock_guard lock(mutex_);
+        scheduling_.reset();
+    }
+
+    bool IpcSessionChannel::hasSessionScheduling() const {
+        const std::lock_guard lock(mutex_);
+        return scheduling_.has_value();
     }
 
     void IpcSessionChannel::close() {
@@ -173,14 +191,47 @@ namespace PickCore {
     }
 
     int IpcSessionChannel::readInputChar() {
-        std::unique_lock lock(mutex_);
-        inputAvailable_.wait(lock, [this] { return closed_ || !inputQueue_.empty(); });
-        if (inputQueue_.empty()) {
-            return std::char_traits<char>::eof();
+        for (;;) {
+            std::unique_lock lock(mutex_);
+            if (!inputQueue_.empty()) {
+                const std::uint8_t value = inputQueue_.front();
+                inputQueue_.pop_front();
+                return static_cast<int>(value);
+            }
+            if (closed_) {
+                return std::char_traits<char>::eof();
+            }
+
+            if (!scheduling_.has_value()) {
+                inputAvailable_.wait(lock, [this] { return closed_ || !inputQueue_.empty(); });
+                continue;
+            }
+
+            SessionInputScheduling scheduling = *scheduling_;
+            lock.unlock();
+
+            if (scheduling.yieldBeforeBlockingRead) {
+                scheduling.yieldBeforeBlockingRead();
+            }
+
+            lock.lock();
+            inputAvailable_.wait(lock, [this] { return closed_ || !inputQueue_.empty(); });
+
+            if (scheduling.acquireAfterWake) {
+                lock.unlock();
+                scheduling.acquireAfterWake();
+                lock.lock();
+            }
+
+            if (!inputQueue_.empty()) {
+                const std::uint8_t value = inputQueue_.front();
+                inputQueue_.pop_front();
+                return static_cast<int>(value);
+            }
+            if (closed_) {
+                return std::char_traits<char>::eof();
+            }
         }
-        const std::uint8_t value = inputQueue_.front();
-        inputQueue_.pop_front();
-        return static_cast<int>(value);
     }
 
     void IpcSessionChannel::writeOutputChar(const int ch, const bool diagnostic) {

@@ -167,7 +167,9 @@ namespace PickShell {
         session->setInputStream(&channel.input());
         session->setOutputStream(&channel.output());
         session->setDiagnosticStream(&channel.diagnostic());
+        host_.bindIpcChannelScheduling(port, channel);
         boundSessionPorts_[port] = 1;
+        boundChannels_[port] = &channel;
 
         startSessionWorker(port);
 
@@ -175,6 +177,11 @@ namespace PickShell {
     }
 
     void GeminiDaemonRunner::detachSession(const PickCore::SessionId port) {
+        const auto channelIt = boundChannels_.find(port);
+        if (channelIt != boundChannels_.end()) {
+            host_.clearIpcChannelScheduling(*channelIt->second);
+            boundChannels_.erase(channelIt);
+        }
         joinSessionWorker(port);
         boundSessionPorts_.erase(port);
 
