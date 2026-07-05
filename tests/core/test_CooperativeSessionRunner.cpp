@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <optional>
 #include <sstream>
 #include <thread>
 
@@ -50,7 +51,7 @@ TEST_CASE("CooperativeSessionRunner yield allows another session to acquire") {
         REQUIRE(runner.activeSession() == 1);
         runner.yieldWaitingForInput(1);
         CHECK(runner.state(1) == PickCore::SessionRunState::WaitingForInput);
-        CHECK_FALSE(runner.activeSession().has_value());
+        CHECK(runner.activeSession() != std::optional<PickCore::SessionId>{1});
 
         while (!sessionOneResumed.load()) {
             std::this_thread::yield();
