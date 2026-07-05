@@ -6,7 +6,7 @@
 #define PICK_SYSTEM_TCL_SESSION_TABLE_H
 
 #include <GeminiServiceDaemon.h>
-#include <SerialSessionRunner.h>
+#include <CooperativeSessionRunner.h>
 
 #include "GeminiSession.h"
 

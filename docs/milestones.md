@@ -25,7 +25,7 @@ Target: a Pick-authentic, multi-session **Linux service** (UniData-style deploym
 - [Milestone 12 — Session Model Foundation (completed)](milestones/12-session-model-foundation.md)
 - [Milestone 13 — Service Daemon Architecture (completed)](milestones/13-service-daemon-architecture.md)
 - [Milestone 14 — Multi-Session Console Support (completed)](milestones/14-multi-session-console-support.md)
-- [Milestone 15 — Cooperative Multi-Session Execution (planned)](milestones/15-cooperative-multi-session-execution.md)
+- [Milestone 15 — Cooperative Multi-Session Execution (completed)](milestones/15-cooperative-multi-session-execution.md)
 - [Milestone 16 — Standalone Edition / Application Mode (planned)](milestones/16-standalone-edition-application-mode.md)
 - [Milestone 17 — Service Integration & Deployment (planned)](milestones/17-service-integration-deployment.md)
 - [Milestone 18 — Version 1.0 Release: Gemini System Service (planned)](milestones/18-version-1-gemini-system-service.md)

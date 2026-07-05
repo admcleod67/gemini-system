@@ -2,7 +2,7 @@
 
 ## Milestone 15 — Cooperative Multi-Session Execution
 
-Allow multiple attached sessions to **make progress concurrently** without true preemptive threading. Introduce a **cooperative scheduler** that switches the exclusive execution token at documented **I/O yield points**. Paused sessions retain full VM, shell, and lock-binding state. Apply simple fairness (round-robin among runnable sessions, run-until-next-yield). No preemption mid-instruction—preserving Pick authenticity and the single-interpreter-stack invariant from M12–M14. *Status: planned.*
+Allow multiple attached sessions to **make progress concurrently** without true preemptive threading. Introduce a **cooperative scheduler** that switches the exclusive execution token at documented **I/O yield points**. Paused sessions retain full VM, shell, and lock-binding state. Apply simple fairness (round-robin among runnable sessions, run-until-next-yield). No preemption mid-instruction—preserving Pick authenticity and the single-interpreter-stack invariant from M12–M14. *Status: implemented.*
 
 M14 delivered multiple consoles and sessions over IPC, but [`SerialSessionRunner`](../../src/core/daemon/SerialSessionRunner.cpp) still holds the execution token for an entire [`runExclusive`](../../src/userland/tcl/GeminiSessionHost.h) callback—today the whole login → REPL worker in [`GeminiDaemonRunner`](../../src/userland/tcl/GeminiDaemonRunner.cpp). A second session **blocks** until the first releases the token, typically only at REPL exit or detach. M15 replaces that coarse exclusivity with **slice-based cooperative scheduling** at session I/O boundaries.
 
@@ -273,8 +273,8 @@ Implementation is sequenced into vertical stages. Each stage ships a test-locked
 
 - **Stage 6 — Fairness policy + debugger yield (stretch)**: round-robin runnable queue; optional assembler **`STEP`** / debug wait yield; starvation regression test. **Exit criterion:** three-session round-robin smoke under synthetic input; debugger yield documented or explicitly deferred with stub. *Status: implemented.* Ships round-robin election in [`CooperativeSessionRunner`](../../src/core/daemon/CooperativeSessionRunner.cpp), three-session unit/integration tests, and debugger **wait** yield via existing IPC transport (ASM> through `readPromptedInputLine`; BASIC `*` through same helper after polish). ASM `STEP`/`RUN`/`CONT` CPU stepping remains out of scope.
 
-- **Stage 7 — Docs + closes M15**: update [`docs/daemon.md`](../daemon.md), [`docs/session.md`](../session.md), [`docs/console.md`](../console.md); milestone index; audit §9 completion criteria; full test suite + both smoke checklists. **Closes Milestone 15.** *Status: planned.*
+- **Stage 7 — Docs + closes M15**: update [`docs/daemon.md`](../daemon.md), [`docs/session.md`](../session.md), [`docs/console.md`](../console.md); milestone index; audit §9 completion criteria; full test suite + both smoke checklists. **Closes Milestone 15.** *Status: implemented.* Cooperative scheduler, yield points, and operator runbooks documented; automated test suite green.
 
 Only Stage 7's exit criteria should claim "Closes Milestone 15".
 
-*Status: planned.*
+*Status: implemented.*

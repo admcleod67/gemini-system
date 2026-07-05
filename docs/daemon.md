@@ -2,7 +2,7 @@
 
 The **Gemini Service Daemon** is the process-scope host for Gemini System: cold start, frozen language registry, shared lock table, port allocation, session table, and (for the long-running binary) a Unix domain IPC server for console attachment.
 
-It is the architectural hinge between the M12 session object ([session model](session.md)) and multi-console attachment in [Milestone 14](milestones/14-multi-session-console-support.md) (implemented).
+It is the architectural hinge between the M12 session object ([session model](session.md)) and multi-console attachment in [Milestone 14](milestones/14-multi-session-console-support.md) (implemented). Cooperative scheduling at session I/O boundaries is described in [Milestone 15](milestones/15-cooperative-multi-session-execution.md) (implemented).
 
 See [Milestone 13](milestones/13-service-daemon-architecture.md) for delivery history and completion criteria.
 
@@ -23,7 +23,7 @@ All three binaries link the same daemon host implementation in `gemini-core` / `
 | Scope | Owned by | Examples |
 |-------|----------|----------|
 | **Process (GSD)** | [`GeminiServiceDaemon`](../src/core/daemon/GeminiServiceDaemon.h) | [`BootMonitor`](../src/core/boot/BootMonitor.h), frozen [`LanguageRegistry`](../src/core/languages/LanguageRegistry.h), shared [`LockTable`](../src/core/locking/LockTable.h), [`PortManager`](../src/core/daemon/PortManager.h), [`DaemonIpcServer`](../src/core/daemon/DaemonIpcServer.h) (daemon binary only) |
-| **Composition (userland)** | [`GeminiSessionHost`](../src/userland/tcl/GeminiSessionHost.h) | [`SessionTable`](../src/userland/tcl/SessionTable.h), [`SerialSessionRunner`](../src/core/daemon/SerialSessionRunner.h) |
+| **Composition (userland)** | [`GeminiSessionHost`](../src/userland/tcl/GeminiSessionHost.h) | [`SessionTable`](../src/userland/tcl/SessionTable.h), [`CooperativeSessionRunner`](../src/core/daemon/CooperativeSessionRunner.h) |
 | **Session** | [`GeminiSession`](../src/userland/tcl/GeminiSession.h) | [`Runtime`](../src/core/vm/Runtime.h), [`Shell`](../src/userland/tcl/Shell.h), account binding, per-session filesystem root, lock session id, I/O channels |
 
 `SessionTable` lives in **`src/userland/tcl/`** (not `core/daemon/`) so `gemini-core` does not depend on userland session types.
@@ -71,9 +71,10 @@ flowchart TB
 ## Component map
 
 ```text
-src/core/daemon/     GeminiServiceDaemon, PortManager, SerialSessionRunner,
-                     DaemonConfig, DaemonIpcProtocol, DaemonIpcServer,
-                     DaemonIpcClient, IpcSessionChannel, ConsoleConfig
+src/core/daemon/     GeminiServiceDaemon, PortManager, CooperativeSessionRunner,
+                     SerialSessionRunner (legacy/tests), DaemonConfig,
+                     DaemonIpcProtocol, DaemonIpcServer, DaemonIpcClient,
+                     IpcSessionChannel, ConsoleConfig
 src/userland/tcl/    SessionTable, GeminiSessionHost, GeminiDaemonRunner
 src/daemon/Main.cpp  gemini-daemon entry
 src/console/Main.cpp gemini-console entry
@@ -92,18 +93,43 @@ src/Main.cpp         gemini-system embedded entry
 
 - Allocated at [`SessionTable::createSession`](../src/userland/tcl/SessionTable.cpp)
 - Released at `destroySession`
-- Map key and [`SessionId`](../src/core/daemon/SerialSessionRunner.h) equal the port number (starting at **1**, lowest free reused on destroy)
+- Map key and [`SessionId`](../src/core/daemon/CooperativeSessionRunner.h) equal the port number (starting at **1**, lowest free reused on destroy)
 - Feeds **`WHO`**, lock identity ([`makeSessionLockId`](../src/userland/tcl/GeminiSession.h)), and future admin listing (M17)
 
 The port survives **`LOGOFF`** until session **destroy** (daemon-assigned; login does not set `whoPort`).
 
 Embedded `gemini-system` uses `maxSessions = 1` / `PortManager(1)`; the operator typically sees port **1** after login.
 
-## Serial execution
+## Cooperative execution
 
-[`SerialSessionRunner`](../src/core/daemon/SerialSessionRunner.h) ensures **at most one** session runs interpreter work (REPL, BASIC, PROC, etc.) at a time. Other session objects may exist in the table but do not make progress until the runner grants the execution token.
+[`CooperativeSessionRunner`](../src/core/daemon/CooperativeSessionRunner.h) (via [`GeminiSessionHost`](../src/userland/tcl/GeminiSessionHost.h)) ensures **at most one** session runs interpreter work at a time while allowing **multiple sessions to make progress** at documented I/O yield points. See [Milestone 15](milestones/15-cooperative-multi-session-execution.md).
 
-This is **not** cooperative scheduling — see [Milestone 15](milestones/15-cooperative-multi-session-execution.md).
+| Concept | Behaviour |
+|---------|-----------|
+| **Execution token** | Only one session holds the token while actively running interpreter work |
+| **Interpreter stack** | At most one VM/shell stack active across all sessions — no preemption mid-command |
+| **Run states** | `Runnable`, `Running`, `WaitingForInput` ([`SessionRunState`](../src/core/daemon/CooperativeSessionRunner.h)) |
+| **Yield** | `yieldWaitingForInput` releases the token before a blocking session read; session marked `WaitingForInput` |
+| **Resume** | `pushInput` on [`IpcSessionChannel`](../src/core/daemon/IpcSessionChannel.h) calls `resume`; blocked reader wakes |
+| **Input wake acquire** | `acquireAfterInputWake` takes the token when free — bypasses round-robin so input is not starved |
+| **Fairness** | Round-robin among `Runnable` sessions on voluntary `acquire` (port order, wrap) |
+| **Worker retire** | `retireSession` clears scheduler state when a session worker exits or detaches — prevents stale RR entries |
+| **Embedded (`maxSessions = 1`)** | Degenerates to immediate acquire; operator-visible behaviour unchanged |
+
+[`SerialSessionRunner`](../src/core/daemon/SerialSessionRunner.h) remains in the tree for unit tests; **`GeminiSessionHost` uses `CooperativeSessionRunner`**.
+
+### v1 yield points
+
+Cooperative scheduling switches only at these boundaries (M15):
+
+| Boundary | Location | Notes |
+|----------|----------|-------|
+| Session input read | [`IpcSessionChannel::readInputChar`](../src/core/daemon/IpcSessionChannel.cpp) | Primary switch point for daemon-attached consoles; hooks via `bindIpcChannelScheduling` |
+| Catalogue login read | [`LoginService::runCatalogLogin`](../src/core/login/LoginService.h) | Via session streams — same cadence as embedded |
+| Tcl / ASM / BASIC debugger line read | [`Shell::readPromptedInputLine`](../src/userland/tcl/Shell.cpp) | Prompt flushed **before** yield (`TCL>`, `ASM>`, BASIC `*`) |
+| BASIC / VM input | [`Runtime::readInputLine`](../src/core/vm/Runtime.cpp) | `INPUT` / `INPUT_STR` / int input opcodes |
+
+**Not yield points:** mid-opcode VM execution, mid-`handleLine` Tcl dispatch, lock table operations, ASM `STEP` / `RUN` / `CONT` CPU loops.
 
 ## Configuration
 
@@ -180,16 +206,20 @@ M13 shipped control-plane plumbing only. M14 extended the same transport with th
 
 ### Session worker
 
-After a successful **`AttachSession`**, [`GeminiDaemonRunner`](../src/userland/tcl/GeminiDaemonRunner.cpp) starts a **session worker thread** under [`runExclusive`](../src/userland/tcl/GeminiSessionHost.h) while the IPC poll loop continues pumping session I/O. The worker mirrors embedded [`Main.cpp`](../src/Main.cpp): catalogue login (when configured), then [`Shell::runTclRepl`](../src/userland/tcl/Shell.cpp), looping back to interactive login after **`LOGOFF`**.
+After a successful **`AttachSession`**, [`GeminiDaemonRunner`](../src/userland/tcl/GeminiDaemonRunner.cpp) starts a **session worker thread** while the IPC poll loop continues pumping session I/O. The worker uses **slice-based** [`runExclusive`](../src/userland/tcl/GeminiSessionHost.h) calls — separate slices for catalogue login and each REPL iteration — not one `runExclusive` spanning the entire worker lifetime.
+
+[`bindIpcChannelScheduling`](../src/userland/tcl/GeminiSessionHost.cpp) wires [`IpcSessionChannel`](../src/core/daemon/IpcSessionChannel.h) to the cooperative runner: yield before blocking read, `resume` on `pushInput`, `acquireAfterInputWake` when bytes arrive.
+
+The worker mirrors embedded [`Main.cpp`](../src/Main.cpp): catalogue login (when configured), then [`Shell::runTclRepl`](../src/userland/tcl/Shell.cpp), looping back to interactive login after **`LOGOFF`**.
 
 - **Console role:** [`gemini-console`](console.md) **`runIoPump`** forwards terminal bytes; the operator sees **`LOGON PLEASE:`**, the Tcl banner, REPL prompts, and command output on stdout.
 - **Daemon host paths:** session catalogue/filesystem roots come from daemon [`DaemonConfig`](../src/core/daemon/DaemonConfig.h), applied via [`applyHostPathsToShell`](../src/userland/tcl/DefaultFileSystemRoot.h).
 - **No catalogue:** REPL runs immediately (same as `Main.cpp`).
 - **Re-attach while logged in:** login is skipped; REPL starts on the existing session binding.
 - **Auto-logon:** `MD,AUTO-LOGON` and daemon-process **`GEMINI_AUTO_LOGON`** / **`GEMINI_AUTO_LOGIN`** apply on the first login attempt per port (`ColdStartPortInit`); interactive credentials always flow from the console via IPC.
-- **Graceful detach:** [`DaemonIpcServer::detachConnection`](../src/core/daemon/DaemonIpcServer.cpp) closes the IPC channel before unbind so blocked REPL reads receive EOF; the session worker is joined and streams are cleared **without** [`destroySession`](../src/userland/tcl/GeminiSessionHost.h). Login state and daemon-assigned **`whoPort`** are preserved for re-attach.
-- **`QUIT` / stdin EOF:** ends the REPL and exits the worker; the session object remains in the table (still logged in after **`QUIT`**, logged out after **`LOGOFF`**).
-- **Serial runner:** only one attached session runs interpreter work at a time; a second console’s worker blocks on `runExclusive` until the first releases the token (login, REPL, or both).
+- **Graceful detach:** [`DaemonIpcServer::detachConnection`](../src/core/daemon/DaemonIpcServer.cpp) closes the IPC channel before unbind so blocked REPL reads receive EOF; the session worker is joined, scheduler state is retired, and streams are cleared **without** [`destroySession`](../src/userland/tcl/GeminiSessionHost.h). Login state and daemon-assigned **`whoPort`** are preserved for re-attach.
+- **`QUIT` / stdin EOF:** ends the REPL and exits the worker (scheduler state retired); the session object remains in the table (still logged in after **`QUIT`**, logged out after **`LOGOFF`**).
+- **Cooperative scheduling:** multiple attached consoles reach **`LOGON PLEASE:`** and **`TCL>`** concurrently; a session blocked in BASIC **`INPUT`** does not prevent another console from running Tcl. Only one session executes interpreter work at any instant.
 
 ### Session plane message types (M14)
 
@@ -219,15 +249,15 @@ After a successful **`AttachSession`**, [`GeminiDaemonRunner`](../src/userland/t
 | Milestone | What “multi-session” means |
 |-----------|----------------------------|
 | **M13** | Multiple session **objects** in table; **serial** execution; IPC **plumbing** only |
-| **M14** | Multiple **attached consoles**; login/REPL over IPC; still serial execution |
-| **M15** | Multiple sessions **make progress** via cooperative yield at I/O boundaries |
+| **M14** | Multiple **attached consoles**; login/REPL over IPC; token held across I/O wait (appears hung) |
+| **M15** | Multiple sessions **make progress** via cooperative yield at I/O boundaries; round-robin fairness |
 
 ## Invariants
 
 - One cold start per process
 - One frozen `LanguageRegistry` per process until daemon restart
 - One shared `LockTable` per process; per-session lock ids remain distinct ([concurrency](concurrency.md))
-- At most one running interpreter stack across sessions (serial runner)
+- At most one running interpreter stack across sessions (cooperative runner enforces exclusive token)
 - Port uniqueness — no two live sessions share the same port / session id
 - Detach ≠ destroy — console disconnect preserves session object until explicit destroy or daemon shutdown
 
@@ -236,7 +266,8 @@ After a successful **`AttachSession`**, [`GeminiDaemonRunner`](../src/userland/t
 | File | Role |
 |------|------|
 | [`GeminiServiceDaemon.h`](../src/core/daemon/GeminiServiceDaemon.h) | Process host, cold start, shared substrate |
-| [`GeminiSessionHost.h`](../src/userland/tcl/GeminiSessionHost.h) | Daemon + session table + serial runner |
+| [`GeminiSessionHost.h`](../src/userland/tcl/GeminiSessionHost.h) | Daemon + session table + cooperative runner |
+| [`CooperativeSessionRunner.h`](../src/core/daemon/CooperativeSessionRunner.h) | Execution token, yield/resume, round-robin fairness |
 | [`GeminiDaemonRunner.h`](../src/userland/tcl/GeminiDaemonRunner.h) | Foreground run loop, IPC integration, shutdown |
 | [`DaemonConfig.h`](../src/core/daemon/DaemonConfig.h) | Configuration resolution |
 | [`DaemonIpcServer.h`](../src/core/daemon/DaemonIpcServer.h) | Unix socket server |
@@ -251,3 +282,4 @@ After a successful **`AttachSession`**, [`GeminiDaemonRunner`](../src/userland/t
 - [Gemini bootstrap](gemini-bootstrap.md) — catalogue, login, cold-start banner
 - [Concurrency and record locking](concurrency.md) — shared lock table and session ids
 - [Milestone 14 — Multi-session console](milestones/14-multi-session-console-support.md) — delivery history (implemented)
+- [Milestone 15 — Cooperative multi-session execution](milestones/15-cooperative-multi-session-execution.md) — delivery history (implemented)

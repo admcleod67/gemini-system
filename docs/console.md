@@ -2,7 +2,7 @@
 
 **`gemini-console`** is a thin terminal front-end for a running **`gemini-daemon`**. It connects over a Unix domain socket, attaches to a session (create or re-attach by port), and pumps terminal bytes to the daemon session I/O bridge. The daemon owns the login and Tcl REPL loop — the same [`Main.cpp`](../src/Main.cpp) flow, driven through [`GeminiSession`](../src/userland/tcl/GeminiSession.h) channels.
 
-See [Service daemon architecture](daemon.md) for IPC protocol and daemon lifecycle. See [Milestone 14](milestones/14-multi-session-console-support.md) for delivery history.
+See [Service daemon architecture](daemon.md) for IPC protocol and daemon lifecycle. See [Milestone 14](milestones/14-multi-session-console-support.md) and [Milestone 15](milestones/15-cooperative-multi-session-execution.md) for delivery history.
 
 ## Overview
 
@@ -73,9 +73,15 @@ The session object, login state, and daemon-assigned **`whoPort`** survive detac
 
 **`WHO`** prints `port username account` using the **daemon-assigned port** from session create ([`SessionTable`](../src/userland/tcl/SessionTable.cpp)). With multiple consoles, each session gets a distinct port (typically 1, 2, …).
 
-### Serial execution
+### Cooperative scheduling
 
-Only one session runs interpreter work at a time ([`SerialSessionRunner`](../src/core/daemon/SerialSessionRunner.h)). A second console may complete attach and wait at login/REPL while the first holds the execution token — expected M14 behaviour, not a hang. See [Milestone 15](milestones/15-cooperative-multi-session-execution.md) for cooperative progress.
+Multiple consoles attached to **`gemini-daemon`** make progress concurrently at I/O boundaries ([`CooperativeSessionRunner`](../src/core/daemon/CooperativeSessionRunner.h)):
+
+- Each console reaches **`LOGON PLEASE:`** and **`TCL>`** without waiting for another console to **`QUIT`**
+- A session blocked in BASIC **`INPUT`** does not prevent another console from running Tcl
+- Round-robin fairness rotates the execution token among idle-at-prompt sessions
+
+Only one session runs interpreter work at any instant — this is cooperative scheduling, not preemption. See [Service daemon architecture — cooperative execution](daemon.md#cooperative-execution).
 
 ### Auto-logon
 
@@ -87,7 +93,7 @@ A second attach to a port that already has a live console binding receives **`Se
 
 ## Manual smoke runbook
 
-Use this checklist to verify daemon + console integration (Milestone 14 §9). Run from a build tree with the `gemini/` bootstrap copied next to binaries (`cd build/src`).
+Use this checklist to verify daemon + console integration (Milestone 15 §9). Run from a build tree with the `gemini/` bootstrap copied next to binaries (`cd build/src`).
 
 **1. Start daemon**
 
@@ -108,17 +114,24 @@ gemini-console --socket /tmp/gemini-test.sock
 # Tcl: QUIT
 ```
 
-**3. Second console — distinct port**
+**3. Second console — distinct port (both attached)**
 
 ```bash
+# Terminal 3 — leave first console at TCL> (do not QUIT)
 gemini-console --socket /tmp/gemini-test.sock
 # login → WHO → expect port 2 (or next free port)
-# QUIT
+# both consoles should show TCL> concurrently
 ```
 
-**4. Tcl on each (serial runner)**
+**4. Interleaved Tcl and BASIC INPUT**
 
-With two consoles attached simultaneously, run a Tcl command on one while the other waits — acceptable in M14.
+With both consoles at **`TCL>`**:
+
+```bash
+# Console A: enter BASIC, run a program with INPUT (or RUN INPUTWAIT if seeded in BP)
+# Console B: run WHO or VERSION while A waits at INPUT
+# Both should respond without either appearing hung
+```
 
 **5. Graceful detach and re-attach**
 
@@ -147,7 +160,7 @@ Quit all consoles, then `kill -TERM` the daemon process. Socket file removed; cl
 
 ## See also
 
-- [Service daemon architecture](daemon.md) — IPC protocol, session worker, serial runner
+- [Service daemon architecture](daemon.md) — IPC protocol, session worker, cooperative scheduling
 - [Session model](session.md) — console I/O transport and detach semantics
 - [Gemini bootstrap](gemini-bootstrap.md) — catalogue login and auto-logon
 - [Developer shell (TCL)](tcl-shell.md) — Tcl commands after login
