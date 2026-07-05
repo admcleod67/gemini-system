@@ -1,5 +1,8 @@
 #include "GeminiDaemonRunner.h"
 
+#include "DefaultFileSystemRoot.h"
+#include "GeminiSession.h"
+
 #include <pick_system/version.hpp>
 
 #include <atomic>
@@ -43,6 +46,89 @@ namespace PickShell {
     }
 
 #ifndef _WIN32
+    void GeminiDaemonRunner::applyHostPaths(GeminiSession &session) {
+        applyHostPathsToShell(session.shell(), config_.hostPaths);
+    }
+
+    void GeminiDaemonRunner::joinSessionLogin(const PickCore::SessionId port) {
+        std::thread worker;
+        {
+            const std::lock_guard lock(loginThreadsMutex_);
+            const auto it = loginThreads_.find(port);
+            if (it == loginThreads_.end()) {
+                return;
+            }
+            worker = std::move(it->second);
+            loginThreads_.erase(it);
+        }
+        if (worker.joinable()) {
+            worker.join();
+        }
+    }
+
+    void GeminiDaemonRunner::joinAllSessionLogins() {
+        std::vector<std::thread> workers;
+        {
+            const std::lock_guard lock(loginThreadsMutex_);
+            workers.reserve(loginThreads_.size());
+            for (auto &entry : loginThreads_) {
+                workers.push_back(std::move(entry.second));
+            }
+            loginThreads_.clear();
+        }
+        for (std::thread &worker : workers) {
+            if (worker.joinable()) {
+                worker.join();
+            }
+        }
+    }
+
+    void GeminiDaemonRunner::startSessionLogin(const PickCore::SessionId port) {
+        GeminiSession *session = host_.sessions().find(port);
+        if (session == nullptr || session->loggedIn()) {
+            return;
+        }
+        applyHostPaths(*session);
+        if (!session->shell().geminiCatalogRoot().has_value()) {
+            return;
+        }
+
+        joinSessionLogin(port);
+
+        std::thread worker([this, port] {
+            host_.runExclusive(port, [this, port] {
+                GeminiSession *activeSession = host_.sessions().find(port);
+                if (activeSession == nullptr || activeSession->loggedIn()) {
+                    return;
+                }
+
+                Shell &shell = activeSession->shell();
+                const std::optional<std::filesystem::path> &catalog = shell.geminiCatalogRoot();
+                if (!catalog.has_value()) {
+                    return;
+                }
+
+                PickCore::CatalogLoginPhase phase = PickCore::CatalogLoginPhase::ColdStartPortInit;
+                if (const auto it = loginPhaseByPort_.find(port); it != loginPhaseByPort_.end()) {
+                    phase = it->second;
+                }
+
+                const std::optional<PickCore::UserSession> userSession =
+                    PickCore::LoginService::runCatalogLogin(activeSession->input(), activeSession->output(), *catalog,
+                                                            shell.fileSystemRoot(), &activeSession->diagnostic(),
+                                                            phase);
+                loginPhaseByPort_[port] = PickCore::CatalogLoginPhase::InteractiveOnly;
+
+                if (userSession.has_value()) {
+                    activeSession->attach(*userSession);
+                }
+            });
+        });
+
+        const std::lock_guard lock(loginThreadsMutex_);
+        loginThreads_[port] = std::move(worker);
+    }
+
     PickCore::AttachSessionResult GeminiDaemonRunner::attachSession(const PickCore::SessionId requestedPort,
                                                                     PickCore::IpcSessionChannel &channel) {
         PickCore::SessionId port = requestedPort;
@@ -66,15 +152,19 @@ namespace PickShell {
             return {PickCore::AttachSessionStatus::SessionNotFound, 0};
         }
 
+        applyHostPaths(*session);
         session->setInputStream(&channel.input());
         session->setOutputStream(&channel.output());
         session->setDiagnosticStream(&channel.diagnostic());
         boundSessionPorts_[port] = 1;
 
+        startSessionLogin(port);
+
         return {PickCore::AttachSessionStatus::Ok, port};
     }
 
     void GeminiDaemonRunner::detachSession(const PickCore::SessionId port) {
+        joinSessionLogin(port);
         boundSessionPorts_.erase(port);
 
         GeminiSession *session = host_.sessions().find(port);
@@ -140,6 +230,7 @@ namespace PickShell {
             detachSession(port);
         }
         boundSessionPorts_.clear();
+        joinAllSessionLogins();
         ipcServer_.stop();
 #endif
         host_.destroyAllSessions();

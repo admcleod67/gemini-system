@@ -119,11 +119,11 @@ namespace PickCore {
         if (!connection.attachedPort.has_value()) {
             return;
         }
-        if (handlers.detachSession) {
-            handlers.detachSession(*connection.attachedPort);
-        }
         if (connection.channel) {
             connection.channel->close();
+        }
+        if (handlers.detachSession) {
+            handlers.detachSession(*connection.attachedPort);
         }
         connection.attachedPort.reset();
         connection.channel.reset();

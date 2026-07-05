@@ -256,7 +256,7 @@ Implementation is sequenced into vertical stages. Each stage ships a test-locked
 
 - **Stage 4 — `gemini-console` skeleton**: new executable; CLI (`--socket`, optional `--port` for attach); connect, handshake, attach-or-create, pump terminal ↔ session I/O until disconnect. No full login/REPL orchestration yet—echo or ping-over-session acceptable interim. **Exit criterion:** console binary connects to running daemon and exchanges session I/O frames. Tests: `tests/console/test_GeminiConsole.cpp` (minimal). *Status: implemented.*
 
-- **Stage 5 — Login over IPC**: wire [`LoginService::runCatalogLogin`](../../src/core/login/LoginService.h) through session I/O bridge inside daemon-side attach handler (mirror [`Main.cpp`](../../src/Main.cpp) login loop without REPL); `gemini-console` drives interactive login. **Exit criterion:** console completes `LOGON PLEASE:` flow and session is attached with account binding. *Status: planned.*
+- **Stage 5 — Login over IPC**: wire [`LoginService::runCatalogLogin`](../../src/core/login/LoginService.h) through session I/O bridge inside daemon-side attach handler (mirror [`Main.cpp`](../../src/Main.cpp) login loop without REPL); `gemini-console` drives interactive login. **Exit criterion:** console completes `LOGON PLEASE:` flow and session is attached with account binding. *Status: implemented.*
 
 - **Stage 6 — REPL, multi-console, graceful detach**: run [`Shell::runTclRepl`](../../src/userland/tcl/Shell.cpp) under `runExclusive` for attached sessions; second console blocked on serial runner; implement detach (console disconnect or message) without `destroySession`; re-attach to existing port. **Exit criterion:** two-console manual smoke (§9); detach/re-attach test; `WHO` correct per session. *Status: planned.*
 

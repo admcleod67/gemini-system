@@ -7,6 +7,7 @@
 
 #include "DaemonConfig.h"
 #include "GeminiSessionHost.h"
+#include "LoginService.h"
 
 #ifndef _WIN32
     #include "DaemonIpcServer.h"
@@ -14,6 +15,8 @@
 
 #include <iosfwd>
 #include <iostream>
+#include <mutex>
+#include <thread>
 #include <unordered_map>
 
 namespace PickShell {
@@ -29,9 +32,13 @@ namespace PickShell {
     private:
         void installSignalHandlers();
         void shutdown();
+        void applyHostPaths(GeminiSession &session);
         PickCore::AttachSessionResult attachSession(PickCore::SessionId requestedPort,
                                                     PickCore::IpcSessionChannel &channel);
         void detachSession(PickCore::SessionId port);
+        void startSessionLogin(PickCore::SessionId port);
+        void joinSessionLogin(PickCore::SessionId port);
+        void joinAllSessionLogins();
 
         PickCore::GeminiServiceDaemon &daemon_;
         GeminiSessionHost &host_;
@@ -39,6 +46,9 @@ namespace PickShell {
 #ifndef _WIN32
         PickCore::DaemonIpcServer ipcServer_;
         std::unordered_map<PickCore::SessionId, int> boundSessionPorts_;
+        std::unordered_map<PickCore::SessionId, PickCore::CatalogLoginPhase> loginPhaseByPort_;
+        std::unordered_map<PickCore::SessionId, std::thread> loginThreads_;
+        std::mutex loginThreadsMutex_;
 #endif
     };
 } // namespace PickShell

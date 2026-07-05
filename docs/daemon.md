@@ -193,7 +193,18 @@ gemini-console [--socket PATH] [--port N]
 - **`runIoPump`** reads stdin (or injected streams in tests) as **`SessionInput`**; writes **`SessionOutput`** / **`SessionDiagnostic`** to stdout/stderr.
 - After stdin EOF, the client drains pending daemon output briefly before exit.
 - **`DetachSession`** on clean shutdown (including SIGINT/SIGTERM); connection close also unbinds on the daemon side.
-- Catalogue login and REPL on the daemon side land in M14 Stage 5–6; Stage 4 is transport only.
+- After attach, the daemon runs catalogue login when a catalog root is configured (M14 Stage 5); Tcl REPL lands in Stage 6.
+
+### Catalogue login over IPC (M14 Stage 5)
+
+After a successful **`AttachSession`**, [`GeminiDaemonRunner`](../src/userland/tcl/GeminiDaemonRunner.cpp) starts catalogue login on a **worker thread** under [`runExclusive`](../src/userland/tcl/GeminiSessionHost.h) while the IPC poll loop continues pumping session I/O. Login uses the same [`LoginService::runCatalogLogin`](../src/core/login/LoginService.h) path as embedded [`Main.cpp`](../src/Main.cpp), reading/writing through the bridged [`GeminiSession`](../src/userland/tcl/GeminiSession.h) streams.
+
+- **Console role:** [`gemini-console`](../src/console/Main.cpp) **`runIoPump`** forwards terminal bytes; the operator sees **`LOGON PLEASE:`** on stdout and types the account (and password if required) on stdin.
+- **Daemon host paths:** session catalogue/filesystem roots come from daemon [`DaemonConfig`](../src/core/daemon/DaemonConfig.h) (`--catalog-root`, `--pick-root`, or env vars), applied via [`applyHostPathsToShell`](../src/userland/tcl/DefaultFileSystemRoot.h).
+- **Skip login** when no catalogue root is configured, or when re-attaching to a session that is already logged in.
+- **Auto-logon:** `MD,AUTO-LOGON` and daemon-process **`GEMINI_AUTO_LOGON`** / **`GEMINI_AUTO_LOGIN`** apply on the first login attempt per port (`ColdStartPortInit`); interactive credentials always flow from the console via IPC.
+- **Detach:** the IPC channel closes before session unbind, unblocking login reads; the login worker is joined before streams are cleared.
+- **REPL** is not started after login until M14 Stage 6.
 
 ### Message types (M14 session plane)
 
