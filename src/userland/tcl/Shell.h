@@ -19,6 +19,7 @@
 #include <optional>
 #include <set>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -93,6 +94,12 @@ namespace PickShell {
         void dispatch(const std::vector<std::string> &tokens, bool &quit, std::ostream &out);
 
         [[nodiscard]] std::string prompt() const;
+
+        /// Emit prompt, flush, then block on one input line (M15 REPL yield boundary).
+        [[nodiscard]] static bool readPromptedInputLine(std::istream &in,
+                                                        std::ostream &out,
+                                                        const std::string_view promptText,
+                                                        std::string &line);
 
         void registerCommands();
 

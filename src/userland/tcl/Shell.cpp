@@ -323,10 +323,10 @@ namespace PickShell {
         static constexpr std::string_view kBanner = "Gemini/TCL Developer Shell\n"
                                                     "Type HELP for usage; HELP-LIST lists HELP topics.\n";
         out.write(kBanner.data(), static_cast<std::streamsize>(kBanner.size()));
+        out.flush();
         for (;;) {
-            out << prompt() << std::flush;
             std::string line;
-            if (!std::getline(in, line)) {
+            if (!readPromptedInputLine(in, out, prompt(), line)) {
                 return ShellRunResult::ExitProcess;
             }
             bool quit = false;
@@ -338,6 +338,15 @@ namespace PickShell {
                 return ShellRunResult::EndSession;
             }
         }
+    }
+
+    bool Shell::readPromptedInputLine(std::istream &in,
+                                      std::ostream &out,
+                                      const std::string_view promptText,
+                                      std::string &line) {
+        out.write(promptText.data(), static_cast<std::streamsize>(promptText.size()));
+        out.flush();
+        return static_cast<bool>(std::getline(in, line));
     }
 
     void Shell::handleLine(const std::string &line, std::ostream &out, bool &quit) {

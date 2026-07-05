@@ -267,7 +267,7 @@ Implementation is sequenced into vertical stages. Each stage ships a test-locked
 
 - **Stage 3 — Login yield + daemon worker slices**: refactor [`GeminiDaemonRunner`](../../src/userland/tcl/GeminiDaemonRunner.cpp) to stop holding one `runExclusive` for the entire worker; integrate login [`LoginService::runCatalogLogin`](../../src/core/login/LoginService.h) reads with yield. **Exit criterion:** two-console integration test—both sessions display **`LOGON PLEASE:`** concurrently. Tests: extend `test_GeminiConsole.cpp`. *Status: implemented.*
 
-- **Stage 4 — Tcl REPL yield**: [`Shell::runTclRepl`](../../src/userland/tcl/Shell.cpp) yields at line input wait (prompt emitted before yield). **Exit criterion:** two consoles both show **`TCL>`** and accept lines interleaved. Tests: extend `test_GeminiConsole.cpp`. *Status: planned.*
+- **Stage 4 — Tcl REPL yield**: [`Shell::runTclRepl`](../../src/userland/tcl/Shell.cpp) yields at line input wait (prompt emitted before yield). **Exit criterion:** two consoles both show **`TCL>`** and accept lines interleaved. Tests: extend `test_GeminiConsole.cpp`. *Status: implemented.*
 
 - **Stage 5 — BASIC / VM input yield**: [`Runtime`](../../src/core/vm/Runtime.cpp) `INPUT` / `INPUT_STR` (and int input) yield through session streams; PROC/Tcl paths that block on session input covered as needed. **Exit criterion:** integration or unit test—session A blocked in BASIC **`INPUT`**, session B executes Tcl **`WHO`**. *Status: planned.*
 

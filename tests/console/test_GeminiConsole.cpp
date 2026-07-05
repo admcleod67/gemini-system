@@ -4,6 +4,7 @@
 #include <sstream>
 #include <string>
 #include <thread>
+#include <vector>
 
 #include "ConsoleConfig.h"
 #include "DaemonIpcClient.h"
@@ -21,6 +22,8 @@
     #include "GeminiDaemonRunner.h"
     #include "GeminiServiceDaemon.h"
     #include "GeminiSessionHost.h"
+
+    #include <pick_system/version.hpp>
 
 namespace {
     struct IgnoreSigPipe {
@@ -94,6 +97,35 @@ namespace {
         return ackPayload->sessionPort;
     }
 
+    void sendSessionInput(const int clientFd, const std::vector<std::uint8_t> &bytes) {
+        PickCore::DaemonIpcSessionDataPayload payload{};
+        payload.data = bytes;
+        PickCore::DaemonIpcFrame frame{};
+        frame.type = PickCore::DaemonIpcMessageType::SessionInput;
+        frame.payload = PickCore::encodeSessionDataPayload(payload);
+        sendFrame(clientFd, frame);
+    }
+
+    void sendSessionInputString(const int clientFd, const std::string &text) {
+        sendSessionInput(clientFd,
+                         std::vector<std::uint8_t>(reinterpret_cast<const std::uint8_t *>(text.data()),
+                                                   reinterpret_cast<const std::uint8_t *>(text.data() + text.size())));
+    }
+
+    bool waitForSessionRunState(PickShell::GeminiSessionHost &host,
+                                const PickCore::SessionId port,
+                                const PickCore::SessionRunState expected,
+                                const std::chrono::milliseconds timeout) {
+        const auto deadline = std::chrono::steady_clock::now() + timeout;
+        while (std::chrono::steady_clock::now() < deadline) {
+            if (host.sessionRunState(port) == expected) {
+                return true;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+        return host.sessionRunState(port) == expected;
+    }
+
     bool waitForSessionOutputContaining(const int clientFd,
                                         const std::string &needle,
                                         std::string &accumulated,
@@ -126,11 +158,22 @@ namespace {
         return accumulated.find(needle) != std::string::npos;
     }
 
+    void recvDetachSessionAckSkippingSessionIo(const int clientFd) {
+        for (;;) {
+            const PickCore::DaemonIpcFrame frame = recvFrame(clientFd);
+            if (frame.type == PickCore::DaemonIpcMessageType::DetachSessionAck) {
+                return;
+            }
+            REQUIRE((frame.type == PickCore::DaemonIpcMessageType::SessionOutput ||
+                     frame.type == PickCore::DaemonIpcMessageType::SessionDiagnostic));
+        }
+    }
+
     void detachAndClose(const int clientFd) {
         PickCore::DaemonIpcFrame detach{};
         detach.type = PickCore::DaemonIpcMessageType::DetachSession;
         sendFrame(clientFd, detach);
-        REQUIRE(recvFrame(clientFd).type == PickCore::DaemonIpcMessageType::DetachSessionAck);
+        recvDetachSessionAckSkippingSessionIo(clientFd);
         ::close(clientFd);
     }
 } // namespace
@@ -410,6 +453,130 @@ TEST_CASE("DaemonIpcClient two consoles display LOGON PLEASE concurrently") {
     CHECK(host.sessionRunState(portA) == PickCore::SessionRunState::WaitingForInput);
     CHECK(host.sessionRunState(portB) == PickCore::SessionRunState::WaitingForInput);
 
+    detachAndClose(clientFdA);
+    detachAndClose(clientFdB);
+    runner.requestShutdown();
+    runnerThread.join();
+}
+
+TEST_CASE("DaemonIpcClient two consoles display TCL prompt concurrently") {
+    const PickCore::DaemonConfig config = makeCatalogDaemonConfig();
+    std::filesystem::create_directories(config.socketPath.parent_path());
+
+    PickCore::GeminiServiceDaemon daemon = PickCore::GeminiServiceDaemon::create(config);
+    PickShell::GeminiSessionHost host(daemon, config.maxSessions);
+    PickShell::GeminiDaemonRunner runner(daemon, host, config);
+
+    std::thread runnerThread([&] {
+        std::ostringstream boot;
+        CHECK(runner.run(boot) == 0);
+    });
+
+    REQUIRE(waitForSocket(config.socketPath, std::chrono::milliseconds(2000)));
+
+    const int clientFdA = connectUnixSocket(config.socketPath);
+    REQUIRE(clientFdA >= 0);
+    sendHandshake(clientFdA);
+    recvHandshakeAck(clientFdA);
+    const PickCore::SessionId portA = attachNewSession(clientFdA);
+
+    const int clientFdB = connectUnixSocket(config.socketPath);
+    REQUIRE(clientFdB >= 0);
+    sendHandshake(clientFdB);
+    recvHandshakeAck(clientFdB);
+    const PickCore::SessionId portB = attachNewSession(clientFdB);
+    REQUIRE(portA != portB);
+
+    std::string outputA;
+    std::string outputB;
+    REQUIRE(waitForSessionOutputContaining(clientFdA, "LOGON PLEASE:", outputA,
+                                           std::chrono::milliseconds(2000)));
+    REQUIRE(waitForSessionOutputContaining(clientFdB, "LOGON PLEASE:", outputB,
+                                           std::chrono::milliseconds(2000)));
+
+    sendSessionInputString(clientFdA, "TST\n");
+    REQUIRE(waitForSessionOutputContaining(clientFdA, "TCL> ", outputA, std::chrono::milliseconds(2000)));
+    REQUIRE(waitForLoggedIn(host, portA, std::chrono::milliseconds(2000)));
+    REQUIRE(waitForSessionRunState(host, portA, PickCore::SessionRunState::WaitingForInput,
+                                   std::chrono::milliseconds(2000)));
+
+    PickShell::GeminiSession *sessionB = host.sessions().find(portB);
+    REQUIRE(sessionB != nullptr);
+    CHECK_FALSE(sessionB->loggedIn());
+    CHECK(outputB.find("TCL> ") == std::string::npos);
+    CHECK(host.sessionRunState(portB) == PickCore::SessionRunState::WaitingForInput);
+
+    sendSessionInputString(clientFdB, "TST\n");
+    REQUIRE(waitForSessionOutputContaining(clientFdB, "TCL> ", outputB, std::chrono::milliseconds(2000)));
+    REQUIRE(waitForLoggedIn(host, portB, std::chrono::milliseconds(2000)));
+    CHECK(host.sessionRunState(portA) == PickCore::SessionRunState::WaitingForInput);
+    CHECK(host.sessionRunState(portB) == PickCore::SessionRunState::WaitingForInput);
+
+    detachAndClose(clientFdA);
+    detachAndClose(clientFdB);
+    runner.requestShutdown();
+    runnerThread.join();
+}
+
+TEST_CASE("DaemonIpcClient two consoles accept interleaved Tcl commands") {
+    const PickCore::DaemonConfig config = makeCatalogDaemonConfig();
+    std::filesystem::create_directories(config.socketPath.parent_path());
+
+    PickCore::GeminiServiceDaemon daemon = PickCore::GeminiServiceDaemon::create(config);
+    PickShell::GeminiSessionHost host(daemon, config.maxSessions);
+    PickShell::GeminiDaemonRunner runner(daemon, host, config);
+
+    std::thread runnerThread([&] {
+        std::ostringstream boot;
+        CHECK(runner.run(boot) == 0);
+    });
+
+    REQUIRE(waitForSocket(config.socketPath, std::chrono::milliseconds(2000)));
+
+    const int clientFdA = connectUnixSocket(config.socketPath);
+    REQUIRE(clientFdA >= 0);
+    sendHandshake(clientFdA);
+    recvHandshakeAck(clientFdA);
+    const PickCore::SessionId portA = attachNewSession(clientFdA);
+
+    const int clientFdB = connectUnixSocket(config.socketPath);
+    REQUIRE(clientFdB >= 0);
+    sendHandshake(clientFdB);
+    recvHandshakeAck(clientFdB);
+    const PickCore::SessionId portB = attachNewSession(clientFdB);
+    REQUIRE(portA != portB);
+
+    std::string outputA;
+    std::string outputB;
+    sendSessionInputString(clientFdA, "TST\n");
+    sendSessionInputString(clientFdB, "TST\n");
+    REQUIRE(waitForSessionOutputContaining(clientFdA, "TCL> ", outputA, std::chrono::milliseconds(2000)));
+    REQUIRE(waitForSessionOutputContaining(clientFdB, "TCL> ", outputB, std::chrono::milliseconds(2000)));
+    REQUIRE(waitForLoggedIn(host, portA, std::chrono::milliseconds(2000)));
+    REQUIRE(waitForLoggedIn(host, portB, std::chrono::milliseconds(2000)));
+
+    PickShell::GeminiSession *sessionA = host.sessions().find(portA);
+    PickShell::GeminiSession *sessionB = host.sessions().find(portB);
+    REQUIRE(sessionA != nullptr);
+    REQUIRE(sessionB != nullptr);
+
+    const std::string whoLineA = std::to_string(sessionA->whoPort()) + " TST TST\n";
+    sendSessionInputString(clientFdA, "WHO\n");
+    REQUIRE(waitForSessionOutputContaining(clientFdA, whoLineA, outputA, std::chrono::milliseconds(2000)));
+    REQUIRE(waitForSessionRunState(host, portA, PickCore::SessionRunState::WaitingForInput,
+                                   std::chrono::milliseconds(2000)));
+
+    sendSessionInputString(clientFdB, "VERSION\n");
+    REQUIRE(waitForSessionOutputContaining(clientFdB, pick_system::version_string, outputB,
+                                           std::chrono::milliseconds(2000)));
+    REQUIRE(waitForSessionRunState(host, portB, PickCore::SessionRunState::WaitingForInput,
+                                   std::chrono::milliseconds(2000)));
+
+    sendSessionInputString(clientFdA, "WHO\n");
+    REQUIRE(waitForSessionOutputContaining(clientFdA, whoLineA, outputA, std::chrono::milliseconds(2000)));
+
+    sendSessionInputString(clientFdA, "QUIT\n");
+    sendSessionInputString(clientFdB, "QUIT\n");
     detachAndClose(clientFdA);
     detachAndClose(clientFdB);
     runner.requestShutdown();
