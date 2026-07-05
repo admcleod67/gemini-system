@@ -269,7 +269,7 @@ Implementation is sequenced into vertical stages. Each stage ships a test-locked
 
 - **Stage 4 — Tcl REPL yield**: [`Shell::runTclRepl`](../../src/userland/tcl/Shell.cpp) yields at line input wait (prompt emitted before yield). **Exit criterion:** two consoles both show **`TCL>`** and accept lines interleaved. Tests: extend `test_GeminiConsole.cpp`. *Status: implemented.*
 
-- **Stage 5 — BASIC / VM input yield**: [`Runtime`](../../src/core/vm/Runtime.cpp) `INPUT` / `INPUT_STR` (and int input) yield through session streams; PROC/Tcl paths that block on session input covered as needed. **Exit criterion:** integration or unit test—session A blocked in BASIC **`INPUT`**, session B executes Tcl **`WHO`**. *Status: planned.*
+- **Stage 5 — BASIC / VM input yield**: [`Runtime`](../../src/core/vm/Runtime.cpp) `INPUT` / `INPUT_STR` (and int input) yield through session streams; PROC/Tcl paths that block on session input covered as needed. **Exit criterion:** integration or unit test—session A blocked in BASIC **`INPUT`**, session B executes Tcl **`WHO`**. *Status: implemented.*
 
 - **Stage 6 — Fairness policy + debugger yield (stretch)**: round-robin runnable queue; optional assembler **`STEP`** / debug wait yield; starvation regression test. **Exit criterion:** three-session round-robin smoke under synthetic input; debugger yield documented or explicitly deferred with stub. *Status: planned.*
 

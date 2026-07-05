@@ -19,6 +19,7 @@
     #include "DaemonConfig.h"
     #include "DaemonIpcProtocol.h"
     #include "DaemonIpcTestUtil.h"
+    #include "FileSystem.h"
     #include "GeminiDaemonRunner.h"
     #include "GeminiServiceDaemon.h"
     #include "GeminiSessionHost.h"
@@ -50,6 +51,40 @@ namespace {
             std::ofstream accounts(gem / "ACCOUNTS.json");
             accounts << R"({"accounts":[{"name":"TST","root":"accounts/TST"}]})";
         }
+
+        PickCore::DaemonConfig config{};
+        config.maxSessions = 2;
+        config.socketPath = root / "gemini.sock";
+        config.hostPaths.geminiCatalogRoot = gem;
+        config.hostPaths.pickFilesystemRoot = pick;
+        return config;
+    }
+
+    void seedVocAndBp(const std::filesystem::path &fsRoot) {
+        PickFS::FileSystem fs(fsRoot);
+        fs.createFile("VOC");
+        fs.createFile("BP");
+        fs.write("VOC", PickFS::Record("BP", "001 F\n002 BP\n003 /gemini/fs/DM/BP\n"));
+    }
+
+    void writeProgramSourceRecord(const std::filesystem::path &fsRoot,
+                                  const std::string &programName,
+                                  const std::string &source) {
+        PickFS::FileSystem fs(fsRoot);
+        fs.write("BP", PickFS::Record(programName, source));
+    }
+
+    PickCore::DaemonConfig makeCatalogDaemonConfigWithInputProgram() {
+        const auto root = uniqueDaemonIpcTempDir();
+        const auto gem = root / "gemini";
+        const auto pick = gem / "accounts" / "TST";
+        std::filesystem::create_directories(pick);
+        {
+            std::ofstream accounts(gem / "ACCOUNTS.json");
+            accounts << R"({"accounts":[{"name":"TST","root":"accounts/TST"}]})";
+        }
+        seedVocAndBp(pick);
+        writeProgramSourceRecord(pick, "INPUTWAIT", "10 INPUT A\n20 END\n");
 
         PickCore::DaemonConfig config{};
         config.maxSessions = 2;
@@ -156,6 +191,17 @@ namespace {
             accumulated.append(reinterpret_cast<const char *>(payload->data.data()), payload->data.size());
         }
         return accumulated.find(needle) != std::string::npos;
+    }
+
+    bool loginAndWaitForTclPrompt(const int clientFd,
+                                  PickShell::GeminiSessionHost &host,
+                                  const PickCore::SessionId port,
+                                  std::string &output) {
+        sendSessionInputString(clientFd, "TST\n");
+        if (!waitForSessionOutputContaining(clientFd, "TCL> ", output, std::chrono::milliseconds(2000))) {
+            return false;
+        }
+        return waitForLoggedIn(host, port, std::chrono::milliseconds(2000));
     }
 
     void recvDetachSessionAckSkippingSessionIo(const int clientFd) {
@@ -575,6 +621,65 @@ TEST_CASE("DaemonIpcClient two consoles accept interleaved Tcl commands") {
     sendSessionInputString(clientFdA, "WHO\n");
     REQUIRE(waitForSessionOutputContaining(clientFdA, whoLineA, outputA, std::chrono::milliseconds(2000)));
 
+    sendSessionInputString(clientFdA, "QUIT\n");
+    sendSessionInputString(clientFdB, "QUIT\n");
+    detachAndClose(clientFdA);
+    detachAndClose(clientFdB);
+    runner.requestShutdown();
+    runnerThread.join();
+}
+
+TEST_CASE("DaemonIpcClient session blocked in BASIC INPUT allows other session Tcl WHO") {
+    const PickCore::DaemonConfig config = makeCatalogDaemonConfigWithInputProgram();
+    std::filesystem::create_directories(config.socketPath.parent_path());
+
+    PickCore::GeminiServiceDaemon daemon = PickCore::GeminiServiceDaemon::create(config);
+    PickShell::GeminiSessionHost host(daemon, config.maxSessions);
+    PickShell::GeminiDaemonRunner runner(daemon, host, config);
+
+    std::thread runnerThread([&] {
+        std::ostringstream boot;
+        CHECK(runner.run(boot) == 0);
+    });
+
+    REQUIRE(waitForSocket(config.socketPath, std::chrono::milliseconds(2000)));
+
+    const int clientFdA = connectUnixSocket(config.socketPath);
+    REQUIRE(clientFdA >= 0);
+    sendHandshake(clientFdA);
+    recvHandshakeAck(clientFdA);
+    const PickCore::SessionId portA = attachNewSession(clientFdA);
+
+    std::string outputA;
+    REQUIRE(loginAndWaitForTclPrompt(clientFdA, host, portA, outputA));
+
+    sendSessionInputString(clientFdA, "RUN INPUTWAIT\n");
+    REQUIRE(waitForSessionRunState(host, portA, PickCore::SessionRunState::WaitingForInput,
+                                   std::chrono::milliseconds(2000)));
+
+    const int clientFdB = connectUnixSocket(config.socketPath);
+    REQUIRE(clientFdB >= 0);
+    sendHandshake(clientFdB);
+    recvHandshakeAck(clientFdB);
+    const PickCore::SessionId portB = attachNewSession(clientFdB);
+    REQUIRE(portA != portB);
+
+    std::string outputB;
+    REQUIRE(loginAndWaitForTclPrompt(clientFdB, host, portB, outputB));
+
+    PickShell::GeminiSession *sessionA = host.sessions().find(portA);
+    PickShell::GeminiSession *sessionB = host.sessions().find(portB);
+    REQUIRE(sessionA != nullptr);
+    REQUIRE(sessionB != nullptr);
+
+    const std::string whoLineB = std::to_string(sessionB->whoPort()) + " TST TST\n";
+    sendSessionInputString(clientFdB, "WHO\n");
+    REQUIRE(waitForSessionOutputContaining(clientFdB, whoLineB, outputB, std::chrono::milliseconds(2000)));
+    REQUIRE(waitForSessionRunState(host, portB, PickCore::SessionRunState::WaitingForInput,
+                                   std::chrono::milliseconds(2000)));
+    CHECK(host.sessionRunState(portA) == PickCore::SessionRunState::WaitingForInput);
+
+    sendSessionInputString(clientFdA, "42\n");
     sendSessionInputString(clientFdA, "QUIT\n");
     sendSessionInputString(clientFdB, "QUIT\n");
     detachAndClose(clientFdA);

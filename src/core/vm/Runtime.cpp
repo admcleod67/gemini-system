@@ -269,6 +269,11 @@ namespace PickVM {
             return pos == trimmed.size();
         }
 
+        /// M15 VM input yield boundary — transport yield occurs in session IpcSessionChannel.
+        bool readInputLine(std::istream &in, std::string &line) {
+            return static_cast<bool>(std::getline(in, line));
+        }
+
     } // namespace
 
     std::ostream &Runtime::out() const {
@@ -547,7 +552,7 @@ namespace PickVM {
 
             case OpCode::InputInt: {
                 std::string line;
-                if (!std::getline(in(), line)) {
+                if (!readInputLine(in(), line)) {
                     throw std::runtime_error("INPUT_INT: end of input");
                 }
                 int value = 0;
@@ -560,7 +565,7 @@ namespace PickVM {
 
             case OpCode::InputStr: {
                 std::string line;
-                if (!std::getline(in(), line)) {
+                if (!readInputLine(in(), line)) {
                     throw std::runtime_error("INPUT_STR: end of input");
                 }
                 const std::size_t first = line.find_first_not_of(" \t\r\n");
