@@ -258,7 +258,7 @@ Implementation is sequenced into vertical stages. Each stage ships a test-locked
 
 - **Stage 5 — Login over IPC**: wire [`LoginService::runCatalogLogin`](../../src/core/login/LoginService.h) through session I/O bridge inside daemon-side attach handler (mirror [`Main.cpp`](../../src/Main.cpp) login loop without REPL); `gemini-console` drives interactive login. **Exit criterion:** console completes `LOGON PLEASE:` flow and session is attached with account binding. *Status: implemented.*
 
-- **Stage 6 — REPL, multi-console, graceful detach**: run [`Shell::runTclRepl`](../../src/userland/tcl/Shell.cpp) under `runExclusive` for attached sessions; second console blocked on serial runner; implement detach (console disconnect or message) without `destroySession`; re-attach to existing port. **Exit criterion:** two-console manual smoke (§9); detach/re-attach test; `WHO` correct per session. *Status: planned.*
+- **Stage 6 — REPL, multi-console, graceful detach**: run [`Shell::runTclRepl`](../../src/userland/tcl/Shell.cpp) under `runExclusive` for attached sessions; second console blocked on serial runner; implement detach (console disconnect or message) without `destroySession`; re-attach to existing port. **Exit criterion:** two-console manual smoke (§9); detach/re-attach test; `WHO` correct per session. *Status: implemented.*
 
 - **Stage 7 — Docs + closes M14**: finalize [`docs/daemon.md`](../daemon.md) session plane; add [`docs/console.md`](../console.md); update [`docs/session.md`](../session.md), [`docs/gemini-bootstrap.md`](../gemini-bootstrap.md), milestone index; audit §9 completion criteria; full test suite + both smoke checklists. **Closes Milestone 14.** *Status: planned.*
 

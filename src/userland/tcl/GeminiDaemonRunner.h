@@ -36,9 +36,9 @@ namespace PickShell {
         PickCore::AttachSessionResult attachSession(PickCore::SessionId requestedPort,
                                                     PickCore::IpcSessionChannel &channel);
         void detachSession(PickCore::SessionId port);
-        void startSessionLogin(PickCore::SessionId port);
-        void joinSessionLogin(PickCore::SessionId port);
-        void joinAllSessionLogins();
+        void startSessionWorker(PickCore::SessionId port);
+        void joinSessionWorker(PickCore::SessionId port);
+        void joinAllSessionWorkers();
 
         PickCore::GeminiServiceDaemon &daemon_;
         GeminiSessionHost &host_;
@@ -47,8 +47,8 @@ namespace PickShell {
         PickCore::DaemonIpcServer ipcServer_;
         std::unordered_map<PickCore::SessionId, int> boundSessionPorts_;
         std::unordered_map<PickCore::SessionId, PickCore::CatalogLoginPhase> loginPhaseByPort_;
-        std::unordered_map<PickCore::SessionId, std::thread> loginThreads_;
-        std::mutex loginThreadsMutex_;
+        std::unordered_map<PickCore::SessionId, std::thread> sessionWorkerThreads_;
+        std::mutex sessionWorkerThreadsMutex_;
 #endif
     };
 } // namespace PickShell

@@ -2,6 +2,7 @@
 
 #include "DefaultFileSystemRoot.h"
 #include "GeminiSession.h"
+#include "Shell.h"
 
 #include <pick_system/version.hpp>
 
@@ -50,31 +51,31 @@ namespace PickShell {
         applyHostPathsToShell(session.shell(), config_.hostPaths);
     }
 
-    void GeminiDaemonRunner::joinSessionLogin(const PickCore::SessionId port) {
+    void GeminiDaemonRunner::joinSessionWorker(const PickCore::SessionId port) {
         std::thread worker;
         {
-            const std::lock_guard lock(loginThreadsMutex_);
-            const auto it = loginThreads_.find(port);
-            if (it == loginThreads_.end()) {
+            const std::lock_guard lock(sessionWorkerThreadsMutex_);
+            const auto it = sessionWorkerThreads_.find(port);
+            if (it == sessionWorkerThreads_.end()) {
                 return;
             }
             worker = std::move(it->second);
-            loginThreads_.erase(it);
+            sessionWorkerThreads_.erase(it);
         }
         if (worker.joinable()) {
             worker.join();
         }
     }
 
-    void GeminiDaemonRunner::joinAllSessionLogins() {
+    void GeminiDaemonRunner::joinAllSessionWorkers() {
         std::vector<std::thread> workers;
         {
-            const std::lock_guard lock(loginThreadsMutex_);
-            workers.reserve(loginThreads_.size());
-            for (auto &entry : loginThreads_) {
+            const std::lock_guard lock(sessionWorkerThreadsMutex_);
+            workers.reserve(sessionWorkerThreads_.size());
+            for (auto &entry : sessionWorkerThreads_) {
                 workers.push_back(std::move(entry.second));
             }
-            loginThreads_.clear();
+            sessionWorkerThreads_.clear();
         }
         for (std::thread &worker : workers) {
             if (worker.joinable()) {
@@ -83,28 +84,26 @@ namespace PickShell {
         }
     }
 
-    void GeminiDaemonRunner::startSessionLogin(const PickCore::SessionId port) {
+    void GeminiDaemonRunner::startSessionWorker(const PickCore::SessionId port) {
         GeminiSession *session = host_.sessions().find(port);
-        if (session == nullptr || session->loggedIn()) {
-            return;
-        }
-        applyHostPaths(*session);
-        if (!session->shell().geminiCatalogRoot().has_value()) {
+        if (session == nullptr) {
             return;
         }
 
-        joinSessionLogin(port);
+        applyHostPaths(*session);
+        joinSessionWorker(port);
 
         std::thread worker([this, port] {
             host_.runExclusive(port, [this, port] {
                 GeminiSession *activeSession = host_.sessions().find(port);
-                if (activeSession == nullptr || activeSession->loggedIn()) {
+                if (activeSession == nullptr) {
                     return;
                 }
 
                 Shell &shell = activeSession->shell();
                 const std::optional<std::filesystem::path> &catalog = shell.geminiCatalogRoot();
                 if (!catalog.has_value()) {
+                    (void) shell.runTclRepl();
                     return;
                 }
 
@@ -113,20 +112,31 @@ namespace PickShell {
                     phase = it->second;
                 }
 
-                const std::optional<PickCore::UserSession> userSession =
-                    PickCore::LoginService::runCatalogLogin(activeSession->input(), activeSession->output(), *catalog,
-                                                            shell.fileSystemRoot(), &activeSession->diagnostic(),
-                                                            phase);
-                loginPhaseByPort_[port] = PickCore::CatalogLoginPhase::InteractiveOnly;
+                for (;;) {
+                    if (!activeSession->loggedIn()) {
+                        const std::optional<PickCore::UserSession> userSession =
+                            PickCore::LoginService::runCatalogLogin(activeSession->input(), activeSession->output(),
+                                                                    *catalog, shell.fileSystemRoot(),
+                                                                    &activeSession->diagnostic(), phase);
+                        loginPhaseByPort_[port] = PickCore::CatalogLoginPhase::InteractiveOnly;
+                        if (!userSession.has_value()) {
+                            return;
+                        }
+                        activeSession->attach(*userSession);
+                    }
 
-                if (userSession.has_value()) {
-                    activeSession->attach(*userSession);
+                    const ShellRunResult result = shell.runTclRepl();
+                    if (result == ShellRunResult::ExitProcess) {
+                        return;
+                    }
+
+                    phase = PickCore::CatalogLoginPhase::InteractiveOnly;
                 }
             });
         });
 
-        const std::lock_guard lock(loginThreadsMutex_);
-        loginThreads_[port] = std::move(worker);
+        const std::lock_guard lock(sessionWorkerThreadsMutex_);
+        sessionWorkerThreads_[port] = std::move(worker);
     }
 
     PickCore::AttachSessionResult GeminiDaemonRunner::attachSession(const PickCore::SessionId requestedPort,
@@ -158,13 +168,13 @@ namespace PickShell {
         session->setDiagnosticStream(&channel.diagnostic());
         boundSessionPorts_[port] = 1;
 
-        startSessionLogin(port);
+        startSessionWorker(port);
 
         return {PickCore::AttachSessionStatus::Ok, port};
     }
 
     void GeminiDaemonRunner::detachSession(const PickCore::SessionId port) {
-        joinSessionLogin(port);
+        joinSessionWorker(port);
         boundSessionPorts_.erase(port);
 
         GeminiSession *session = host_.sessions().find(port);
@@ -230,7 +240,7 @@ namespace PickShell {
             detachSession(port);
         }
         boundSessionPorts_.clear();
-        joinAllSessionLogins();
+        joinAllSessionWorkers();
         ipcServer_.stop();
 #endif
         host_.destroyAllSessions();

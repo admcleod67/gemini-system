@@ -11,6 +11,7 @@
 
 #ifndef _WIN32
     #include <fcntl.h>
+    #include <poll.h>
     #include <unistd.h>
 
     #include <filesystem>
@@ -64,6 +65,25 @@ namespace {
             PickCore::decodeSessionDataPayload(frame.payload);
         REQUIRE(payload.has_value());
         return payload->data;
+    }
+
+    std::string drainSessionOutput(const int clientFd) {
+        std::string result;
+        int idlePolls = 0;
+        while (idlePolls < 10) {
+            pollfd pfd{};
+            pfd.fd = clientFd;
+            pfd.events = POLLIN;
+            const int pollResult = ::poll(&pfd, 1, 50);
+            if (pollResult <= 0 || (pfd.revents & POLLIN) == 0) {
+                ++idlePolls;
+                continue;
+            }
+            idlePolls = 0;
+            const std::vector<std::uint8_t> chunk = recvSessionOutput(clientFd);
+            result.append(reinterpret_cast<const char *>(chunk.data()), chunk.size());
+        }
+        return result;
     }
 } // namespace
 
@@ -344,33 +364,15 @@ TEST_CASE("GeminiDaemonRunner session I/O bridge round-trips bytes over IPC") {
     sendHandshake(clientFd);
     recvHandshakeAck(clientFd);
 
-    const PickCore::SessionId port = attachNewSession(clientFd);
+    (void) attachNewSession(clientFd);
 
-    std::atomic<bool> echoReady{false};
-    std::thread echoThread([&] {
-        host.runExclusive(port, [&] {
-            PickShell::GeminiSession *session = host.sessions().find(port);
-            REQUIRE(session != nullptr);
-            echoReady.store(true);
-            const int value = session->input().get();
-            session->output().put(static_cast<char>(value));
-            session->output().flush();
-        });
-    });
+    const std::string banner = drainSessionOutput(clientFd);
+    CHECK(banner.find("Gemini/TCL Developer Shell") != std::string::npos);
 
-    const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(2000);
-    while (!echoReady.load() && std::chrono::steady_clock::now() < deadline) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    }
-    REQUIRE(echoReady.load());
+    sendSessionInput(clientFd, {'W', 'H', 'O', '\n', 'Q', 'U', 'I', 'T', '\n'});
+    const std::string commandOutput = drainSessionOutput(clientFd);
+    CHECK(commandOutput.find("0 - -\n") != std::string::npos);
 
-    sendSessionInput(clientFd, {'Z'});
-
-    const std::vector<std::uint8_t> output = recvSessionOutput(clientFd);
-    REQUIRE(output.size() == 1);
-    CHECK(output[0] == 'Z');
-
-    echoThread.join();
     ::close(clientFd);
     runner.requestShutdown();
     runnerThread.join();

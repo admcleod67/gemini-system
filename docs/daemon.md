@@ -172,7 +172,7 @@ Those are [Milestone 14](milestones/14-multi-session-console-support.md). M13 `R
 - **`DetachSession`** or connection close unbinds the connection from the session; the session object remains in the table.
 - **At most one live console per session** — a second attach to the same port receives `SessionAlreadyBound`.
 
-Login and REPL orchestration over the bridge land in M14 Stage 5–6; Stage 3 wires transport only.
+Login and REPL orchestration over the bridge is implemented in M14 Stage 5–6; Stage 3 wires transport only.
 
 ### gemini-console skeleton (M14 Stage 4)
 
@@ -193,18 +193,20 @@ gemini-console [--socket PATH] [--port N]
 - **`runIoPump`** reads stdin (or injected streams in tests) as **`SessionInput`**; writes **`SessionOutput`** / **`SessionDiagnostic`** to stdout/stderr.
 - After stdin EOF, the client drains pending daemon output briefly before exit.
 - **`DetachSession`** on clean shutdown (including SIGINT/SIGTERM); connection close also unbinds on the daemon side.
-- After attach, the daemon runs catalogue login when a catalog root is configured (M14 Stage 5); Tcl REPL lands in Stage 6.
+- After attach, the daemon runs catalogue login and Tcl REPL when a catalog root is configured (M14 Stage 5–6).
 
-### Catalogue login over IPC (M14 Stage 5)
+### Session worker over IPC (M14 Stage 5–6)
 
-After a successful **`AttachSession`**, [`GeminiDaemonRunner`](../src/userland/tcl/GeminiDaemonRunner.cpp) starts catalogue login on a **worker thread** under [`runExclusive`](../src/userland/tcl/GeminiSessionHost.h) while the IPC poll loop continues pumping session I/O. Login uses the same [`LoginService::runCatalogLogin`](../src/core/login/LoginService.h) path as embedded [`Main.cpp`](../src/Main.cpp), reading/writing through the bridged [`GeminiSession`](../src/userland/tcl/GeminiSession.h) streams.
+After a successful **`AttachSession`**, [`GeminiDaemonRunner`](../src/userland/tcl/GeminiDaemonRunner.cpp) starts a **session worker thread** under [`runExclusive`](../src/userland/tcl/GeminiSessionHost.h) while the IPC poll loop continues pumping session I/O. The worker mirrors embedded [`Main.cpp`](../src/Main.cpp): catalogue login (when configured), then [`Shell::runTclRepl`](../src/userland/tcl/Shell.cpp), looping back to interactive login after **`LOGOFF`**.
 
-- **Console role:** [`gemini-console`](../src/console/Main.cpp) **`runIoPump`** forwards terminal bytes; the operator sees **`LOGON PLEASE:`** on stdout and types the account (and password if required) on stdin.
+- **Console role:** [`gemini-console`](../src/console/Main.cpp) **`runIoPump`** forwards terminal bytes; the operator sees **`LOGON PLEASE:`**, the Tcl banner, REPL prompts, and command output on stdout.
 - **Daemon host paths:** session catalogue/filesystem roots come from daemon [`DaemonConfig`](../src/core/daemon/DaemonConfig.h) (`--catalog-root`, `--pick-root`, or env vars), applied via [`applyHostPathsToShell`](../src/userland/tcl/DefaultFileSystemRoot.h).
-- **Skip login** when no catalogue root is configured, or when re-attaching to a session that is already logged in.
+- **No catalogue:** REPL runs immediately (same as `Main.cpp`).
+- **Re-attach while logged in:** login is skipped; REPL starts on the existing session binding.
 - **Auto-logon:** `MD,AUTO-LOGON` and daemon-process **`GEMINI_AUTO_LOGON`** / **`GEMINI_AUTO_LOGIN`** apply on the first login attempt per port (`ColdStartPortInit`); interactive credentials always flow from the console via IPC.
-- **Detach:** the IPC channel closes before session unbind, unblocking login reads; the login worker is joined before streams are cleared.
-- **REPL** is not started after login until M14 Stage 6.
+- **Graceful detach:** [`DaemonIpcServer::detachConnection`](../src/core/daemon/DaemonIpcServer.cpp) closes the IPC channel before unbind so blocked REPL reads receive EOF; the session worker is joined and streams are cleared **without** [`destroySession`](../src/userland/tcl/GeminiSessionHost.h). Login state and daemon-assigned **`whoPort`** are preserved for re-attach.
+- **`QUIT` / stdin EOF:** ends the REPL and exits the worker; the session object remains in the table (still logged in after **`QUIT`**, logged out after **`LOGOFF`**).
+- **Serial runner:** only one attached session runs interpreter work at a time; a second console’s worker blocks on `runExclusive` until the first releases the token (login, REPL, or both).
 
 ### Message types (M14 session plane)
 
@@ -226,7 +228,7 @@ Wire types and payload layouts are defined in [`DaemonIpcProtocol.h`](../src/cor
 - **AttachSession** before any session I/O on that connection
 - Session I/O frames are **connection-scoped** (no port field after attach)
 - **SessionInput** is client → server only; **SessionOutput** and **SessionDiagnostic** are server → client only
-- **DetachSession** or connection close ends the binding; the session object may remain in the table (M14 Stage 6)
+- **DetachSession** or connection close ends the binding; the session object may remain in the table with login state preserved (M14 Stage 6)
 - Max data chunk per session I/O frame: **65532 bytes** (`kDaemonIpcMaxSessionDataSize`)
 
 **M14 error codes** (delivered in `Error` frames): `SessionNotFound`, `SessionAlreadyBound`, `NotAttached`.

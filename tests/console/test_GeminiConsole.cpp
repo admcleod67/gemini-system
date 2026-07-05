@@ -1,6 +1,5 @@
 #include <doctest/doctest.h>
 
-#include <atomic>
 #include <chrono>
 #include <sstream>
 #include <string>
@@ -59,6 +58,14 @@ namespace {
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
         return false;
+    }
+
+    std::string runIoPumpWithInput(PickCore::DaemonIpcClient &client, const std::string &input) {
+        std::istringstream in(input);
+        std::ostringstream output;
+        std::ostringstream diagnostic;
+        CHECK(client.runIoPump(in, output, diagnostic) == 0);
+        return output.str();
     }
 } // namespace
 
@@ -164,35 +171,12 @@ TEST_CASE("DaemonIpcClient runIoPump round-trips bytes over IPC") {
     PickCore::DaemonIpcClient client(config.socketPath);
     client.connect();
     client.handshake();
-    const PickCore::SessionId port = client.attachSession(0);
+    (void) client.attachSession(0);
 
-    std::atomic<bool> echoReady{false};
-    std::thread echoThread([&] {
-        host.runExclusive(port, [&] {
-            PickShell::GeminiSession *session = host.sessions().find(port);
-            REQUIRE(session != nullptr);
-            echoReady.store(true);
-            const int value = session->input().get();
-            session->output().put(static_cast<char>(value));
-            session->output().flush();
-        });
-    });
+    const std::string output = runIoPumpWithInput(client, "WHO\nQUIT\n");
 
-    const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(2000);
-    while (!echoReady.load() && std::chrono::steady_clock::now() < deadline) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    }
-    REQUIRE(echoReady.load());
-
-    std::istringstream input("Z");
-    std::ostringstream output;
-    std::ostringstream diagnostic;
-
-    std::thread pumpThread([&] { CHECK(client.runIoPump(input, output, diagnostic) == 0); });
-    pumpThread.join();
-    echoThread.join();
-
-    CHECK(output.str() == "Z");
+    CHECK(output.find("Gemini/TCL Developer Shell") != std::string::npos);
+    CHECK(output.find("0 - -\n") != std::string::npos);
 
     client.disconnect();
     runner.requestShutdown();
@@ -280,6 +264,170 @@ TEST_CASE("DaemonIpcClient re-attaches to logged-in session without re-login") {
     CHECK(session->sessionAccount() == "TST");
 
     secondClient.disconnect();
+    runner.requestShutdown();
+    runnerThread.join();
+}
+
+TEST_CASE("DaemonIpcClient runs WHO over IPC after catalogue login") {
+    const PickCore::DaemonConfig config = makeCatalogDaemonConfig();
+    std::filesystem::create_directories(config.socketPath.parent_path());
+
+    PickCore::GeminiServiceDaemon daemon = PickCore::GeminiServiceDaemon::create(config);
+    PickShell::GeminiSessionHost host(daemon, config.maxSessions);
+    PickShell::GeminiDaemonRunner runner(daemon, host, config);
+
+    std::thread runnerThread([&] {
+        std::ostringstream boot;
+        CHECK(runner.run(boot) == 0);
+    });
+
+    REQUIRE(waitForSocket(config.socketPath, std::chrono::milliseconds(2000)));
+
+    PickCore::DaemonIpcClient client(config.socketPath);
+    client.connect();
+    client.handshake();
+    const PickCore::SessionId port = client.attachSession(0);
+
+    const std::string output = runIoPumpWithInput(client, "TST\nWHO\nQUIT\n");
+
+    PickShell::GeminiSession *session = host.sessions().find(port);
+    REQUIRE(session != nullptr);
+    const std::string whoLine = std::to_string(session->whoPort()) + " TST TST\n";
+
+    CHECK(output.find("LOGON PLEASE:") != std::string::npos);
+    CHECK(output.find("Gemini/TCL Developer Shell") != std::string::npos);
+    CHECK(output.find(whoLine) != std::string::npos);
+
+    client.disconnect();
+    runner.requestShutdown();
+    runnerThread.join();
+}
+
+TEST_CASE("DaemonIpcClient two consoles receive distinct WHO ports") {
+    const PickCore::DaemonConfig config = makeCatalogDaemonConfig();
+    std::filesystem::create_directories(config.socketPath.parent_path());
+
+    PickCore::GeminiServiceDaemon daemon = PickCore::GeminiServiceDaemon::create(config);
+    PickShell::GeminiSessionHost host(daemon, config.maxSessions);
+    PickShell::GeminiDaemonRunner runner(daemon, host, config);
+
+    std::thread runnerThread([&] {
+        std::ostringstream boot;
+        CHECK(runner.run(boot) == 0);
+    });
+
+    REQUIRE(waitForSocket(config.socketPath, std::chrono::milliseconds(2000)));
+
+    PickCore::DaemonIpcClient clientA(config.socketPath);
+    clientA.connect();
+    clientA.handshake();
+    const PickCore::SessionId portA = clientA.attachSession(0);
+
+    PickCore::DaemonIpcClient clientB(config.socketPath);
+    clientB.connect();
+    clientB.handshake();
+    const PickCore::SessionId portB = clientB.attachSession(0);
+    REQUIRE(portA != portB);
+
+    const std::string outputA = runIoPumpWithInput(clientA, "TST\nWHO\nQUIT\n");
+    const std::string outputB = runIoPumpWithInput(clientB, "TST\nWHO\nQUIT\n");
+
+    PickShell::GeminiSession *sessionA = host.sessions().find(portA);
+    PickShell::GeminiSession *sessionB = host.sessions().find(portB);
+    REQUIRE(sessionA != nullptr);
+    REQUIRE(sessionB != nullptr);
+
+    const std::string whoLineA = std::to_string(sessionA->whoPort()) + " TST TST\n";
+    const std::string whoLineB = std::to_string(sessionB->whoPort()) + " TST TST\n";
+    CHECK(sessionA->whoPort() != sessionB->whoPort());
+    CHECK(outputA.find(whoLineA) != std::string::npos);
+    CHECK(outputB.find(whoLineB) != std::string::npos);
+
+    clientA.disconnect();
+    clientB.disconnect();
+    runner.requestShutdown();
+    runnerThread.join();
+}
+
+TEST_CASE("DaemonIpcClient detach and re-attach preserves WHO without re-login") {
+    const PickCore::DaemonConfig config = makeCatalogDaemonConfig();
+    std::filesystem::create_directories(config.socketPath.parent_path());
+
+    PickCore::GeminiServiceDaemon daemon = PickCore::GeminiServiceDaemon::create(config);
+    PickShell::GeminiSessionHost host(daemon, config.maxSessions);
+    PickShell::GeminiDaemonRunner runner(daemon, host, config);
+
+    std::thread runnerThread([&] {
+        std::ostringstream boot;
+        CHECK(runner.run(boot) == 0);
+    });
+
+    REQUIRE(waitForSocket(config.socketPath, std::chrono::milliseconds(2000)));
+
+    PickCore::DaemonIpcClient firstClient(config.socketPath);
+    firstClient.connect();
+    firstClient.handshake();
+    const PickCore::SessionId port = firstClient.attachSession(0);
+
+    const std::string loginOutput = runIoPumpWithInput(firstClient, "TST\nWHO\n");
+    REQUIRE(waitForLoggedIn(host, port, std::chrono::milliseconds(2000)));
+
+    PickShell::GeminiSession *session = host.sessions().find(port);
+    REQUIRE(session != nullptr);
+    const int whoPort = session->whoPort();
+    const std::string whoLine = std::to_string(whoPort) + " TST TST\n";
+    CHECK(loginOutput.find(whoLine) != std::string::npos);
+
+    firstClient.detachSession();
+    firstClient.disconnect();
+
+    REQUIRE(session->loggedIn());
+    CHECK(session->whoPort() == whoPort);
+
+    PickCore::DaemonIpcClient secondClient(config.socketPath);
+    secondClient.connect();
+    secondClient.handshake();
+    CHECK(secondClient.attachSession(port) == port);
+
+    const std::string reattachOutput = runIoPumpWithInput(secondClient, "WHO\nQUIT\n");
+    CHECK(reattachOutput.find("LOGON PLEASE:") == std::string::npos);
+    CHECK(reattachOutput.find(whoLine) != std::string::npos);
+
+    secondClient.disconnect();
+    runner.requestShutdown();
+    runnerThread.join();
+}
+
+TEST_CASE("DaemonIpcClient LOGOFF while attached returns to login prompt") {
+    const PickCore::DaemonConfig config = makeCatalogDaemonConfig();
+    std::filesystem::create_directories(config.socketPath.parent_path());
+
+    PickCore::GeminiServiceDaemon daemon = PickCore::GeminiServiceDaemon::create(config);
+    PickShell::GeminiSessionHost host(daemon, config.maxSessions);
+    PickShell::GeminiDaemonRunner runner(daemon, host, config);
+
+    std::thread runnerThread([&] {
+        std::ostringstream boot;
+        CHECK(runner.run(boot) == 0);
+    });
+
+    REQUIRE(waitForSocket(config.socketPath, std::chrono::milliseconds(2000)));
+
+    PickCore::DaemonIpcClient client(config.socketPath);
+    client.connect();
+    client.handshake();
+    const PickCore::SessionId port = client.attachSession(0);
+
+    const std::string output = runIoPumpWithInput(client, "TST\nLOGOFF\nQUIT\n");
+
+    CHECK(output.find("Logged off.") != std::string::npos);
+    CHECK(output.rfind("LOGON PLEASE:") > output.find("Logged off."));
+
+    PickShell::GeminiSession *session = host.sessions().find(port);
+    REQUIRE(session != nullptr);
+    CHECK_FALSE(session->loggedIn());
+
+    client.disconnect();
     runner.requestShutdown();
     runnerThread.join();
 }
