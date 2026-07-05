@@ -265,7 +265,7 @@ Implementation is sequenced into vertical stages. Each stage ships a test-locked
 
 - **Stage 2 — Schedulable session input**: yield before blocking read in [`IpcSessionChannel`](../../src/core/daemon/IpcSessionChannel.cpp) (and embedded stdin wrapper if needed); waking on `pushInput` marks session runnable and notifies scheduler. **Exit criterion:** test demonstrates blocked `input().get()` releases token; second session acquires; first resumes after bytes pushed. Tests: `tests/core/test_SchedulableSessionIo.cpp`. *Status: implemented.*
 
-- **Stage 3 — Login yield + daemon worker slices**: refactor [`GeminiDaemonRunner`](../../src/userland/tcl/GeminiDaemonRunner.cpp) to stop holding one `runExclusive` for the entire worker; integrate login [`LoginService::runCatalogLogin`](../../src/core/login/LoginService.h) reads with yield. **Exit criterion:** two-console integration test—both sessions display **`LOGON PLEASE:`** concurrently. Tests: extend `test_GeminiConsole.cpp`. *Status: planned.*
+- **Stage 3 — Login yield + daemon worker slices**: refactor [`GeminiDaemonRunner`](../../src/userland/tcl/GeminiDaemonRunner.cpp) to stop holding one `runExclusive` for the entire worker; integrate login [`LoginService::runCatalogLogin`](../../src/core/login/LoginService.h) reads with yield. **Exit criterion:** two-console integration test—both sessions display **`LOGON PLEASE:`** concurrently. Tests: extend `test_GeminiConsole.cpp`. *Status: implemented.*
 
 - **Stage 4 — Tcl REPL yield**: [`Shell::runTclRepl`](../../src/userland/tcl/Shell.cpp) yields at line input wait (prompt emitted before yield). **Exit criterion:** two consoles both show **`TCL>`** and accept lines interleaved. Tests: extend `test_GeminiConsole.cpp`. *Status: planned.*
 

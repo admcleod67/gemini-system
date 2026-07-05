@@ -95,7 +95,7 @@ namespace PickShell {
         joinSessionWorker(port);
 
         std::thread worker([this, port] {
-            host_.runExclusive(port, [this, port] {
+            for (;;) {
                 GeminiSession *activeSession = host_.sessions().find(port);
                 if (activeSession == nullptr) {
                     return;
@@ -104,36 +104,37 @@ namespace PickShell {
                 Shell &shell = activeSession->shell();
                 const std::optional<std::filesystem::path> &catalog = shell.geminiCatalogRoot();
                 if (!catalog.has_value()) {
-                    (void) shell.runTclRepl();
+                    host_.runExclusive(port, [&] { (void) shell.runTclRepl(); });
                     return;
                 }
 
-                PickCore::CatalogLoginPhase phase = PickCore::CatalogLoginPhase::ColdStartPortInit;
-                if (const auto it = loginPhaseByPort_.find(port); it != loginPhaseByPort_.end()) {
-                    phase = it->second;
-                }
-
-                for (;;) {
-                    if (!activeSession->loggedIn()) {
-                        const std::optional<PickCore::UserSession> userSession =
-                            PickCore::LoginService::runCatalogLogin(activeSession->input(), activeSession->output(),
-                                                                    *catalog, shell.fileSystemRoot(),
-                                                                    &activeSession->diagnostic(), phase);
-                        loginPhaseByPort_[port] = PickCore::CatalogLoginPhase::InteractiveOnly;
-                        if (!userSession.has_value()) {
-                            return;
-                        }
-                        activeSession->attach(*userSession);
+                if (!activeSession->loggedIn()) {
+                    PickCore::CatalogLoginPhase phase = PickCore::CatalogLoginPhase::ColdStartPortInit;
+                    if (const auto it = loginPhaseByPort_.find(port); it != loginPhaseByPort_.end()) {
+                        phase = it->second;
                     }
 
-                    const ShellRunResult result = shell.runTclRepl();
-                    if (result == ShellRunResult::ExitProcess) {
+                    std::optional<PickCore::UserSession> userSession;
+                    host_.runExclusive(port, [&] {
+                        userSession = PickCore::LoginService::runCatalogLogin(
+                            activeSession->input(), activeSession->output(), *catalog, shell.fileSystemRoot(),
+                            &activeSession->diagnostic(), phase);
+                    });
+                    loginPhaseByPort_[port] = PickCore::CatalogLoginPhase::InteractiveOnly;
+                    if (!userSession.has_value()) {
                         return;
                     }
-
-                    phase = PickCore::CatalogLoginPhase::InteractiveOnly;
+                    activeSession->attach(*userSession);
                 }
-            });
+
+                ShellRunResult result = ShellRunResult::ExitProcess;
+                host_.runExclusive(port, [&] { result = shell.runTclRepl(); });
+                if (result == ShellRunResult::ExitProcess) {
+                    return;
+                }
+
+                loginPhaseByPort_[port] = PickCore::CatalogLoginPhase::InteractiveOnly;
+            }
         });
 
         const std::lock_guard lock(sessionWorkerThreadsMutex_);

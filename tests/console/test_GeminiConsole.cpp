@@ -12,6 +12,7 @@
     #include <csignal>
     #include <filesystem>
     #include <fstream>
+    #include <poll.h>
     #include <unistd.h>
 
     #include "DaemonConfig.h"
@@ -30,6 +31,7 @@ namespace {
 
 using PickTests::connectUnixSocket;
 using PickTests::recvFrame;
+using PickTests::recvHandshakeAck;
 using PickTests::sendFrame;
 using PickTests::sendHandshake;
 using PickTests::uniqueDaemonIpcTempDir;
@@ -74,6 +76,62 @@ namespace {
         std::ostringstream diagnostic;
         CHECK(client.runIoPump(in, output, diagnostic) == 0);
         return output.str();
+    }
+
+    PickCore::SessionId attachNewSession(const int clientFd) {
+        PickCore::DaemonIpcAttachSessionPayload attachPayload{};
+        attachPayload.requestedPort = 0;
+        PickCore::DaemonIpcFrame attach{};
+        attach.type = PickCore::DaemonIpcMessageType::AttachSession;
+        attach.payload = PickCore::encodeAttachSessionPayload(attachPayload);
+        sendFrame(clientFd, attach);
+
+        const PickCore::DaemonIpcFrame ack = recvFrame(clientFd);
+        REQUIRE(ack.type == PickCore::DaemonIpcMessageType::AttachSessionAck);
+        const std::optional<PickCore::DaemonIpcAttachSessionAckPayload> ackPayload =
+            PickCore::decodeAttachSessionAckPayload(ack.payload);
+        REQUIRE(ackPayload.has_value());
+        return ackPayload->sessionPort;
+    }
+
+    bool waitForSessionOutputContaining(const int clientFd,
+                                        const std::string &needle,
+                                        std::string &accumulated,
+                                        const std::chrono::milliseconds timeout) {
+        const auto deadline = std::chrono::steady_clock::now() + timeout;
+        while (std::chrono::steady_clock::now() < deadline) {
+            if (accumulated.find(needle) != std::string::npos) {
+                return true;
+            }
+
+            pollfd pfd{};
+            pfd.fd = clientFd;
+            pfd.events = POLLIN;
+            const int pollResult = ::poll(&pfd, 1, 50);
+            if (pollResult <= 0 || (pfd.revents & POLLIN) == 0) {
+                continue;
+            }
+
+            const PickCore::DaemonIpcFrame frame = recvFrame(clientFd);
+            if (frame.type != PickCore::DaemonIpcMessageType::SessionOutput) {
+                continue;
+            }
+            const std::optional<PickCore::DaemonIpcSessionDataPayload> payload =
+                PickCore::decodeSessionDataPayload(frame.payload);
+            if (!payload.has_value()) {
+                continue;
+            }
+            accumulated.append(reinterpret_cast<const char *>(payload->data.data()), payload->data.size());
+        }
+        return accumulated.find(needle) != std::string::npos;
+    }
+
+    void detachAndClose(const int clientFd) {
+        PickCore::DaemonIpcFrame detach{};
+        detach.type = PickCore::DaemonIpcMessageType::DetachSession;
+        sendFrame(clientFd, detach);
+        REQUIRE(recvFrame(clientFd).type == PickCore::DaemonIpcMessageType::DetachSessionAck);
+        ::close(clientFd);
     }
 } // namespace
 
@@ -304,6 +362,56 @@ TEST_CASE("DaemonIpcClient runs WHO over IPC after catalogue login") {
     CHECK(output.find(whoLine) != std::string::npos);
 
     client.disconnect();
+    runner.requestShutdown();
+    runnerThread.join();
+}
+
+TEST_CASE("DaemonIpcClient two consoles display LOGON PLEASE concurrently") {
+    const PickCore::DaemonConfig config = makeCatalogDaemonConfig();
+    std::filesystem::create_directories(config.socketPath.parent_path());
+
+    PickCore::GeminiServiceDaemon daemon = PickCore::GeminiServiceDaemon::create(config);
+    PickShell::GeminiSessionHost host(daemon, config.maxSessions);
+    PickShell::GeminiDaemonRunner runner(daemon, host, config);
+
+    std::thread runnerThread([&] {
+        std::ostringstream boot;
+        CHECK(runner.run(boot) == 0);
+    });
+
+    REQUIRE(waitForSocket(config.socketPath, std::chrono::milliseconds(2000)));
+
+    const int clientFdA = connectUnixSocket(config.socketPath);
+    REQUIRE(clientFdA >= 0);
+    sendHandshake(clientFdA);
+    recvHandshakeAck(clientFdA);
+    const PickCore::SessionId portA = attachNewSession(clientFdA);
+
+    const int clientFdB = connectUnixSocket(config.socketPath);
+    REQUIRE(clientFdB >= 0);
+    sendHandshake(clientFdB);
+    recvHandshakeAck(clientFdB);
+    const PickCore::SessionId portB = attachNewSession(clientFdB);
+    REQUIRE(portA != portB);
+
+    std::string outputA;
+    std::string outputB;
+    REQUIRE(waitForSessionOutputContaining(clientFdA, "LOGON PLEASE:", outputA,
+                                           std::chrono::milliseconds(2000)));
+    REQUIRE(waitForSessionOutputContaining(clientFdB, "LOGON PLEASE:", outputB,
+                                           std::chrono::milliseconds(2000)));
+
+    PickShell::GeminiSession *sessionA = host.sessions().find(portA);
+    PickShell::GeminiSession *sessionB = host.sessions().find(portB);
+    REQUIRE(sessionA != nullptr);
+    REQUIRE(sessionB != nullptr);
+    CHECK_FALSE(sessionA->loggedIn());
+    CHECK_FALSE(sessionB->loggedIn());
+    CHECK(host.sessionRunState(portA) == PickCore::SessionRunState::WaitingForInput);
+    CHECK(host.sessionRunState(portB) == PickCore::SessionRunState::WaitingForInput);
+
+    detachAndClose(clientFdA);
+    detachAndClose(clientFdB);
     runner.requestShutdown();
     runnerThread.join();
 }
