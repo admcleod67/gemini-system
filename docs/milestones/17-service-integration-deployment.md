@@ -15,8 +15,15 @@ Make Gemini a first-class **Linux service**. Add a **systemd** unit (`gemini.ser
 - **`LISTSESSIONS`**, **`KILLSESSION`**, **`STATUS`** (and related introspection) exposed via Tcl admin commands.
 - Extend the **`SYSTEM`** introspection direction from [**Milestone 11**](11-multi-language-runtime-infrastructure.md) (e.g. **`SYSTEM LANGUAGES`**) to cover service and session state.
 
+### Application edition packaging
+
+Residual scope from the retired [**Milestone 16**](16-standalone-edition-application-mode.md) (architecture already delivered as **`gemini-system`** in M12–M13):
+
+- **Service edition install** — `gemini-daemon`, `gemini-console`, bootstrap/modules tree, systemd unit, config file defaults.
+- **Application edition install** — `gemini-system`, bootstrap/modules tree; no daemon unit or IPC socket.
+- Clear separation in packaging/docs: **`gemini-console`** requires a running daemon (connection failure is an error; no embedded fallback).
+
 ### Grounding
 
 - **Graceful shutdown:** flush filesystem state, release locks held by terminating sessions, tear down session objects cleanly.
 - **Session persistence across daemon restart (TBD):** graceful shutdown may save in-flight state, but cold restart likely means fresh sessions unless explicitly designed otherwise—document the chosen behaviour.
-- May include **application edition packaging** ([**Milestone 16**](16-standalone-edition-application-mode.md)) as a second build/deliverable target if M16 scope is folded in.

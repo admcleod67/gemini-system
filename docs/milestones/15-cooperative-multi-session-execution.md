@@ -174,7 +174,7 @@ Milestone 15 does **not** introduce:
 - Changes to Tcl/BASIC/PROC/ENGLISH **command semantics** or locking rules
 - IPC protocol changes (M14 session plane unchanged)
 - Remote telnet/SSH, systemd, admin **`LISTSESSIONS`** ([**Milestone 17**](17-service-integration-deployment.md))
-- Application-edition packaging ([**Milestone 16**](16-standalone-edition-application-mode.md))
+- Application-edition install/packaging ([**Milestone 17**](17-service-integration-deployment.md)); edition docs in [**Milestone 18**](18-version-1-gemini-system-service.md)
 - Fairness beyond simple round-robin (priority queues, account quotas)
 - Yield inside tight CPU-bound loops with no I/O (operator **`BREAK`** / cancel is post-M15)
 

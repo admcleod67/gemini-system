@@ -10,11 +10,11 @@ See [Milestone 13](milestones/13-service-daemon-architecture.md) for delivery hi
 
 All three binaries link the same daemon host implementation in `gemini-core` / `gemini-tcl` — not parallel codebases.
 
-| Binary | Composition | I/O / IPC |
-|--------|-------------|-----------|
-| **`gemini-system`** | [`createEmbedded()`](../src/core/daemon/GeminiServiceDaemon.cpp) → [`GeminiSessionHost`](../src/userland/tcl/GeminiSessionHost.h) (`maxSessions = 1`) → one [`GeminiSession`](../src/userland/tcl/GeminiSession.h) → login/REPL | `stdin` / `stdout` / `stderr`; **no IPC server** |
-| **`gemini-daemon`** | [`create(config)`](../src/core/daemon/GeminiServiceDaemon.cpp) → `GeminiSessionHost` → [`GeminiDaemonRunner`](../src/userland/tcl/GeminiDaemonRunner.cpp) | Unix domain socket; accepts multiple [`gemini-console`](console.md) clients; session workers run login/REPL per attach |
-| **`gemini-console`** | [`DaemonIpcClient`](../src/core/daemon/DaemonIpcClient.h) only (links `gemini-core`) | Terminal ↔ daemon session I/O over IPC; see [Console client](console.md) |
+| Binary | Edition | Composition | I/O / IPC |
+|--------|---------|-------------|-----------|
+| **`gemini-system`** | Application | [`createEmbedded()`](../src/core/daemon/GeminiServiceDaemon.cpp) → [`GeminiSessionHost`](../src/userland/tcl/GeminiSessionHost.h) (`maxSessions = 1`) → one [`GeminiSession`](../src/userland/tcl/GeminiSession.h) → login/REPL | `stdin` / `stdout` / `stderr`; **no IPC server** |
+| **`gemini-daemon`** | Service | [`create(config)`](../src/core/daemon/GeminiServiceDaemon.cpp) → `GeminiSessionHost` → [`GeminiDaemonRunner`](../src/userland/tcl/GeminiDaemonRunner.cpp) | Unix domain socket; accepts multiple [`gemini-console`](console.md) clients; session workers run login/REPL per attach |
+| **`gemini-console`** | Service (client) | [`DaemonIpcClient`](../src/core/daemon/DaemonIpcClient.h) only (links `gemini-core`) | Terminal ↔ daemon session I/O over IPC; requires running daemon — see [Console client](console.md) |
 
 [`Main.cpp`](../src/Main.cpp) hosts the embedded path. [`src/daemon/Main.cpp`](../src/daemon/Main.cpp) hosts the long-running daemon. [`src/console/Main.cpp`](../src/console/Main.cpp) hosts the console client.
 

@@ -97,7 +97,7 @@ Without this distinction, “multi-session” in M13 can be mistaken for M14 or 
 
 | Binary | Role |
 |--------|------|
-| **`gemini-system`** | Embedded GSD, `maxSessions = 1`, direct console I/O (application edition packaging in [Milestone 16](16-standalone-edition-application-mode.md)) |
+| **`gemini-system`** | Embedded GSD, `maxSessions = 1`, direct console I/O (**Application Edition**; install/packaging in [Milestone 17](17-service-integration-deployment.md)) |
 | **`gemini-daemon`** | Long-running GSD; foreground for M13; systemd wrapper in [Milestone 17](17-service-integration-deployment.md) |
 
 Both link the same daemon host implementation — not parallel codebases.
@@ -140,7 +140,7 @@ Milestone 13 does **not** introduce:
 
 - **`gemini-console`** client, login/REPL over IPC, or console multiplexing ([**Milestone 14**](14-multi-session-console-support.md))
 - Cooperative multi-session scheduling or yield at I/O ([**Milestone 15**](15-cooperative-multi-session-execution.md))
-- Application-edition packaging, failover when no service is running ([**Milestone 16**](16-standalone-edition-application-mode.md))
+- Application-edition install/packaging ([**Milestone 17**](17-service-integration-deployment.md)); edition docs in [**Milestone 18**](18-version-1-gemini-system-service.md)
 - **systemd** unit, **journald**, production config polish, or admin Tcl commands **`LISTSESSIONS`** / **`KILLSESSION`** / **`STATUS`** ([**Milestone 17**](17-service-integration-deployment.md))
 - Remote telnet/SSH, hot-reload of language modules without daemon restart, or session restore across cold restart
 - Any change to Tcl/BASIC/PROC/ENGLISH command semantics, locking rules, or language dispatch

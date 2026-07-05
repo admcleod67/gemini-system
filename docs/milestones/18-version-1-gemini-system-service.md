@@ -10,8 +10,8 @@ M18 is a **stabilization and documentation capstone**—not a bucket for new arc
 
 **Dual deliverables:**
 
-- **Service edition** — multi-session Linux daemon ([**Milestones 13–17**](13-service-daemon-architecture.md))
-- **Application edition** — single-session **`gemini-system`** wrapper on the same architecture ([**Milestone 16**](16-standalone-edition-application-mode.md))
+- **Service edition** — **`gemini-daemon`** + **`gemini-console`**; multi-session Linux deployment ([**Milestones 13–17**](13-service-daemon-architecture.md))
+- **Application edition** — **`gemini-system`**; single-session embedded host on the same architecture (delivered M12–M13; see [Milestone 16 retirement note](16-standalone-edition-application-mode.md))
 
 ### Positioning
 
@@ -20,8 +20,8 @@ M18 is a **stabilization and documentation capstone**—not a bucket for new arc
 ### Release criteria (outline)
 
 - Test matrix covering multi-session locks, cooperative scheduling, and language module boot
-- **Architecture**, **admin**, and **developer** guides (migration notes from today’s monolithic **`gemini-system`**)
-- Repository hygiene: milestone history, clean packaging, public release checklist
+- **Architecture**, **admin**, and **developer** guides — including **Service Edition** vs **Application Edition** operator docs (`gemini-daemon`/`gemini-console` vs `gemini-system`; no console failover)
+- Repository hygiene: milestone history, clean packaging (M17 install splits), public release checklist
 
 ### Out of scope for v1.0 (explicit)
 

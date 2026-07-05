@@ -16,7 +16,7 @@ The console does **not** interpret Tcl or run login logic locally. Catalogue log
 
 ## Prerequisites
 
-- A running **`gemini-daemon`** on a reachable Unix domain socket
+- A running **`gemini-daemon`** on a reachable Unix domain socket — if the daemon is not running or the socket is unreachable, **`gemini-console`** exits with an error; it does **not** fall back to embedded **`gemini-system`**. For single-process local use, run **`gemini-system`** instead.
 - **Catalogue and pick roots** configured on the **daemon** (`--catalog-root`, `--pick-root`, or `GEMINI_CATALOG_ROOT` / `GEMINI_FILESYSTEM_ROOT`) — not on the console
 - Unix domain IPC (not available on Windows; [`Main.cpp`](../src/console/Main.cpp) exits with an error there)
 

@@ -20,13 +20,13 @@ Detailed scope for each milestone is in [`docs/milestones/`](milestones/) (two-d
 
 ## Path to Version 1.0 (Gemini System Service)
 
-Target: a Pick-authentic, multi-session **Linux service** (UniData-style deployment), with a single-session **application edition** built on the same architecture—not a separate codebase.
+Target: a Pick-authentic, multi-session **Linux service** (UniData-style deployment), with a single-session **application edition** (`gemini-system`) on the same architecture—not a separate codebase. The application edition was delivered in Milestones 12–13; remaining path-to-1.0 work is service deployment and release packaging.
 
 - [Milestone 12 — Session Model Foundation (completed)](milestones/12-session-model-foundation.md)
 - [Milestone 13 — Service Daemon Architecture (completed)](milestones/13-service-daemon-architecture.md)
 - [Milestone 14 — Multi-Session Console Support (completed)](milestones/14-multi-session-console-support.md)
 - [Milestone 15 — Cooperative Multi-Session Execution (completed)](milestones/15-cooperative-multi-session-execution.md)
-- [Milestone 16 — Standalone Edition / Application Mode (planned)](milestones/16-standalone-edition-application-mode.md)
+- [Milestone 16 — Standalone Edition / Application Mode (superseded)](milestones/16-standalone-edition-application-mode.md)
 - [Milestone 17 — Service Integration & Deployment (planned)](milestones/17-service-integration-deployment.md)
 - [Milestone 18 — Version 1.0 Release: Gemini System Service (planned)](milestones/18-version-1-gemini-system-service.md)
 

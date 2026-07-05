@@ -23,7 +23,7 @@ This is the foundation required for:
 - A session table (M13)
 - Remote consoles (M14)
 - Cooperative multi-session execution (M15)
-- Application mode (M16)
+- Application edition (`gemini-system`; delivered M12–M13; see [Milestone 16](16-standalone-edition-application-mode.md) retirement note)
 - Deployment as a Linux service (M17)
 
 ---

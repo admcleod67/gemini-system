@@ -162,7 +162,7 @@ Protocol version negotiation via handshake continues; M14 adds message types (an
 Milestone 14 does **not** introduce:
 
 - Cooperative multi-session scheduling or yield at I/O ([**Milestone 15**](15-cooperative-multi-session-execution.md))
-- Application-edition packaging or service failover ([**Milestone 16**](16-standalone-edition-application-mode.md))
+- Application-edition install/packaging ([**Milestone 17**](17-service-integration-deployment.md)); edition docs in [**Milestone 18**](18-version-1-gemini-system-service.md)
 - **systemd**, **journald**, or admin Tcl commands **`LISTSESSIONS`** / **`KILLSESSION`** / **`STATUS`** ([**Milestone 17**](17-service-integration-deployment.md))
 - Remote telnet/SSH (Unix domain socket only for v1)
 - Session restore across daemon cold restart
