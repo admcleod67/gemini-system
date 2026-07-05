@@ -131,6 +131,12 @@ Cooperative scheduling switches only at these boundaries (M15):
 
 **Not yield points:** mid-opcode VM execution, mid-`handleLine` Tcl dispatch, lock table operations, ASM `STEP` / `RUN` / `CONT` CPU loops.
 
+### Known limitation (Version 1.0)
+
+A session running **CPU-bound** BASIC (or other VM work without `INPUT`) holds the execution token until the run finishes. Other consoles stay blocked at prompts until then — round-robin does not apply because the busy session never yields. Example: nested `FOR` loops with `GOSUB` and no input (~billions of VM steps).
+
+This is intentional M15 scope. Post–v1.0 improvement: opcode-budget yield and operator **BREAK** in [**Milestone 19**](milestones/19-execution-fairness-cpu-bound-yield.md). Until then, admins may use **`KILLSESSION`** (M17) to terminate a runaway session.
+
 ## Configuration
 
 [`DaemonConfig`](../src/core/daemon/DaemonConfig.h) is resolved by [`resolveDaemonConfig`](../src/core/daemon/DaemonConfig.cpp) for `gemini-daemon`:

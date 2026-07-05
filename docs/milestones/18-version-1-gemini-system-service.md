@@ -20,11 +20,12 @@ M18 is a **stabilization and documentation capstone**—not a bucket for new arc
 ### Release criteria (outline)
 
 - Test matrix covering multi-session locks, cooperative scheduling, and language module boot
-- **Architecture**, **admin**, and **developer** guides — including **Service Edition** vs **Application Edition** operator docs (`gemini-daemon`/`gemini-console` vs `gemini-system`; no console failover)
+- **Architecture**, **admin**, and **developer** guides — including **Service Edition** vs **Application Edition** operator docs (`gemini-daemon`/`gemini-console` vs `gemini-system`; no console failover); document cooperative **CPU-bound starvation** as a v1.0 known limitation ([**Milestone 19**](19-execution-fairness-cpu-bound-yield.md) post-1.0)
 - Repository hygiene: milestone history, clean packaging (M17 install splits), public release checklist
 
 ### Out of scope for v1.0 (explicit)
 
+- CPU-bound multi-session fairness (opcode-budget VM yield, operator **BREAK**) — [**Milestone 19**](19-execution-fairness-cpu-bound-yield.md) after v1.0; document as known limitation in release docs
 - Remote access beyond local Unix domain sockets (SSH/telnet post-1.0)
 - Hot-reload of language modules without daemon restart
 - Session restore across cold daemon restart (unless explicitly delivered in M17)

@@ -30,3 +30,6 @@ Target: a Pick-authentic, multi-session **Linux service** (UniData-style deploym
 - [Milestone 17 — Service Integration & Deployment (planned)](milestones/17-service-integration-deployment.md)
 - [Milestone 18 — Version 1.0 Release: Gemini System Service (planned)](milestones/18-version-1-gemini-system-service.md)
 
+## Post–Version 1.0
+
+- [Milestone 19 — Execution Fairness: CPU-Bound Cooperative Yield (planned)](milestones/19-execution-fairness-cpu-bound-yield.md)
