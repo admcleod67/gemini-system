@@ -12,7 +12,7 @@ See [Milestone 12](milestones/12-session-model-foundation.md) for rationale and 
 | **Composition** | [`GeminiSessionHost`](../src/userland/tcl/GeminiSessionHost.h) | [`SessionTable`](../src/userland/tcl/SessionTable.h), [`SerialSessionRunner`](../src/core/daemon/SerialSessionRunner.h) |
 | **Session** | [`GeminiSession`](../src/userland/tcl/GeminiSession.h) | [`Runtime`](../src/core/vm/Runtime.h), [`Shell`](../src/userland/tcl/Shell.h), Tcl env, filesystem root, lock session id, I/O channels |
 
-Standalone **`gemini-system`** embeds the daemon with `maxSessions = 1` and hosts exactly one session. The same `GeminiSession` type lives in the daemon session table when using **`gemini-daemon`**. See [Service daemon architecture](daemon.md) and [Milestone 13](milestones/13-service-daemon-architecture.md).
+Standalone **`gemini-system`** embeds the daemon with `maxSessions = 1` and hosts exactly one session. The same `GeminiSession` type lives in the daemon session table when using **`gemini-daemon`** with one or more **`gemini-console`** attachments. See [Service daemon architecture](daemon.md), [Console client](console.md), and [Milestone 13](milestones/13-service-daemon-architecture.md).
 
 ## Lifecycle API
 
@@ -44,6 +44,21 @@ Login ([`LoginService`](../src/core/login/LoginService.h)) and the Tcl REPL read
 
 Tests inject `std::istringstream` / `std::ostringstream` via `setInputStream` / `setOutputStream`.
 
+## Console I/O transport (M14)
+
+| Mode | Transport | Binding |
+|------|-----------|---------|
+| **Embedded** (`gemini-system`) | Process `stdin` / `stdout` / `stderr` | Default stream pointers on session create |
+| **Daemon-attached** (`gemini-console`) | IPC session-plane frames via [`IpcSessionChannel`](../src/core/daemon/IpcSessionChannel.h) | [`GeminiDaemonRunner`](../src/userland/tcl/GeminiDaemonRunner.cpp) sets streams on **`AttachSession`** |
+
+Login ([`LoginService`](../src/core/login/LoginService.h)) and the Tcl REPL use the same session channel API in both modes — only the transport differs.
+
+**Detach ≠ destroy:** when a console disconnects or sends **`DetachSession`**, stream pointers are cleared but the session object remains in [`SessionTable`](../src/userland/tcl/SessionTable.h). **`loggedIn()`**, VM state, and daemon-assigned **`whoPort`** are preserved until re-attach or **`destroySession`**.
+
+**At most one live console per session** — a second attach to the same port while bound receives **`SessionAlreadyBound`**.
+
+See [Console client](console.md) for operator workflows and [Service daemon architecture](daemon.md) for IPC details.
+
 ## Invariants
 
 - Exactly one `Runtime` per session for the session lifetime
@@ -61,12 +76,14 @@ Tests inject `std::istringstream` / `std::ostringstream` via `setInputStream` / 
 | [`GeminiSessionHost.h`](../src/userland/tcl/GeminiSessionHost.h) | Embedded/daemon composition: daemon + table + serial runner |
 | [`SessionTable.h`](../src/userland/tcl/SessionTable.h) | Session object table, port allocation at create |
 | [`Main.cpp`](../src/Main.cpp) | Embedded: `create()`, boot, login loop, `attach()` |
+| [`GeminiDaemonRunner.cpp`](../src/userland/tcl/GeminiDaemonRunner.cpp) | Daemon: attach binds IPC streams; session worker drives login/REPL |
 | [`Shell.h`](../src/userland/tcl/Shell.h) | Interpreter front-end; holds `GeminiSession&` |
 
 ## See also
 
-- [Service daemon architecture](daemon.md) — GSD, `gemini-daemon`, IPC boundary vs M14
+- [Service daemon architecture](daemon.md) — GSD, `gemini-daemon`, IPC
+- [Console client](console.md) — `gemini-console` attach/create and detach
 - [Gemini bootstrap](gemini-bootstrap.md) — catalogue login and account roots
 - [Developer shell (TCL)](tcl-shell.md) — Tcl REPL after login
 - [Concurrency and record locking](concurrency.md) — lock binding on `attach()`
-- [Milestone 13 — Service daemon](milestones/13-service-daemon-architecture.md) — GSD delivery (implemented)
+- [Milestone 14 — Multi-session console](milestones/14-multi-session-console-support.md) — console attachment (implemented)

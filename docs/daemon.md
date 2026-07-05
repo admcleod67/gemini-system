@@ -1,21 +1,22 @@
 # Gemini Service Daemon (GSD)
 
-The **Gemini Service Daemon** is the process-scope host for Gemini System: cold start, frozen language registry, shared lock table, port allocation, session table, and (for the long-running binary) a minimal Unix domain IPC server.
+The **Gemini Service Daemon** is the process-scope host for Gemini System: cold start, frozen language registry, shared lock table, port allocation, session table, and (for the long-running binary) a Unix domain IPC server for console attachment.
 
-It is the architectural hinge between the M12 session object ([session model](session.md)) and multi-console attachment in [Milestone 14](milestones/14-multi-session-console-support.md).
+It is the architectural hinge between the M12 session object ([session model](session.md)) and multi-console attachment in [Milestone 14](milestones/14-multi-session-console-support.md) (implemented).
 
 See [Milestone 13](milestones/13-service-daemon-architecture.md) for delivery history and completion criteria.
 
 ## Entry points
 
-Both binaries link the same daemon host implementation in `gemini-core` / `gemini-tcl` — not parallel codebases.
+All three binaries link the same daemon host implementation in `gemini-core` / `gemini-tcl` — not parallel codebases.
 
 | Binary | Composition | I/O / IPC |
 |--------|-------------|-----------|
 | **`gemini-system`** | [`createEmbedded()`](../src/core/daemon/GeminiServiceDaemon.cpp) → [`GeminiSessionHost`](../src/userland/tcl/GeminiSessionHost.h) (`maxSessions = 1`) → one [`GeminiSession`](../src/userland/tcl/GeminiSession.h) → login/REPL | `stdin` / `stdout` / `stderr`; **no IPC server** |
-| **`gemini-daemon`** | [`create(config)`](../src/core/daemon/GeminiServiceDaemon.cpp) → `GeminiSessionHost` → [`GeminiDaemonRunner`](../src/userland/tcl/GeminiDaemonRunner.cpp) | Unix domain socket; idle service host until M14 consoles attach |
+| **`gemini-daemon`** | [`create(config)`](../src/core/daemon/GeminiServiceDaemon.cpp) → `GeminiSessionHost` → [`GeminiDaemonRunner`](../src/userland/tcl/GeminiDaemonRunner.cpp) | Unix domain socket; accepts multiple [`gemini-console`](console.md) clients; session workers run login/REPL per attach |
+| **`gemini-console`** | [`DaemonIpcClient`](../src/core/daemon/DaemonIpcClient.h) only (links `gemini-core`) | Terminal ↔ daemon session I/O over IPC; see [Console client](console.md) |
 
-[`Main.cpp`](../src/Main.cpp) hosts the embedded path. [`src/daemon/Main.cpp`](../src/daemon/Main.cpp) hosts the long-running daemon.
+[`Main.cpp`](../src/Main.cpp) hosts the embedded path. [`src/daemon/Main.cpp`](../src/daemon/Main.cpp) hosts the long-running daemon. [`src/console/Main.cpp`](../src/console/Main.cpp) hosts the console client.
 
 ## Process vs session scope
 
@@ -38,6 +39,11 @@ flowchart TB
         Main --> Host1 --> Session1
     end
 
+    subgraph clients [gemini-console clients]
+        ConsoleA[gemini_console_A]
+        ConsoleB[gemini_console_B]
+    end
+
     subgraph daemonBin [gemini-daemon]
         DaemonMain[daemon/Main.cpp]
         Runner[GeminiDaemonRunner]
@@ -57,16 +63,20 @@ flowchart TB
 
     Host1 --> process
     HostN --> process
-    Ipc -.->|"M14 gemini-console"| Future[console attach]
+    ConsoleA --> Ipc
+    ConsoleB --> Ipc
+    HostN --> SessionN[Session table]
 ```
 
 ## Component map
 
 ```text
 src/core/daemon/     GeminiServiceDaemon, PortManager, SerialSessionRunner,
-                     DaemonConfig, DaemonIpcProtocol, DaemonIpcServer
+                     DaemonConfig, DaemonIpcProtocol, DaemonIpcServer,
+                     DaemonIpcClient, IpcSessionChannel, ConsoleConfig
 src/userland/tcl/    SessionTable, GeminiSessionHost, GeminiDaemonRunner
 src/daemon/Main.cpp  gemini-daemon entry
+src/console/Main.cpp gemini-console entry
 src/Main.cpp         gemini-system embedded entry
 ```
 
@@ -107,6 +117,8 @@ This is **not** cooperative scheduling — see [Milestone 15](milestones/15-coop
 
 Embedded mode uses [`DaemonConfig::embedded()`](../src/core/daemon/DaemonConfig.h) (`maxSessions = 1`); socket path is ignored.
 
+Host paths (`--catalog-root`, `--pick-root`) are applied to attached sessions by the daemon, not by `gemini-console`.
+
 ## Lifecycle (`gemini-daemon`)
 
 [`GeminiDaemonRunner`](../src/userland/tcl/GeminiDaemonRunner.cpp):
@@ -115,11 +127,13 @@ Embedded mode uses [`DaemonConfig::embedded()`](../src/core/daemon/DaemonConfig.
 2. `coldStart()` — boot banner
 3. Start **IPC server** on configured socket path
 4. Poll loop: accept clients, dispatch IPC, until shutdown requested
-5. **Graceful shutdown** — stop IPC (unlink socket), destroy all sessions (release locks and ports)
+5. **Graceful shutdown** — detach all bound sessions, stop IPC (unlink socket), destroy all sessions (release locks and ports)
+
+**Console detach** (per session): unbinds I/O and joins the session worker **without** `destroySession`; login state and VM state are preserved until re-attach or daemon shutdown.
 
 Shutdown may also be triggered by an IPC **ShutdownRequest** or by destroying the daemon process.
 
-**Not in M13:** systemd unit, journald, background detachment (Milestone 17).
+**Not in M14:** systemd unit, journald, background detachment (Milestone 17).
 
 ## IPC protocol v1
 
@@ -137,7 +151,7 @@ payloadLen = uint32
 payload[]  = type-specific (may be empty)
 ```
 
-### Message types (M13)
+### Control plane (M13)
 
 | Type | Direction | Purpose |
 |------|-----------|---------|
@@ -145,62 +159,31 @@ payload[]  = type-specific (may be empty)
 | `HandshakeAck` | server → client | Server version, `maxSessions`, build version string |
 | `Ping` / `Pong` | either | Liveness check |
 | `ShutdownRequest` / `ShutdownAck` | client → server | Request graceful daemon shutdown |
-| `ReserveSession` / `ReserveSessionAck` | client → server | Stub: create session object, return port (no login/REPL) |
+| `ReserveSession` / `ReserveSessionAck` | client → server | M13 stub: create session object, return port (superseded by `AttachSession` for consoles) |
 | `Error` | server → client | Protocol or capacity error |
 
-### M13 boundary
+M13 shipped control-plane plumbing only. M14 extended the same transport with the **session plane** below. `ReserveSession` remains for M13 compatibility; **`gemini-console`** uses `AttachSession` with `requestedPort = 0` instead.
 
-IPC in M13 is **transport plumbing only**:
+### Multi-client connections
 
-- **No** catalogue login over the socket
-- **No** Tcl/BASIC/PROC REPL byte stream
-- **No** console multiplexing
+[`DaemonIpcServer`](../src/core/daemon/DaemonIpcServer.cpp) accepts **multiple concurrent** Unix socket clients. Each connection maintains its own handshake state and read buffer; the daemon run loop uses `pollAndDispatch()` to service all connections without blocking on a single client.
 
-Those are [Milestone 14](milestones/14-multi-session-console-support.md). M13 `ReserveSession` only allocates a session slot and returns a port number.
-
-### Multi-client connections (M14 Stage 2)
-
-[`DaemonIpcServer`](../src/core/daemon/DaemonIpcServer.cpp) accepts **multiple concurrent** Unix socket clients. Each connection maintains its own handshake state and read buffer; the daemon run loop uses `pollAndDispatch()` to service all connections without blocking on a single client. Control-plane messages (`Handshake`, `Ping`, `ShutdownRequest`, `ReserveSession`) work per connection; clients stay connected after `Ping` or `ReserveSession` until they disconnect or send `ShutdownRequest`.
-
-### Session I/O bridge (M14 Stage 3)
+### Session I/O bridge
 
 [`IpcSessionChannel`](../src/core/daemon/IpcSessionChannel.h) provides IPC-backed `std::istream` / `std::ostream` adapters. On `AttachSession`, [`GeminiDaemonRunner`](../src/userland/tcl/GeminiDaemonRunner.cpp) binds those streams to the target [`GeminiSession`](../src/userland/tcl/GeminiSession.h) via `setInputStream` / `setOutputStream` / `setDiagnosticStream`.
 
-- **`AttachSession`** with `requestedPort = 0` creates a session (same allocation path as `ReserveSession`); a non-zero port attaches to an existing detached session.
+- **`AttachSession`** with `requestedPort = 0` creates a session; a non-zero port attaches to an existing detached session.
 - **`SessionInput`** frames append to the session input queue; session code reads via blocking `input()` as in embedded mode.
 - Session **`output()`** / **`diagnostic()`** writes are queued and flushed as **`SessionOutput`** / **`SessionDiagnostic`** frames on the next `pollAndDispatch()` cycle (including `POLLOUT` retry when the socket would block).
 - **`DetachSession`** or connection close unbinds the connection from the session; the session object remains in the table.
 - **At most one live console per session** — a second attach to the same port receives `SessionAlreadyBound`.
 
-Login and REPL orchestration over the bridge is implemented in M14 Stage 5–6; Stage 3 wires transport only.
-
-### gemini-console skeleton (M14 Stage 4)
-
-[`gemini-console`](../src/console/Main.cpp) is a thin IPC client that connects to a running daemon, handshakes, attaches to a session, and pumps terminal bytes over the session plane until stdin EOF or interrupt. Implementation lives in [`DaemonIpcClient`](../src/core/daemon/DaemonIpcClient.h) (connect, attach/detach, poll-based I/O pump) and [`ConsoleConfig`](../src/core/daemon/ConsoleConfig.h) (CLI parsing).
-
-```bash
-gemini-console [--socket PATH] [--port N]
-```
-
-| Flag / env | Default | Purpose |
-|------------|---------|---------|
-| `--socket PATH` | `GEMINI_DAEMON_SOCKET` or [`defaultDaemonSocketPath()`](../src/core/daemon/DaemonConfig.cpp) | Daemon Unix socket |
-| `--port N` | omitted → create new session | Attach to existing detached session port |
-
-**Behaviour:**
-
-- Handshake, then **`AttachSession`** (`requestedPort = 0` creates; non-zero re-attaches).
-- **`runIoPump`** reads stdin (or injected streams in tests) as **`SessionInput`**; writes **`SessionOutput`** / **`SessionDiagnostic`** to stdout/stderr.
-- After stdin EOF, the client drains pending daemon output briefly before exit.
-- **`DetachSession`** on clean shutdown (including SIGINT/SIGTERM); connection close also unbinds on the daemon side.
-- After attach, the daemon runs catalogue login and Tcl REPL when a catalog root is configured (M14 Stage 5–6).
-
-### Session worker over IPC (M14 Stage 5–6)
+### Session worker
 
 After a successful **`AttachSession`**, [`GeminiDaemonRunner`](../src/userland/tcl/GeminiDaemonRunner.cpp) starts a **session worker thread** under [`runExclusive`](../src/userland/tcl/GeminiSessionHost.h) while the IPC poll loop continues pumping session I/O. The worker mirrors embedded [`Main.cpp`](../src/Main.cpp): catalogue login (when configured), then [`Shell::runTclRepl`](../src/userland/tcl/Shell.cpp), looping back to interactive login after **`LOGOFF`**.
 
-- **Console role:** [`gemini-console`](../src/console/Main.cpp) **`runIoPump`** forwards terminal bytes; the operator sees **`LOGON PLEASE:`**, the Tcl banner, REPL prompts, and command output on stdout.
-- **Daemon host paths:** session catalogue/filesystem roots come from daemon [`DaemonConfig`](../src/core/daemon/DaemonConfig.h) (`--catalog-root`, `--pick-root`, or env vars), applied via [`applyHostPathsToShell`](../src/userland/tcl/DefaultFileSystemRoot.h).
+- **Console role:** [`gemini-console`](console.md) **`runIoPump`** forwards terminal bytes; the operator sees **`LOGON PLEASE:`**, the Tcl banner, REPL prompts, and command output on stdout.
+- **Daemon host paths:** session catalogue/filesystem roots come from daemon [`DaemonConfig`](../src/core/daemon/DaemonConfig.h), applied via [`applyHostPathsToShell`](../src/userland/tcl/DefaultFileSystemRoot.h).
 - **No catalogue:** REPL runs immediately (same as `Main.cpp`).
 - **Re-attach while logged in:** login is skipped; REPL starts on the existing session binding.
 - **Auto-logon:** `MD,AUTO-LOGON` and daemon-process **`GEMINI_AUTO_LOGON`** / **`GEMINI_AUTO_LOGIN`** apply on the first login attempt per port (`ColdStartPortInit`); interactive credentials always flow from the console via IPC.
@@ -208,9 +191,7 @@ After a successful **`AttachSession`**, [`GeminiDaemonRunner`](../src/userland/t
 - **`QUIT` / stdin EOF:** ends the REPL and exits the worker; the session object remains in the table (still logged in after **`QUIT`**, logged out after **`LOGOFF`**).
 - **Serial runner:** only one attached session runs interpreter work at a time; a second console’s worker blocks on `runExclusive` until the first releases the token (login, REPL, or both).
 
-### Message types (M14 session plane)
-
-Wire types and payload layouts are defined in [`DaemonIpcProtocol.h`](../src/core/daemon/DaemonIpcProtocol.h). Attach, detach, and session I/O are handled server-side in [`DaemonIpcServer`](../src/core/daemon/DaemonIpcServer.cpp); the wire spec is authoritative in the header.
+### Session plane message types (M14)
 
 | Type | Direction | Purpose |
 |------|-----------|---------|
@@ -224,16 +205,14 @@ Wire types and payload layouts are defined in [`DaemonIpcProtocol.h`](../src/cor
 
 **Session-plane rules:**
 
-- **Handshake first** (same as M13 control plane)
+- **Handshake first** (same as control plane)
 - **AttachSession** before any session I/O on that connection
 - Session I/O frames are **connection-scoped** (no port field after attach)
 - **SessionInput** is client → server only; **SessionOutput** and **SessionDiagnostic** are server → client only
-- **DetachSession** or connection close ends the binding; the session object may remain in the table with login state preserved (M14 Stage 6)
+- **DetachSession** or connection close ends the binding; the session object may remain in the table with login state preserved
 - Max data chunk per session I/O frame: **65532 bytes** (`kDaemonIpcMaxSessionDataSize`)
 
-**M14 error codes** (delivered in `Error` frames): `SessionNotFound`, `SessionAlreadyBound`, `NotAttached`.
-
-`ReserveSession` remains for M13 compatibility; **`gemini-console`** uses `AttachSession` with `requestedPort = 0` instead.
+**Session-plane error codes** (delivered in `Error` frames): `SessionNotFound`, `SessionAlreadyBound`, `NotAttached`.
 
 ## M13 vs M14 vs M15
 
@@ -250,6 +229,7 @@ Wire types and payload layouts are defined in [`DaemonIpcProtocol.h`](../src/cor
 - One shared `LockTable` per process; per-session lock ids remain distinct ([concurrency](concurrency.md))
 - At most one running interpreter stack across sessions (serial runner)
 - Port uniqueness — no two live sessions share the same port / session id
+- Detach ≠ destroy — console disconnect preserves session object until explicit destroy or daemon shutdown
 
 ## Source map
 
@@ -260,11 +240,14 @@ Wire types and payload layouts are defined in [`DaemonIpcProtocol.h`](../src/cor
 | [`GeminiDaemonRunner.h`](../src/userland/tcl/GeminiDaemonRunner.h) | Foreground run loop, IPC integration, shutdown |
 | [`DaemonConfig.h`](../src/core/daemon/DaemonConfig.h) | Configuration resolution |
 | [`DaemonIpcServer.h`](../src/core/daemon/DaemonIpcServer.h) | Unix socket server |
+| [`DaemonIpcClient.h`](../src/core/daemon/DaemonIpcClient.h) | Console-side IPC client |
+| [`IpcSessionChannel.h`](../src/core/daemon/IpcSessionChannel.h) | Session stream adapters |
 | [`DaemonIpcProtocol.h`](../src/core/daemon/DaemonIpcProtocol.h) | Wire protocol v1 |
 
 ## See also
 
+- [Console client](console.md) — `gemini-console` usage, attach/create, detach semantics
 - [Session model](session.md) — `GeminiSession` lifecycle and I/O
 - [Gemini bootstrap](gemini-bootstrap.md) — catalogue, login, cold-start banner
 - [Concurrency and record locking](concurrency.md) — shared lock table and session ids
-- [Milestone 14 — Multi-session console](milestones/14-multi-session-console-support.md) — `gemini-console` and REPL over IPC
+- [Milestone 14 — Multi-session console](milestones/14-multi-session-console-support.md) — delivery history (implemented)

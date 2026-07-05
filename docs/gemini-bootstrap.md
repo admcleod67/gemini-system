@@ -88,11 +88,27 @@ Programmatic **`stdout`** for auto-login is therefore **`LOGON PLEASE: `** plus 
 
 **Breaking change:** logon is **account-based** (`ACCOUNTS.json` only). The previous **`USERS.json` username + defaultAccount** logon path has been removed.
 
-## `gemini-daemon` (service host)
+## `gemini-daemon` and `gemini-console` (service host)
 
-Building the project also produces **`gemini-daemon`**, a long-running process host that shares the same [`GeminiServiceDaemon`](../src/core/daemon/GeminiServiceDaemon.h) implementation as embedded `gemini-system`. It runs cold start to stdout, listens on a Unix domain socket for minimal IPC (handshake, ping, shutdown, reserve-session stub), and does **not** start an interactive login/REPL in M13 — console attachment is [Milestone 14](milestones/14-multi-session-console-support.md).
+Building the project also produces **`gemini-daemon`**, a long-running process host that shares the same [`GeminiServiceDaemon`](../src/core/daemon/GeminiServiceDaemon.h) implementation as embedded `gemini-system`, and **`gemini-console`**, a terminal client that attaches over IPC.
 
-Configuration uses CLI flags and environment variables (`GEMINI_DAEMON_SOCKET`, `GEMINI_MAX_SESSIONS`, and the same host path variables as `gemini-system`). See [Service daemon architecture](daemon.md).
+**`gemini-daemon`** runs cold start to stdout and listens on a Unix domain socket. It does **not** start an interactive login/REPL in-process — that happens when a **`gemini-console`** attaches and the daemon session worker runs [`LoginService`](../src/core/login/LoginService.h) and [`Shell::runTclRepl`](../src/userland/tcl/Shell.cpp) through the session I/O bridge (same flow as embedded [`Main.cpp`](../src/Main.cpp)).
+
+Configuration uses CLI flags and environment variables on the **daemon** (`GEMINI_DAEMON_SOCKET`, `GEMINI_MAX_SESSIONS`, `GEMINI_CATALOG_ROOT`, `GEMINI_FILESYSTEM_ROOT`, and related host path variables). The console only needs `--socket` (and optionally `--port` to re-attach). See [Service daemon architecture](daemon.md) and [Console client](console.md).
+
+**Quick smoke (two terminals):**
+
+```bash
+# Terminal 1
+gemini-daemon --socket /tmp/gemini.sock --catalog-root gemini --pick-root gemini/accounts/TST
+
+# Terminal 2
+gemini-console --socket /tmp/gemini.sock
+```
+
+Auto-logon env vars (`GEMINI_AUTO_LOGON`, `MD,AUTO-LOGON`) apply in the **daemon process** on first login per port when the daemon has a catalogue root configured.
+
+**`gemini-system`** is unchanged: embedded host, direct stdio, no IPC.
 
 The **`gemini-bootstrap-copy`** CMake step copies the `gemini/` tree next to both executables when the run working directory is the build output directory.
 

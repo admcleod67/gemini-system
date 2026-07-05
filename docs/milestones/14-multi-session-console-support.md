@@ -2,7 +2,7 @@
 
 ## Milestone 14 — Multi-Session Console Support
 
-Allow multiple consoles to attach to the daemon, each bound to its own session. Ship a **`gemini-console`** client that connects over IPC, with a protocol to request a new session or attach to an existing one. Multiplex console input and output to the correct session; keep interpreter and runtime state isolated per session. Support graceful detach so a console can disconnect without terminating the session. Execution remains serial across sessions until Milestone 15. *Status: planned.*
+Allow multiple consoles to attach to the daemon, each bound to its own session. Ship a **`gemini-console`** client that connects over IPC, with a protocol to request a new session or attach to an existing one. Multiplex console input and output to the correct session; keep interpreter and runtime state isolated per session. Support graceful detach so a console can disconnect without terminating the session. Execution remains serial across sessions until Milestone 15. *Status: implemented.*
 
 M13 delivered the service host and minimal IPC plumbing; M14 crosses the IPC boundary with login and REPL byte streams. This is the first milestone where Gemini **feels like a multi-user Pick system** (UniData-style): multiple consoles, multiple sessions, but **still serial execution**—only one session runs interpreter work at a time until [**Milestone 15**](15-cooperative-multi-session-execution.md).
 
@@ -260,8 +260,8 @@ Implementation is sequenced into vertical stages. Each stage ships a test-locked
 
 - **Stage 6 — REPL, multi-console, graceful detach**: run [`Shell::runTclRepl`](../../src/userland/tcl/Shell.cpp) under `runExclusive` for attached sessions; second console blocked on serial runner; implement detach (console disconnect or message) without `destroySession`; re-attach to existing port. **Exit criterion:** two-console manual smoke (§9); detach/re-attach test; `WHO` correct per session. *Status: implemented.*
 
-- **Stage 7 — Docs + closes M14**: finalize [`docs/daemon.md`](../daemon.md) session plane; add [`docs/console.md`](../console.md); update [`docs/session.md`](../session.md), [`docs/gemini-bootstrap.md`](../gemini-bootstrap.md), milestone index; audit §9 completion criteria; full test suite + both smoke checklists. **Closes Milestone 14.** *Status: planned.*
+- **Stage 7 — Docs + closes M14**: finalize [`docs/daemon.md`](../daemon.md) session plane; add [`docs/console.md`](../console.md); update [`docs/session.md`](../session.md), [`docs/gemini-bootstrap.md`](../gemini-bootstrap.md), milestone index; audit §9 completion criteria; full test suite + both smoke checklists. **Closes Milestone 14.** *Status: implemented.*
 
 Only Stage 7's exit criteria should claim "Closes Milestone 14".
 
-*Status: planned.*
+*Status: implemented.*
