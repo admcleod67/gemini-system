@@ -71,7 +71,18 @@ namespace PickCore {
     void CooperativeSessionRunner::runExclusive(const SessionId id, const std::function<void()> &fn) {
         acquire(id);
         fn();
-        release(id);
+        const std::lock_guard lock(mutex_);
+        if (active_.has_value() && *active_ == id && depth_ > 0) {
+            --depth_;
+            if (depth_ == 0) {
+                active_.reset();
+                sessionStates_[id] = SessionRunState::Runnable;
+                cv_.notify_all();
+            }
+        } else if (!active_.has_value() && stateLocked(id) == SessionRunState::WaitingForInput) {
+            sessionStates_[id] = SessionRunState::Runnable;
+            cv_.notify_all();
+        }
     }
 
     std::optional<SessionId> CooperativeSessionRunner::activeSession() const {

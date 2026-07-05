@@ -162,20 +162,45 @@ TEST_CASE("Schedulable IpcSessionChannel close after yield returns EOF without d
 
     std::atomic<bool> finished{false};
 
-    std::thread reader([&] {
-        runner.acquire(1);
-        CHECK(channel.input().peek() == std::char_traits<char>::eof());
-        finished = true;
-        runner.release(1);
+    std::thread worker([&] {
+        runner.runExclusive(1, [&] {
+            std::thread reader([&] {
+                CHECK(channel.input().peek() == std::char_traits<char>::eof());
+                finished = true;
+            });
+            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+            while (runner.state(1) != PickCore::SessionRunState::WaitingForInput) {
+                std::this_thread::yield();
+            }
+            channel.close();
+            reader.join();
+        });
     });
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(20));
-    while (runner.state(1) != PickCore::SessionRunState::WaitingForInput) {
-        std::this_thread::yield();
-    }
-
-    channel.close();
-    reader.join();
+    worker.join();
     CHECK(finished.load());
+    CHECK_FALSE(runner.activeSession().has_value());
+    CHECK(runner.state(1) == PickCore::SessionRunState::Runnable);
+}
+
+TEST_CASE("runExclusive exits cleanly when callback ends after yield waiting for input") {
+    PickCore::CooperativeSessionRunner runner;
+    PickCore::IpcSessionChannel channel;
+    bindRunnerScheduling(runner, 1, channel);
+
+    std::thread worker([&] {
+        runner.runExclusive(1, [&] {
+            std::thread reader([&] { CHECK(channel.input().peek() == std::char_traits<char>::eof()); });
+            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+            while (runner.state(1) != PickCore::SessionRunState::WaitingForInput) {
+                std::this_thread::yield();
+            }
+            channel.close();
+            reader.join();
+        });
+    });
+
+    worker.join();
+    CHECK(runner.state(1) == PickCore::SessionRunState::Runnable);
     CHECK_FALSE(runner.activeSession().has_value());
 }
