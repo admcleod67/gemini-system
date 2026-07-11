@@ -38,6 +38,6 @@ Technical reference for Gemini System. Paths below are relative to this director
 
 ## Roadmap
 
-- **[Project milestones](milestones.md)** — hub index; **Milestones 1–15** completed; **17–18** outline service deployment and Version 1.0 release; **19** (post–v1.0) covers CPU-bound execution fairness.
+- **[Project milestones](milestones.md)** — hub index; **Milestones 1–17** completed; **Milestone 18** Version 1.0 release capstone (in progress); **Milestone 19** (post–v1.0) covers CPU-bound execution fairness.
 - **[Milestone detail pages](milestones/)** — one file per milestone (`NN-slug.md` for sortable filenames).
 - **[Compatibility (R83/Pick)](compatibility-r83-pick.md)** — implemented/partial/deferred Gemini compatibility notes versus classic Pick behavior.

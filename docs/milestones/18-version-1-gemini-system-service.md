@@ -59,14 +59,10 @@ Prefer documenting which existing `ctest` cases map to each row; add tests **onl
 | Daemon config / unit shape | `loadDaemonConfigFile…` / `resolveDaemonConfig…`; `systemd gemini.service unit…`; `packaging daemon.conf…` | **OK**; live `systemctl` = manual §9 |
 | Manual smoke | [`daemon.md`](../daemon.md) M17 checklists (`gemini-system`, systemd, Application packaging) | **OK** — reuse for public checklist Stage 5 |
 
-**Remaining gaps** (Stages 3–5):
+**Remaining gaps** (Stages 4–5):
 
 | Gap | Owner stage |
 |-----|-------------|
-| Stale [`docs/README.md`](../README.md) hub (“M1–15 / 17–18 outline”) | **Stage 3** |
-| No short **migration** notes (`gemini-system`-only → Service Edition) | **Stage 3** |
-| **Local UDS only** not listed with CPU / cold-restart known limits | **Stage 3** |
-| Edition naming glossary / consistency (Application/Service vs embedded/standalone) | **Stage 3** |
 | No `CHANGELOG.md`; `PROJECT_VERSION` remains `0.18.0` until tag | **Stage 4** / **5** |
 | Milestone hub / root README “path to 1.0” status flips | **Stage 5** |
 
@@ -81,7 +77,7 @@ Bring operator and developer docs to a v1.0 bar:
 - **Developer** — Tcl / BASIC / PROC / ASM entry points, bytecode/module docs (existing tree under [`docs/`](../README.md)); README and docs hub reflect **1.0** status
 - **Known limitations** — CPU-bound multi-session starvation (I/O yield only); cold restart does not restore sessions; local UDS only — point at [M19](19-execution-fairness-cpu-bound-yield.md) for fairness
 
-Edition naming and residual operator-doc work parked from [M16](16-standalone-edition-application-mode.md) land here. Stage 1 notes existing edition/admin/CPU/cold-restart coverage in [`daemon.md`](../daemon.md) / [`console.md`](../console.md) is largely at bar; remaining doc gaps are listed above for Stage 3.
+Edition naming and residual operator-doc work parked from [M16](16-standalone-edition-application-mode.md) land here. **Stage 3** ships edition glossary, known-limitations trio, Application→Service migration, and docs hub accuracy in operator docs.
 
 #### 2.4 Repository hygiene and release packaging
 
@@ -201,7 +197,7 @@ M18 is sequenced as **audit → fill gaps → docs → hygiene → release**. Ea
 
 - **Stage 2 — Test matrix fill**: add or extend automated tests **only** for matrix holes (primary: daemon-attached two-console lock conflict; optional Runtime-only install); publish final matrix with `ctest` names for locks, cooperative yield, module boot, admin, and install layout. **Exit criterion:** matrix table complete with links/names; `ctest` green; no new product features. *Status: implemented.* Ships `DaemonIpcClient two consoles READU conflict returns RECORD LOCKED` in [`test_GeminiConsole.cpp`](../../tests/console/test_GeminiConsole.cpp); final §2.2 matrix; Runtime-only install deferred.
 
-- **Stage 3 — Docs capstone**: edition naming/migration notes; hub accuracy ([`docs/README.md`](../README.md)); surface known limitations (CPU starvation → M19; cold restart; **local UDS**); tighten architecture/admin/developer cross-links. **Exit criterion:** docs review against §2.3; Application and Service operator stories readable without the milestone page. *Status: planned.*
+- **Stage 3 — Docs capstone**: edition naming/migration notes; hub accuracy ([`docs/README.md`](../README.md)); surface known limitations (CPU starvation → M19; cold restart; **local UDS**); tighten architecture/admin/developer cross-links. **Exit criterion:** docs review against §2.3; Application and Service operator stories readable without the milestone page. *Status: implemented.* Ships edition glossary, known-limitations trio, and Application→Service migration in [`docs/daemon.md`](../daemon.md); console/session edition wording; docs hub roadmap fix.
 
 - **Stage 4 — Repo hygiene**: add `CHANGELOG.md` (1.0 entry draft), version bump preparation, packaging recipe verification, milestone/docs hub consistency for a post-1.0 world (except final status flip). **Exit criterion:** release notes draft ready; install recipes smoke-passed; hub prose accurate aside from M18 status flip. *Status: planned.*
 

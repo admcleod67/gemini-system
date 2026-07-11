@@ -12,7 +12,7 @@ See [Milestone 12](milestones/12-session-model-foundation.md) for rationale and 
 | **Composition** | [`GeminiSessionHost`](../src/userland/tcl/GeminiSessionHost.h) | [`SessionTable`](../src/userland/tcl/SessionTable.h), [`CooperativeSessionRunner`](../src/core/daemon/CooperativeSessionRunner.h) |
 | **Session** | [`GeminiSession`](../src/userland/tcl/GeminiSession.h) | [`Runtime`](../src/core/vm/Runtime.h), [`Shell`](../src/userland/tcl/Shell.h), Tcl env, filesystem root, lock session id, I/O channels |
 
-Standalone **`gemini-system`** embeds the daemon with `maxSessions = 1` and hosts exactly one session. The same `GeminiSession` type lives in the daemon session table when using **`gemini-daemon`** with one or more **`gemini-console`** attachments. See [Service daemon architecture](daemon.md), [Console client](console.md), and [Milestone 13](milestones/13-service-daemon-architecture.md).
+**Application Edition** (`gemini-system`) embeds the daemon with `maxSessions = 1` and hosts exactly one session. The same `GeminiSession` type lives in the daemon session table under **Service Edition** (`gemini-daemon` with one or more `gemini-console` attachments). See [Service daemon architecture](daemon.md) (edition names), [Console client](console.md), and [Milestone 13](milestones/13-service-daemon-architecture.md).
 
 ## Lifecycle API
 
@@ -27,7 +27,7 @@ Standalone **`gemini-system`** embeds the daemon with `maxSessions = 1` and host
 **Host mapping:**
 
 - **`LOGOFF`** (Tcl): `detach()` then `reset()` → `ShellRunResult::EndSession` → `main` re-runs login
-- **`QUIT`** (Tcl): `reset()` then end the REPL/worker. Under embedded **`gemini-system`**, that exits the process. Under **`gemini-daemon`**, the worker ends while the daemon continues (session object may remain for re-attach; contrast **`SHUTDOWN`** / **`KILLSESSION`** in [daemon.md](daemon.md#session-end-contrast)).
+- **`QUIT`** (Tcl): `reset()` then end the REPL/worker. Under Application Edition **`gemini-system`**, that exits the process. Under Service Edition **`gemini-daemon`**, the worker ends while the daemon continues (session object may remain for re-attach; contrast **`SHUTDOWN`** / **`KILLSESSION`** in [daemon.md](daemon.md#session-end-contrast)).
 - **`LOGTO`**: `attach()` with new account after re-authentication
 
 `Shell::attachUserSession` delegates to `GeminiSession::attach()`.
@@ -48,8 +48,8 @@ Tests inject `std::istringstream` / `std::ostringstream` via `setInputStream` / 
 
 | Mode | Transport | Binding |
 |------|-----------|---------|
-| **Embedded** (`gemini-system`) | Process `stdin` / `stdout` / `stderr` | Default stream pointers on session create |
-| **Daemon-attached** (`gemini-console`) | IPC session-plane frames via [`IpcSessionChannel`](../src/core/daemon/IpcSessionChannel.h) | [`GeminiDaemonRunner`](../src/userland/tcl/GeminiDaemonRunner.cpp) sets streams on **`AttachSession`** |
+| **Application Edition** (`gemini-system`) | Process `stdin` / `stdout` / `stderr` | Default stream pointers on session create |
+| **Service Edition** (`gemini-console`) | IPC session-plane frames via [`IpcSessionChannel`](../src/core/daemon/IpcSessionChannel.h) | [`GeminiDaemonRunner`](../src/userland/tcl/GeminiDaemonRunner.cpp) sets streams on **`AttachSession`** |
 
 Login ([`LoginService`](../src/core/login/LoginService.h)) and the Tcl REPL use the same session channel API in both modes — only the transport differs.
 
@@ -71,7 +71,7 @@ When attached to **`gemini-daemon`**, each session worker cooperates with others
 
 Yield occurs at session I/O boundaries (login read, REPL line read, BASIC `INPUT`, etc.) — see [daemon cooperative execution](daemon.md#cooperative-execution). **Record locks are not released on yield** ([Milestone 10](milestones/10-record-locking-multi-user.md)).
 
-Embedded **`gemini-system`** (`maxSessions = 1`) uses the same scheduler API but only one session exists — behaviour is unchanged from pre-M15 embedded mode.
+Application Edition **`gemini-system`** (`maxSessions = 1`) uses the same scheduler API but only one session exists — behaviour is unchanged from pre-M15 embedded mode.
 
 ## Invariants
 

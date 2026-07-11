@@ -10,13 +10,13 @@ See [Service daemon architecture](daemon.md) for IPC protocol and daemon lifecyc
 |-----------|------|
 | **`gemini-console`** | Handshake, attach/detach, `stdin`/`stdout`/`stderr` ↔ session I/O frames |
 | **`gemini-daemon`** | Cold start, session table, IPC server, session worker (login + REPL) per attach |
-| **`GeminiSession`** | Same session object and I/O API as embedded `gemini-system` |
+| **`GeminiSession`** | Same session object and I/O API as Application Edition `gemini-system` |
 
 The console does **not** interpret Tcl or run login logic locally. Catalogue login (`LOGON PLEASE:` cadence) runs in the daemon under [`GeminiDaemonRunner::startSessionWorker`](../src/userland/tcl/GeminiDaemonRunner.cpp).
 
 ## Prerequisites
 
-- A running **`gemini-daemon`** on a reachable Unix domain socket — if the daemon is not running or the socket is unreachable, **`gemini-console`** exits with an error; it does **not** fall back to embedded **`gemini-system`**. For single-process local use, run **`gemini-system`** instead.
+- A running **`gemini-daemon`** on a **local** Unix domain socket — if the daemon is not running or the socket is unreachable, **`gemini-console`** exits with an error; it does **not** fall back to Application Edition **`gemini-system`**. For single-process local use, run **`gemini-system`** instead. Remote attach is out of scope for Version 1.0 — see [Known limitations](daemon.md#known-limitations-version-10).
 - **Catalogue and pick roots** configured on the **daemon** (`--catalog-root`, `--pick-root`, or `GEMINI_CATALOG_ROOT` / `GEMINI_FILESYSTEM_ROOT`) — not on the console
 - Unix domain IPC (not available on Windows; [`Main.cpp`](../src/console/Main.cpp) exits with an error there)
 
@@ -95,7 +95,7 @@ Multiple consoles attached to **`gemini-daemon`** make progress concurrently at 
 - A session blocked in BASIC **`INPUT`** does not prevent another console from running Tcl
 - Round-robin fairness rotates the execution token among idle-at-prompt sessions
 
-**CPU-bound programs:** a session in a long BASIC run (nested loops, no `INPUT`) does not yield; other consoles wait until it finishes. See [Service daemon architecture — known limitation](daemon.md#known-limitation-version-10) and [Milestone 19](milestones/19-execution-fairness-cpu-bound-yield.md) (planned post–v1.0).
+**CPU-bound programs:** a session in a long BASIC run (nested loops, no `INPUT`) does not yield; other consoles wait until it finishes. See [Service daemon — known limitations](daemon.md#known-limitations-version-10) and [Milestone 19](milestones/19-execution-fairness-cpu-bound-yield.md) (planned post–v1.0).
 
 Only one session runs interpreter work at any instant — this is cooperative scheduling, not preemption. See [Service daemon architecture — cooperative execution](daemon.md#cooperative-execution).
 
@@ -163,7 +163,7 @@ Quit all consoles, then `kill -TERM` the daemon process. Socket file removed; cl
 
 ## Embedded path unchanged
 
-**`gemini-system`** remains the single-process embedded host (`maxSessions = 1`, direct stdio). It does not use `gemini-console` or IPC. Manual smoke for embedded mode is unchanged — see [Gemini bootstrap](gemini-bootstrap.md).
+**Application Edition** **`gemini-system`** remains the single-process embedded host (`maxSessions = 1`, direct stdio). It does not use `gemini-console` or IPC. Manual smoke is unchanged — see [Gemini bootstrap](gemini-bootstrap.md). For moving to Service Edition, see [Migrating from Application Edition to Service Edition](daemon.md#migrating-from-application-edition-to-service-edition).
 
 ## Source map
 

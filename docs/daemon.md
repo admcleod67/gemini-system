@@ -16,6 +16,14 @@ All three binaries link the same daemon host implementation in `gemini-core` / `
 | **`gemini-daemon`** | Service | [`create(config)`](../src/core/daemon/GeminiServiceDaemon.cpp) → `GeminiSessionHost` → [`GeminiDaemonRunner`](../src/userland/tcl/GeminiDaemonRunner.cpp) | Unix domain socket; accepts multiple [`gemini-console`](console.md) clients; session workers run login/REPL per attach |
 | **`gemini-console`** | Service (client) | [`DaemonIpcClient`](../src/core/daemon/DaemonIpcClient.h) only (links `gemini-core`) | Terminal ↔ daemon session I/O over IPC; requires running daemon — see [Console client](console.md) |
 
+**Edition names:**
+
+- **Application Edition** — **`gemini-system`**: single-session embedded host (`maxSessions = 1`, direct stdio, no IPC)
+- **Service Edition** — **`gemini-daemon`** + **`gemini-console`**: multi-session Linux service over a local Unix domain socket
+- Prefer these edition names over “standalone”; “embedded” means the Application path only
+
+There is **no console failover**: a failed `gemini-console` connect is an error, not a switch to Application Edition.
+
 [`Main.cpp`](../src/Main.cpp) hosts the embedded path. [`src/daemon/Main.cpp`](../src/daemon/Main.cpp) hosts the long-running daemon. [`src/console/Main.cpp`](../src/console/Main.cpp) hosts the console client.
 
 ## Process vs session scope
@@ -159,11 +167,11 @@ Cooperative scheduling switches only at these boundaries (M15):
 
 **Not yield points:** mid-opcode VM execution, mid-`handleLine` Tcl dispatch, lock table operations, ASM `STEP` / `RUN` / `CONT` CPU loops.
 
-### Known limitation (Version 1.0)
+### Known limitations (Version 1.0)
 
-A session running **CPU-bound** BASIC (or other VM work without `INPUT`) holds the execution token until the run finishes. Other consoles stay blocked at prompts until then — round-robin does not apply because the busy session never yields. Example: nested `FOR` loops with `GOSUB` and no input (~billions of VM steps).
-
-This is intentional M15 scope. Post–v1.0 improvement: opcode-budget yield and operator **BREAK** in [**Milestone 19**](milestones/19-execution-fairness-cpu-bound-yield.md). Until then, admins may use **`KILLSESSION`** (M17) to terminate a runaway session.
+- **CPU-bound starvation:** a session running **CPU-bound** BASIC (or other VM work without `INPUT`) holds the execution token until the run finishes. Other consoles stay blocked at prompts — round-robin does not apply because the busy session never yields. Example: nested `FOR` loops with `GOSUB` and no input (~billions of VM steps). Intentional M15 scope. Post–v1.0: opcode-budget yield and operator **BREAK** in [**Milestone 19**](milestones/19-execution-fairness-cpu-bound-yield.md). Until then, admins may use **`KILLSESSION`** (M17) to terminate a runaway session.
+- **Cold restart = fresh sessions:** after daemon stop/restart or Tcl **`SHUTDOWN`**, in-flight REPL / VM / login state is **not** restored — see [Cold restart = fresh sessions](#cold-restart--fresh-sessions).
+- **Local Unix domain sockets only:** Service Edition attach uses a local **`AF_UNIX`** socket. Remote access (SSH/telnet front-ends, networked IPC) is out of scope for Version 1.0.
 
 ## Configuration
 
@@ -257,6 +265,15 @@ cmake --install <build-dir> --prefix <prefix> --component Service
 Then follow the [systemd](#systemd-geminiservice) operator steps (unit under `${CMAKE_INSTALL_LIBDIR}/systemd/system`).
 
 **No console failover:** [`gemini-console`](console.md) requires a running `gemini-daemon`. A failed socket connect is an **error**; it does **not** start embedded `gemini-system`. Use Application Edition for single-process stdio.
+
+### Migrating from Application Edition to Service Edition
+
+1. Install **Runtime** + **Service** (keep Application install if you still want `gemini-system` on the same prefix).
+2. Edit `daemon.conf`: set `catalog_root`, `pick_root`, and `modules_root` to the same bootstrap tree you used with Application Edition (typically `<prefix>/share/gemini` and account roots under it).
+3. Start the daemon via [systemd](#systemd-geminiservice) (`systemctl start gemini`) or run `gemini-daemon --config …` in the foreground.
+4. Attach with `gemini-console --socket <path>` (default under systemd: `/run/gemini/gemini.sock`).
+
+Application Edition remains the right choice for single-process local use. **`gemini-console` never falls back** to `gemini-system` if the daemon is down.
 
 Bootstrap layout and env resolution: [Gemini bootstrap](gemini-bootstrap.md).
 
