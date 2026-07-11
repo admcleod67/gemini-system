@@ -1,3 +1,4 @@
+#include <atomic>
 #include <iostream>
 #include <optional>
 
@@ -16,14 +17,29 @@ int main() {
     PickShell::GeminiSession &session = handle.session;
     applyDefaultFileSystemRoot(session.shell());
 
+    std::atomic<bool> shutdownRequested{false};
     PickShell::Shell &shell = session.shell();
     shell.setAdminQueries(PickShell::ShellAdminQueries{
-        [&host] { return host.listAdminSessions(); },
-        [&host] { return host.adminStatus(); },
+        .listSessions = [&host] { return host.listAdminSessions(); },
+        .status = [&host] { return host.adminStatus(); },
+        .killSession =
+            [&host](const PickCore::SessionId port, std::string &error) {
+                if (host.sessions().find(port) == nullptr) {
+                    error = "session not found";
+                    return false;
+                }
+                host.retireSession(port);
+                host.destroySession(port);
+                return true;
+            },
+        .requestShutdown = [&shutdownRequested] { shutdownRequested.store(true, std::memory_order_release); },
     });
     const auto &catalog = shell.geminiCatalogRoot();
     if (!catalog.has_value()) {
         host.runExclusive(handle.id, [&] { (void) shell.runTclRepl(); });
+        if (shutdownRequested.load(std::memory_order_acquire)) {
+            host.destroyAllSessions();
+        }
         return 0;
     }
 
@@ -42,6 +58,9 @@ int main() {
             return result;
         }();
         if (r == PickShell::ShellRunResult::ExitProcess) {
+            if (shutdownRequested.load(std::memory_order_acquire)) {
+                host.destroyAllSessions();
+            }
             return 0;
         }
     }

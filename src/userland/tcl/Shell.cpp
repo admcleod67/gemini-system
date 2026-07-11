@@ -421,15 +421,16 @@ namespace PickShell {
             }
             cmdVersion(out);
         };
-        tclCommands_["SYSTEM"] = [this](const Tokens &tokens, std::ostream &out, bool &) {
-            cmdSystem(tokens, out);
+        tclCommands_["SYSTEM"] = [this](const Tokens &tokens, std::ostream &out, bool &quit) {
+            cmdSystem(tokens, out, quit);
         };
         tclCommands_["ABOUT"] = [this](const Tokens &tokens, std::ostream &out, bool &) {
             if (tokens.size() != 1) {
                 out << "ABOUT takes no arguments\n";
                 return;
             }
-            cmdSystem(tokens, out);
+            bool ignoredQuit = false;
+            cmdSystem(tokens, out, ignoredQuit);
         };
         tclCommands_["SHOW-MODULES"] = [this](const Tokens &tokens, std::ostream &out, bool &) {
             if (tokens.size() != 1) {
@@ -458,6 +459,16 @@ namespace PickShell {
                 return;
             }
             cmdStatus(out);
+        };
+        tclCommands_["KILLSESSION"] = [this](const Tokens &tokens, std::ostream &out, bool &) {
+            cmdKillSession(tokens, out);
+        };
+        tclCommands_["SHUTDOWN"] = [this](const Tokens &tokens, std::ostream &out, bool &quit) {
+            if (tokens.size() != 1) {
+                out << "SHUTDOWN takes no arguments\n";
+                return;
+            }
+            cmdShutdown(out, quit);
         };
         tclCommands_["ECHO"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdEcho(tokens, out); };
         tclCommands_["RUN"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdRun(tokens, out); };
@@ -1551,7 +1562,7 @@ namespace PickShell {
         out << "Build: " << __DATE__ << "\n";
     }
 
-    void Shell::cmdSystem(const Tokens &tokens, std::ostream &out) {
+    void Shell::cmdSystem(const Tokens &tokens, std::ostream &out, bool &quit) {
         if (tokens.size() == 1) {
             out << "System: " << pick_system::system_title << "\n";
             out << "Version: " << pick_system::version_string << "\n";
@@ -1593,6 +1604,11 @@ namespace PickShell {
 
         if (tokens.size() == 2 && tokens[1] == "STATUS") {
             cmdStatus(out);
+            return;
+        }
+
+        if (tokens.size() == 2 && tokens[1] == "SHUTDOWN") {
+            cmdShutdown(out, quit);
             return;
         }
 
@@ -1695,6 +1711,49 @@ namespace PickShell {
         }
         const AdminDaemonStatus status = adminQueries_.status ? adminQueries_.status() : fallbackAdminStatus();
         formatStatus(status, out);
+    }
+
+    void Shell::cmdKillSession(const Tokens &tokens, std::ostream &out) {
+        if (!requireSysprog(out, "KILLSESSION")) {
+            return;
+        }
+        if (tokens.size() != 2) {
+            out << "KILLSESSION requires a session port\n";
+            return;
+        }
+        const std::optional<int> portValue = parsePositiveInt(tokens[1]);
+        if (!portValue.has_value()) {
+            out << "KILLSESSION requires a session port\n";
+            return;
+        }
+        const auto port = static_cast<PickCore::SessionId>(*portValue);
+        if (static_cast<int>(port) == session_.whoPort()) {
+            out << "KILLSESSION: cannot kill current session\n";
+            return;
+        }
+        if (!adminQueries_.killSession) {
+            out << "KILLSESSION: not available\n";
+            return;
+        }
+        std::string error;
+        if (!adminQueries_.killSession(port, error)) {
+            out << "KILLSESSION: " << error << '\n';
+            return;
+        }
+        out << "Session " << port << " killed\n";
+    }
+
+    void Shell::cmdShutdown(std::ostream &out, bool &quit) {
+        if (!requireSysprog(out, "SHUTDOWN")) {
+            return;
+        }
+        if (!adminQueries_.requestShutdown) {
+            out << "SHUTDOWN: not available\n";
+            return;
+        }
+        adminQueries_.requestShutdown();
+        out << "Shutting down\n";
+        quit = true;
     }
 
     void Shell::cmdDumpStack(std::ostream &out) {

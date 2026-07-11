@@ -1,5 +1,6 @@
 //
-// Admin LISTSESSIONS / STATUS DTOs and Shell query callbacks (Milestone 17 Stage 4).
+// Admin LISTSESSIONS / STATUS / KILLSESSION / SHUTDOWN DTOs and Shell query callbacks
+// (Milestone 17 Stages 4–5).
 //
 
 #ifndef PICK_SYSTEM_TCL_ADMIN_QUERIES_H
@@ -33,6 +34,8 @@ namespace PickShell {
     struct ShellAdminQueries {
         std::function<std::vector<AdminSessionRow>()> listSessions;
         std::function<AdminDaemonStatus()> status;
+        std::function<bool(PickCore::SessionId, std::string &error)> killSession;
+        std::function<void()> requestShutdown;
     };
 } // namespace PickShell
 

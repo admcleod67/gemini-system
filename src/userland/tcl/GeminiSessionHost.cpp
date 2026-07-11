@@ -56,6 +56,10 @@ namespace PickShell {
         return runner_.state(id);
     }
 
+    std::optional<PickCore::SessionId> GeminiSessionHost::activeSession() const {
+        return runner_.activeSession();
+    }
+
     void GeminiSessionHost::bindIpcChannelScheduling(const PickCore::SessionId id,
                                                      PickCore::IpcSessionChannel &channel) {
         channel.setSessionScheduling(PickCore::SessionInputScheduling{

@@ -16,8 +16,10 @@
 #include <iosfwd>
 #include <iostream>
 #include <mutex>
+#include <string>
 #include <thread>
 #include <unordered_map>
+#include <vector>
 
 namespace PickShell {
     class GeminiDaemonRunner {
@@ -34,6 +36,9 @@ namespace PickShell {
         void shutdown();
         void applyHostPaths(GeminiSession &session);
         void installAdminQueries(GeminiSession &session);
+        [[nodiscard]] bool killSession(PickCore::SessionId port, std::string &error);
+        void unbindConsoleWithoutJoin(PickCore::SessionId port);
+        void drainPendingSessionDestroys();
         PickCore::AttachSessionResult attachSession(PickCore::SessionId requestedPort,
                                                     PickCore::IpcSessionChannel &channel);
         void detachSession(PickCore::SessionId port);
@@ -51,6 +56,8 @@ namespace PickShell {
         std::unordered_map<PickCore::SessionId, PickCore::CatalogLoginPhase> loginPhaseByPort_;
         std::unordered_map<PickCore::SessionId, std::thread> sessionWorkerThreads_;
         std::mutex sessionWorkerThreadsMutex_;
+        std::vector<PickCore::SessionId> pendingDestroyPorts_;
+        std::mutex pendingDestroyMutex_;
 #endif
     };
 } // namespace PickShell

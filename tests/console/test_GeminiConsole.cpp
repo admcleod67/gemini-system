@@ -1043,4 +1043,139 @@ TEST_CASE("DaemonIpcClient SYSPROG LISTSESSIONS and STATUS show both consoles") 
     runnerThread.join();
 }
 
+TEST_CASE("DaemonIpcClient SYSPROG KILLSESSION destroys peer and releases locks") {
+    const auto root = uniqueDaemonIpcTempDir();
+    const auto gem = root / "gemini";
+    const auto shared = gem / "accounts" / "SHARED";
+    std::filesystem::create_directories(shared / "VOC");
+    {
+        std::ofstream accounts(gem / "ACCOUNTS.json");
+        accounts << R"({"accounts":[{"name":"SYSPROG","root":"accounts/SHARED"},{"name":"TST","root":"accounts/SHARED"}]})";
+    }
+    {
+        PickFS::FileSystem fs(shared);
+        fs.createFile("DATA");
+        fs.write("DATA", PickFS::Record("R1", "seed"));
+    }
+
+    PickCore::DaemonConfig config{};
+    config.maxSessions = 2;
+    config.socketPath = root / "gemini.sock";
+    config.hostPaths.geminiCatalogRoot = gem;
+    config.hostPaths.pickFilesystemRoot = shared;
+
+    PickCore::GeminiServiceDaemon daemon = PickCore::GeminiServiceDaemon::create(config);
+    PickShell::GeminiSessionHost host(daemon, config.maxSessions);
+    PickShell::GeminiDaemonRunner runner(daemon, host, config);
+
+    std::thread runnerThread([&] {
+        std::ostringstream boot;
+        CHECK(runner.run(boot) == 0);
+    });
+
+    REQUIRE(waitForSocket(config.socketPath, std::chrono::milliseconds(2000)));
+
+    const int clientFdA = connectUnixSocket(config.socketPath);
+    REQUIRE(clientFdA >= 0);
+    sendHandshake(clientFdA);
+    recvHandshakeAck(clientFdA);
+    const PickCore::SessionId portA = attachNewSession(clientFdA);
+
+    const int clientFdB = connectUnixSocket(config.socketPath);
+    REQUIRE(clientFdB >= 0);
+    sendHandshake(clientFdB);
+    recvHandshakeAck(clientFdB);
+    const PickCore::SessionId portB = attachNewSession(clientFdB);
+    REQUIRE(portA != portB);
+
+    std::string outputA;
+    std::string outputB;
+    sendSessionInputString(clientFdA, "SYSPROG\n");
+    sendSessionInputString(clientFdB, "TST\n");
+    REQUIRE(waitForSessionOutputContaining(clientFdA, "TCL> ", outputA, std::chrono::milliseconds(2000)));
+    REQUIRE(waitForSessionOutputContaining(clientFdB, "TCL> ", outputB, std::chrono::milliseconds(2000)));
+    REQUIRE(waitForLoggedIn(host, portA, std::chrono::milliseconds(2000)));
+    REQUIRE(waitForLoggedIn(host, portB, std::chrono::milliseconds(2000)));
+
+    sendSessionInputString(clientFdB, "READU DATA R1\n");
+    REQUIRE(waitForSessionOutputContaining(clientFdB, "seed\n", outputB, std::chrono::milliseconds(2000)));
+    REQUIRE(waitForSessionRunState(host, portB, PickCore::SessionRunState::WaitingForInput,
+                                   std::chrono::milliseconds(2000)));
+
+    sendSessionInputString(clientFdA, "KILLSESSION " + std::to_string(portB) + "\n");
+    REQUIRE(waitForSessionOutputContaining(clientFdA, "Session " + std::to_string(portB) + " killed\n", outputA,
+                                           std::chrono::milliseconds(2000)));
+
+    const auto destroyDeadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(2000);
+    while (std::chrono::steady_clock::now() < destroyDeadline) {
+        if (host.sessions().find(portB) == nullptr) {
+            break;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    REQUIRE(host.sessions().find(portB) == nullptr);
+    CHECK(host.sessions().count() == 1);
+
+    sendSessionInputString(clientFdA, "LISTSESSIONS\n");
+    REQUIRE(waitForSessionOutputContaining(clientFdA, "PORT BOUND USER ACCOUNT STATE\n", outputA,
+                                           std::chrono::milliseconds(2000)));
+    CHECK(outputA.find(std::to_string(portB) + " yes") == std::string::npos);
+
+    sendSessionInputString(clientFdA, "READU DATA R1\n");
+    REQUIRE(waitForSessionOutputContaining(clientFdA, "seed\n", outputA, std::chrono::milliseconds(2000)));
+
+    sendSessionInputString(clientFdA, "QUIT\n");
+    detachAndClose(clientFdA);
+    ::close(clientFdB);
+    runner.requestShutdown();
+    runnerThread.join();
+}
+
+TEST_CASE("DaemonIpcClient SYSPROG SHUTDOWN stops daemon and unlinks socket") {
+    const auto root = uniqueDaemonIpcTempDir();
+    const auto gem = root / "gemini";
+    const auto sysprog = gem / "accounts" / "SYSPROG";
+    std::filesystem::create_directories(sysprog / "VOC");
+    {
+        std::ofstream accounts(gem / "ACCOUNTS.json");
+        accounts << R"({"accounts":[{"name":"SYSPROG","root":"accounts/SYSPROG"}]})";
+    }
+
+    PickCore::DaemonConfig config{};
+    config.maxSessions = 2;
+    config.socketPath = root / "gemini.sock";
+    config.hostPaths.geminiCatalogRoot = gem;
+    config.hostPaths.pickFilesystemRoot = sysprog;
+
+    PickCore::GeminiServiceDaemon daemon = PickCore::GeminiServiceDaemon::create(config);
+    PickShell::GeminiSessionHost host(daemon, config.maxSessions);
+    PickShell::GeminiDaemonRunner runner(daemon, host, config);
+
+    std::thread runnerThread([&] {
+        std::ostringstream boot;
+        CHECK(runner.run(boot) == 0);
+    });
+
+    REQUIRE(waitForSocket(config.socketPath, std::chrono::milliseconds(2000)));
+
+    const int clientFd = connectUnixSocket(config.socketPath);
+    REQUIRE(clientFd >= 0);
+    sendHandshake(clientFd);
+    recvHandshakeAck(clientFd);
+    const PickCore::SessionId port = attachNewSession(clientFd);
+
+    std::string output;
+    sendSessionInputString(clientFd, "SYSPROG\n");
+    REQUIRE(waitForSessionOutputContaining(clientFd, "TCL> ", output, std::chrono::milliseconds(2000)));
+    REQUIRE(waitForLoggedIn(host, port, std::chrono::milliseconds(2000)));
+
+    sendSessionInputString(clientFd, "SHUTDOWN\n");
+    REQUIRE(waitForSessionOutputContaining(clientFd, "Shutting down\n", output, std::chrono::milliseconds(2000)));
+
+    runnerThread.join();
+    CHECK_FALSE(std::filesystem::exists(config.socketPath));
+    CHECK(host.sessions().count() == 0);
+    ::close(clientFd);
+}
+
 #endif

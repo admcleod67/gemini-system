@@ -100,16 +100,18 @@ The port survives **`LOGOFF`** until session **destroy** (daemon-assigned; login
 
 Embedded `gemini-system` uses `maxSessions = 1` / `PortManager(1)`; the operator typically sees port **1** after login.
 
-## Admin Tcl (`LISTSESSIONS` / `STATUS`)
+## Admin Tcl (`LISTSESSIONS` / `STATUS` / `KILLSESSION` / `SHUTDOWN`)
 
-Privileged session operators (logged-in account **`SYSPROG`**) can inspect daemon capacity from Tcl:
+Privileged session operators (logged-in account **`SYSPROG`**) can inspect and control the daemon from Tcl:
 
 | Command | Purpose |
 |---------|---------|
 | **`LISTSESSIONS`** | All session ports, console bound yes/no, login identity, cooperative run state |
 | **`STATUS`** / **`SYSTEM STATUS`** | Version, `sessions` / `maxSessions`, socket path (`none` for embedded) |
+| **`KILLSESSION`** *port* | Destroy one other session (unbind console if attached, release locks/ports). Cannot kill the calling session. |
+| **`SHUTDOWN`** / **`SYSTEM SHUTDOWN`** | Same graceful stop as **SIGTERM** / IPC **`ShutdownRequest`**: detach all, destroy sessions, unlink socket, exit |
 
-See [Tcl shell](tcl-shell.md). Destructive admin verbs (**`KILLSESSION`**, **`SHUTDOWN`**) remain M17 Stage 5.
+See [Tcl shell](tcl-shell.md). Console **detach** alone preserves the session for re-attach; **`KILLSESSION`** destroys it.
 
 ## Cooperative execution
 

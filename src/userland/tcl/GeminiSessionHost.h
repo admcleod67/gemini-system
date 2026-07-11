@@ -13,6 +13,7 @@
 
 #include <filesystem>
 #include <functional>
+#include <optional>
 #include <vector>
 
 namespace PickShell {
@@ -32,6 +33,7 @@ namespace PickShell {
         void resume(PickCore::SessionId id);
         void retireSession(PickCore::SessionId id);
         [[nodiscard]] PickCore::SessionRunState sessionRunState(PickCore::SessionId id) const;
+        [[nodiscard]] std::optional<PickCore::SessionId> activeSession() const;
 
         void bindIpcChannelScheduling(PickCore::SessionId id, PickCore::IpcSessionChannel &channel);
         void clearIpcChannelScheduling(PickCore::IpcSessionChannel &channel);

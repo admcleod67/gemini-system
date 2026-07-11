@@ -167,11 +167,13 @@ namespace PickShell {
         [[nodiscard]] std::string generatedHelpCommandsBody();
 
         void cmdVersion(std::ostream &out);
-        void cmdSystem(const Tokens &tokens, std::ostream &out);
+        void cmdSystem(const Tokens &tokens, std::ostream &out, bool &quit);
         void cmdShowModules(std::ostream &out);
         void cmdWho(std::ostream &out);
         void cmdListSessions(std::ostream &out);
         void cmdStatus(std::ostream &out);
+        void cmdKillSession(const Tokens &tokens, std::ostream &out);
+        void cmdShutdown(std::ostream &out, bool &quit);
 
         [[nodiscard]] bool requireSysprog(std::ostream &out, std::string_view command) const;
         [[nodiscard]] static const char *runStateLabel(PickCore::SessionRunState state);

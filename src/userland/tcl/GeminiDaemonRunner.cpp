@@ -45,10 +45,99 @@ namespace PickShell {
 
     void GeminiDaemonRunner::installAdminQueries(GeminiSession &session) {
         session.shell().setAdminQueries(ShellAdminQueries{
-            [this] { return host_.listAdminSessions(); },
-            [this] { return host_.adminStatus(); },
+            .listSessions = [this] { return host_.listAdminSessions(); },
+            .status = [this] { return host_.adminStatus(); },
+            .killSession = [this](const PickCore::SessionId port, std::string &error) {
+                return killSession(port, error);
+            },
+            .requestShutdown = [this] { requestShutdown(); },
         });
     }
+
+    bool GeminiDaemonRunner::killSession(const PickCore::SessionId port, std::string &error) {
+        if (host_.sessions().find(port) == nullptr) {
+            error = "session not found";
+            return false;
+        }
+
+#ifndef _WIN32
+        const bool hadWorker = boundSessionPorts_.contains(port) || [&] {
+            const std::lock_guard lock(sessionWorkerThreadsMutex_);
+            return sessionWorkerThreads_.contains(port);
+        }();
+
+        if (boundSessionPorts_.contains(port)) {
+            // Close the console without joining: the caller may hold the cooperative token.
+            // Destroy is deferred to the main poll loop after the victim worker exits.
+            unbindConsoleWithoutJoin(port);
+            host_.retireSession(port);
+            {
+                const std::lock_guard lock(pendingDestroyMutex_);
+                pendingDestroyPorts_.push_back(port);
+            }
+            return true;
+        }
+
+        host_.retireSession(port);
+        if (hadWorker) {
+            const std::lock_guard lock(pendingDestroyMutex_);
+            pendingDestroyPorts_.push_back(port);
+            return true;
+        }
+#endif
+        host_.retireSession(port);
+        host_.destroySession(port);
+        return true;
+    }
+
+#ifndef _WIN32
+    void GeminiDaemonRunner::unbindConsoleWithoutJoin(const PickCore::SessionId port) {
+        const auto channelIt = boundChannels_.find(port);
+        if (channelIt != boundChannels_.end()) {
+            PickCore::IpcSessionChannel &channel = *channelIt->second;
+            host_.clearIpcChannelScheduling(channel);
+            channel.close();
+            boundChannels_.erase(channelIt);
+        }
+        boundSessionPorts_.erase(port);
+
+        GeminiSession *session = host_.sessions().find(port);
+        if (session == nullptr) {
+            return;
+        }
+        session->setInputStream(nullptr);
+        session->setOutputStream(nullptr);
+        session->setDiagnosticStream(nullptr);
+    }
+
+    void GeminiDaemonRunner::drainPendingSessionDestroys() {
+        std::vector<PickCore::SessionId> ports;
+        {
+            const std::lock_guard lock(pendingDestroyMutex_);
+            ports.swap(pendingDestroyPorts_);
+        }
+        std::vector<PickCore::SessionId> deferred;
+        for (const PickCore::SessionId port : ports) {
+            // Victim workers may be blocked waiting for the cooperative token held by the
+            // killer. Join only when no other session is actively running.
+            if (const std::optional<PickCore::SessionId> active = host_.activeSession();
+                active.has_value() && *active != port) {
+                deferred.push_back(port);
+                continue;
+            }
+            joinSessionWorker(port);
+            host_.retireSession(port);
+            loginPhaseByPort_.erase(port);
+            if (host_.sessions().find(port) != nullptr) {
+                host_.destroySession(port);
+            }
+        }
+        if (!deferred.empty()) {
+            const std::lock_guard lock(pendingDestroyMutex_);
+            pendingDestroyPorts_.insert(pendingDestroyPorts_.end(), deferred.begin(), deferred.end());
+        }
+    }
+#endif
 
     void GeminiDaemonRunner::requestShutdown() {
         shutdownRequested.store(true, std::memory_order_release);
@@ -258,10 +347,12 @@ namespace PickShell {
         handlers.requestShutdown = [this] { requestShutdown(); };
 
         while (!shutdownRequested.load(std::memory_order_acquire)) {
+            drainPendingSessionDestroys();
             if (ipcServer_.pollAndDispatch(std::chrono::milliseconds(100), serverConfig, handlers)) {
                 break;
             }
         }
+        drainPendingSessionDestroys();
 #else
         while (!shutdownRequested.load(std::memory_order_acquire)) {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -274,6 +365,7 @@ namespace PickShell {
 
     void GeminiDaemonRunner::shutdown() {
 #ifndef _WIN32
+        drainPendingSessionDestroys();
         std::vector<PickCore::SessionId> boundPorts;
         boundPorts.reserve(boundSessionPorts_.size());
         for (const auto &entry : boundSessionPorts_) {
