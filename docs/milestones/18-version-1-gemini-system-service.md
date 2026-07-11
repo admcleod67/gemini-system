@@ -4,29 +4,185 @@
 
 Deliver the first stable **Version 1.0** Gemini System: a Pick-authentic, multi-session **service edition** and a matching **application edition**, both on the same architecture. Ship reliable daemon-based multi-session operation, integrated language libraries (Tcl, BASIC, PROC, assembler shell), multi-attribute Pick filesystem semantics, and complete **architecture**, **admin**, and **developer** documentation. Define and meet public **release criteria** for the repository and deliverables. *Status: planned.*
 
-### Release scope
+[**Milestone 17**](17-service-integration-deployment.md) closed Linux service integration (config, journald, systemd, admin Tcl, install components). M18 is the **stabilization and documentation capstone** that declares Version 1.0 — not a bucket for new architecture. Avoid sneaking in telnet, SQL, distributed sessions, transaction semantics, or CPU-bound fairness; those belong in post-1.0 milestones ([**Milestone 19**](19-execution-fairness-cpu-bound-yield.md) and later).
 
-M18 is a **stabilization and documentation capstone**—not a bucket for new architecture. Avoid sneaking in telnet, SQL, distributed sessions, or transaction semantics; those belong in post-1.0 milestones.
+---
 
-**Dual deliverables:**
+### 1. Purpose and rationale
 
-- **Service edition** — **`gemini-daemon`** + **`gemini-console`**; multi-session Linux deployment ([**Milestones 13–17**](13-service-daemon-architecture.md))
-- **Application edition** — **`gemini-system`**; single-session embedded host on the same architecture (delivered M12–M13; see [Milestone 16 retirement note](16-standalone-edition-application-mode.md))
+Milestones 1–17 built a working Pick-like platform and a UniData-style Linux service path. What remains for a credible **1.0** is not another subsystem, but a **release boundary**:
 
-### Positioning
+1. **Prove** what already ships — multi-session locks, cooperative I/O scheduling, language-module boot, both editions
+2. **Document** architecture, admin, and developer surfaces as a coherent v1.0 story (Service vs Application; known limits)
+3. **Hygiene** — version identity, milestone history, packaging recipes, public release checklist
+4. **Tag** Version 1.0 when the checklist is green
 
-**Version 1.0** means Pick-authentic multi-user **file and lock semantics** on Linux (UniData-style service deployment), not full R83 terminal/phantom fidelity. Gemini remains grounded in Pick authenticity while shifting deployment focus from a single developer process toward a production Linux service.
+**Version 1.0** means Pick-authentic multi-user **file and lock semantics** on Linux (local Unix-domain service deployment), not full R83 terminal/phantom fidelity. Gemini stays grounded in Pick authenticity while treating production Linux service deployment as a first-class deliverable alongside the single-process application host.
 
-### Release criteria (outline)
+**Design constraint:** no new session model, IPC protocol, or scheduler behaviour in M18. Bug fixes and doc/test gaps that block the release checklist are in scope; feature work is not.
 
-- Test matrix covering multi-session locks, cooperative scheduling, and language module boot
-- **Architecture**, **admin**, and **developer** guides — including **Service Edition** vs **Application Edition** operator docs (`gemini-daemon`/`gemini-console` vs `gemini-system`; no console failover); document cooperative **CPU-bound starvation** as a v1.0 known limitation ([**Milestone 19**](19-execution-fairness-cpu-bound-yield.md) post-1.0)
-- Repository hygiene: milestone history, clean packaging (M17 install splits), public release checklist
+---
 
-### Out of scope for v1.0 (explicit)
+### 2. Scope
 
-- CPU-bound multi-session fairness (opcode-budget VM yield, operator **BREAK**) — [**Milestone 19**](19-execution-fairness-cpu-bound-yield.md) after v1.0; document as known limitation in release docs
+#### 2.1 Dual deliverables (already built — M18 documents and freezes them)
+
+| Edition | Binaries | Hosting |
+|---------|----------|---------|
+| **Service** | **`gemini-daemon`** + **`gemini-console`** | Multi-session Linux deployment ([M13–M17](13-service-daemon-architecture.md)) |
+| **Application** | **`gemini-system`** | Single-session embedded host on the same architecture ([M12–M13](12-session-model-foundation.md); [M16 retirement](16-standalone-edition-application-mode.md)) |
+
+**No console failover:** `gemini-console` requires a running daemon; connection failure is an error, not a switch to embedded mode.
+
+#### 2.2 Test matrix (audit + fill gaps)
+
+Publish and satisfy a **v1.0 test matrix** covering at least:
+
+- Multi-session **record locks** (M10 + daemon-attached sessions)
+- **Cooperative scheduling** at I/O yield points (M15)
+- **Language module** boot / registration (M11)
+- Admin verbs and lifecycle (M17): **`LISTSESSIONS`**, **`STATUS`**, **`KILLSESSION`**, **`SHUTDOWN`**
+- Install layout smoke for **Runtime** / **Application** / **Service** components (M17)
+
+Prefer documenting which existing `ctest` cases map to each row; add tests **only** where the matrix has a real hole. Do not invent product features to “fill” coverage.
+
+#### 2.3 Documentation capstone
+
+Bring operator and developer docs to a v1.0 bar:
+
+- **Architecture** — session model, daemon/IPC, cooperative execution (existing [`session.md`](../session.md), [`daemon.md`](../daemon.md); tighten cross-links and edition framing)
+- **Admin** — systemd, config, admin Tcl, session-end contrast, cold restart = fresh sessions (largely M17); edition install recipes; migration notes for operators moving from `gemini-system`-only to Service Edition
+- **Developer** — Tcl / BASIC / PROC / ASM entry points, bytecode/module docs (existing tree under [`docs/`](../README.md)); README and docs hub reflect **1.0** status
+- **Known limitations** — CPU-bound multi-session starvation (I/O yield only); cold restart does not restore sessions; local UDS only — point at [M19](19-execution-fairness-cpu-bound-yield.md) for fairness
+
+Edition naming and residual operator-doc work parked from [M16](16-standalone-edition-application-mode.md) land here.
+
+#### 2.4 Repository hygiene and release packaging
+
+- Align **`PROJECT_VERSION`** / annotated git tag with the public **1.0** identity (today: `0.17.0` in root [`CMakeLists.txt`](../../CMakeLists.txt))
+- Milestone hub / README: M18 **implemented**; path-to-1.0 closed; M19 marked post–v1.0
+- Confirm M17 CMake install components remain the packaging story (CPack / distro packages optional — see §8)
+- **Public release checklist** (Stage 5) that an outsider can run: build, `ctest`, Application smoke, Service install smoke, systemd checklist on Linux
+
+---
+
+### 3. Architecture (freeze — no M18 changes)
+
+M18 does **not** change process topology. For reference:
+
+```text
+Service Edition:
+  systemd (gemini.service)
+       └── gemini-daemon ── Unix socket ── gemini-console (N)
+              └── GeminiServiceDaemon + CooperativeSessionRunner
+
+Application Edition:
+  gemini-system ── createEmbedded() ── one session, stdio (no IPC)
+```
+
+Session lifecycle, IPC v1, and cooperative I/O yield remain as documented after M15/M17. Cold restart continues to mean **fresh sessions** (no restore).
+
+---
+
+### 4. Non-goals
+
+- New admin verbs, IPC messages, or scheduler/VM yield behaviour
+- CPU-bound multi-session fairness / operator **BREAK** — [**Milestone 19**](19-execution-fairness-cpu-bound-yield.md) **after** v1.0 is tagged
 - Remote access beyond local Unix domain sockets (SSH/telnet post-1.0)
 - Hot-reload of language modules without daemon restart
-- Session restore across cold daemon restart (unless explicitly delivered in M17)
+- Session restore across cold daemon restart
 - Transaction semantics, SQL gateways, or other post-Pick extensions
+- Distro packaging beyond what M17 already ships, unless explicitly chosen in §8 (CPack is optional stretch, not required for closure)
+
+---
+
+### 5. Compatibility expectations
+
+- **`gemini-system`** external behaviour must not regress (boot → logon → Tcl/BASIC → `LOGOFF` / `QUIT` / embedded **`SHUTDOWN`**)
+- Service Edition operator paths from M17 (§9 / [`daemon.md`](../daemon.md) smoke) remain valid
+- Public docs must state honestly what 1.0 is **not** (R83 terminal fidelity, CPU fairness, remote attach)
+
+---
+
+### 6. Dependencies and grounding
+
+| Dependency | Role |
+|------------|------|
+| [M12–M15](12-session-model-foundation.md) | Session model, daemon, consoles, cooperative I/O yield |
+| [M17](17-service-integration-deployment.md) | Config, systemd, admin Tcl, install components — **prerequisite complete** |
+| [M16 residual](16-standalone-edition-application-mode.md) | Edition naming, migration notes, release checklist |
+| [M19](19-execution-fairness-cpu-bound-yield.md) | **Blocked until** M18 tags v1.0; document CPU starvation as known limit until then |
+
+---
+
+### 7. Deliverables
+
+**Documentation / process:**
+
+| Area | Artifact |
+|------|----------|
+| v1.0 test matrix | Table in this milestone and/or [`docs/`](../README.md) pointing at `ctest` coverage |
+| Edition + migration | README / [`daemon.md`](../daemon.md) / short admin notes: Service vs Application; no failover |
+| Known limitations | Explicit in release docs + [`daemon.md`](../daemon.md) |
+| Public release checklist | §9 + Stage 5; runnable by an operator |
+| Changelog / release notes | e.g. `CHANGELOG.md` or annotated tag body — chosen in §8 |
+| Status flips | This page, [`milestones.md`](../milestones.md), [`README.md`](../../README.md), [`docs/README.md`](../README.md) |
+
+**Code / packaging (minimal):**
+
+- Version bump to **1.0.0** (CMake `PROJECT_VERSION` and tag)
+- Tests only where the matrix audit finds holes
+- No required new runtime features
+
+---
+
+### 8. Open decisions
+
+| Topic | Options / notes | Default leaning |
+|-------|-----------------|-----------------|
+| Public version tag | `v1.0.0` (semver major) vs keep `0.x` | **`v1.0.0`** — milestone title is Version 1.0 |
+| Changelog | New `CHANGELOG.md` vs git annotated tags only | **`CHANGELOG.md`** with 1.0 entry (tags still used) |
+| System title string | [`system_title`](../../include/pick_system/version.hpp) still says “Developer Edition” | Decide whether 1.0 renames or keeps “Developer Edition” |
+| CPack / `.deb` / `.rpm` | Stretch vs defer post-1.0 | **Defer** — M17 `cmake --install` components suffice for 1.0 |
+| Docs structure | New top-level “admin guide” vs expand existing `daemon.md` / `console.md` | **Expand existing** docs; avoid a parallel doc tree unless audit proves need |
+| CI systemd | Require live systemd in CI vs Linux operator checklist | **Operator checklist** (same as M17) |
+
+Resolve these in Stage 1 (audit) or Stage 4 (hygiene) before tagging; record choices in this table as **resolved** when closed.
+
+---
+
+### 9. Milestone completion criteria
+
+- v1.0 **test matrix** published; every row mapped to automated tests and/or an explicit manual smoke step
+- Full **`ctest`** green
+- **Architecture / admin / developer** docs describe both editions, no console failover, cold restart, and CPU-bound known limitation
+- **Public release checklist** executed (Application + Service; systemd on Linux where available)
+- **`PROJECT_VERSION`** and annotated git tag **`v1.0.0`** (or the §8-resolved equivalent)
+- Milestone hub / README show M18 **implemented** / completed; M19 remains planned post–v1.0
+- No new architecture claimed as part of 1.0 beyond M17
+
+**Manual smoke** — reuse M17 / [`daemon.md`](../daemon.md) checklists:
+
+- `gemini-system` 5-step
+- systemd Service Edition (two consoles, admin verbs, `SHUTDOWN` / `systemctl stop` → fresh sessions)
+- Application / Service install-component recipes
+
+---
+
+### 10. Delivery plan
+
+M18 is sequenced as **audit → fill gaps → docs → hygiene → release**. Each stage has an exit criterion; the full test suite must stay green. Do **not** start [Milestone 19](19-execution-fairness-cpu-bound-yield.md) until Stage 5 tags Version 1.0. Detailed per-stage plans may live in `~/.cursor/plans/m18_stage_*.plan.md` during implementation; status is summarised here as each stage lands.
+
+- **Stage 1 — Release audit**: inventory existing tests and docs against §2.2–§2.4; list gaps only (no code yet unless a trivial doc typo blocks reading). Resolve or schedule §8 decisions. **Exit criterion:** written gap list + proposed matrix rows; open decisions table updated or deferred with owners. *Status: planned.*
+
+- **Stage 2 — Test matrix fill**: add or extend automated tests **only** for matrix holes; document which tests cover locks, cooperative yield, module boot, admin, and install layout. **Exit criterion:** matrix table complete with links/names; `ctest` green; no new product features. *Status: planned.*
+
+- **Stage 3 — Docs capstone**: edition naming and migration notes; tighten architecture/admin/developer cross-links; ensure known limitations (CPU starvation → M19; cold restart; local UDS) are obvious from README / daemon / console docs. Soften stale “path to 1.0” wording where M17 already shipped. **Exit criterion:** docs review against §2.3; Application and Service operator stories readable without the milestone page. *Status: planned.*
+
+- **Stage 4 — Repo hygiene**: `CHANGELOG` (or chosen release notes), version bump preparation, packaging recipe verification, milestone/docs hub consistency. **Exit criterion:** release notes draft ready; install recipes smoke-passed; hub prose accurate for a post-1.0 world (except final status flip). *Status: planned.*
+
+- **Stage 5 — Tag Version 1.0 + closes M18**: run public release checklist; set `PROJECT_VERSION` to **1.0.0**; annotated tag **`v1.0.0`**; flip this milestone, [`milestones.md`](../milestones.md), and README status. **Closes Milestone 18.** *Status: planned.*
+
+Only Stage 5's exit criteria should claim "Closes Milestone 18".
+
+*Status: planned.*
