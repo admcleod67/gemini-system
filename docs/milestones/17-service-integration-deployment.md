@@ -2,22 +2,22 @@
 
 ## Milestone 17 — Service Integration & Deployment
 
-Make Gemini a first-class **Linux service**. Add a **systemd** unit (`gemini.service`) with proper lifecycle integration, **journald** logging for daemon output, and a **configuration file** for socket paths, session limits, and host settings. Expose **admin Tcl commands** such as **`LISTSESSIONS`**, **`KILLSESSION`**, **`STATUS`**, and Pick-style **`SHUTDOWN`**. Harden **graceful shutdown** and ship **install packaging** that separates the **Service Edition** (`gemini-daemon` + `gemini-console`) from the **Application Edition** (`gemini-system`). *Status: planned.*
+Make Gemini a first-class **Linux service**. Add a **systemd** unit (`gemini.service`) with proper lifecycle integration, **journald** logging for daemon output, and a **configuration file** for socket paths, session limits, and host settings. Expose **admin Tcl commands** such as **`LISTSESSIONS`**, **`KILLSESSION`**, **`STATUS`**, and Pick-style **`SHUTDOWN`**. Harden **graceful shutdown** and ship **install packaging** that separates the **Service Edition** (`gemini-daemon` + `gemini-console`) from the **Application Edition** (`gemini-system`). *Status: implemented.*
 
-M13–M15 delivered a multi-session daemon with IPC consoles and cooperative I/O yield. Operators still start `gemini-daemon` by hand in the foreground; there is no systemd unit, no admin session introspection beyond **`WHO`**, and no install layout that distinguishes service vs application deliverables. File-backed daemon config landed in Stage 1; remaining M17 work closes systemd, admin Tcl, and packaging so Gemini can run as a UniData-style Linux service ahead of the [**Milestone 18**](18-version-1-gemini-system-service.md) Version 1.0 release.
+M13–M15 delivered a multi-session daemon with IPC consoles and cooperative I/O yield. Before this milestone, operators typically started `gemini-daemon` by hand in the foreground, had no systemd unit, no admin session introspection beyond **`WHO`**, and no install layout that distinguished service vs application deliverables. M17 closes config, journald, systemd, admin Tcl, and packaging so Gemini can run as a UniData-style Linux service ahead of the [**Milestone 18**](18-version-1-gemini-system-service.md) Version 1.0 release.
 
 ---
 
 ### 1. Purpose and rationale
 
-Today’s service path works for development:
+Before Milestone 17, the service path was enough for development smoke but not for production Linux deployment:
 
-- [`gemini-daemon`](../../src/daemon/Main.cpp) starts in the foreground, installs **SIGTERM** / **SIGINT** handlers, cold-starts, and polls IPC ([`GeminiDaemonRunner`](../../src/userland/tcl/GeminiDaemonRunner.cpp))
-- [`DaemonConfig`](../../src/core/daemon/DaemonConfig.h) resolves socket path, `maxSessions`, and host roots from **CLI and environment** only
-- Binaries install via CMake `install(TARGETS …)` — no unit file, no config defaults under `/etc`, no bootstrap tree packaging
-- Session operators see **`WHO`**; there is no daemon-wide **`LISTSESSIONS`** / **`KILLSESSION`** / **`STATUS`**
+- [`gemini-daemon`](../../src/daemon/Main.cpp) started in the foreground, installed **SIGTERM** / **SIGINT** handlers, cold-started, and polled IPC ([`GeminiDaemonRunner`](../../src/userland/tcl/GeminiDaemonRunner.cpp))
+- [`DaemonConfig`](../../src/core/daemon/DaemonConfig.h) resolved socket path, `maxSessions`, and host roots from **CLI and environment** only
+- Binaries installed via CMake `install(TARGETS …)` — no unit file, no config defaults under `/etc`, no bootstrap tree packaging
+- Session operators saw **`WHO`**; there was no daemon-wide **`LISTSESSIONS`** / **`KILLSESSION`** / **`STATUS`**
 
-That is enough for Milestone 14–15 smoke, but not for production Linux deployment. Operators expect:
+Operators expected:
 
 1. **`systemctl start gemini`** — daemon managed by systemd
 2. Boot and runtime lines in **journald**
@@ -207,7 +207,7 @@ Milestone 17 does **not** introduce:
 | Area | Path / artifact |
 |------|-----------------|
 | Config file parser + resolution | [`DaemonConfig`](../../src/core/daemon/DaemonConfig.h) / `.cpp` |
-| systemd unit | e.g. `packaging/systemd/gemini.service` (exact path TBD) |
+| systemd unit | [`packaging/systemd/gemini.service.in`](../../packaging/systemd/gemini.service.in) → installed `gemini.service` |
 | Default config sample | e.g. `packaging/gemini/daemon.conf.example` |
 | Admin Tcl | [`Shell.cpp`](../../src/userland/tcl/Shell.cpp) + host/session-table hooks |
 | **`KILLSESSION`** / **`SHUTDOWN`** teardown | [`GeminiSessionHost`](../../src/userland/tcl/GeminiSessionHost.h) / [`GeminiDaemonRunner`](../../src/userland/tcl/GeminiDaemonRunner.cpp) |
@@ -229,16 +229,16 @@ Milestone 17 does **not** introduce:
 
 ---
 
-### 8. Open decisions (resolve during stages)
+### 8. Decisions (resolved)
 
-| Topic | Options | Default lean |
-|-------|---------|--------------|
-| Config file format | key=value vs INI sections | key=value, one setting per line |
-| Default config path | `/etc/gemini/daemon.conf` vs XDG | `/etc/gemini/daemon.conf` for service; document XDG for user |
-| Admin privilege | SYSPROG-only vs all logged-in sessions | SYSPROG-only for **`KILLSESSION`** / **`SHUTDOWN`**; list/status open or same gate |
-| **`STATUS`** / **`SHUTDOWN`** vs **`SYSTEM …`** | Top-level vs SYSTEM subcommand | Top-level verbs; optional **`SYSTEM STATUS`** / **`SYSTEM SHUTDOWN`** aliases |
-| **`SHUTDOWN`** confirmation | Immediate vs confirm prompt | Immediate for M17 v1 (document danger); optional confirm stretch |
-| systemd Type | `simple` vs `notify` | `simple` unless readiness socket is easy |
+| Topic | Choice (shipped) |
+|-------|------------------|
+| Config file format | `key=value`, one setting per line (`#` comments) |
+| Default config path | `/etc/gemini/daemon.conf` (or `${CMAKE_INSTALL_SYSCONFDIR}/gemini/daemon.conf`); unit passes `--config` |
+| Admin privilege | Logged-in account **`SYSPROG`** for **`LISTSESSIONS`**, **`STATUS`**, **`KILLSESSION`**, and **`SHUTDOWN`** |
+| **`STATUS`** / **`SHUTDOWN`** vs **`SYSTEM …`** | Top-level verbs; **`SYSTEM STATUS`** / **`SYSTEM SHUTDOWN`** aliases |
+| **`SHUTDOWN`** confirmation | Immediate (no confirm prompt); stops Gemini only, not the host OS |
+| systemd Type | `Type=simple` |
 
 ---
 
@@ -254,6 +254,8 @@ Milestone 17 does **not** introduce:
 - **`gemini-system`** passes manual smoke unchanged
 - All existing tests pass; new tests cover config and admin commands
 - Documented in [`docs/daemon.md`](../daemon.md)
+
+Operator-facing copies of the smoke checklists below live in [`docs/daemon.md`](../daemon.md) (Manual smoke).
 
 **Manual smoke checklist — `gemini-system`** (must pass after every stage):
 
@@ -296,8 +298,8 @@ Implementation is sequenced into vertical stages. Each stage ships a test-locked
 
 - **Stage 6 — Install packaging (Service vs Application)**: CMake/CPack (or equivalent) components — service ships daemon+console+unit+config; application ships `gemini-system`+bootstrap/modules; document no console failover. **Exit criterion:** documented install recipes; packaging files in tree; smoke checklist §9 Application Edition passes. *Status: implemented.* Ships CMake components **`Runtime`** / **`Application`** / **`Service`**, bootstrap+modules under `${CMAKE_INSTALL_DATADIR}/gemini`, install-layout tests in [`tests/core/test_InstallComponents.cpp`](../../tests/core/test_InstallComponents.cpp), and edition recipes in [`docs/daemon.md`](../daemon.md).
 
-- **Stage 7 — Docs + closes M17**: update [`docs/daemon.md`](../daemon.md), [`docs/console.md`](../console.md), [`docs/tcl-shell.md`](../tcl-shell.md); document **`SHUTDOWN`** vs **`LOGOFF`** / **`QUIT`** / **`KILLSESSION`**; cold-restart = fresh sessions; audit §9; full test suite + systemd and `gemini-system` smoke. **Closes Milestone 17.** *Status: planned.*
+- **Stage 7 — Docs + closes M17**: update [`docs/daemon.md`](../daemon.md), [`docs/console.md`](../console.md), [`docs/tcl-shell.md`](../tcl-shell.md); document **`SHUTDOWN`** vs **`LOGOFF`** / **`QUIT`** / **`KILLSESSION`**; cold-restart = fresh sessions; audit §9; full test suite + systemd and `gemini-system` smoke. **Closes Milestone 17.** *Status: implemented.* Ships session-end contrast and cold-restart policy in [`docs/daemon.md`](../daemon.md), admin/restart notes in [`docs/console.md`](../console.md) and [`docs/tcl-shell.md`](../tcl-shell.md), §9 operator smoke checklists consolidated in daemon docs, and milestone hub / README status flip.
 
 Only Stage 7's exit criteria should claim "Closes Milestone 17".
 
-*Status: planned.*
+*Status: implemented.*

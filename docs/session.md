@@ -27,7 +27,7 @@ Standalone **`gemini-system`** embeds the daemon with `maxSessions = 1` and host
 **Host mapping:**
 
 - **`LOGOFF`** (Tcl): `detach()` then `reset()` → `ShellRunResult::EndSession` → `main` re-runs login
-- **`QUIT`** (Tcl): `reset()` → process exit
+- **`QUIT`** (Tcl): `reset()` then end the REPL/worker. Under embedded **`gemini-system`**, that exits the process. Under **`gemini-daemon`**, the worker ends while the daemon continues (session object may remain for re-attach; contrast **`SHUTDOWN`** / **`KILLSESSION`** in [daemon.md](daemon.md#session-end-contrast)).
 - **`LOGTO`**: `attach()` with new account after re-authentication
 
 `Shell::attachUserSession` delegates to `GeminiSession::attach()`.

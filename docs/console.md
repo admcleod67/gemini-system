@@ -30,6 +30,12 @@ gemini-console --socket /run/gemini/gemini.sock
 
 Socket file permissions are **0600** — only the socket owner may connect. This gates **who may attach**, not **which Pick account** is logged in; account identity comes from catalogue login over the session bridge.
 
+## Admin from a console
+
+Admin Tcl verbs run **inside** the daemon session (not in the console binary). Log in as **`SYSPROG`**, then use **`LISTSESSIONS`**, **`STATUS`**, **`KILLSESSION`**, and **`SHUTDOWN`** — see [Tcl shell](tcl-shell.md) and [Service daemon — Admin Tcl](daemon.md#admin-tcl-listsessions--status--killsession--shutdown).
+
+After daemon **restart** or **`SHUTDOWN`**, prior ports and session state are gone ([cold restart = fresh sessions](daemon.md#cold-restart--fresh-sessions)); re-attach with `--port 0` (create) or a newly assigned port.
+
 ## CLI reference
 
 ```bash

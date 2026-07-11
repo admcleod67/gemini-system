@@ -67,9 +67,9 @@ For ENGLISH command forms and worked query examples, see [ENGLISH query core](en
 | **`WHO`** | Print `port username account` when logged in with a Gemini catalogue (account-only logon uses the same string for username and account until a user model exists); otherwise **`0 - -`**. |
 | **`LISTSESSIONS`** | **SYSPROG** only. Whitespace-separated table of all daemon sessions: `PORT BOUND USER ACCOUNT STATE` (header), then one row per port sorted ascending. Bound console is `yes`/`no`; logged-out identity is `- -`; state is `Runnable` / `Running` / `WaitingForInput`. Non-SYSPROG (or not logged in): `LISTSESSIONS requires SYSPROG`. |
 | **`STATUS`** | **SYSPROG** only. Three lines: `Gemini System <version>`, `sessions=N maxSessions=M`, `socket=<path|none>`. Non-SYSPROG: `STATUS requires SYSPROG`. Same output via **`SYSTEM STATUS`**. |
-| **`KILLSESSION`** *port* | **SYSPROG** only. Destroy another session by port: unbind its console if attached, retire scheduler state, release locks, free the port. Cannot target the calling session (`KILLSESSION: cannot kill current session` — use **`SHUTDOWN`**). Unknown port: `KILLSESSION: session not found`. Contrast: **`LOGOFF`** ends login only; **`QUIT`** ends the REPL/worker without destroying the session object for re-attach. |
-| **`SHUTDOWN`** | **SYSPROG** only. Stop the whole system: same graceful teardown as daemon **SIGTERM** / IPC **`ShutdownRequest`** (detach all, destroy sessions, unlink socket, exit). On embedded **`gemini-system`**, exits the process after teardown. Prints `Shutting down` and ends the issuing REPL. Same via **`SYSTEM SHUTDOWN`**. Not the same as **`QUIT`** (one session) or **`KILLSESSION`** (one other port). |
-| **`QUIT`** | Exit the shell; clears loaded program state in the VM, shell-held bytecode metadata, and **shell variables**. |
+| **`KILLSESSION`** *port* | **SYSPROG** only. Destroy another session by port: unbind its console if attached, retire scheduler state, release locks, free the port. Cannot target the calling session (`KILLSESSION: cannot kill current session` — use **`SHUTDOWN`**). Unknown port: `KILLSESSION: session not found`. |
+| **`SHUTDOWN`** | **SYSPROG** only. Stop the whole Gemini system immediately (no confirm): same graceful teardown as daemon **SIGTERM** / IPC **`ShutdownRequest`**. On embedded **`gemini-system`**, exits the process after teardown. Prints `Shutting down` and ends the issuing REPL. Same via **`SYSTEM SHUTDOWN`**. Stops Gemini only — not the host OS. |
+| **`QUIT`** | Exit the shell; clears loaded program state in the VM, shell-held bytecode metadata, and **shell variables**. Under **`gemini-daemon`**, ends this session’s worker only (daemon keeps running; session object may remain for re-attach). Under embedded **`gemini-system`**, exits the process. |
 | **`ECHO`** … | Echo remaining tokens, **space-separated**. Known session tokens **`@USERNO`**, **`@ACCOUNT`**, **`@LOGNAME`**, and **`@DEFDATA`** (case-insensitive) expand from the session before **`$`** rules. Within each token, scan left to right: **`$$`** becomes a single **`$`**; **`$Name`** ( **`Name`** = letters, digits, underscore, **`@`**, at least one character) is replaced by that shell variable’s value, or—if **`Name`** is one of the four **`@`** system names—by the session value; otherwise nothing if unset; any other **`$`** is echoed literally. `$` substitution remains ECHO-scoped in this milestone. |
 | **`SET`** *name* *word…* | Set a **shell variable**. Names are **case-insensitive**; the canonical name is **ASCII uppercase** (what **`LIST-VARS`** shows). The value is the remaining tokens joined with single spaces; **`SET`** *name* alone sets an empty string. Quoted/escaped input participates in tokenization before this join step. Variable names must be non-empty. Targets **`@USERNO`**, **`@ACCOUNT`**, **`@LOGNAME`**, and **`@DEFDATA`** are rejected (**`Read-only system variable`**). Value tokens may include those **`@`** names; they expand from the session when used as operands (not as the **`SET`** target name). |
 | **`SET PAGE-LENGTH`** *n* | Typed system setting — configures the ENGLISH report formatter's lines per page (M8 Stage 2). Requires a positive integer; bad input emits **`SET PAGE-LENGTH requires a positive integer`** and leaves the previous value. Default = **24**, resets on **`LOGOFF`**. Read via **`GET PAGE-LENGTH`** (prints the integer). Not stored in the env map, so it does **not** appear in **`LIST-VARS`**. See [ENGLISH formatting](english-formatting.md). |
@@ -104,7 +104,18 @@ For ENGLISH command forms and worked query examples, see [ENGLISH query core](en
 | **`EDIT`** *file* *record-name* \| **`EDIT`** *programName* | Open a **blocking** line-oriented record editor (prompt **`ED> `**) on an in-memory copy of the record. Shorthand *programName* resolves the **source** record `(file, key)` via VOC (same as `BASIC` / `RUN` source), never `_OBJ`. Missing record starts with an empty buffer. See [TCL EDIT](#tcl-edit-line-record-editor) below. |
 | **`DUMP-STACK`** | Print the VM stack (uses the command output stream). |
 | **`LOGTO`** *account* | After catalogue login: switch Pick root to another account from **`ACCOUNTS.json`** (requires **`VOC/`** under the resolved path). |
-| **`LOGOFF`** | After catalogue login: clear session and return control to **`main`** so the host can run the core **LOGON** phase again (not an inner Tcl loop). |
+| **`LOGOFF`** | After catalogue login: clear session identity and return control so the host can run **LOGON** again (not an inner Tcl loop). On the daemon, the session **object and port remain** until **`KILLSESSION`** or daemon shutdown. |
+
+### Session-end contrast (LOGOFF / QUIT / KILLSESSION / SHUTDOWN)
+
+| Verb | Effect |
+|------|--------|
+| **`LOGOFF`** | End this login; port/session object may remain (daemon) |
+| **`QUIT`** | End this REPL/worker; daemon continues; embedded `gemini-system` exits |
+| **`KILLSESSION`** | Destroy **another** port (SYSPROG); cannot kill self |
+| **`SHUTDOWN`** | Stop whole daemon / embedded process (SYSPROG); immediate; not host power-off |
+
+Full table (including detach / SIGTERM): [Service daemon — Session-end contrast](daemon.md#session-end-contrast).
 
 Unknown first token: **`Unknown command: …`**.
 

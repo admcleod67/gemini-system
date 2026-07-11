@@ -94,7 +94,7 @@ src/Main.cpp         gemini-system embedded entry
 - Allocated at [`SessionTable::createSession`](../src/userland/tcl/SessionTable.cpp)
 - Released at `destroySession`
 - Map key and [`SessionId`](../src/core/daemon/CooperativeSessionRunner.h) equal the port number (starting at **1**, lowest free reused on destroy)
-- Feeds **`WHO`**, lock identity ([`makeSessionLockId`](../src/userland/tcl/GeminiSession.h)), and admin **`LISTSESSIONS`** (M17 Stage 4)
+- Feeds **`WHO`**, lock identity ([`makeSessionLockId`](../src/userland/tcl/GeminiSession.h)), and admin **`LISTSESSIONS`** (M17)
 
 The port survives **`LOGOFF`** until session **destroy** (daemon-assigned; login does not set `whoPort`).
 
@@ -111,7 +111,22 @@ Privileged session operators (logged-in account **`SYSPROG`**) can inspect and c
 | **`KILLSESSION`** *port* | Destroy one other session (unbind console if attached, release locks/ports). Cannot kill the calling session. |
 | **`SHUTDOWN`** / **`SYSTEM SHUTDOWN`** | Same graceful stop as **SIGTERM** / IPC **`ShutdownRequest`**: detach all, destroy sessions, unlink socket, exit |
 
-See [Tcl shell](tcl-shell.md). Console **detach** alone preserves the session for re-attach; **`KILLSESSION`** destroys it.
+See [Tcl shell](tcl-shell.md). Console **detach** alone preserves the session for re-attach; **`KILLSESSION`** destroys it. **`SHUTDOWN`** is immediate (no confirm) and stops Gemini only — not the host OS.
+
+### Session-end contrast
+
+| Verb / action | Scope | Session object | Daemon process |
+|---------------|-------|----------------|----------------|
+| **`LOGOFF`** | This login | Remains (port kept); back to `LOGON PLEASE:` | Continues |
+| **`QUIT`** / EOF | This REPL/worker | Remains (re-attach possible) | Continues |
+| Console **detach** | Binding only | Remains | Continues |
+| **`KILLSESSION`** *port* | One other port | Destroyed; locks/ports freed | Continues |
+| **`SHUTDOWN`** / **SIGTERM** / IPC shutdown | Whole system | All destroyed | Exits |
+| Embedded **`SHUTDOWN`** | Process | Torn down | `gemini-system` exits |
+
+### Cold restart = fresh sessions
+
+After daemon **stop** / **restart**, Tcl **`SHUTDOWN`**, or process exit, in-flight REPL / VM / login state is **not** restored. A new start allocates fresh session objects and ports; prior attach ports are gone. This is intentional for Version 1.0 — session persistence across cold restart is out of scope ([Milestone 18](milestones/18-version-1-gemini-system-service.md)).
 
 ## Cooperative execution
 
@@ -181,7 +196,7 @@ Host paths (`--catalog-root`, `--pick-root`) are applied to attached sessions by
 4. Poll loop: accept clients, dispatch IPC, until shutdown requested
 5. **Graceful shutdown** — detach all bound sessions, stop IPC (unlink socket), destroy all sessions (release locks and ports)
 
-**Console detach** (per session): unbinds I/O and joins the session worker **without** `destroySession`; login state and VM state are preserved until re-attach or daemon shutdown.
+**Console detach** (per session): unbinds I/O and joins the session worker **without** `destroySession`; login state and VM state are preserved until re-attach or daemon shutdown. After a **cold restart**, that preserved state is gone — see [Cold restart = fresh sessions](#cold-restart--fresh-sessions).
 
 Shutdown may also be triggered by an IPC **ShutdownRequest** or by destroying the daemon process.
 
@@ -206,7 +221,7 @@ Operator errors (e.g. bad `--config`) go to stderr. Follow the unit with `journa
 
 ## Install packaging (Service vs Application)
 
-Milestone 17 Stage 6 splits `cmake --install` into named **components**. Plain `cmake --install <build-dir>` (no `--component`) still installs **everything**.
+Milestone 17 splits `cmake --install` into named **components**. Plain `cmake --install <build-dir>` (no `--component`) still installs **everything**.
 
 | Component | Contents |
 |-----------|----------|
@@ -247,7 +262,7 @@ Bootstrap layout and env resolution: [Gemini bootstrap](gemini-bootstrap.md).
 
 ## systemd (`gemini.service`)
 
-Milestone 17 Stage 3 ships an installable unit and default config:
+Milestone 17 ships an installable unit and default config:
 
 | Artifact | Install location (prefix-dependent) |
 |----------|-------------------------------------|
@@ -257,7 +272,7 @@ Milestone 17 Stage 3 ships an installable unit and default config:
 
 Default config uses **`socket=/run/gemini/gemini.sock`**. The unit sets `RuntimeDirectory=gemini` so `/run/gemini` exists at start. Socket mode remains **0600**.
 
-`ExecStart` runs `gemini-daemon --config …/gemini/daemon.conf`. Stop uses **SIGTERM** (graceful teardown). `Type=simple` — no readiness notification yet. No dedicated service user in Stage 3 (runs as root when installed system-wide); operators may add `User=` / data dirs later.
+`ExecStart` runs `gemini-daemon --config …/gemini/daemon.conf`. Stop uses **SIGTERM** (graceful teardown). `Type=simple` — no readiness notification yet. No dedicated service user in M17 (runs as root when installed system-wide); operators may add `User=` / data dirs later.
 
 Set **`pick_root`**, **`catalog_root`**, and **`modules_root`** in the installed conf for a useful multi-user system (defaults leave them commented).
 
@@ -271,19 +286,37 @@ sudo systemctl enable --now gemini
 journalctl -u gemini -f       # boot banner + IPC LISTENING
 gemini-console --socket /run/gemini/gemini.sock
 sudo systemctl stop gemini
-sudo systemctl restart gemini
+sudo systemctl restart gemini   # fresh sessions — no restore
 ```
 
-### Manual smoke checklist
+### Manual smoke checklists
 
-1. Install binaries, unit, and conf to a prefix systemd can see (or copy the unit into `/etc/systemd/system/`)
-2. Edit conf with catalogue / pick / modules roots as needed
-3. `systemctl daemon-reload && systemctl start gemini`
-4. Journal shows cold-start lines and `IPC LISTENING: /run/gemini/gemini.sock`
-5. Attach `gemini-console --socket /run/gemini/gemini.sock` → login / `WHO`
-6. `systemctl stop gemini` → clean exit; socket removed with runtime dir teardown
+Operator copies of [Milestone 17 §9](milestones/17-service-integration-deployment.md#9-milestone-completion-criteria). Linux systemd smoke is required for M17 closure on a real host; CI does not run a live systemd unit.
 
-**Not in Stage 3:** socket activation (`gemini.socket`), `Type=notify`, dedicated `User=gemini`.
+**`gemini-system`:**
+
+1. Boot with catalogue → interactive or auto LOGON
+2. Tcl: `VERSION`, `WHO`
+3. Enter BASIC → run a one-line program → `END`
+4. `LOGOFF` → re-login
+5. `QUIT` → clean process exit
+
+**systemd service:**
+
+1. Install unit + config pointing at a test catalogue/pick root (or documented socket)
+2. `systemctl start gemini` → daemon running; journal shows boot banner / `MODULES:`
+3. Attach **two** `gemini-console` instances → login → **`WHO`** distinct ports
+4. From SYSPROG: **`LISTSESSIONS`**, **`STATUS`**
+5. From SYSPROG: **`KILLSESSION`** the other port → other console disconnects or errors cleanly; locks released
+6. Re-attach a second console, then from SYSPROG: **`SHUTDOWN`** → daemon exits; socket removed; consoles disconnect; `systemctl` shows inactive (or restart → fresh sessions)
+7. Alternate stop: `systemctl stop gemini` → same clean teardown; restart → fresh sessions (no restore)
+
+**Application Edition packaging:**
+
+1. Install **Runtime** + **Application** only → `gemini-system` runs without daemon (set `GEMINI_CATALOG_ROOT` / related env — see [Install packaging](#install-packaging-service-vs-application))
+2. Confirm `gemini-console` is not installed / not required for application-only use
+
+**Not in M17:** socket activation (`gemini.socket`), `Type=notify`, dedicated `User=gemini`.
 
 ## IPC protocol v1
 
@@ -403,7 +436,9 @@ The worker mirrors embedded [`Main.cpp`](../src/Main.cpp): catalogue login (when
 
 - [Console client](console.md) — `gemini-console` usage, attach/create, detach semantics
 - [Session model](session.md) — `GeminiSession` lifecycle and I/O
+- [Tcl shell](tcl-shell.md) — admin verbs and REPL commands
 - [Gemini bootstrap](gemini-bootstrap.md) — catalogue, login, cold-start banner
 - [Concurrency and record locking](concurrency.md) — shared lock table and session ids
+- [Milestone 17 — Service integration & deployment](milestones/17-service-integration-deployment.md) — delivery history (implemented)
 - [Milestone 14 — Multi-session console](milestones/14-multi-session-console-support.md) — delivery history (implemented)
 - [Milestone 15 — Cooperative multi-session execution](milestones/15-cooperative-multi-session-execution.md) — delivery history (implemented)

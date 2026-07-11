@@ -94,7 +94,7 @@ Building the project also produces **`gemini-daemon`**, a long-running process h
 
 **`gemini-daemon`** runs cold start to stdout and listens on a Unix domain socket. It does **not** start an interactive login/REPL in-process — that happens when a **`gemini-console`** attaches and the daemon session worker runs [`LoginService`](../src/core/login/LoginService.h) and [`Shell::runTclRepl`](../src/userland/tcl/Shell.cpp) through the session I/O bridge (same flow as embedded [`Main.cpp`](../src/Main.cpp)).
 
-Configuration uses CLI flags and environment variables on the **daemon** (`GEMINI_DAEMON_SOCKET`, `GEMINI_MAX_SESSIONS`, `GEMINI_CATALOG_ROOT`, `GEMINI_FILESYSTEM_ROOT`, and related host path variables). The console only needs `--socket` (and optionally `--port` to re-attach). See [Service daemon architecture](daemon.md) and [Console client](console.md).
+Configuration loads from a **config file** (`--config` / `GEMINI_DAEMON_CONFIG`, default install path `/etc/gemini/daemon.conf`) as well as CLI flags and environment variables on the **daemon** (`GEMINI_DAEMON_SOCKET`, `GEMINI_MAX_SESSIONS`, `GEMINI_CATALOG_ROOT`, `GEMINI_FILESYSTEM_ROOT`, and related host path variables; precedence: CLI > env > file > defaults). The console only needs `--socket` (and optionally `--port` to re-attach). See [Service daemon architecture](daemon.md) and [Console client](console.md).
 
 **Quick smoke (two terminals):**
 

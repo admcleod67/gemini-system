@@ -9,7 +9,7 @@ The implementation remains intentionally incremental, but the platform is now br
 filesystem-backed Pick file semantics, BASIC compiler/shell workflows, and ENGLISH/DICT query foundations. The goal is
 still to grow the system in **small, verifiable steps** (tests, clear boundaries) rather than landing a large stack at once.
 
-A phased **roadmap** (Milestone 1 onward) is summarized in **[`docs/milestones.md`](docs/milestones.md)** (hub); long-form text for each milestone lives under **[`docs/milestones/`](docs/milestones/)**. **Milestones 1–15** are implemented (through cooperative multi-session execution). The single-session **application edition** is **`gemini-system`** (M12–M13). **Milestones 17–18** describe the remaining path to **Version 1.0** (Linux service deployment and release packaging).
+A phased **roadmap** (Milestone 1 onward) is summarized in **[`docs/milestones.md`](docs/milestones.md)** (hub); long-form text for each milestone lives under **[`docs/milestones/`](docs/milestones/)**. **Milestones 1–17** are implemented (through cooperative multi-session execution and Linux service integration; Milestone 16 was retired into M17 packaging). The single-session **application edition** is **`gemini-system`** (M12–M13). **Milestone 18** is the remaining path to **Version 1.0** release packaging; **Milestone 19** covers post–v1.0 CPU-bound yield. Service Edition install (`gemini-daemon` / `gemini-console` / systemd) is documented in **[`docs/daemon.md`](docs/daemon.md)**.
 
 ## Building
 
@@ -25,7 +25,7 @@ Artifacts include **`gemini-system`** (embedded host with boot and Tcl REPL), **
 
 ### Install (editions)
 
-Install is split into CMake components — see **[Install packaging](docs/daemon.md#install-packaging-service-vs-application)** in the daemon docs.
+Install is split into CMake components — see **[Install packaging](docs/daemon.md#install-packaging-service-vs-application)** in the daemon docs (Application and Service recipes).
 
 ```bash
 # Application Edition only (no daemon / console)
