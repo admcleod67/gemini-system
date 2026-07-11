@@ -46,31 +46,31 @@ Publish and satisfy a **v1.0 test matrix** covering at least:
 
 Prefer documenting which existing `ctest` cases map to each row; add tests **only** where the matrix has a real hole. Do not invent product features to “fill” coverage.
 
-**Draft matrix (Stage 1 audit)** — representative `ctest` / doctest names (not every assertion):
+**v1.0 test matrix (Stage 2)** — representative `ctest` / doctest names (not every assertion):
 
-| Area | Coverage today | Verdict |
-|------|----------------|---------|
-| Multi-session locks (in-process) | `LockTable cross-session…`, `FileSystem S1 readU blocks S2…`, shell/PROC/M10 cross-shell locking, `GeminiSession` detach/reset release | **OK** — document in Stage 2 |
-| Multi-session locks (daemon-attached) | `DaemonIpcClient SYSPROG KILLSESSION destroys peer and releases locks` (`READU` then kill); **no** two-console conflict → `RECORD LOCKED` / `?LOCKED?` without kill | **Gap → Stage 2** |
+| Area | Coverage | Verdict |
+|------|----------|---------|
+| Multi-session locks (in-process) | `LockTable cross-session…`, `FileSystem S1 readU blocks S2…`, shell/PROC/M10 cross-shell locking, `GeminiSession` detach/reset release | **OK** |
+| Multi-session locks (daemon-attached) | `DaemonIpcClient two consoles READU conflict returns RECORD LOCKED`; `DaemonIpcClient SYSPROG KILLSESSION destroys peer and releases locks` | **OK** |
 | Cooperative I/O yield | `CooperativeSessionRunner yield…` / round-robin / starvation; `Schedulable IpcSessionChannel…`; `DaemonIpcClient session blocked in BASIC INPUT allows other session Tcl WHO` | **OK** |
 | Language module boot | `LanguageModuleLoader…`, `BootMonitor cold start loads language modules…`, `LanguageRegistry…`, daemon coldStart freezes registry | **OK** |
 | Admin verbs | `test_AdminCommands` host cases; `DaemonIpcClient SYSPROG LISTSESSIONS and STATUS…`, `…KILLSESSION…`, `…SHUTDOWN…` | **OK** |
-| Install Application / Service | `Application component install excludes service binaries`; `Service component install excludes gemini-system` (both via Runtime + edition) | **OK** (optional: Runtime-only install — Stage 2 if desired) |
+| Install Application / Service | `Application component install excludes service binaries`; `Service component install excludes gemini-system` (both via Runtime + edition) | **OK** |
 | Daemon config / unit shape | `loadDaemonConfigFile…` / `resolveDaemonConfig…`; `systemd gemini.service unit…`; `packaging daemon.conf…` | **OK**; live `systemctl` = manual §9 |
 | Manual smoke | [`daemon.md`](../daemon.md) M17 checklists (`gemini-system`, systemd, Application packaging) | **OK** — reuse for public checklist Stage 5 |
 
-**Gap list (Stage 1)** — schedule only; do not fix in Stage 1:
+**Remaining gaps** (Stages 3–5):
 
 | Gap | Owner stage |
 |-----|-------------|
-| Daemon-attached two-console lock **conflict** (peer `READU`/`WRITEU` → locked error without `KILLSESSION`) | **Stage 2** |
-| Optional thin **Runtime-only** install assertion | **Stage 2** (optional) |
 | Stale [`docs/README.md`](../README.md) hub (“M1–15 / 17–18 outline”) | **Stage 3** |
 | No short **migration** notes (`gemini-system`-only → Service Edition) | **Stage 3** |
 | **Local UDS only** not listed with CPU / cold-restart known limits | **Stage 3** |
 | Edition naming glossary / consistency (Application/Service vs embedded/standalone) | **Stage 3** |
 | No `CHANGELOG.md`; `PROJECT_VERSION` remains `0.18.0` until tag | **Stage 4** / **5** |
 | Milestone hub / root README “path to 1.0” status flips | **Stage 5** |
+
+Runtime-only install assertion: **deferred** (not required for 1.0; Application/Service install cases cover the matrix row).
 
 #### 2.3 Documentation capstone
 
@@ -199,7 +199,7 @@ M18 is sequenced as **audit → fill gaps → docs → hygiene → release**. Ea
 
 - **Stage 1 — Release audit**: inventory existing tests and docs against §2.2–§2.4; list gaps only (no code yet unless a trivial doc typo blocks reading). Resolve §8 decisions. **Exit criterion:** written gap list + proposed matrix rows; open decisions table updated or deferred with owners. *Status: implemented.* Ships draft §2.2 test matrix, Stage 1–5 gap list, and §8 decisions (resolved) in this milestone page.
 
-- **Stage 2 — Test matrix fill**: add or extend automated tests **only** for matrix holes (primary: daemon-attached two-console lock conflict; optional Runtime-only install); publish final matrix with `ctest` names for locks, cooperative yield, module boot, admin, and install layout. **Exit criterion:** matrix table complete with links/names; `ctest` green; no new product features. *Status: planned.*
+- **Stage 2 — Test matrix fill**: add or extend automated tests **only** for matrix holes (primary: daemon-attached two-console lock conflict; optional Runtime-only install); publish final matrix with `ctest` names for locks, cooperative yield, module boot, admin, and install layout. **Exit criterion:** matrix table complete with links/names; `ctest` green; no new product features. *Status: implemented.* Ships `DaemonIpcClient two consoles READU conflict returns RECORD LOCKED` in [`test_GeminiConsole.cpp`](../../tests/console/test_GeminiConsole.cpp); final §2.2 matrix; Runtime-only install deferred.
 
 - **Stage 3 — Docs capstone**: edition naming/migration notes; hub accuracy ([`docs/README.md`](../README.md)); surface known limitations (CPU starvation → M19; cold restart; **local UDS**); tighten architecture/admin/developer cross-links. **Exit criterion:** docs review against §2.3; Application and Service operator stories readable without the milestone page. *Status: planned.*
 
