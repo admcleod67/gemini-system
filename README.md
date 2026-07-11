@@ -9,7 +9,7 @@ The implementation remains intentionally incremental, but the platform is now br
 filesystem-backed Pick file semantics, BASIC compiler/shell workflows, and ENGLISH/DICT query foundations. The goal is
 still to grow the system in **small, verifiable steps** (tests, clear boundaries) rather than landing a large stack at once.
 
-A phased **roadmap** (Milestone 1 onward) is summarized in **[`docs/milestones.md`](docs/milestones.md)** (hub); long-form text for each milestone lives under **[`docs/milestones/`](docs/milestones/)**. **Milestones 1–17** are implemented (through cooperative multi-session execution and Linux service integration; Milestone 16 was retired into M17 packaging). The single-session **application edition** is **`gemini-system`** (M12–M13). **Milestone 18** is the remaining path to **Version 1.0** release packaging; **Milestone 19** covers post–v1.0 CPU-bound yield. Service Edition install (`gemini-daemon` / `gemini-console` / systemd) is documented in **[`docs/daemon.md`](docs/daemon.md)**.
+A phased **roadmap** (Milestone 1 onward) is summarized in **[`docs/milestones.md`](docs/milestones.md)** (hub); long-form text for each milestone lives under **[`docs/milestones/`](docs/milestones/)**. **Milestones 1–17** are implemented (through cooperative multi-session execution and Linux service integration; Milestone 16 was retired into M17 packaging). The single-session **application edition** is **`gemini-system`** (M12–M13). **Milestone 18** is the remaining path to **Version 1.0** release packaging; **Milestone 19** covers post–v1.0 CPU-bound yield. Service Edition install and **Version 1.0 known limitations** are in **[`docs/daemon.md`](docs/daemon.md)**. Release notes: **[`CHANGELOG.md`](CHANGELOG.md)**.
 
 ## Building
 
@@ -37,7 +37,7 @@ cmake --install build --prefix /tmp/gemini-app --component Application
 
 ## Documentation
 
-More detail lives under **[`docs/`](docs/README.md)**:
+More detail lives under **[`docs/`](docs/README.md)**. Release history: **[`CHANGELOG.md`](CHANGELOG.md)**.
 
 - **[Bytecode VM](docs/vm.md)** — `.tbc` format, opcodes, parser and runtime.
 - **[Bytecode contract & language modules](docs/bytecode.md)** — **`CALL_FUNC`** ABI for external compilers; [module author guide](docs/language-modules.md).

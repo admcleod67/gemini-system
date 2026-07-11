@@ -308,7 +308,7 @@ sudo systemctl restart gemini   # fresh sessions — no restore
 
 ### Manual smoke checklists
 
-Operator copies of [Milestone 17 §9](milestones/17-service-integration-deployment.md#9-milestone-completion-criteria). Linux systemd smoke is required for M17 closure on a real host; CI does not run a live systemd unit.
+Operator copies of [Milestone 17 §9](milestones/17-service-integration-deployment.md#9-milestone-completion-criteria). Linux systemd smoke is required for M17 closure on a real host; CI does not run a live systemd unit. The **Version 1.0 public release checklist** (build, `ctest`, both install editions, smokes, tag) is drafted in [Milestone 18 §9](milestones/18-version-1-gemini-system-service.md#9-milestone-completion-criteria).
 
 **`gemini-system`:**
 

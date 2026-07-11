@@ -59,12 +59,11 @@ Prefer documenting which existing `ctest` cases map to each row; add tests **onl
 | Daemon config / unit shape | `loadDaemonConfigFile…` / `resolveDaemonConfig…`; `systemd gemini.service unit…`; `packaging daemon.conf…` | **OK**; live `systemctl` = manual §9 |
 | Manual smoke | [`daemon.md`](../daemon.md) M17 checklists (`gemini-system`, systemd, Application packaging) | **OK** — reuse for public checklist Stage 5 |
 
-**Remaining gaps** (Stages 4–5):
+**Remaining gaps** (Stage 5):
 
 | Gap | Owner stage |
 |-----|-------------|
-| No `CHANGELOG.md`; `PROJECT_VERSION` remains `0.18.0` until tag | **Stage 4** / **5** |
-| Milestone hub / root README “path to 1.0” status flips | **Stage 5** |
+| `PROJECT_VERSION` → `1.0.0`; CHANGELOG `[Unreleased]` → `[1.0.0]`; annotated tag **`v1.0.0`**; milestone hub / README status flips | **Stage 5** |
 
 Runtime-only install assertion: **deferred** (not required for 1.0; Application/Service install cases cover the matrix row).
 
@@ -187,6 +186,17 @@ Session lifecycle, IPC v1, and cooperative I/O yield remain as documented after 
 - systemd Service Edition (two consoles, admin verbs, `SHUTDOWN` / `systemctl stop` → fresh sessions)
 - Application / Service install-component recipes
 
+**Public release checklist** (execute at Stage 5; draft locked here):
+
+1. `cmake` build + full `ctest` green
+2. Application Edition install smoke — Runtime + Application → `gemini-system` present; no daemon/console ([`daemon.md`](../daemon.md#install-packaging-service-vs-application))
+3. Service Edition install smoke — Runtime + Service → daemon, console, `daemon.conf`, `gemini.service`
+4. `gemini-system` 5-step manual smoke ([`daemon.md`](../daemon.md#manual-smoke-checklists))
+5. Linux systemd checklist ([`daemon.md`](../daemon.md#manual-smoke-checklists)) — operator host; not required in CI
+6. Set `PROJECT_VERSION` to **1.0.0**; retitle [`CHANGELOG.md`](../../CHANGELOG.md) `[Unreleased]` → `[1.0.0] - <date>`; annotated tag **`v1.0.0`**; flip this milestone, [`milestones.md`](../milestones.md), and README status
+
+Operator smoke checklists also live under [`daemon.md` Manual smoke](../daemon.md#manual-smoke-checklists). The Version 1.0 public checklist above is authoritative for Stage 5.
+
 ---
 
 ### 10. Delivery plan
@@ -199,7 +209,7 @@ M18 is sequenced as **audit → fill gaps → docs → hygiene → release**. Ea
 
 - **Stage 3 — Docs capstone**: edition naming/migration notes; hub accuracy ([`docs/README.md`](../README.md)); surface known limitations (CPU starvation → M19; cold restart; **local UDS**); tighten architecture/admin/developer cross-links. **Exit criterion:** docs review against §2.3; Application and Service operator stories readable without the milestone page. *Status: implemented.* Ships edition glossary, known-limitations trio, and Application→Service migration in [`docs/daemon.md`](../daemon.md); console/session edition wording; docs hub roadmap fix.
 
-- **Stage 4 — Repo hygiene**: add `CHANGELOG.md` (1.0 entry draft), version bump preparation, packaging recipe verification, milestone/docs hub consistency for a post-1.0 world (except final status flip). **Exit criterion:** release notes draft ready; install recipes smoke-passed; hub prose accurate aside from M18 status flip. *Status: planned.*
+- **Stage 4 — Repo hygiene**: add `CHANGELOG.md` (1.0 entry draft), version bump preparation, packaging recipe verification, milestone/docs hub consistency for a post-1.0 world (except final status flip). **Exit criterion:** release notes draft ready; install recipes smoke-passed; hub prose accurate aside from M18 status flip. *Status: implemented.* Ships [`CHANGELOG.md`](../../CHANGELOG.md) (`Unreleased` 1.0 draft + `0.17.0`); public release checklist in §9; README/docs hub links; Application and Service `cmake --install` smoke to `/tmp/gemini-*-m18` passed (`PROJECT_VERSION` still `0.18.0`).
 
 - **Stage 5 — Tag Version 1.0 + closes M18**: run public release checklist; set `PROJECT_VERSION` to **1.0.0**; annotated tag **`v1.0.0`**; flip this milestone, [`milestones.md`](../milestones.md), and README status. **Closes Milestone 18.** *Status: planned.*
 
