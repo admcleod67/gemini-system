@@ -4,7 +4,7 @@
 
 Make Gemini a first-class **Linux service**. Add a **systemd** unit (`gemini.service`) with proper lifecycle integration, **journald** logging for daemon output, and a **configuration file** for socket paths, session limits, and host settings. Expose **admin Tcl commands** such as **`LISTSESSIONS`**, **`KILLSESSION`**, **`STATUS`**, and Pick-style **`SHUTDOWN`**. Harden **graceful shutdown** and ship **install packaging** that separates the **Service Edition** (`gemini-daemon` + `gemini-console`) from the **Application Edition** (`gemini-system`). *Status: planned.*
 
-M13–M15 delivered a multi-session daemon with IPC consoles and cooperative I/O yield. Operators still start `gemini-daemon` by hand in the foreground; configuration is CLI/env only; there is no systemd unit, no admin session introspection beyond **`WHO`**, and no install layout that distinguishes service vs application deliverables. M17 closes that deployment gap so Gemini can run as a UniData-style Linux service ahead of the [**Milestone 18**](18-version-1-gemini-system-service.md) Version 1.0 release.
+M13–M15 delivered a multi-session daemon with IPC consoles and cooperative I/O yield. Operators still start `gemini-daemon` by hand in the foreground; there is no systemd unit, no admin session introspection beyond **`WHO`**, and no install layout that distinguishes service vs application deliverables. File-backed daemon config landed in Stage 1; remaining M17 work closes systemd, admin Tcl, and packaging so Gemini can run as a UniData-style Linux service ahead of the [**Milestone 18**](18-version-1-gemini-system-service.md) Version 1.0 release.
 
 ---
 
@@ -43,7 +43,7 @@ Extend [`DaemonConfig`](../../src/core/daemon/DaemonConfig.h) / [`resolveDaemonC
 | Catalogue / pick / modules roots | Same host paths CLI already supports |
 | Optional log verbosity / identity | Enough for journald-friendly boot lines |
 
-**Resolution order (M17 v1):** CLI overrides environment overrides config file overrides built-in defaults. Document paths (e.g. `/etc/gemini/daemon.conf` or `$XDG_CONFIG_HOME/gemini/daemon.conf` for user installs). Config format: simple key=value or INI-style — pick one in Stage 1 and lock it in tests.
+**Resolution order (M17 v1):** CLI overrides environment overrides config file overrides built-in defaults. Config format is **`key=value`** (Stage 1). Load a file only via `--config PATH` or `GEMINI_DAEMON_CONFIG` — auto-load of `/etc/gemini/daemon.conf` / XDG is deferred to later packaging stages.
 
 **`gemini-console`** may gain a matching config for default socket path (optional stretch); daemon config is required.
 
@@ -284,7 +284,7 @@ Milestone 17 does **not** introduce:
 
 Implementation is sequenced into vertical stages. Each stage ships a test-locked slice before the next starts; the full test suite must remain green after every stage. **`gemini-system` external behaviour must not regress** until Stage 7 claims milestone closure. Detailed per-stage plans may live in `~/.cursor/plans/m17_stage_*.plan.md` during implementation; status is summarised here as each stage lands (matching the M13–M15 precedent).
 
-- **Stage 1 — Config file support**: extend [`DaemonConfig`](../../src/core/daemon/DaemonConfig.h) with file parsing and documented resolution order (CLI > env > file > defaults); sample config; unit tests for precedence and invalid keys. **Exit criterion:** `gemini-daemon --config path` (or equivalent) starts with file-backed socket/maxSessions/host paths; existing CLI/env tests still pass. *Status: planned.*
+- **Stage 1 — Config file support**: extend [`DaemonConfig`](../../src/core/daemon/DaemonConfig.h) with file parsing and documented resolution order (CLI > env > file > defaults); sample config; unit tests for precedence and invalid keys. **Exit criterion:** `gemini-daemon --config path` (or equivalent) starts with file-backed socket/maxSessions/host paths; existing CLI/env tests still pass. *Status: implemented.* Ships `loadDaemonConfigFile`, `--config` / `GEMINI_DAEMON_CONFIG`, [`packaging/gemini/daemon.conf.example`](../../packaging/gemini/daemon.conf.example), and extended [`tests/core/test_DaemonConfig.cpp`](../../tests/core/test_DaemonConfig.cpp).
 
 - **Stage 2 — Logging / journald readiness**: audit daemon stdout/stderr under non-TTY; ensure cold-start and **`MODULES:`** lines flush; document systemd `StandardOutput=journal` expectations; fix any interactive-only assumptions in the daemon entry path. **Exit criterion:** headless daemon start produces complete boot banner to a pipe/file; documented journald behaviour. *Status: planned.*
 

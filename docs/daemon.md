@@ -139,13 +139,20 @@ This is intentional M15 scope. Post–v1.0 improvement: opcode-budget yield and 
 
 ## Configuration
 
-[`DaemonConfig`](../src/core/daemon/DaemonConfig.h) is resolved by [`resolveDaemonConfig`](../src/core/daemon/DaemonConfig.cpp) for `gemini-daemon`:
+[`DaemonConfig`](../src/core/daemon/DaemonConfig.h) is resolved by [`resolveDaemonConfig`](../src/core/daemon/DaemonConfig.cpp) for `gemini-daemon`.
+
+**Precedence:** CLI flags > environment variables > config file > built-in defaults.
 
 | Source | Settings |
 |--------|----------|
-| **CLI** | `--socket`, `--max-sessions`, `--pick-root`, `--catalog-root`, `--modules-root`, `--help` |
-| **Environment** | `GEMINI_DAEMON_SOCKET`, `GEMINI_MAX_SESSIONS`, `GEMINI_FILESYSTEM_ROOT`, `GEMINI_CATALOG_ROOT`, `GEMINI_MODULES_PATH` |
+| **CLI** | `--config`, `--socket`, `--max-sessions`, `--pick-root`, `--catalog-root`, `--modules-root`, `--help` |
+| **Environment** | `GEMINI_DAEMON_CONFIG`, `GEMINI_DAEMON_SOCKET`, `GEMINI_MAX_SESSIONS`, `GEMINI_FILESYSTEM_ROOT`, `GEMINI_CATALOG_ROOT`, `GEMINI_MODULES_PATH` |
+| **Config file** | Loaded only when `--config PATH` is given or `GEMINI_DAEMON_CONFIG` is set (`--config` wins for which file). Format: `key=value` lines; `#` comments; keys `socket`, `max_sessions`, `pick_root`, `catalog_root`, `modules_root`. See [`packaging/gemini/daemon.conf.example`](../packaging/gemini/daemon.conf.example). |
 | **Defaults** | Host paths from [`resolveDefaultHostPaths`](../src/core/host/HostBootstrap.cpp); socket `$XDG_RUNTIME_DIR/gemini.sock` or `/tmp/gemini.sock`; `maxSessions = 64` |
+
+Recommended install paths for later stages (not auto-loaded yet): `/etc/gemini/daemon.conf` for the service edition; `$XDG_CONFIG_HOME/gemini/daemon.conf` for user installs. Stage 3 systemd will pass `--config` explicitly.
+
+Invalid config (missing file, unknown key, malformed line, bad `max_sessions`) causes `gemini-daemon` to print an error and exit with status `1`.
 
 Embedded mode uses [`DaemonConfig::embedded()`](../src/core/daemon/DaemonConfig.h) (`maxSessions = 1`); socket path is ignored.
 

@@ -11,6 +11,10 @@ int main(const int argc, char *argv[]) {
         PickCore::printDaemonUsage(argc > 0 ? argv[0] : "gemini-daemon");
         return 0;
     }
+    if (resolution.error.has_value()) {
+        std::cerr << "gemini-daemon: " << *resolution.error << '\n';
+        return 1;
+    }
 
     PickCore::GeminiServiceDaemon daemon = PickCore::GeminiServiceDaemon::create(resolution.config);
     PickShell::GeminiSessionHost host(daemon, resolution.config.maxSessions);
