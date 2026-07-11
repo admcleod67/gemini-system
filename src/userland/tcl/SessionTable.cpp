@@ -48,6 +48,14 @@ namespace PickShell {
         return it->second.get();
     }
 
+    const GeminiSession *SessionTable::find(const PickCore::SessionId id) const {
+        const auto it = sessions_.find(id);
+        if (it == sessions_.end()) {
+            return nullptr;
+        }
+        return it->second.get();
+    }
+
     std::vector<PickCore::SessionId> SessionTable::sessionIds() const {
         std::vector<PickCore::SessionId> ids;
         ids.reserve(sessions_.size());

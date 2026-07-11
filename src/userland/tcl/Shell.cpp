@@ -265,6 +265,10 @@ namespace PickShell {
         session_.attach(userSession);
     }
 
+    void Shell::setAdminQueries(ShellAdminQueries queries) {
+        adminQueries_ = std::move(queries);
+    }
+
     Shell::TokenizeResult Shell::tokenize(const std::string &line) {
         TokenizeResult result;
         std::string current;
@@ -440,6 +444,20 @@ namespace PickShell {
                 return;
             }
             cmdWho(out);
+        };
+        tclCommands_["LISTSESSIONS"] = [this](const Tokens &tokens, std::ostream &out, bool &) {
+            if (tokens.size() != 1) {
+                out << "LISTSESSIONS takes no arguments\n";
+                return;
+            }
+            cmdListSessions(out);
+        };
+        tclCommands_["STATUS"] = [this](const Tokens &tokens, std::ostream &out, bool &) {
+            if (tokens.size() != 1) {
+                out << "STATUS takes no arguments\n";
+                return;
+            }
+            cmdStatus(out);
         };
         tclCommands_["ECHO"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdEcho(tokens, out); };
         tclCommands_["RUN"] = [this](const Tokens &tokens, std::ostream &out, bool &) { cmdRun(tokens, out); };
@@ -1573,6 +1591,11 @@ namespace PickShell {
             return;
         }
 
+        if (tokens.size() == 2 && tokens[1] == "STATUS") {
+            cmdStatus(out);
+            return;
+        }
+
         out << "SYSTEM: unknown subcommand \"" << tokens[1] << "\"\n";
     }
 
@@ -1589,6 +1612,89 @@ namespace PickShell {
             return;
         }
         out << session_.whoPort() << ' ' << session_.sessionUsername() << ' ' << session_.sessionAccount() << '\n';
+    }
+
+    bool Shell::requireSysprog(std::ostream &out, const std::string_view command) const {
+        if (session_.loggedIn() && session_.sessionAccount() == "SYSPROG") {
+            return true;
+        }
+        out << command << " requires SYSPROG\n";
+        return false;
+    }
+
+    const char *Shell::runStateLabel(const PickCore::SessionRunState state) {
+        switch (state) {
+            case PickCore::SessionRunState::Runnable:
+                return "Runnable";
+            case PickCore::SessionRunState::Running:
+                return "Running";
+            case PickCore::SessionRunState::WaitingForInput:
+                return "WaitingForInput";
+        }
+        return "Runnable";
+    }
+
+    void Shell::formatListSessions(const std::vector<AdminSessionRow> &rows, std::ostream &out) const {
+        out << "PORT BOUND USER ACCOUNT STATE\n";
+        for (const AdminSessionRow &row : rows) {
+            out << row.port << ' ' << (row.consoleBound ? "yes" : "no") << ' ';
+            if (row.loggedIn) {
+                out << row.username << ' ' << row.account;
+            } else {
+                out << "- -";
+            }
+            out << ' ' << runStateLabel(row.runState) << '\n';
+        }
+    }
+
+    void Shell::formatStatus(const AdminDaemonStatus &status, std::ostream &out) const {
+        out << "Gemini System " << status.version << '\n';
+        out << "sessions=" << status.sessionCount << " maxSessions=" << status.maxSessions << '\n';
+        out << "socket=";
+        if (status.socketPath.empty()) {
+            out << "none";
+        } else {
+            out << status.socketPath.string();
+        }
+        out << '\n';
+    }
+
+    std::vector<AdminSessionRow> Shell::fallbackAdminSessions() const {
+        AdminSessionRow row;
+        row.port = static_cast<PickCore::SessionId>(session_.whoPort());
+        row.consoleBound = false;
+        row.loggedIn = session_.loggedIn();
+        if (row.loggedIn) {
+            row.username = session_.sessionUsername();
+            row.account = session_.sessionAccount();
+        }
+        row.runState = PickCore::SessionRunState::Runnable;
+        return {std::move(row)};
+    }
+
+    AdminDaemonStatus Shell::fallbackAdminStatus() const {
+        AdminDaemonStatus status;
+        status.maxSessions = 1;
+        status.sessionCount = 1;
+        status.version = pick_system::version_string;
+        return status;
+    }
+
+    void Shell::cmdListSessions(std::ostream &out) {
+        if (!requireSysprog(out, "LISTSESSIONS")) {
+            return;
+        }
+        const std::vector<AdminSessionRow> rows =
+            adminQueries_.listSessions ? adminQueries_.listSessions() : fallbackAdminSessions();
+        formatListSessions(rows, out);
+    }
+
+    void Shell::cmdStatus(std::ostream &out) {
+        if (!requireSysprog(out, "STATUS")) {
+            return;
+        }
+        const AdminDaemonStatus status = adminQueries_.status ? adminQueries_.status() : fallbackAdminStatus();
+        formatStatus(status, out);
     }
 
     void Shell::cmdDumpStack(std::ostream &out) {

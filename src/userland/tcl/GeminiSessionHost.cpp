@@ -1,5 +1,8 @@
 #include "GeminiSessionHost.h"
 
+#include <pick_system/version.hpp>
+
+#include <algorithm>
 #include <vector>
 
 namespace PickShell {
@@ -64,5 +67,48 @@ namespace PickShell {
 
     void GeminiSessionHost::clearIpcChannelScheduling(PickCore::IpcSessionChannel &channel) {
         channel.clearSessionScheduling();
+    }
+
+    void GeminiSessionHost::setConsoleBoundQuery(std::function<bool(PickCore::SessionId)> query) {
+        consoleBoundQuery_ = std::move(query);
+    }
+
+    void GeminiSessionHost::setAdminSocketPath(std::filesystem::path path) {
+        adminSocketPath_ = std::move(path);
+    }
+
+    std::vector<AdminSessionRow> GeminiSessionHost::listAdminSessions() const {
+        std::vector<PickCore::SessionId> ids = sessions_.sessionIds();
+        std::sort(ids.begin(), ids.end());
+
+        std::vector<AdminSessionRow> rows;
+        rows.reserve(ids.size());
+        for (const PickCore::SessionId id : ids) {
+            const GeminiSession *session = sessions_.find(id);
+            if (session == nullptr) {
+                continue;
+            }
+
+            AdminSessionRow row;
+            row.port = id;
+            row.consoleBound = consoleBoundQuery_ ? consoleBoundQuery_(id) : false;
+            row.loggedIn = session->loggedIn();
+            if (row.loggedIn) {
+                row.username = session->sessionUsername();
+                row.account = session->sessionAccount();
+            }
+            row.runState = runner_.state(id);
+            rows.push_back(std::move(row));
+        }
+        return rows;
+    }
+
+    AdminDaemonStatus GeminiSessionHost::adminStatus() const {
+        AdminDaemonStatus status;
+        status.maxSessions = sessions_.maxSessions();
+        status.sessionCount = sessions_.count();
+        status.socketPath = adminSocketPath_;
+        status.version = pick_system::version_string;
+        return status;
     }
 } // namespace PickShell

@@ -56,6 +56,7 @@ add_executable(
         basic/test_BasicSemanticAnalyzer.cpp
         basic/test_BasicStatementParser.cpp
         tcl/test_AssemblerShell.cpp
+        tcl/test_AdminCommands.cpp
         tcl/test_GeminiSession.cpp
         tcl/test_Shell.cpp
         tcl/test_ShellLocking.cpp

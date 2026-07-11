@@ -94,11 +94,22 @@ src/Main.cpp         gemini-system embedded entry
 - Allocated at [`SessionTable::createSession`](../src/userland/tcl/SessionTable.cpp)
 - Released at `destroySession`
 - Map key and [`SessionId`](../src/core/daemon/CooperativeSessionRunner.h) equal the port number (starting at **1**, lowest free reused on destroy)
-- Feeds **`WHO`**, lock identity ([`makeSessionLockId`](../src/userland/tcl/GeminiSession.h)), and future admin listing (M17)
+- Feeds **`WHO`**, lock identity ([`makeSessionLockId`](../src/userland/tcl/GeminiSession.h)), and admin **`LISTSESSIONS`** (M17 Stage 4)
 
 The port survives **`LOGOFF`** until session **destroy** (daemon-assigned; login does not set `whoPort`).
 
 Embedded `gemini-system` uses `maxSessions = 1` / `PortManager(1)`; the operator typically sees port **1** after login.
+
+## Admin Tcl (`LISTSESSIONS` / `STATUS`)
+
+Privileged session operators (logged-in account **`SYSPROG`**) can inspect daemon capacity from Tcl:
+
+| Command | Purpose |
+|---------|---------|
+| **`LISTSESSIONS`** | All session ports, console bound yes/no, login identity, cooperative run state |
+| **`STATUS`** / **`SYSTEM STATUS`** | Version, `sessions` / `maxSessions`, socket path (`none` for embedded) |
+
+See [Tcl shell](tcl-shell.md). Destructive admin verbs (**`KILLSESSION`**, **`SHUTDOWN`**) remain M17 Stage 5.
 
 ## Cooperative execution
 

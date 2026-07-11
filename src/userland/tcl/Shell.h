@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include "AdminQueries.h"
 #include "AssemblerShell.h"
 #include "BasicShell.h"
 #include "EnglishService.h"
@@ -53,6 +54,8 @@ namespace PickShell {
 
         /// Apply a successful core login (filesystem root, identity, Tcl `@*` variables).
         void attachUserSession(const PickCore::UserSession &session);
+
+        void setAdminQueries(ShellAdminQueries queries);
 
         // One line of input; all command output goes to out. For interactive use, pass std::cout.
         void handleLine(const std::string &line, std::ostream &out, bool &quit);
@@ -167,6 +170,15 @@ namespace PickShell {
         void cmdSystem(const Tokens &tokens, std::ostream &out);
         void cmdShowModules(std::ostream &out);
         void cmdWho(std::ostream &out);
+        void cmdListSessions(std::ostream &out);
+        void cmdStatus(std::ostream &out);
+
+        [[nodiscard]] bool requireSysprog(std::ostream &out, std::string_view command) const;
+        [[nodiscard]] static const char *runStateLabel(PickCore::SessionRunState state);
+        void formatListSessions(const std::vector<AdminSessionRow> &rows, std::ostream &out) const;
+        void formatStatus(const AdminDaemonStatus &status, std::ostream &out) const;
+        [[nodiscard]] std::vector<AdminSessionRow> fallbackAdminSessions() const;
+        [[nodiscard]] AdminDaemonStatus fallbackAdminStatus() const;
 
         void cmdDumpStack(std::ostream &out);
 
@@ -228,6 +240,7 @@ namespace PickShell {
         std::optional<int> basicResumePastLine_;
         bool basicTrace_{false};
         std::size_t procReadNextIndex_{0};
+        ShellAdminQueries adminQueries_;
     };
 } // namespace PickShell
 

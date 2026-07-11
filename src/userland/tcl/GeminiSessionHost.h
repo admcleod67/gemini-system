@@ -5,12 +5,15 @@
 #ifndef PICK_SYSTEM_TCL_GEMINI_SESSION_HOST_H
 #define PICK_SYSTEM_TCL_GEMINI_SESSION_HOST_H
 
+#include "AdminQueries.h"
 #include "SessionTable.h"
 
 #include <CooperativeSessionRunner.h>
 #include <IpcSessionChannel.h>
 
+#include <filesystem>
 #include <functional>
+#include <vector>
 
 namespace PickShell {
     class GeminiSessionHost {
@@ -33,6 +36,12 @@ namespace PickShell {
         void bindIpcChannelScheduling(PickCore::SessionId id, PickCore::IpcSessionChannel &channel);
         void clearIpcChannelScheduling(PickCore::IpcSessionChannel &channel);
 
+        void setConsoleBoundQuery(std::function<bool(PickCore::SessionId)> query);
+        void setAdminSocketPath(std::filesystem::path path);
+
+        [[nodiscard]] std::vector<AdminSessionRow> listAdminSessions() const;
+        [[nodiscard]] AdminDaemonStatus adminStatus() const;
+
         [[nodiscard]] PickCore::GeminiServiceDaemon &daemon() noexcept { return daemon_; }
         [[nodiscard]] const PickCore::GeminiServiceDaemon &daemon() const noexcept { return daemon_; }
 
@@ -43,6 +52,8 @@ namespace PickShell {
         PickCore::GeminiServiceDaemon &daemon_;
         SessionTable sessions_;
         PickCore::CooperativeSessionRunner runner_;
+        std::function<bool(PickCore::SessionId)> consoleBoundQuery_;
+        std::filesystem::path adminSocketPath_;
     };
 } // namespace PickShell
 

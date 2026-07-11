@@ -35,6 +35,19 @@ namespace PickShell {
           ipcServer_(config.socketPath)
 #endif
     {
+        host_.setAdminSocketPath(config_.socketPath);
+#ifndef _WIN32
+        host_.setConsoleBoundQuery([this](const PickCore::SessionId id) {
+            return boundSessionPorts_.contains(id);
+        });
+#endif
+    }
+
+    void GeminiDaemonRunner::installAdminQueries(GeminiSession &session) {
+        session.shell().setAdminQueries(ShellAdminQueries{
+            [this] { return host_.listAdminSessions(); },
+            [this] { return host_.adminStatus(); },
+        });
     }
 
     void GeminiDaemonRunner::requestShutdown() {
@@ -158,7 +171,9 @@ namespace PickShell {
 
         if (port == 0) {
             try {
-                port = host_.createSession().id;
+                const SessionHandle handle = host_.createSession();
+                port = handle.id;
+                installAdminQueries(handle.session);
             } catch (const std::exception &) {
                 return {PickCore::AttachSessionStatus::SessionTableFull, 0};
             }
@@ -175,6 +190,7 @@ namespace PickShell {
             return {PickCore::AttachSessionStatus::SessionNotFound, 0};
         }
 
+        installAdminQueries(*session);
         applyHostPaths(*session);
         session->setInputStream(&channel.input());
         session->setOutputStream(&channel.output());
@@ -227,7 +243,9 @@ namespace PickShell {
         PickCore::DaemonIpcHandlers handlers{};
         handlers.reserveSession = [this]() -> std::optional<PickCore::SessionId> {
             try {
-                return host_.createSession().id;
+                const SessionHandle handle = host_.createSession();
+                installAdminQueries(handle.session);
+                return handle.id;
             } catch (const std::exception &) {
                 return std::nullopt;
             }

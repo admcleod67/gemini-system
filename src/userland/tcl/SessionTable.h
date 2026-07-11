@@ -30,6 +30,7 @@ namespace PickShell {
         void destroySession(PickCore::SessionId id);
 
         [[nodiscard]] GeminiSession *find(PickCore::SessionId id);
+        [[nodiscard]] const GeminiSession *find(PickCore::SessionId id) const;
         [[nodiscard]] std::vector<PickCore::SessionId> sessionIds() const;
         [[nodiscard]] std::size_t count() const { return sessions_.size(); }
         [[nodiscard]] std::size_t maxSessions() const { return maxSessions_; }

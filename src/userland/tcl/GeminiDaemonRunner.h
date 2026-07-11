@@ -33,6 +33,7 @@ namespace PickShell {
         void installSignalHandlers();
         void shutdown();
         void applyHostPaths(GeminiSession &session);
+        void installAdminQueries(GeminiSession &session);
         PickCore::AttachSessionResult attachSession(PickCore::SessionId requestedPort,
                                                     PickCore::IpcSessionChannel &channel);
         void detachSession(PickCore::SessionId port);

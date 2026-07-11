@@ -5,6 +5,7 @@
 #include <GeminiServiceDaemon.h>
 #include <GeminiSessionHost.h>
 #include <LoginService.h>
+#include <Shell.h>
 
 int main() {
     PickCore::GeminiServiceDaemon daemon = PickCore::GeminiServiceDaemon::createEmbedded();
@@ -16,6 +17,10 @@ int main() {
     applyDefaultFileSystemRoot(session.shell());
 
     PickShell::Shell &shell = session.shell();
+    shell.setAdminQueries(PickShell::ShellAdminQueries{
+        [&host] { return host.listAdminSessions(); },
+        [&host] { return host.adminStatus(); },
+    });
     const auto &catalog = shell.geminiCatalogRoot();
     if (!catalog.has_value()) {
         host.runExclusive(handle.id, [&] { (void) shell.runTclRepl(); });
