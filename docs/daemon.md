@@ -163,8 +163,8 @@ Host paths (`--catalog-root`, `--pick-root`) are applied to attached sessions by
 [`GeminiDaemonRunner`](../src/userland/tcl/GeminiDaemonRunner.cpp):
 
 1. Install **SIGTERM** / **SIGINT** handlers
-2. `coldStart()` — boot banner
-3. Start **IPC server** on configured socket path
+2. `coldStart()` — boot banner (flushed at end of [`BootMonitor::runColdStart`](../src/core/boot/BootMonitor.cpp))
+3. Start **IPC server** on configured socket path; emit **`IPC LISTENING: <path>`** and flush
 4. Poll loop: accept clients, dispatch IPC, until shutdown requested
 5. **Graceful shutdown** — detach all bound sessions, stop IPC (unlink socket), destroy all sessions (release locks and ports)
 
@@ -172,7 +172,26 @@ Host paths (`--catalog-root`, `--pick-root`) are applied to attached sessions by
 
 Shutdown may also be triggered by an IPC **ShutdownRequest** or by destroying the daemon process.
 
-**Not in M14:** systemd unit, journald, background detachment (Milestone 17).
+## Logging / journald
+
+Daemon process logs go to **stdout** / **stderr** (not a separate log file). For systemd (Milestone 17 Stage 3 unit), use:
+
+- `StandardOutput=journal`
+- `StandardError=journal`
+
+`gemini-daemon` sets **line-buffered stdout** and **unbuffered stderr** at startup so boot and listen lines appear promptly when stdout is a pipe or journal (not a TTY).
+
+Typical boot sequence on stdout:
+
+1. Title / version, `INITIALIZING SYSTEM...`, attach status lines
+2. `MODULES:` (loaded count or skip) and related module lines
+3. `PORT MANAGER: …`
+4. `SYSTEM READY` (blank line follows; stream is flushed)
+5. `IPC LISTENING: <socket path>` (flushed)
+
+Operator errors (e.g. bad `--config`) go to stderr.
+
+**Still pending (Stage 3):** systemd unit file and install rules.
 
 ## IPC protocol v1
 

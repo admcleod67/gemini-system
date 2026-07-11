@@ -217,6 +217,8 @@ namespace PickShell {
 
 #ifndef _WIN32
         ipcServer_.start();
+        bootOut << "IPC LISTENING: " << config_.socketPath.string() << '\n';
+        bootOut.flush();
 
         PickCore::DaemonIpcServerConfig serverConfig{};
         serverConfig.maxSessions = config_.maxSessions;

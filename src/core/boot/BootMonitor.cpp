@@ -108,5 +108,6 @@ namespace PickCore {
             out << "PORT MANAGER: (stub)\n";
         }
         out << "SYSTEM READY\n\n";
+        out.flush();
     }
 } // namespace PickCore

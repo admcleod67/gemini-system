@@ -32,9 +32,12 @@ TEST_CASE("GeminiServiceDaemon embedded coordinates table and port capacity") {
 }
 
 TEST_CASE("GeminiDaemonRunner shutdown destroys sessions and releases ports") {
+    const auto root = uniqueTempDir();
+    std::filesystem::create_directories(root);
+
     PickCore::DaemonConfig config{};
     config.maxSessions = 2;
-    config.socketPath = uniqueTempDir() / "gemini.sock";
+    config.socketPath = root / "gemini.sock";
 
     PickCore::GeminiServiceDaemon daemon = PickCore::GeminiServiceDaemon::create(config);
     PickShell::GeminiSessionHost host(daemon, config.maxSessions);
@@ -89,6 +92,35 @@ TEST_CASE("GeminiDaemonRunner shutdown unlinks configured socket file") {
     runnerThread.join();
 
     CHECK_FALSE(std::filesystem::exists(socketPath));
+}
+
+TEST_CASE("GeminiDaemonRunner bootOut includes banner MODULES SYSTEM READY and IPC LISTENING") {
+#ifndef _WIN32
+    const auto root = uniqueTempDir();
+    std::filesystem::create_directories(root);
+    const std::filesystem::path socketPath = root / "gemini.sock";
+
+    PickCore::DaemonConfig config{};
+    config.maxSessions = 1;
+    config.socketPath = socketPath;
+
+    PickCore::GeminiServiceDaemon daemon = PickCore::GeminiServiceDaemon::create(config);
+    PickShell::GeminiSessionHost host(daemon, config.maxSessions);
+    PickShell::GeminiDaemonRunner runner(daemon, host, config);
+
+    std::ostringstream boot;
+    std::thread runnerThread([&] { CHECK(runner.run(boot) == 0); });
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    runner.requestShutdown();
+    runnerThread.join();
+
+    const std::string text = boot.str();
+    CHECK(text.find("INITIALIZING SYSTEM") != std::string::npos);
+    CHECK(text.find("MODULES:") != std::string::npos);
+    CHECK(text.find("SYSTEM READY") != std::string::npos);
+    CHECK(text.find("IPC LISTENING: " + socketPath.string()) != std::string::npos);
+#endif
 }
 
 TEST_CASE("GeminiSessionHost destroyAllSessions clears table") {
