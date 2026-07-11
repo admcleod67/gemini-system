@@ -30,6 +30,12 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(nlohmann_json)
 
+# Install components (Milestone 17 Stage 6):
+#   Runtime     — share/gemini bootstrap + language modules
+#   Application — gemini-system
+#   Service     — gemini-daemon, gemini-console, systemd unit, daemon.conf
+# Plain `cmake --install` installs all components. Edition recipes use --component.
+
 add_subdirectory(src)
 add_subdirectory(packaging)
 

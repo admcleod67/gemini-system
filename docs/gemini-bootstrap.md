@@ -132,6 +132,8 @@ The **smoke** test sets **`GEMINI_AUTO_LOGON=SYSPROG`** so `echo QUIT | gemini-s
 
 Building **`gemini-system`** or **`gemini-daemon`** triggers a **`gemini-bootstrap-copy`** step that copies the entire `gemini/` tree from the source tree into **`CMAKE_CURRENT_BINARY_DIR`/gemini** (typically `<build>/src/gemini` when using the project’s `src/CMakeLists.txt`). That keeps `gemini/` next to the built binaries when the run **working directory** is set to that same directory (e.g. CLion default for targets defined under `src/`). The build also copies language modules (**`libgemini-module-basic`**, **`-pascal`**, **`-comal`**, **`-cobol`**, **`-stub`**, or platform equivalents) into **`gemini/modules/`** under that same tree.
 
+**Installed tree (Milestone 17 Stage 6):** `cmake --install` with component **`Runtime`** places the same bootstrap under **`${CMAKE_INSTALL_DATADIR}/gemini`** (typically `<prefix>/share/gemini`) and built modules under **`…/gemini/modules/`**. Application and Service recipes install **`Runtime`** alongside the edition binary component — see [Service daemon — Install packaging](daemon.md#install-packaging-service-vs-application).
+
 ## Language modules (Milestone 11)
 
 At cold start, **`BootMonitor`** scans **`gemini/modules/`** for shared libraries (`.dylib` / `.so` / `.dll`) and loads each via **`register_language`**. Override the directory with **`GEMINI_MODULES_PATH`**. When a catalogue root is configured, the default modules path is **`<catalogue-root>/modules`** (i.e. `gemini/modules/` next to `ACCOUNTS.json`). Failed modules are logged during boot and do not abort startup.

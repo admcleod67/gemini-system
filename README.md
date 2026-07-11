@@ -23,6 +23,18 @@ ctest --test-dir build --output-on-failure
 
 Artifacts include **`gemini-system`** (embedded host with boot and Tcl REPL), **`gemini-daemon`** (long-running service host with IPC), **`gemini-console`** (daemon-attached terminal client), and **`pick-tests`** (unit tests).
 
+### Install (editions)
+
+Install is split into CMake components — see **[Install packaging](docs/daemon.md#install-packaging-service-vs-application)** in the daemon docs.
+
+```bash
+# Application Edition only (no daemon / console)
+cmake --install build --prefix /tmp/gemini-app --component Runtime
+cmake --install build --prefix /tmp/gemini-app --component Application
+```
+
+`gemini-console` always requires a running daemon (no failover to embedded mode).
+
 ## Documentation
 
 More detail lives under **[`docs/`](docs/README.md)**:

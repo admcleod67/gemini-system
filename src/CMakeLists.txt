@@ -22,7 +22,9 @@ target_compile_definitions(
         PRIVATE "PICK_SYSTEM_VERSION=\"${PROJECT_VERSION}\""
 )
 
-install(TARGETS gemini-system RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(TARGETS gemini-system
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+        COMPONENT Application)
 
 add_executable(gemini-daemon daemon/Main.cpp)
 target_link_libraries(gemini-daemon PRIVATE gemini-tcl)
@@ -35,10 +37,19 @@ target_compile_definitions(
         PRIVATE "PICK_SYSTEM_VERSION=\"${PROJECT_VERSION}\""
 )
 
-install(TARGETS gemini-daemon RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(TARGETS gemini-daemon
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+        COMPONENT Service)
 
 add_executable(gemini-console console/Main.cpp)
 target_link_libraries(gemini-console PRIVATE gemini-core)
 pick_system_enable_warnings(gemini-console)
 
-install(TARGETS gemini-console RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(TARGETS gemini-console
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+        COMPONENT Service)
+
+# Shared bootstrap tree for Application and Service editions (Milestone 17 Stage 6).
+install(DIRECTORY ${CMAKE_SOURCE_DIR}/gemini/
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/gemini
+        COMPONENT Runtime)

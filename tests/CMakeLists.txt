@@ -23,6 +23,7 @@ add_executable(
         core/test_DaemonConfig.cpp
         core/test_DaemonLifecycle.cpp
         core/test_SystemdPackaging.cpp
+        core/test_InstallComponents.cpp
         core/test_DaemonIpc.cpp
         core/test_DaemonIpcSession.cpp
         core/test_SessionIoBridge.cpp
@@ -76,6 +77,12 @@ target_compile_definitions(
                 "PICK_SYSTEM_GEMINI_SYSPROG_FIXTURE=\"${CMAKE_SOURCE_DIR}/gemini/accounts/SYSPROG\""
                 "PICK_SYSTEM_GEMINI_SERVICE_UNIT=\"${CMAKE_BINARY_DIR}/packaging/systemd/gemini.service\""
                 "PICK_SYSTEM_GEMINI_DAEMON_CONF=\"${CMAKE_SOURCE_DIR}/packaging/gemini/daemon.conf\""
+                "PICK_SYSTEM_CMAKE_COMMAND=\"${CMAKE_COMMAND}\""
+                "PICK_SYSTEM_BINARY_DIR=\"${CMAKE_BINARY_DIR}\""
+                "PICK_SYSTEM_INSTALL_BINDIR=\"${CMAKE_INSTALL_BINDIR}\""
+                "PICK_SYSTEM_INSTALL_DATADIR=\"${CMAKE_INSTALL_DATADIR}\""
+                "PICK_SYSTEM_INSTALL_SYSCONFDIR=\"${CMAKE_INSTALL_SYSCONFDIR}\""
+                "PICK_SYSTEM_INSTALL_LIBDIR=\"${CMAKE_INSTALL_LIBDIR}\""
                 "GEMINI_STUB_MODULE_PATH=\"$<TARGET_FILE:gemini-module-stub>\""
                 "GEMINI_BASIC_MODULE_PATH=\"$<TARGET_FILE:gemini-module-basic>\""
                 "GEMINI_PASCAL_MODULE_PATH=\"$<TARGET_FILE:gemini-module-pascal>\""

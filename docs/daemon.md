@@ -204,6 +204,47 @@ Typical boot sequence on stdout:
 
 Operator errors (e.g. bad `--config`) go to stderr. Follow the unit with `journalctl -u gemini -f`.
 
+## Install packaging (Service vs Application)
+
+Milestone 17 Stage 6 splits `cmake --install` into named **components**. Plain `cmake --install <build-dir>` (no `--component`) still installs **everything**.
+
+| Component | Contents |
+|-----------|----------|
+| **`Runtime`** | `${CMAKE_INSTALL_DATADIR}/gemini/` bootstrap tree (`ACCOUNTS.json`, accounts, …) and language modules under `…/gemini/modules/` |
+| **`Application`** | `gemini-system` only |
+| **`Service`** | `gemini-daemon`, `gemini-console`, `gemini.service`, `daemon.conf`, and `daemon.conf.example` under `${CMAKE_INSTALL_DATADIR}/doc/gemini/` |
+
+**Application Edition** (no daemon):
+
+```bash
+cmake --install <build-dir> --prefix <prefix> --component Runtime
+cmake --install <build-dir> --prefix <prefix> --component Application
+export GEMINI_CATALOG_ROOT=<prefix>/share/gemini
+export GEMINI_FILESYSTEM_ROOT=<prefix>/share/gemini/accounts/SYSPROG
+export GEMINI_MODULES_PATH=<prefix>/share/gemini/modules
+# optional: GEMINI_AUTO_LOGON=SYSPROG
+<prefix>/bin/gemini-system
+```
+
+(On some prefixes `share` may be under `CMAKE_INSTALL_DATADIR`; adjust if you set a custom `CMAKE_INSTALL_DATADIR`.)
+
+**Service Edition**:
+
+```bash
+cmake --install <build-dir> --prefix <prefix> --component Runtime
+cmake --install <build-dir> --prefix <prefix> --component Service
+# Edit <prefix>/etc/gemini/daemon.conf (or …/etc/gemini/…):
+#   catalog_root=<prefix>/share/gemini
+#   pick_root=<prefix>/share/gemini/accounts/SYSPROG
+#   modules_root=<prefix>/share/gemini/modules
+```
+
+Then follow the [systemd](#systemd-geminiservice) operator steps (unit under `${CMAKE_INSTALL_LIBDIR}/systemd/system`).
+
+**No console failover:** [`gemini-console`](console.md) requires a running `gemini-daemon`. A failed socket connect is an **error**; it does **not** start embedded `gemini-system`. Use Application Edition for single-process stdio.
+
+Bootstrap layout and env resolution: [Gemini bootstrap](gemini-bootstrap.md).
+
 ## systemd (`gemini.service`)
 
 Milestone 17 Stage 3 ships an installable unit and default config:
@@ -223,7 +264,8 @@ Set **`pick_root`**, **`catalog_root`**, and **`modules_root`** in the installed
 ### Operator steps
 
 ```bash
-cmake --install <build-dir>   # or package install
+# Full tree (all components), or Service + Runtime only — see Install packaging above
+cmake --install <build-dir>   # or: --component Runtime && --component Service
 sudo systemctl daemon-reload
 sudo systemctl enable --now gemini
 journalctl -u gemini -f       # boot banner + IPC LISTENING
