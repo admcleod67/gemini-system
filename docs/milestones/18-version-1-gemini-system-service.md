@@ -46,6 +46,32 @@ Publish and satisfy a **v1.0 test matrix** covering at least:
 
 Prefer documenting which existing `ctest` cases map to each row; add tests **only** where the matrix has a real hole. Do not invent product features to “fill” coverage.
 
+**Draft matrix (Stage 1 audit)** — representative `ctest` / doctest names (not every assertion):
+
+| Area | Coverage today | Verdict |
+|------|----------------|---------|
+| Multi-session locks (in-process) | `LockTable cross-session…`, `FileSystem S1 readU blocks S2…`, shell/PROC/M10 cross-shell locking, `GeminiSession` detach/reset release | **OK** — document in Stage 2 |
+| Multi-session locks (daemon-attached) | `DaemonIpcClient SYSPROG KILLSESSION destroys peer and releases locks` (`READU` then kill); **no** two-console conflict → `RECORD LOCKED` / `?LOCKED?` without kill | **Gap → Stage 2** |
+| Cooperative I/O yield | `CooperativeSessionRunner yield…` / round-robin / starvation; `Schedulable IpcSessionChannel…`; `DaemonIpcClient session blocked in BASIC INPUT allows other session Tcl WHO` | **OK** |
+| Language module boot | `LanguageModuleLoader…`, `BootMonitor cold start loads language modules…`, `LanguageRegistry…`, daemon coldStart freezes registry | **OK** |
+| Admin verbs | `test_AdminCommands` host cases; `DaemonIpcClient SYSPROG LISTSESSIONS and STATUS…`, `…KILLSESSION…`, `…SHUTDOWN…` | **OK** |
+| Install Application / Service | `Application component install excludes service binaries`; `Service component install excludes gemini-system` (both via Runtime + edition) | **OK** (optional: Runtime-only install — Stage 2 if desired) |
+| Daemon config / unit shape | `loadDaemonConfigFile…` / `resolveDaemonConfig…`; `systemd gemini.service unit…`; `packaging daemon.conf…` | **OK**; live `systemctl` = manual §9 |
+| Manual smoke | [`daemon.md`](../daemon.md) M17 checklists (`gemini-system`, systemd, Application packaging) | **OK** — reuse for public checklist Stage 5 |
+
+**Gap list (Stage 1)** — schedule only; do not fix in Stage 1:
+
+| Gap | Owner stage |
+|-----|-------------|
+| Daemon-attached two-console lock **conflict** (peer `READU`/`WRITEU` → locked error without `KILLSESSION`) | **Stage 2** |
+| Optional thin **Runtime-only** install assertion | **Stage 2** (optional) |
+| Stale [`docs/README.md`](../README.md) hub (“M1–15 / 17–18 outline”) | **Stage 3** |
+| No short **migration** notes (`gemini-system`-only → Service Edition) | **Stage 3** |
+| **Local UDS only** not listed with CPU / cold-restart known limits | **Stage 3** |
+| Edition naming glossary / consistency (Application/Service vs embedded/standalone) | **Stage 3** |
+| No `CHANGELOG.md`; `PROJECT_VERSION` remains `0.18.0` until tag | **Stage 4** / **5** |
+| Milestone hub / root README “path to 1.0” status flips | **Stage 5** |
+
 #### 2.3 Documentation capstone
 
 Bring operator and developer docs to a v1.0 bar:
@@ -55,13 +81,13 @@ Bring operator and developer docs to a v1.0 bar:
 - **Developer** — Tcl / BASIC / PROC / ASM entry points, bytecode/module docs (existing tree under [`docs/`](../README.md)); README and docs hub reflect **1.0** status
 - **Known limitations** — CPU-bound multi-session starvation (I/O yield only); cold restart does not restore sessions; local UDS only — point at [M19](19-execution-fairness-cpu-bound-yield.md) for fairness
 
-Edition naming and residual operator-doc work parked from [M16](16-standalone-edition-application-mode.md) land here.
+Edition naming and residual operator-doc work parked from [M16](16-standalone-edition-application-mode.md) land here. Stage 1 notes existing edition/admin/CPU/cold-restart coverage in [`daemon.md`](../daemon.md) / [`console.md`](../console.md) is largely at bar; remaining doc gaps are listed above for Stage 3.
 
 #### 2.4 Repository hygiene and release packaging
 
-- Align **`PROJECT_VERSION`** / annotated git tag with the public **1.0** identity (today: `0.17.0` in root [`CMakeLists.txt`](../../CMakeLists.txt))
+- Align **`PROJECT_VERSION`** / annotated git tag with the public **1.0** identity (today: `0.18.0` in root [`CMakeLists.txt`](../../CMakeLists.txt); bump to `1.0.0` at Stage 5)
 - Milestone hub / README: M18 **implemented**; path-to-1.0 closed; M19 marked post–v1.0
-- Confirm M17 CMake install components remain the packaging story (CPack / distro packages optional — see §8)
+- Confirm M17 CMake install components remain the packaging story (CPack deferred — see §8)
 - **Public release checklist** (Stage 5) that an outsider can run: build, `ctest`, Application smoke, Service install smoke, systemd checklist on Linux
 
 ---
@@ -92,7 +118,7 @@ Session lifecycle, IPC v1, and cooperative I/O yield remain as documented after 
 - Hot-reload of language modules without daemon restart
 - Session restore across cold daemon restart
 - Transaction semantics, SQL gateways, or other post-Pick extensions
-- Distro packaging beyond what M17 already ships, unless explicitly chosen in §8 (CPack is optional stretch, not required for closure)
+- Distro packaging beyond what M17 already ships (CPack / `.deb` / `.rpm` deferred post-1.0 — see §8)
 
 ---
 
@@ -125,29 +151,27 @@ Session lifecycle, IPC v1, and cooperative I/O yield remain as documented after 
 | Edition + migration | README / [`daemon.md`](../daemon.md) / short admin notes: Service vs Application; no failover |
 | Known limitations | Explicit in release docs + [`daemon.md`](../daemon.md) |
 | Public release checklist | §9 + Stage 5; runnable by an operator |
-| Changelog / release notes | e.g. `CHANGELOG.md` or annotated tag body — chosen in §8 |
+| Changelog / release notes | [`CHANGELOG.md`](../../CHANGELOG.md) with 1.0 entry (Stage 4); annotated tags kept |
 | Status flips | This page, [`milestones.md`](../milestones.md), [`README.md`](../../README.md), [`docs/README.md`](../README.md) |
 
 **Code / packaging (minimal):**
 
-- Version bump to **1.0.0** (CMake `PROJECT_VERSION` and tag)
-- Tests only where the matrix audit finds holes
+- Version bump to **1.0.0** (CMake `PROJECT_VERSION` and tag) at Stage 5
+- Tests only where the matrix audit finds holes (Stage 2)
 - No required new runtime features
 
 ---
 
-### 8. Open decisions
+### 8. Decisions (resolved)
 
-| Topic | Options / notes | Default leaning |
-|-------|-----------------|-----------------|
-| Public version tag | `v1.0.0` (semver major) vs keep `0.x` | **`v1.0.0`** — milestone title is Version 1.0 |
-| Changelog | New `CHANGELOG.md` vs git annotated tags only | **`CHANGELOG.md`** with 1.0 entry (tags still used) |
-| System title string | [`system_title`](../../include/pick_system/version.hpp) still says “Developer Edition” | Decide whether 1.0 renames or keeps “Developer Edition” |
-| CPack / `.deb` / `.rpm` | Stretch vs defer post-1.0 | **Defer** — M17 `cmake --install` components suffice for 1.0 |
-| Docs structure | New top-level “admin guide” vs expand existing `daemon.md` / `console.md` | **Expand existing** docs; avoid a parallel doc tree unless audit proves need |
-| CI systemd | Require live systemd in CI vs Linux operator checklist | **Operator checklist** (same as M17) |
-
-Resolve these in Stage 1 (audit) or Stage 4 (hygiene) before tagging; record choices in this table as **resolved** when closed.
+| Topic | Choice (Stage 1) |
+|-------|------------------|
+| Public version tag | **`v1.0.0`** — set CMake `PROJECT_VERSION` to `1.0.0` and annotate the tag at Stage 5; leave **`0.18.0`** until then |
+| Changelog | Add **`CHANGELOG.md`** at Stage 4 with a 1.0 entry; keep annotated git tags |
+| System title string | **Keep** `"Gemini System Developer Edition"` in [`version.hpp`](../../include/pick_system/version.hpp) for v1.0 |
+| CPack / `.deb` / `.rpm` | **Defer** post-1.0 — M17 `cmake --install` components are the packaging story |
+| Docs structure | **Expand existing** [`daemon.md`](../daemon.md) / [`console.md`](../console.md) / README — no parallel admin-guide tree |
+| CI systemd | **Operator checklist** only (same as M17); do not require live systemd in CI |
 
 ---
 
@@ -173,13 +197,13 @@ Resolve these in Stage 1 (audit) or Stage 4 (hygiene) before tagging; record cho
 
 M18 is sequenced as **audit → fill gaps → docs → hygiene → release**. Each stage has an exit criterion; the full test suite must stay green. Do **not** start [Milestone 19](19-execution-fairness-cpu-bound-yield.md) until Stage 5 tags Version 1.0. Detailed per-stage plans may live in `~/.cursor/plans/m18_stage_*.plan.md` during implementation; status is summarised here as each stage lands.
 
-- **Stage 1 — Release audit**: inventory existing tests and docs against §2.2–§2.4; list gaps only (no code yet unless a trivial doc typo blocks reading). Resolve or schedule §8 decisions. **Exit criterion:** written gap list + proposed matrix rows; open decisions table updated or deferred with owners. *Status: planned.*
+- **Stage 1 — Release audit**: inventory existing tests and docs against §2.2–§2.4; list gaps only (no code yet unless a trivial doc typo blocks reading). Resolve §8 decisions. **Exit criterion:** written gap list + proposed matrix rows; open decisions table updated or deferred with owners. *Status: implemented.* Ships draft §2.2 test matrix, Stage 1–5 gap list, and §8 decisions (resolved) in this milestone page.
 
-- **Stage 2 — Test matrix fill**: add or extend automated tests **only** for matrix holes; document which tests cover locks, cooperative yield, module boot, admin, and install layout. **Exit criterion:** matrix table complete with links/names; `ctest` green; no new product features. *Status: planned.*
+- **Stage 2 — Test matrix fill**: add or extend automated tests **only** for matrix holes (primary: daemon-attached two-console lock conflict; optional Runtime-only install); publish final matrix with `ctest` names for locks, cooperative yield, module boot, admin, and install layout. **Exit criterion:** matrix table complete with links/names; `ctest` green; no new product features. *Status: planned.*
 
-- **Stage 3 — Docs capstone**: edition naming and migration notes; tighten architecture/admin/developer cross-links; ensure known limitations (CPU starvation → M19; cold restart; local UDS) are obvious from README / daemon / console docs. Soften stale “path to 1.0” wording where M17 already shipped. **Exit criterion:** docs review against §2.3; Application and Service operator stories readable without the milestone page. *Status: planned.*
+- **Stage 3 — Docs capstone**: edition naming/migration notes; hub accuracy ([`docs/README.md`](../README.md)); surface known limitations (CPU starvation → M19; cold restart; **local UDS**); tighten architecture/admin/developer cross-links. **Exit criterion:** docs review against §2.3; Application and Service operator stories readable without the milestone page. *Status: planned.*
 
-- **Stage 4 — Repo hygiene**: `CHANGELOG` (or chosen release notes), version bump preparation, packaging recipe verification, milestone/docs hub consistency. **Exit criterion:** release notes draft ready; install recipes smoke-passed; hub prose accurate for a post-1.0 world (except final status flip). *Status: planned.*
+- **Stage 4 — Repo hygiene**: add `CHANGELOG.md` (1.0 entry draft), version bump preparation, packaging recipe verification, milestone/docs hub consistency for a post-1.0 world (except final status flip). **Exit criterion:** release notes draft ready; install recipes smoke-passed; hub prose accurate aside from M18 status flip. *Status: planned.*
 
 - **Stage 5 — Tag Version 1.0 + closes M18**: run public release checklist; set `PROJECT_VERSION` to **1.0.0**; annotated tag **`v1.0.0`**; flip this milestone, [`milestones.md`](../milestones.md), and README status. **Closes Milestone 18.** *Status: planned.*
 
