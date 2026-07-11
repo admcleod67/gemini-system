@@ -9,7 +9,7 @@ The implementation remains intentionally incremental, but the platform is now br
 filesystem-backed Pick file semantics, BASIC compiler/shell workflows, and ENGLISH/DICT query foundations. The goal is
 still to grow the system in **small, verifiable steps** (tests, clear boundaries) rather than landing a large stack at once.
 
-A phased **roadmap** (Milestone 1 onward) is summarized in **[`docs/milestones.md`](docs/milestones.md)** (hub); long-form text for each milestone lives under **[`docs/milestones/`](docs/milestones/)**. **Milestones 1–17** are implemented (through cooperative multi-session execution and Linux service integration; Milestone 16 was retired into M17 packaging). The single-session **application edition** is **`gemini-system`** (M12–M13). **Milestone 18** is the remaining path to **Version 1.0** release packaging; **Milestone 19** covers post–v1.0 CPU-bound yield. Service Edition install and **Version 1.0 known limitations** are in **[`docs/daemon.md`](docs/daemon.md)**. Release notes: **[`CHANGELOG.md`](CHANGELOG.md)**.
+A phased **roadmap** (Milestone 1 onward) is summarized in **[`docs/milestones.md`](docs/milestones.md)** (hub); long-form text for each milestone lives under **[`docs/milestones/`](docs/milestones/)**. **Milestones 1–18** are implemented; **Version 1.0.0** is the current stable release (dual Application and Service editions). **Milestone 19** covers post–v1.0 CPU-bound yield. Service Edition install and **Version 1.0 known limitations** are in **[`docs/daemon.md`](docs/daemon.md)**. Release notes: **[`CHANGELOG.md`](CHANGELOG.md)**.
 
 ## Building
 

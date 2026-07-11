@@ -18,9 +18,9 @@ Detailed scope for each milestone is in [`docs/milestones/`](milestones/) (two-d
 - [Milestone 10 — Record Locking & Multi‑User Concurrency (completed)](milestones/10-record-locking-multi-user.md)
 - [Milestone 11 — Multi‑Language Runtime Infrastructure (completed)](milestones/11-multi-language-runtime-infrastructure.md)
 
-## Path to Version 1.0 (Gemini System Service)
+## Version 1.0 (Gemini System Service)
 
-Target: a Pick-authentic, multi-session **Linux service** (UniData-style deployment), with a single-session **application edition** (`gemini-system`) on the same architecture—not a separate codebase. The application edition was delivered in Milestones 12–13; remaining path-to-1.0 work is service deployment and release packaging.
+Target delivered: a Pick-authentic, multi-session **Linux service** (UniData-style deployment), with a single-session **application edition** (`gemini-system`) on the same architecture—not a separate codebase. Application edition: Milestones 12–13; service path: 13–17; Version **1.0.0** release: Milestone 18. Post–v1.0 work continues at Milestone 19.
 
 - [Milestone 12 — Session Model Foundation (completed)](milestones/12-session-model-foundation.md)
 - [Milestone 13 — Service Daemon Architecture (completed)](milestones/13-service-daemon-architecture.md)
@@ -28,7 +28,7 @@ Target: a Pick-authentic, multi-session **Linux service** (UniData-style deploym
 - [Milestone 15 — Cooperative Multi-Session Execution (completed)](milestones/15-cooperative-multi-session-execution.md)
 - [Milestone 16 — Standalone Edition / Application Mode (superseded)](milestones/16-standalone-edition-application-mode.md)
 - [Milestone 17 — Service Integration & Deployment (completed)](milestones/17-service-integration-deployment.md)
-- [Milestone 18 — Version 1.0 Release: Gemini System Service (planned)](milestones/18-version-1-gemini-system-service.md)
+- [Milestone 18 — Version 1.0 Release: Gemini System Service (completed)](milestones/18-version-1-gemini-system-service.md)
 
 ## Post–Version 1.0
 

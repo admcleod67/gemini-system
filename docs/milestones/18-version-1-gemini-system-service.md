@@ -2,7 +2,7 @@
 
 ## Milestone 18 — Version 1.0 Release: Gemini System Service
 
-Deliver the first stable **Version 1.0** Gemini System: a Pick-authentic, multi-session **service edition** and a matching **application edition**, both on the same architecture. Ship reliable daemon-based multi-session operation, integrated language libraries (Tcl, BASIC, PROC, assembler shell), multi-attribute Pick filesystem semantics, and complete **architecture**, **admin**, and **developer** documentation. Define and meet public **release criteria** for the repository and deliverables. *Status: planned.*
+Deliver the first stable **Version 1.0** Gemini System: a Pick-authentic, multi-session **service edition** and a matching **application edition**, both on the same architecture. Ship reliable daemon-based multi-session operation, integrated language libraries (Tcl, BASIC, PROC, assembler shell), multi-attribute Pick filesystem semantics, and complete **architecture**, **admin**, and **developer** documentation. Define and meet public **release criteria** for the repository and deliverables. *Status: implemented.*
 
 [**Milestone 17**](17-service-integration-deployment.md) closed Linux service integration (config, journald, systemd, admin Tcl, install components). M18 is the **stabilization and documentation capstone** that declares Version 1.0 — not a bucket for new architecture. Avoid sneaking in telnet, SQL, distributed sessions, transaction semantics, or CPU-bound fairness; those belong in post-1.0 milestones ([**Milestone 19**](19-execution-fairness-cpu-bound-yield.md) and later).
 
@@ -59,11 +59,7 @@ Prefer documenting which existing `ctest` cases map to each row; add tests **onl
 | Daemon config / unit shape | `loadDaemonConfigFile…` / `resolveDaemonConfig…`; `systemd gemini.service unit…`; `packaging daemon.conf…` | **OK**; live `systemctl` = manual §9 |
 | Manual smoke | [`daemon.md`](../daemon.md) M17 checklists (`gemini-system`, systemd, Application packaging) | **OK** — reuse for public checklist Stage 5 |
 
-**Remaining gaps** (Stage 5):
-
-| Gap | Owner stage |
-|-----|-------------|
-| `PROJECT_VERSION` → `1.0.0`; CHANGELOG `[Unreleased]` → `[1.0.0]`; annotated tag **`v1.0.0`**; milestone hub / README status flips | **Stage 5** |
+**Remaining gaps:** none — Stage 5 closed Version 1.0.
 
 Runtime-only install assertion: **deferred** (not required for 1.0; Application/Service install cases cover the matrix row).
 
@@ -80,7 +76,7 @@ Edition naming and residual operator-doc work parked from [M16](16-standalone-ed
 
 #### 2.4 Repository hygiene and release packaging
 
-- Align **`PROJECT_VERSION`** / annotated git tag with the public **1.0** identity (today: `0.18.0` in root [`CMakeLists.txt`](../../CMakeLists.txt); bump to `1.0.0` at Stage 5)
+- Align **`PROJECT_VERSION`** / annotated git tag with the public **1.0** identity (`1.0.0` / **`v1.0.0`** at Stage 5)
 - Milestone hub / README: M18 **implemented**; path-to-1.0 closed; M19 marked post–v1.0
 - Confirm M17 CMake install components remain the packaging story (CPack deferred — see §8)
 - **Public release checklist** (Stage 5) that an outsider can run: build, `ctest`, Application smoke, Service install smoke, systemd checklist on Linux
@@ -161,8 +157,8 @@ Session lifecycle, IPC v1, and cooperative I/O yield remain as documented after 
 
 | Topic | Choice (Stage 1) |
 |-------|------------------|
-| Public version tag | **`v1.0.0`** — set CMake `PROJECT_VERSION` to `1.0.0` and annotate the tag at Stage 5; leave **`0.18.0`** until then |
-| Changelog | Add **`CHANGELOG.md`** at Stage 4 with a 1.0 entry; keep annotated git tags |
+| Public version tag | **`v1.0.0`** — set CMake `PROJECT_VERSION` to `1.0.0` and annotate the tag at Stage 5 |
+| Changelog | [`CHANGELOG.md`](../../CHANGELOG.md) with **`[1.0.0]`** entry; keep annotated git tags |
 | System title string | **Keep** `"Gemini System Developer Edition"` in [`version.hpp`](../../include/pick_system/version.hpp) for v1.0 |
 | CPack / `.deb` / `.rpm` | **Defer** post-1.0 — M17 `cmake --install` components are the packaging story |
 | Docs structure | **Expand existing** [`daemon.md`](../daemon.md) / [`console.md`](../console.md) / README — no parallel admin-guide tree |
@@ -211,8 +207,8 @@ M18 is sequenced as **audit → fill gaps → docs → hygiene → release**. Ea
 
 - **Stage 4 — Repo hygiene**: add `CHANGELOG.md` (1.0 entry draft), version bump preparation, packaging recipe verification, milestone/docs hub consistency for a post-1.0 world (except final status flip). **Exit criterion:** release notes draft ready; install recipes smoke-passed; hub prose accurate aside from M18 status flip. *Status: implemented.* Ships [`CHANGELOG.md`](../../CHANGELOG.md) (`Unreleased` 1.0 draft + `0.17.0`); public release checklist in §9; README/docs hub links; Application and Service `cmake --install` smoke to `/tmp/gemini-*-m18` passed (`PROJECT_VERSION` still `0.18.0`).
 
-- **Stage 5 — Tag Version 1.0 + closes M18**: run public release checklist; set `PROJECT_VERSION` to **1.0.0**; annotated tag **`v1.0.0`**; flip this milestone, [`milestones.md`](../milestones.md), and README status. **Closes Milestone 18.** *Status: planned.*
+- **Stage 5 — Tag Version 1.0 + closes M18**: run public release checklist; set `PROJECT_VERSION` to **1.0.0**; annotated tag **`v1.0.0`**; flip this milestone, [`milestones.md`](../milestones.md), and README status. **Closes Milestone 18.** *Status: implemented.* Ships `PROJECT_VERSION` **1.0.0**, [`CHANGELOG.md`](../../CHANGELOG.md) `[1.0.0] - 2026-07-11`, annotated tag **`v1.0.0`**, hub/README status flips; public checklist executed (`ctest`, Application/Service install smoke, `smoke` target); Linux systemd remains the operator checklist (not CI).
 
 Only Stage 5's exit criteria should claim "Closes Milestone 18".
 
-*Status: planned.*
+*Status: implemented.*

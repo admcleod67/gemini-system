@@ -3,11 +3,9 @@
 All notable releases of Gemini System are documented here.
 Older `v0.x` annotated tags (before 0.17.0) remain in git history.
 
-## [Unreleased]
+## [1.0.0] - 2026-07-11
 
-### Version 1.0.0 (pending)
-
-Draft notes for the first stable **Version 1.0** release ([Milestone 18](docs/milestones/18-version-1-gemini-system-service.md)). Rename this section to `[1.0.0] - <date>` when tagging.
+First stable **Version 1.0** release ([Milestone 18](docs/milestones/18-version-1-gemini-system-service.md)).
 
 - **Dual editions** on one architecture: **Application** (`gemini-system`) and **Service** (`gemini-daemon` + `gemini-console`)
 - Multi-session **record locks**, cooperative **I/O yield** scheduling, language-module boot
