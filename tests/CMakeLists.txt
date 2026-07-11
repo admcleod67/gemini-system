@@ -22,6 +22,7 @@ add_executable(
         core/test_GeminiDaemon.cpp
         core/test_DaemonConfig.cpp
         core/test_DaemonLifecycle.cpp
+        core/test_SystemdPackaging.cpp
         core/test_DaemonIpc.cpp
         core/test_DaemonIpcSession.cpp
         core/test_SessionIoBridge.cpp
@@ -72,6 +73,8 @@ target_compile_definitions(
         pick-tests
         PRIVATE "PICK_SYSTEM_VERSION=\"${PROJECT_VERSION}\""
                 "PICK_SYSTEM_GEMINI_SYSPROG_FIXTURE=\"${CMAKE_SOURCE_DIR}/gemini/accounts/SYSPROG\""
+                "PICK_SYSTEM_GEMINI_SERVICE_UNIT=\"${CMAKE_BINARY_DIR}/packaging/systemd/gemini.service\""
+                "PICK_SYSTEM_GEMINI_DAEMON_CONF=\"${CMAKE_SOURCE_DIR}/packaging/gemini/daemon.conf\""
                 "GEMINI_STUB_MODULE_PATH=\"$<TARGET_FILE:gemini-module-stub>\""
                 "GEMINI_BASIC_MODULE_PATH=\"$<TARGET_FILE:gemini-module-basic>\""
                 "GEMINI_PASCAL_MODULE_PATH=\"$<TARGET_FILE:gemini-module-pascal>\""

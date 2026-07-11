@@ -20,6 +20,14 @@ The console does **not** interpret Tcl or run login logic locally. Catalogue log
 - **Catalogue and pick roots** configured on the **daemon** (`--catalog-root`, `--pick-root`, or `GEMINI_CATALOG_ROOT` / `GEMINI_FILESYSTEM_ROOT`) — not on the console
 - Unix domain IPC (not available on Windows; [`Main.cpp`](../src/console/Main.cpp) exits with an error there)
 
+When the daemon is managed by **systemd** (`gemini.service`), the default socket is **`/run/gemini/gemini.sock`**. Attach with:
+
+```bash
+gemini-console --socket /run/gemini/gemini.sock
+```
+
+(or set `GEMINI_DAEMON_SOCKET` to match the installed [`daemon.conf`](../packaging/gemini/daemon.conf)). See [Service daemon — systemd](daemon.md#systemd-geminiservice).
+
 Socket file permissions are **0600** — only the socket owner may connect. This gates **who may attach**, not **which Pick account** is logged in; account identity comes from catalogue login over the session bridge.
 
 ## CLI reference

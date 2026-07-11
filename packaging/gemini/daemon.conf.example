@@ -1,12 +1,16 @@
 # Example gemini-daemon config (key=value).
 # Precedence: CLI > environment > this file > defaults.
-# Load with: gemini-daemon --config /path/to/daemon.conf
-# Or set GEMINI_DAEMON_CONFIG to this file's path.
 #
-# Recommended service path (auto-load deferred to later stages): /etc/gemini/daemon.conf
+# Service install (Milestone 17 Stage 3):
+#   /etc/gemini/daemon.conf  — installed default used by gemini.service
+#   gemini-daemon --config /etc/gemini/daemon.conf
+#   systemctl enable --now gemini
+#
+# Load manually with: gemini-daemon --config /path/to/daemon.conf
+# Or set GEMINI_DAEMON_CONFIG to this file's path.
 # User installs may use $XDG_CONFIG_HOME/gemini/daemon.conf
 #
-# socket=/var/run/gemini/gemini.sock
+# socket=/run/gemini/gemini.sock
 # max_sessions=64
 # pick_root=/var/lib/gemini/accounts
 # catalog_root=/var/lib/gemini/catalog

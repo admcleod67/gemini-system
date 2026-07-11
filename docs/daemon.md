@@ -150,7 +150,7 @@ This is intentional M15 scope. Post–v1.0 improvement: opcode-budget yield and 
 | **Config file** | Loaded only when `--config PATH` is given or `GEMINI_DAEMON_CONFIG` is set (`--config` wins for which file). Format: `key=value` lines; `#` comments; keys `socket`, `max_sessions`, `pick_root`, `catalog_root`, `modules_root`. See [`packaging/gemini/daemon.conf.example`](../packaging/gemini/daemon.conf.example). |
 | **Defaults** | Host paths from [`resolveDefaultHostPaths`](../src/core/host/HostBootstrap.cpp); socket `$XDG_RUNTIME_DIR/gemini.sock` or `/tmp/gemini.sock`; `maxSessions = 64` |
 
-Recommended install paths for later stages (not auto-loaded yet): `/etc/gemini/daemon.conf` for the service edition; `$XDG_CONFIG_HOME/gemini/daemon.conf` for user installs. Stage 3 systemd will pass `--config` explicitly.
+Recommended install path for the service edition: **`/etc/gemini/daemon.conf`** (or `${CMAKE_INSTALL_SYSCONFDIR}/gemini/daemon.conf` under a custom prefix). The **`gemini.service`** unit passes `--config` to that file. User installs may use `$XDG_CONFIG_HOME/gemini/daemon.conf` with a manual `GEMINI_DAEMON_CONFIG` or `--config`.
 
 Invalid config (missing file, unknown key, malformed line, bad `max_sessions`) causes `gemini-daemon` to print an error and exit with status `1`.
 
@@ -174,7 +174,7 @@ Shutdown may also be triggered by an IPC **ShutdownRequest** or by destroying th
 
 ## Logging / journald
 
-Daemon process logs go to **stdout** / **stderr** (not a separate log file). For systemd (Milestone 17 Stage 3 unit), use:
+Daemon process logs go to **stdout** / **stderr** (not a separate log file). The installed **`gemini.service`** unit sets:
 
 - `StandardOutput=journal`
 - `StandardError=journal`
@@ -189,9 +189,46 @@ Typical boot sequence on stdout:
 4. `SYSTEM READY` (blank line follows; stream is flushed)
 5. `IPC LISTENING: <socket path>` (flushed)
 
-Operator errors (e.g. bad `--config`) go to stderr.
+Operator errors (e.g. bad `--config`) go to stderr. Follow the unit with `journalctl -u gemini -f`.
 
-**Still pending (Stage 3):** systemd unit file and install rules.
+## systemd (`gemini.service`)
+
+Milestone 17 Stage 3 ships an installable unit and default config:
+
+| Artifact | Install location (prefix-dependent) |
+|----------|-------------------------------------|
+| Unit | `${CMAKE_INSTALL_LIBDIR}/systemd/system/gemini.service` (e.g. `/usr/local/lib/systemd/system/gemini.service`) |
+| Config | `${CMAKE_INSTALL_SYSCONFDIR}/gemini/daemon.conf` (e.g. `/usr/local/etc/gemini/daemon.conf` or `/etc/gemini/daemon.conf`) |
+| Binary | `${CMAKE_INSTALL_BINDIR}/gemini-daemon` |
+
+Default config uses **`socket=/run/gemini/gemini.sock`**. The unit sets `RuntimeDirectory=gemini` so `/run/gemini` exists at start. Socket mode remains **0600**.
+
+`ExecStart` runs `gemini-daemon --config …/gemini/daemon.conf`. Stop uses **SIGTERM** (graceful teardown). `Type=simple` — no readiness notification yet. No dedicated service user in Stage 3 (runs as root when installed system-wide); operators may add `User=` / data dirs later.
+
+Set **`pick_root`**, **`catalog_root`**, and **`modules_root`** in the installed conf for a useful multi-user system (defaults leave them commented).
+
+### Operator steps
+
+```bash
+cmake --install <build-dir>   # or package install
+sudo systemctl daemon-reload
+sudo systemctl enable --now gemini
+journalctl -u gemini -f       # boot banner + IPC LISTENING
+gemini-console --socket /run/gemini/gemini.sock
+sudo systemctl stop gemini
+sudo systemctl restart gemini
+```
+
+### Manual smoke checklist
+
+1. Install binaries, unit, and conf to a prefix systemd can see (or copy the unit into `/etc/systemd/system/`)
+2. Edit conf with catalogue / pick / modules roots as needed
+3. `systemctl daemon-reload && systemctl start gemini`
+4. Journal shows cold-start lines and `IPC LISTENING: /run/gemini/gemini.sock`
+5. Attach `gemini-console --socket /run/gemini/gemini.sock` → login / `WHO`
+6. `systemctl stop gemini` → clean exit; socket removed with runtime dir teardown
+
+**Not in Stage 3:** socket activation (`gemini.socket`), `Type=notify`, dedicated `User=gemini`.
 
 ## IPC protocol v1
 

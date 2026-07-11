@@ -31,6 +31,7 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(nlohmann_json)
 
 add_subdirectory(src)
+add_subdirectory(packaging)
 
 if (BUILD_TESTING)
     include(CTest)

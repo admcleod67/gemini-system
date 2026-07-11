@@ -1,0 +1,15 @@
+[Unit]
+Description=Gemini System Service Daemon
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=@CMAKE_INSTALL_FULL_BINDIR@/gemini-daemon --config @CMAKE_INSTALL_FULL_SYSCONFDIR@/gemini/daemon.conf
+Restart=on-failure
+RuntimeDirectory=gemini
+RuntimeDirectoryMode=0755
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
