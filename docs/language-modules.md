@@ -101,8 +101,11 @@ The in-tree BASIC compiler emits **`CALL_FUNC`** using these IDs; see [`bytecode
 
 Stub modules (**`gemini-module-pascal`**, **`-comal`**, **`-cobol`**) register metadata only and reserve namespace IDs for future compilers. They appear in **`SYSTEM LANGUAGES`** with function count **`0`** until a compiler and handler table ship.
 
+**Pascal (Apollo):** console builtins (`write` / `writeln` / `read` / `readln`) are expected to become real **`CALL_FUNC`** handlers. For the [standalone VM runner (Milestone 19)](milestones/19-standalone-vm-runner.md) spike, a minimal Pascal I/O module may be implemented **in this tree** so `gemini-vm` can prove Apollo hello/count. **Steady state:** the Pascal helper module should be built and shipped with **apollo-compiler** against this ABI; Gemini remains loader + published namespace/function IDs, not the permanent home of every outside language’s builtins. See Apollo Compiler Milestone 6 (Language modules).
+
 ## See also
 
 - [`bytecode.md`](bytecode.md) — **`CALL_FUNC`** encoding and BASIC function table
 - [`schemas/language-namespaces.json`](schemas/language-namespaces.json) — machine-readable ID catalogue
 - [`milestones/11-multi-language-runtime-infrastructure.md`](milestones/11-multi-language-runtime-infrastructure.md)
+- [`milestones/19-standalone-vm-runner.md`](milestones/19-standalone-vm-runner.md) — Pick-independent runner; Pascal module ownership

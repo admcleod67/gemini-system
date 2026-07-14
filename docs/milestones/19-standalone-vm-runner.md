@@ -21,7 +21,7 @@ Gemini already runs a bytecode VM on desktop OSes inside Pick hosts (`gemini-sys
 
 A separate binary keeps the boundary honest. Do **not** overload Application Edition with a “bare VM” mode that still boots Pick.
 
-Sister project **apollo-compiler** Milestone 6 defines the acceptance story from the compiler side; this milestone owns the Gemini-side runner.
+Sister project **apollo-compiler** Milestone 6 defines the acceptance story from the compiler side; this milestone owns the Gemini-side runner and (for the spike only) may host a minimal Pascal I/O module — see §2.5.
 
 ---
 
@@ -37,7 +37,7 @@ Sister project **apollo-compiler** Milestone 6 defines the acceptance story from
 
 - **Console:** stdin / stdout / stderr (or equivalent stream hooks on the runtime).
 - **Filesystem:** **unbound** — do not attach Pick [`FileSystem`](../../src/core/filesystem/FileSystem.h). Existing runtime behaviour when FS is null (“filesystem backend not configured”) is acceptable for console-only programs.
-- **Language modules:** load optional shared modules (same ABI as M11) so Apollo/Pascal and BASIC `CALL_FUNC` work when present.
+- **Language modules:** load optional shared modules (same ABI as [M11](11-multi-language-runtime-infrastructure.md) / [`language-modules.md`](../language-modules.md)) so Apollo/Pascal and BASIC **`CALL_FUNC`** work when present. See §2.5 for Pascal ownership.
 
 #### 2.3 Hard non-Pick boundary
 
@@ -52,8 +52,21 @@ The runner **must not** include or require:
 #### 2.4 Review + spike approach
 
 1. **Review** — document Pick vs portable boundaries in the current VM and plugin model.
-2. **Spike** — run an Apollo-emitted console-only program (e.g. `hello.pas` / `count.pas` → `.tbc`) on `gemini-vm`.
+2. **Spike** — run an Apollo-emitted console-only program (e.g. `hello.pas` / `count.pas` → `.tbc`) on `gemini-vm`, with a Pascal I/O module whose namespace/function IDs match Apollo codegen.
 3. **Harden** — CMake target, tests, docs; keep Pick hosts untouched.
+
+#### 2.5 Pascal language module ownership
+
+Apollo’s v1 builtins are console only (`write` / `writeln` / `read` / `readln`). Codegen (Apollo Milestone 5) must emit **`CALL_FUNC`** against Gemini’s published module ABI ([`bytecode.md`](../bytecode.md), [`language-modules.md`](../language-modules.md)) — not Pick-specific opcodes. User `procedure` / `function` bodies remain ordinary `.tbc` code, not module entry points.
+
+| Horizon | Where the Pascal I/O module lives |
+|---------|-----------------------------------|
+| **M19 spike** | Acceptable to implement a minimal Pascal console module **in this repo** (extend stub [`gemini-module-pascal`](../../modules/) or equivalent) so `gemini-vm` + Apollo hello/count can prove the path without waiting on Apollo packaging |
+| **Steady state** | Build and ship the Pascal helper module with **apollo-compiler** against Gemini’s published ABI; install into the runner’s / Pick host’s modules path. Gemini remains **ABI + loader**, not the long-term catalogue of every outside language’s implementations |
+
+Rationale (aligned with Apollo Milestone 6): keeping every front-end’s builtins forever inside gemini-system couples releases. Drop-in modules keep Pick/Gemini from needing each language at **build** time — only at **deploy** time (module on disk + matching IDs in bytecode).
+
+If the spike lands here, schedule a follow-on to move ownership to Apollo (documented in Apollo M6 follow-on). Namespace/function IDs used by Apollo emission and the loaded module **must match**.
 
 ---
 
@@ -62,6 +75,7 @@ The runner **must not** include or require:
 - Mercury / third-repo split of the VM (revisit only if packaging pain demands it)
 - Rewriting the VM from scratch
 - Pascal or Pick **file I/O** as a requirement for the first proof
+- Owning Pascal builtins in gemini-system **permanently** (spike only; see §2.5)
 - CPU-bound multi-session fairness ([**Milestone 21**](21-execution-fairness-cpu-bound-yield.md))
 - R83 compatibility gap closure ([compatibility notes](../compatibility-r83-pick.md); planned after this milestone)
 - Changing Application/Service edition semantics
@@ -72,7 +86,7 @@ The runner **must not** include or require:
 
 - **`gemini-system` / daemon / console:** no intentional behaviour change; regression barred by full test suite.
 - **Runtime:** nullable filesystem and language-registry freeze remain the extension points; Pick hosts keep binding FS and session I/O as today.
-- **Apollo:** success when an Apollo-compiled console-only Pascal program runs on `gemini-vm`; Apollo does not reimplement a VM.
+- **Apollo:** success when an Apollo-compiled console-only Pascal program runs on `gemini-vm` with a matching Pascal I/O module loaded; Apollo does not reimplement a VM.
 
 ---
 
@@ -82,8 +96,9 @@ The runner **must not** include or require:
 |------------|------|
 | [M11](11-multi-language-runtime-infrastructure.md) | Language module ABI / loader |
 | VM + `.tbc` | [`docs/vm.md`](../vm.md), [`Runtime`](../../src/core/vm/Runtime.h) |
+| Module ABI docs | [`language-modules.md`](../language-modules.md), [`bytecode.md`](../bytecode.md) |
 | [M18](18-version-1-gemini-system-service.md) | v1.0 baseline; editions remain Pick hosts |
-| Apollo Compiler M6 | Acceptance program + emit path |
+| Apollo Compiler M5 / M6 | `.tbc` emission + acceptance program; Pascal module ownership policy |
 
 ---
 
@@ -93,8 +108,9 @@ The runner **must not** include or require:
 |------|----------|
 | Binary | `gemini-vm` (name finalized in implementation) under `src/` + CMake |
 | Review note | Short section in this milestone or `docs/vm.md`: Pick vs portable boundaries |
+| Pascal I/O (spike) | Minimal console handlers + published IDs (in-tree or Apollo-supplied module) |
 | Tests | Load+run `.tbc` fixture; console I/O smoke; optional Apollo-emitted artifact in CI or documented manual step |
-| Docs | Runner usage in `docs/vm.md` and/or README; Apollo docs cross-link once available |
+| Docs | Runner usage in `docs/vm.md` and/or README; cross-link Apollo M6 |
 
 ---
 
@@ -102,6 +118,7 @@ The runner **must not** include or require:
 
 - [ ] Review recorded: Pick vs portable boundaries for the current VM
 - [ ] **`gemini-vm`** (or chosen name) builds and runs a `.tbc` with console I/O only, **no** catalogue/Tcl/session table/Pick FS
+- [ ] Pascal I/O module available (Gemini spike **or** Apollo-built) with namespace/function IDs matching Apollo Milestone 5 emission
 - [ ] An Apollo-compiled console-only Pascal program runs on that target (automated or documented manual smoke)
 - [ ] Full existing `ctest` green; Application Edition smoke unchanged
 - [ ] Operator/developer docs describe how to invoke the standalone runner
@@ -111,15 +128,16 @@ The runner **must not** include or require:
 
 ### 8. Suggested implementation stages
 
-1. **Review** — inventory Pick coupling in VM entry paths; write boundary notes. *Status: planned.*
+1. **Review** — inventory Pick coupling in VM entry paths; write boundary notes; confirm Pascal namespace ID reservation. *Status: planned.*
 2. **Spike runner** — minimal executable: parse `.tbc`, run with stdout, FS unset; fixture test. *Status: planned.*
-3. **Modules + Apollo proof** — optional module load; run Apollo-emitted console program. *Status: planned.*
-4. **Docs + closes M19** — vm/README notes; hub status; full suite green. **Closes Milestone 19.** *Status: planned.*
+3. **Modules + Apollo proof** — Pascal console module (spike in-tree acceptable); load modules; run Apollo-emitted console program. *Status: planned.*
+4. **Docs + closes M19** — vm/README notes; ownership handoff noted if spike stayed in-tree; hub status; full suite green. **Closes Milestone 19.** *Status: planned.*
 
 ---
 
 ### 9. Follow-on (beyond M19)
 
+- Move Pascal I/O module ownership to **apollo-compiler** if the M19 spike lived in gemini-system (steady-state drop-in module)
 - Optional host filesystem façade (non-Pick) for BASIC/Pascal file I/O
 - R83 compatibility gap work (within reason) — see [`compatibility-r83-pick.md`](../compatibility-r83-pick.md)
 - CPU-bound cooperative yield — [**Milestone 21**](21-execution-fairness-cpu-bound-yield.md)
