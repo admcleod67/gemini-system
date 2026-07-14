@@ -1,10 +1,10 @@
 ← [Project milestones index](../milestones.md)
 
-## Milestone 19 — Execution Fairness: CPU-Bound Cooperative Yield
+## Milestone 21 — Execution Fairness: CPU-Bound Cooperative Yield
 
-Extend [**Milestone 15**](15-cooperative-multi-session-execution.md) cooperative scheduling so sessions blocked in **CPU-bound** interpreter work (not only at I/O waits) periodically release the execution token. Preserve the single-interpreter-stack invariant: still no preemptive threading or parallel VM stacks. *Status: planned (post–Version 1.0).*
+Extend [**Milestone 15**](15-cooperative-multi-session-execution.md) cooperative scheduling so sessions blocked in **CPU-bound** interpreter work (not only at I/O waits) periodically release the execution token. Preserve the single-interpreter-stack invariant: still no preemptive threading or parallel VM stacks. *Status: planned (deferred; after standalone VM and R83-compat work).*
 
-Depends on [**Milestone 18**](18-version-1-gemini-system-service.md) (Version 1.0 release). Do not start before v1.0 is tagged — M18 is a stabilization capstone; this milestone introduces new scheduler/VM behaviour.
+Formerly numbered Milestone 19. Renumbered so [**Milestone 19**](19-standalone-vm-runner.md) (standalone VM runner) and R83 compatibility gap closure can precede fairness. Depends on [**Milestone 18**](18-version-1-gemini-system-service.md) (Version 1.0). Do not start while higher-priority post–v1.0 milestones remain open.
 
 ---
 
@@ -16,7 +16,7 @@ M15 yields at **I/O boundaries** only (login reads, `TCL>` line input, BASIC `IN
 
 Round-robin in [`CooperativeSessionRunner`](../../src/core/daemon/CooperativeSessionRunner.cpp) applies only among sessions that have **yielded** and are `Runnable`. A session inside [`Shell::runBasicUntilStop`](../../src/userland/tcl/Shell.cpp) never yields, so others starve.
 
-This is **documented M15 non-goal behaviour**, not a regression. Version 1.0 ships with I/O responsiveness at prompts; CPU fairness under load is post-1.0.
+This is **documented M15 non-goal behaviour**, not a regression. Version 1.0 ships with I/O responsiveness at prompts; CPU fairness under load remains a later post-1.0 item.
 
 ---
 
@@ -24,13 +24,13 @@ This is **documented M15 non-goal behaviour**, not a regression. Version 1.0 shi
 
 Operators expect multi-session **responsiveness** not only at idle prompts but also when another terminal runs a runaway or long batch job — within Pick-authentic constraints (one interpreter stack, cooperative model).
 
-M19 adds **voluntary yield inside long-running VM work** so other sessions can acquire the token and make progress, without OS time slices or pthread-per-session execution.
+M21 adds **voluntary yield inside long-running VM work** so other sessions can acquire the token and make progress, without OS time slices or pthread-per-session execution.
 
 ---
 
 ### 3. Scope
 
-#### 3.1 Opcode-budget yield (v1 of M19)
+#### 3.1 Opcode-budget yield (v1 of M21)
 
 - In [`Shell::runBasicUntilStop`](../../src/userland/tcl/Shell.cpp) and/or [`VmDebugService::stepRuntime`](../../src/userland/assembler/VmDebugService.cpp), after every **N** VM steps (configurable constant or daemon setting):
   - `release` execution token (or equivalent yield API on [`GeminiSessionHost`](../../src/userland/tcl/GeminiSessionHost.h))
@@ -95,10 +95,10 @@ M19 adds **voluntary yield inside long-running VM work** so other sessions can a
 
 ### 7. Suggested implementation stages
 
-1. **Opcode-budget yield** — constant N in `runBasicUntilStop`; two-session unit + integration test. **Minimum viable M19.**
+1. **Opcode-budget yield** — constant N in `runBasicUntilStop`; two-session unit + integration test. **Minimum viable M21.**
 2. **BREAK / interrupt** — same-session cancel; document Ctrl-C policy.
 3. **Output backpressure yield** — if IPC output stall reproduces starvation with `PRINT`-heavy loops.
-4. **Docs + closes M19** — daemon/console operator notes; full test suite green.
+4. **Docs + closes M21** — daemon/console operator notes; full test suite green.
 
 ---
 

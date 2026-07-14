@@ -22,7 +22,7 @@ Operators expected:
 1. **`systemctl start gemini`** — daemon managed by systemd
 2. Boot and runtime lines in **journald**
 3. A **config file** (with CLI/env override) for socket, session caps, catalogue/pick roots
-4. Admin visibility and control over attached sessions (especially runaway CPU-bound programs until [**Milestone 19**](19-execution-fairness-cpu-bound-yield.md))
+4. Admin visibility and control over attached sessions (especially runaway CPU-bound programs until [**Milestone 21**](21-execution-fairness-cpu-bound-yield.md))
 5. A Pick-authentic **`SHUTDOWN`** verb that stops the whole system/daemon from a privileged Tcl session (not merely **`LOGOFF`** / **`QUIT`**)
 6. Clear **Service Edition** vs **Application Edition** install stories (residual from retired [**Milestone 16**](16-standalone-edition-application-mode.md))
 
@@ -168,7 +168,7 @@ Milestone 17 does **not** introduce:
 
 - Remote access beyond local Unix domain sockets (SSH/telnet — post-1.0)
 - Session restore / persistence across cold daemon restart
-- CPU-bound opcode-budget yield or operator **BREAK** ([**Milestone 19**](19-execution-fairness-cpu-bound-yield.md))
+- CPU-bound opcode-budget yield or operator **BREAK** ([**Milestone 21**](21-execution-fairness-cpu-bound-yield.md))
 - Preemptive threading or changes to cooperative I/O yield (M15)
 - Hot-reload of language modules without daemon restart
 - Full privilege / RBAC system beyond a minimal admin gate for kill/list/shutdown

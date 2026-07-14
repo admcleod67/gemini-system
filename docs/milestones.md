@@ -20,7 +20,7 @@ Detailed scope for each milestone is in [`docs/milestones/`](milestones/) (two-d
 
 ## Version 1.0 (Gemini System Service)
 
-Target delivered: a Pick-authentic, multi-session **Linux service** (UniData-style deployment), with a single-session **application edition** (`gemini-system`) on the same architecture—not a separate codebase. Application edition: Milestones 12–13; service path: 13–17; Version **1.0.0** release: Milestone 18. Post–v1.0 work continues at Milestone 19.
+Target delivered: a Pick-authentic, multi-session **Linux service** (UniData-style deployment), with a single-session **application edition** (`gemini-system`) on the same architecture—not a separate codebase. Application edition: Milestones 12–13; service path: 13–17; Version **1.0.0** release: Milestone 18.
 
 - [Milestone 12 — Session Model Foundation (completed)](milestones/12-session-model-foundation.md)
 - [Milestone 13 — Service Daemon Architecture (completed)](milestones/13-service-daemon-architecture.md)
@@ -32,4 +32,6 @@ Target delivered: a Pick-authentic, multi-session **Linux service** (UniData-sty
 
 ## Post–Version 1.0
 
-- [Milestone 19 — Execution Fairness: CPU-Bound Cooperative Yield (planned)](milestones/19-execution-fairness-cpu-bound-yield.md)
+- [Milestone 19 — Standalone VM Runner (planned)](milestones/19-standalone-vm-runner.md) — Pick-independent `gemini-vm` (working name); unblocks Apollo Compiler M6
+- **Milestone 20 — R83 compatibility gaps (planned)** — within reason; track candidates in [`compatibility-r83-pick.md`](compatibility-r83-pick.md) (detail page TBD)
+- [Milestone 21 — Execution Fairness: CPU-Bound Cooperative Yield (planned, deferred)](milestones/21-execution-fairness-cpu-bound-yield.md) — after M19 and R83-compat work; formerly numbered M19

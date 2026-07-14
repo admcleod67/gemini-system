@@ -169,7 +169,7 @@ Cooperative scheduling switches only at these boundaries (M15):
 
 ### Known limitations (Version 1.0)
 
-- **CPU-bound starvation:** a session running **CPU-bound** BASIC (or other VM work without `INPUT`) holds the execution token until the run finishes. Other consoles stay blocked at prompts — round-robin does not apply because the busy session never yields. Example: nested `FOR` loops with `GOSUB` and no input (~billions of VM steps). Intentional M15 scope. Post–v1.0: opcode-budget yield and operator **BREAK** in [**Milestone 19**](milestones/19-execution-fairness-cpu-bound-yield.md). Until then, admins may use **`KILLSESSION`** (M17) to terminate a runaway session.
+- **CPU-bound starvation:** a session running **CPU-bound** BASIC (or other VM work without `INPUT`) holds the execution token until the run finishes. Other consoles stay blocked at prompts — round-robin does not apply because the busy session never yields. Example: nested `FOR` loops with `GOSUB` and no input (~billions of VM steps). Intentional M15 scope. Later post–v1.0: opcode-budget yield and operator **BREAK** in [**Milestone 21**](milestones/21-execution-fairness-cpu-bound-yield.md). Until then, admins may use **`KILLSESSION`** (M17) to terminate a runaway session.
 - **Cold restart = fresh sessions:** after daemon stop/restart or Tcl **`SHUTDOWN`**, in-flight REPL / VM / login state is **not** restored — see [Cold restart = fresh sessions](#cold-restart--fresh-sessions).
 - **Local Unix domain sockets only:** Service Edition attach uses a local **`AF_UNIX`** socket. Remote access (SSH/telnet front-ends, networked IPC) is out of scope for Version 1.0.
 
