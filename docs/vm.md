@@ -102,6 +102,42 @@ Jump targets must refer to defined labels and resolve to valid instruction indic
 - Runtime keeps a per-loaded-program variable map for `STORE_VAR`/`LOAD_VAR`, a **call stack** for `CALL`/`RETURN`, a **for-stack** for `FOR_SETUP`/`FOR_NEXT`, and an **arrays map** for `DIM_ARRAY`/`LOAD_ARR`/`STORE_ARR`; loading a new program resets all four.
 - When no metadata is supplied (or metadata is shorter than the program), missing entries are treated as source line **`0`** (sentinel for "no source line").
 
+## Standalone runner boundary
+
+[Milestone 19](milestones/19-standalone-vm-runner.md) adds a Pick-independent host executable (**`gemini-vm`**, Stage 2+) that runs `.tbc` files without catalogue, Tcl, session table, or Pick filesystem. The portable VM core already exists in **`gemini-core`**; Pick hosts wrap it with session and filesystem services. This section records the boundary for implementers. It is **descriptive only** — Stage 1 does not change **`gemini-system`**, **`gemini-daemon`**, or **`gemini-console`** behaviour.
+
+### VM entry paths today
+
+| Entry path | Primary files | Pick coupling |
+|------------|---------------|---------------|
+| Application cold start | [`Main.cpp`](../src/Main.cpp), [`BootMonitor.cpp`](../src/core/boot/BootMonitor.cpp) | Catalogue, `ACCOUNTS.json`, module path under catalogue root |
+| Daemon multi-session | [`daemon/Main.cpp`](../src/daemon/Main.cpp), [`GeminiServiceDaemon`](../src/core/daemon/GeminiServiceDaemon.h) | Same + IPC, [`SessionTable`](../src/userland/tcl/SessionTable.h) |
+| Tcl `RUN` | [`Shell::cmdRun`](../src/userland/tcl/Shell.cpp) | VOC resolver, Pick FS `_OBJ` records, [`SystemVarReaderScope`](../src/userland/tcl/Shell.cpp), CHAIN re-resolution |
+| BASIC compile-and-run | [`Shell::executeCompiledBasicProgram`](../src/userland/tcl/Shell.cpp) | Session I/O streams, system variables, SIGINT → `interrupt()` |
+| Assembler debugger loop | [`GeminiSession::executeVmLoop`](../src/userland/tcl/GeminiSession.cpp) | Breakpoints, session-scoped runtime |
+| Direct API (tests) | [`test_Runtime.cpp`](../tests/core/test_Runtime.cpp), [`test_CallFunc.cpp`](../tests/core/test_CallFunc.cpp) | None — model for Stage 2 |
+
+**Session-owned Pick surface:** [`GeminiSession`](../src/userland/tcl/GeminiSession.h) owns `PickVM::Runtime`, `PickFS::FileSystem`, `VocResolver`, and `Shell`. [`SessionTable`](../src/userland/tcl/SessionTable.cpp) wires `runtime().setLanguageRegistry()` from the daemon. FS opcodes throw `"filesystem backend not configured"` when `fileSystem_` is null. Lock opcodes (`READ_REC_U`, etc.) depend on session lock context.
+
+**File loading:** [`Parser::parseFile`](../src/core/vm/Parser.cpp) opens a host path and parses `.tbc` text with no Pick coupling, but **no product command uses it today**. Tcl `RUN` loads bytecode from a Pick VOC record (`<name>_OBJ`) and rejects program names containing `.` (so `RUN mini.tbc` fails).
+
+**Library note:** `gemini-core` bundles VM, catalogue, daemon, and login code. The standalone runner links **`gemini-core`** only (not **`gemini-tcl`**); a Mercury repo split is an explicit non-goal for M19.
+
+### Portable vs Pick host
+
+| Layer | Portable (`gemini-vm`, M19 Stage 2+) | Pick host only |
+|-------|--------------------------------------|----------------|
+| Load bytecode | `Parser::parseFile(argv path)` | `RUN` via VOC + `_OBJ` record |
+| Execute | `Runtime::loadProgram` + `Runtime::run` | `executeVmLoop`, debugger, CHAIN |
+| Console I/O | `setOutputStream` / `setInputStream`; PRINT/INPUT opcodes | Session-attached streams |
+| Language modules | `loadLanguageModules` + `setLanguageRegistry` | [`BootMonitor`](../src/core/boot/BootMonitor.cpp) during cold start |
+| Filesystem | Leave `setFileSystem(nullptr)` | `GeminiSession::fileSystem`, VOC |
+| System variables | Omit `setSystemVariableReader` | `SystemVarReaderScope` (@USERNO, etc.) |
+| Locks / multi-session | Not used | Session table, cooperative runner |
+| Process UX | `argv → run → exit code` | Login, Tcl REPL, daemon IPC |
+
+Pascal console builtins use **`CALL_FUNC`** against namespace **`3`** ([`pascal_function_ids.hpp`](../include/gemini/pascal_function_ids.hpp)); see [`bytecode.md`](bytecode.md). Sister project **apollo-compiler** Milestone 6 tracks acceptance from the compiler side.
+
 ## Instruction listing
 
 `PickVM::formatInstructionLine(ip, instr, loaded?)` produces lines like:

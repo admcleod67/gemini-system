@@ -78,7 +78,7 @@ Semantic errors inside a handler (for example BASIC `LOG` domain) use language-s
 |----|------|--------|--------|
 | `1` | *(reserved)* | — | Internal unit tests only; not shipped |
 | `2` | `basic` | `gemini-module-basic` | Reference implementation; 28 functions |
-| `3` | `pascal` | `gemini-module-pascal` | Stub — metadata only |
+| `3` | `pascal` | `gemini-module-pascal` | Console IDs published; handlers in M19 Stage 3 |
 | `4` | `comal` | `gemini-module-comal` | Stub — metadata only |
 | `5` | `cobol` | `gemini-module-cobol` | Stub — metadata only |
 | `256` (`0x100`) | `stub` | `gemini-module-stub` | Integration-test stub |
@@ -125,6 +125,26 @@ Namespace constant: `Gemini::kNamespaceIdBasic` / `Gemini::Basic::*` in [`includ
 **INDEX:** source may omit the third argument; the BASIC compiler pushes a default `1` and always emits **`arg-count` 3**.
 
 See [`docs/basic-language.md`](basic-language.md) for Pick semantics of each built-in.
+
+## Pascal namespace (`3`) — function table
+
+Namespace constant: `Gemini::kNamespaceIdPascal` / `Gemini::Pascal::*` in [`include/gemini/pascal_function_ids.hpp`](../include/gemini/pascal_function_ids.hpp).
+
+Published for **Apollo Compiler Milestone 5** codegen. Handlers ship in Gemini Milestone 19 Stage 3 (spike module) or with Apollo in steady state.
+
+| ID | Name | Arity | Notes |
+|----|------|-------|-------|
+| 0 | `write` | 1 | Pop one printable value (`int`, `double`, or `string`); write to stdout **without** newline |
+| 1 | `writeln` | 1 | Pop one printable value; write to stdout and append newline |
+| 2 | `writeln` | 0 | Write newline only (bare `writeln;`) |
+| 3 | `read` | 1 | Pop **variable name** string; read from stdin and store into that variable via `Runtime*` (`hostContext`) |
+| 4 | `readln` | 1 | Pop **variable name** string; read one input line and store into that variable via `Runtime*` |
+
+**Variadic source calls:** Pascal `write(a, b, c)` and `writeln(a, b, c)` compile to **one `CALL_FUNC` per argument** (each with **`arg-count` 1**), left-to-right. This matches the registry's fixed-arity model (same pattern as BASIC `INDEX` supplying a default third argument).
+
+**`read` / `readln`:** the compiler pushes the target variable name as a string literal. The module handler casts `hostContext` to [`PickVM::Runtime`](../src/core/vm/Runtime.h), reads from the runtime input stream, and stores into the named variable (using the same type rules Apollo's semantic analyser enforces). Handlers push **`0`** as a dummy return value to satisfy the stack contract.
+
+**Example:** `writeln('Hello')` lowers to push string `"Hello"`, then `CALL_FUNC 3, 1, 1`.
 
 ## Legacy `INVOKE_BUILTIN`
 

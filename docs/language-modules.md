@@ -99,13 +99,13 @@ The in-tree BASIC compiler emits **`CALL_FUNC`** using these IDs; see [`bytecode
 
 ### Stub modules
 
-Stub modules (**`gemini-module-pascal`**, **`-comal`**, **`-cobol`**) register metadata only and reserve namespace IDs for future compilers. They appear in **`SYSTEM LANGUAGES`** with function count **`0`** until a compiler and handler table ship.
+Stub modules (**`gemini-module-pascal`**, **`-comal`**, **`-cobol`**) register metadata and reserve namespace IDs for future compilers. COMAL and COBOL appear in **`SYSTEM LANGUAGES`** with function count **`0`** until handlers ship.
 
-**Pascal (Apollo):** console builtins (`write` / `writeln` / `read` / `readln`) are expected to become real **`CALL_FUNC`** handlers. For the [standalone VM runner (Milestone 19)](milestones/19-standalone-vm-runner.md) spike, a minimal Pascal I/O module may be implemented **in this tree** so `gemini-vm` can prove Apollo hello/count. **Steady state:** the Pascal helper module should be built and shipped with **apollo-compiler** against this ABI; Gemini remains loader + published namespace/function IDs, not the permanent home of every outside language’s builtins. See Apollo Compiler Milestone 6 (Language modules).
+**Pascal (Apollo):** console function IDs are published in [`include/gemini/pascal_function_ids.hpp`](../include/gemini/pascal_function_ids.hpp) and [`bytecode.md`](bytecode.md) (namespace **`3`**: `write`, `writeln`, `read`, `readln`). The in-tree **`gemini-module-pascal`** stub registers the namespace but has **no handlers yet** (function count **`0`** at boot until M19 Stage 3). Apollo Milestone 5 codegen should emit **`CALL_FUNC`** using these IDs. For the [standalone VM runner (Milestone 19)](milestones/19-standalone-vm-runner.md) spike, a minimal Pascal I/O module may be implemented **in this tree** so `gemini-vm` can prove Apollo hello/count. **Steady state:** the Pascal helper module should be built and shipped with **apollo-compiler** against this ABI; Gemini remains loader + published namespace/function IDs, not the permanent home of every outside language’s builtins. See Apollo Compiler Milestone 6 (Language modules).
 
 ## See also
 
-- [`bytecode.md`](bytecode.md) — **`CALL_FUNC`** encoding and BASIC function table
+- [`bytecode.md`](bytecode.md) — **`CALL_FUNC`** encoding, BASIC and Pascal function tables
 - [`schemas/language-namespaces.json`](schemas/language-namespaces.json) — machine-readable ID catalogue
 - [`milestones/11-multi-language-runtime-infrastructure.md`](milestones/11-multi-language-runtime-infrastructure.md)
 - [`milestones/19-standalone-vm-runner.md`](milestones/19-standalone-vm-runner.md) — Pick-independent runner; Pascal module ownership

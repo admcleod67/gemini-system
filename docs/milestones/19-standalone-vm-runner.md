@@ -107,8 +107,8 @@ If the spike lands here, schedule a follow-on to move ownership to Apollo (docum
 | Area | Artifact |
 |------|----------|
 | Binary | `gemini-vm` (name finalized in implementation) under `src/` + CMake |
-| Review note | Short section in this milestone or `docs/vm.md`: Pick vs portable boundaries |
-| Pascal I/O (spike) | Minimal console handlers + published IDs (in-tree or Apollo-supplied module) |
+| Review note | [`docs/vm.md`](../vm.md) § Standalone runner boundary *(Stage 1)* |
+| Pascal I/O (spike) | Published IDs in [`pascal_function_ids.hpp`](../../include/gemini/pascal_function_ids.hpp) *(Stage 1)*; handlers in Stage 3 |
 | Tests | Load+run `.tbc` fixture; console I/O smoke; optional Apollo-emitted artifact in CI or documented manual step |
 | Docs | Runner usage in `docs/vm.md` and/or README; cross-link Apollo M6 |
 
@@ -116,7 +116,7 @@ If the spike lands here, schedule a follow-on to move ownership to Apollo (docum
 
 ### 7. Milestone completion criteria
 
-- [ ] Review recorded: Pick vs portable boundaries for the current VM
+- [x] Review recorded: Pick vs portable boundaries for the current VM
 - [ ] **`gemini-vm`** (or chosen name) builds and runs a `.tbc` with console I/O only, **no** catalogue/Tcl/session table/Pick FS
 - [ ] Pascal I/O module available (Gemini spike **or** Apollo-built) with namespace/function IDs matching Apollo Milestone 5 emission
 - [ ] An Apollo-compiled console-only Pascal program runs on that target (automated or documented manual smoke)
@@ -126,12 +126,45 @@ If the spike lands here, schedule a follow-on to move ownership to Apollo (docum
 
 ---
 
-### 8. Suggested implementation stages
+### 8. Delivery plan
 
-1. **Review** — inventory Pick coupling in VM entry paths; write boundary notes; confirm Pascal namespace ID reservation. *Status: planned.*
-2. **Spike runner** — minimal executable: parse `.tbc`, run with stdout, FS unset; fixture test. *Status: planned.*
-3. **Modules + Apollo proof** — Pascal console module (spike in-tree acceptable); load modules; run Apollo-emitted console program. *Status: planned.*
-4. **Docs + closes M19** — vm/README notes; ownership handoff noted if spike stayed in-tree; hub status; full suite green. **Closes Milestone 19.** *Status: planned.*
+M19 is sequenced as **review → spike runner → modules + Apollo proof → docs + close**. Each stage has an exit criterion; the full test suite must stay green. Only Stage 4 claims "Closes Milestone 19."
+
+- **Stage 1 — Review**: inventory Pick coupling in VM entry paths; write boundary notes in [`docs/vm.md`](../vm.md); publish Pascal namespace **`3`** console function IDs for Apollo M5. **Exit criterion:** boundary section committed; IDs in header + schema + [`bytecode.md`](../bytecode.md); gaps and Stage 2 sketch recorded below. *Status: implemented.* Ships [`docs/vm.md`](../vm.md) § Standalone runner boundary; [`include/gemini/pascal_function_ids.hpp`](../../include/gemini/pascal_function_ids.hpp); updated [`bytecode.md`](../bytecode.md), [`language-namespaces.json`](../schemas/language-namespaces.json), [`language-modules.md`](../language-modules.md); §8.1 findings.
+
+- **Stage 2 — Spike runner**: minimal **`gemini-vm`** executable — parse `.tbc`, run with stdout, FS unset; fixture test. *Status: planned.*
+
+- **Stage 3 — Modules + Apollo proof**: Pascal console module (spike in-tree acceptable); load modules; run Apollo-emitted console program. *Status: planned.*
+
+- **Stage 4 — Docs + closes M19**: runner usage notes; ownership handoff if spike stayed in-tree; hub status; full suite green. **Closes Milestone 19.** *Status: planned.*
+
+#### 8.1 Stage 1 findings (gaps and Stage 2 sketch)
+
+**Gaps tracked into Stages 2–3:**
+
+1. No host CLI for `.tbc` file paths — only Pick-record `RUN` and test `parseFile`.
+2. [`programs/hello.tbc`](../../programs/hello.tbc) is sample/docs only — good Stage 2 fixture candidate.
+3. [`LanguageModuleLoader`](../../src/core/languages/LanguageModuleLoader.cpp) accepts `hostContext` at load time but does not pass it to handlers at registration; `CALL_FUNC` dispatch passes `Runtime*` at call time — sufficient for console module handlers.
+4. [`Runtime.h`](../../src/core/vm/Runtime.h) includes [`FileSystem.h`](../../src/core/filesystem/FileSystem.h) (header coupling even when FS unset) — note only; not fixed in Stage 1.
+5. Apollo-compiled proof deferred until Apollo M5 emission + Stage 3 module handlers.
+6. [`gemini-module-pascal`](../../modules/gemini-pascal/PascalModule.cpp) registers namespace **`3`** but has no handler table yet — IDs published; implementation in Stage 3.
+
+**Apollo coordination:** Apollo Milestone 5 codegen should import IDs from [`include/gemini/pascal_function_ids.hpp`](../../include/gemini/pascal_function_ids.hpp) and emit **`CALL_FUNC 3, <fn-id>, <arg-count>`** per [`bytecode.md`](../bytecode.md) § Pascal namespace. Variadic `write`/`writeln` source calls compile to one **`CALL_FUNC` per argument**.
+
+**Minimal Stage 2 sketch:**
+
+```text
+gemini-vm program.tbc [--modules PATH]
+  registry = LanguageRegistry::instance()
+  loadLanguageModules(registry, modulesPath or GEMINI_MODULES_PATH or ./gemini/modules)
+  Runtime rt; rt.setLanguageRegistry(&registry);  // FS stays null
+  loaded = Parser().parseFile(argv[1])
+  rt.loadProgram(loaded.program, loaded.sourceLinePerInstr)
+  rt.run()
+  exit 0 on clean halt; exit 1 on exception
+```
+
+No `BootMonitor` banner UX, no catalogue, no `GeminiSession`, no `applyDefaultFileSystemRoot`.
 
 ---
 

@@ -9,5 +9,6 @@
 
 #include <gemini/basic_function_ids.hpp>
 #include <gemini/namespace_ids.hpp>
+#include <gemini/pascal_function_ids.hpp>
 
 #endif // GEMINI_LANGUAGE_ABI_HPP

@@ -15,7 +15,7 @@ namespace Gemini {
     /// BASIC built-ins (reference module: gemini-module-basic).
     constexpr NamespaceId kNamespaceIdBasic = 0x00000002;
 
-    /// Pascal helper library (stub until a Pascal compiler ships).
+    /// Pascal helper library (console function IDs published; handlers ship in M19 Stage 3).
     constexpr NamespaceId kNamespaceIdPascal = 0x00000003;
 
     /// COMAL helper library (stub until a COMAL compiler ships).

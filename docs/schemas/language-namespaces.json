@@ -56,8 +56,14 @@
       "module": "gemini-module-pascal",
       "version": "1",
       "shipped": true,
-      "note": "Registration-only stub",
-      "functions": []
+      "note": "Console IDs published (M19 Stage 1); handlers ship in M19 Stage 3",
+      "functions": [
+        { "id": 0, "name": "write", "arity": 1 },
+        { "id": 1, "name": "writeln", "arity": 1 },
+        { "id": 2, "name": "writeln", "arity": 0 },
+        { "id": 3, "name": "read", "arity": 1 },
+        { "id": 4, "name": "readln", "arity": 1 }
+      ]
     },
     {
       "id": 4,
