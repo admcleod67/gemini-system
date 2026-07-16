@@ -106,7 +106,7 @@ If the spike lands here, schedule a follow-on to move ownership to Apollo (docum
 
 | Area | Artifact |
 |------|----------|
-| Binary | `gemini-vm` (name finalized in implementation) under `src/` + CMake |
+| Binary | **`gemini-vm`** ([`src/vm/Main.cpp`](../../src/vm/Main.cpp)) *(Stage 2)* |
 | Review note | [`docs/vm.md`](../vm.md) § Standalone runner boundary *(Stage 1)* |
 | Pascal I/O (spike) | Published IDs in [`pascal_function_ids.hpp`](../../include/gemini/pascal_function_ids.hpp) *(Stage 1)*; handlers in Stage 3 |
 | Tests | Load+run `.tbc` fixture; console I/O smoke; optional Apollo-emitted artifact in CI or documented manual step |
@@ -117,7 +117,7 @@ If the spike lands here, schedule a follow-on to move ownership to Apollo (docum
 ### 7. Milestone completion criteria
 
 - [x] Review recorded: Pick vs portable boundaries for the current VM
-- [ ] **`gemini-vm`** (or chosen name) builds and runs a `.tbc` with console I/O only, **no** catalogue/Tcl/session table/Pick FS
+- [x] **`gemini-vm`** (or chosen name) builds and runs a `.tbc` with console I/O only, **no** catalogue/Tcl/session table/Pick FS
 - [ ] Pascal I/O module available (Gemini spike **or** Apollo-built) with namespace/function IDs matching Apollo Milestone 5 emission
 - [ ] An Apollo-compiled console-only Pascal program runs on that target (automated or documented manual smoke)
 - [ ] Full existing `ctest` green; Application Edition smoke unchanged
@@ -132,7 +132,7 @@ M19 is sequenced as **review → spike runner → modules + Apollo proof → doc
 
 - **Stage 1 — Review**: inventory Pick coupling in VM entry paths; write boundary notes in [`docs/vm.md`](../vm.md); publish Pascal namespace **`3`** console function IDs for Apollo M5. **Exit criterion:** boundary section committed; IDs in header + schema + [`bytecode.md`](../bytecode.md); gaps and Stage 2 sketch recorded below. *Status: implemented.* Ships [`docs/vm.md`](../vm.md) § Standalone runner boundary; [`include/gemini/pascal_function_ids.hpp`](../../include/gemini/pascal_function_ids.hpp); updated [`bytecode.md`](../bytecode.md), [`language-namespaces.json`](../schemas/language-namespaces.json), [`language-modules.md`](../language-modules.md); §8.1 findings.
 
-- **Stage 2 — Spike runner**: minimal **`gemini-vm`** executable — parse `.tbc`, run with stdout, FS unset; fixture test. *Status: planned.*
+- **Stage 2 — Spike runner**: minimal **`gemini-vm`** executable — parse `.tbc`, run with stdout, FS unset; optional module-dir load; fixture test. **Exit criterion:** binary builds and runs [`programs/hello.tbc`](../../programs/hello.tbc); CTest smoke + unit prove `Hello, world`; missing args/file exit `1` with `gemini-vm:` stderr; full `ctest` green. *Status: implemented.* Ships [`src/vm/Main.cpp`](../../src/vm/Main.cpp), CMake target **`gemini-vm`** (Application install), [`tests/core/test_StandaloneVm.cpp`](../../tests/core/test_StandaloneVm.cpp), `gemini-vm-smoke`, usage note in [`docs/vm.md`](../vm.md).
 
 - **Stage 3 — Modules + Apollo proof**: Pascal console module (spike in-tree acceptable); load modules; run Apollo-emitted console program. *Status: planned.*
 
@@ -142,8 +142,8 @@ M19 is sequenced as **review → spike runner → modules + Apollo proof → doc
 
 **Gaps tracked into Stages 2–3:**
 
-1. No host CLI for `.tbc` file paths — only Pick-record `RUN` and test `parseFile`.
-2. [`programs/hello.tbc`](../../programs/hello.tbc) is sample/docs only — good Stage 2 fixture candidate.
+1. ~~No host CLI for `.tbc` file paths~~ — resolved in Stage 2 (`gemini-vm`).
+2. [`programs/hello.tbc`](../../programs/hello.tbc) used as Stage 2 fixture (`gemini-vm-smoke` + unit test).
 3. [`LanguageModuleLoader`](../../src/core/languages/LanguageModuleLoader.cpp) accepts `hostContext` at load time but does not pass it to handlers at registration; `CALL_FUNC` dispatch passes `Runtime*` at call time — sufficient for console module handlers.
 4. [`Runtime.h`](../../src/core/vm/Runtime.h) includes [`FileSystem.h`](../../src/core/filesystem/FileSystem.h) (header coupling even when FS unset) — note only; not fixed in Stage 1.
 5. Apollo-compiled proof deferred until Apollo M5 emission + Stage 3 module handlers.

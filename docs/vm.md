@@ -104,7 +104,25 @@ Jump targets must refer to defined labels and resolve to valid instruction indic
 
 ## Standalone runner boundary
 
-[Milestone 19](milestones/19-standalone-vm-runner.md) adds a Pick-independent host executable (**`gemini-vm`**, Stage 2+) that runs `.tbc` files without catalogue, Tcl, session table, or Pick filesystem. The portable VM core already exists in **`gemini-core`**; Pick hosts wrap it with session and filesystem services. This section records the boundary for implementers. It is **descriptive only** — Stage 1 does not change **`gemini-system`**, **`gemini-daemon`**, or **`gemini-console`** behaviour.
+[Milestone 19](milestones/19-standalone-vm-runner.md) adds a Pick-independent host executable (**`gemini-vm`**) that runs `.tbc` files without catalogue, Tcl, session table, or Pick filesystem. The portable VM core already exists in **`gemini-core`**; Pick hosts wrap it with session and filesystem services. This section records the boundary for implementers. **`gemini-system`**, **`gemini-daemon`**, and **`gemini-console`** behaviour is unchanged.
+
+### Usage (`gemini-vm`)
+
+```text
+gemini-vm [--modules PATH] [-h|--help] <program.tbc>
+```
+
+| Item | Behaviour |
+|------|-----------|
+| Program | Host filesystem path to text bytecode (`.tbc`) |
+| Console | stdout / stdin (default VM streams) |
+| Filesystem | Unbound — Pick FS opcodes fail if used |
+| Modules | Optional; `--modules PATH`, else `GEMINI_MODULES_PATH`, else `./gemini/modules` |
+| Exit `0` | Clean halt (or `--help`) |
+| Exit `1` | Missing args, parse error, or runtime error (`gemini-vm: …` on stderr) |
+| Exit `130` | Interrupted (`UserInterrupt`) |
+
+Example: `gemini-vm programs/hello.tbc` prints `Hello, world`. Programs that use only core opcodes (e.g. `PRINT_*`) need no language modules. Programs that emit **`CALL_FUNC`** need a matching module loaded.
 
 ### VM entry paths today
 
@@ -119,7 +137,7 @@ Jump targets must refer to defined labels and resolve to valid instruction indic
 
 **Session-owned Pick surface:** [`GeminiSession`](../src/userland/tcl/GeminiSession.h) owns `PickVM::Runtime`, `PickFS::FileSystem`, `VocResolver`, and `Shell`. [`SessionTable`](../src/userland/tcl/SessionTable.cpp) wires `runtime().setLanguageRegistry()` from the daemon. FS opcodes throw `"filesystem backend not configured"` when `fileSystem_` is null. Lock opcodes (`READ_REC_U`, etc.) depend on session lock context.
 
-**File loading:** [`Parser::parseFile`](../src/core/vm/Parser.cpp) opens a host path and parses `.tbc` text with no Pick coupling, but **no product command uses it today**. Tcl `RUN` loads bytecode from a Pick VOC record (`<name>_OBJ`) and rejects program names containing `.` (so `RUN mini.tbc` fails).
+**File loading:** [`Parser::parseFile`](../src/core/vm/Parser.cpp) opens a host path and parses `.tbc` text with no Pick coupling; **`gemini-vm`** uses it for the standalone runner. Tcl `RUN` loads bytecode from a Pick VOC record (`<name>_OBJ`) and rejects program names containing `.` (so `RUN mini.tbc` fails).
 
 **Library note:** `gemini-core` bundles VM, catalogue, daemon, and login code. The standalone runner links **`gemini-core`** only (not **`gemini-tcl`**); a Mercury repo split is an explicit non-goal for M19.
 

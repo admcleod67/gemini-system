@@ -49,6 +49,14 @@ install(TARGETS gemini-console
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
         COMPONENT Service)
 
+add_executable(gemini-vm vm/Main.cpp)
+target_link_libraries(gemini-vm PRIVATE gemini-core)
+pick_system_enable_warnings(gemini-vm)
+
+install(TARGETS gemini-vm
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+        COMPONENT Application)
+
 # Shared bootstrap tree for Application and Service editions (Milestone 17 Stage 6).
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/gemini/
         DESTINATION ${CMAKE_INSTALL_DATADIR}/gemini

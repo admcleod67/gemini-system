@@ -35,6 +35,7 @@ add_executable(
         core/test_FileSystem.cpp
         core/test_LoginService.cpp
         core/test_Parser.cpp
+        core/test_StandaloneVm.cpp
         core/test_Runtime.cpp
         core/test_VocResolver.cpp
         core/test_MdDefaultDataFile.cpp
@@ -83,6 +84,7 @@ target_compile_definitions(
                 "PICK_SYSTEM_INSTALL_DATADIR=\"${CMAKE_INSTALL_DATADIR}\""
                 "PICK_SYSTEM_INSTALL_SYSCONFDIR=\"${CMAKE_INSTALL_SYSCONFDIR}\""
                 "PICK_SYSTEM_INSTALL_LIBDIR=\"${CMAKE_INSTALL_LIBDIR}\""
+                "GEMINI_TEST_HELLO_TBC=\"${CMAKE_SOURCE_DIR}/programs/hello.tbc\""
                 "GEMINI_STUB_MODULE_PATH=\"$<TARGET_FILE:gemini-module-stub>\""
                 "GEMINI_BASIC_MODULE_PATH=\"$<TARGET_FILE:gemini-module-basic>\""
                 "GEMINI_PASCAL_MODULE_PATH=\"$<TARGET_FILE:gemini-module-pascal>\""
@@ -100,3 +102,9 @@ endif ()
 
 add_test(NAME smoke COMMAND sh -c "echo QUIT | $<TARGET_FILE:gemini-system>")
 set_property(TEST smoke PROPERTY ENVIRONMENT "GEMINI_AUTO_LOGON=SYSPROG")
+
+add_test(NAME gemini-vm-smoke
+         COMMAND $<TARGET_FILE:gemini-vm>
+                 "${CMAKE_SOURCE_DIR}/programs/hello.tbc")
+set_tests_properties(gemini-vm-smoke PROPERTIES
+        PASS_REGULAR_EXPRESSION "Hello, world")
