@@ -78,7 +78,7 @@ Semantic errors inside a handler (for example BASIC `LOG` domain) use language-s
 |----|------|--------|--------|
 | `1` | *(reserved)* | — | Internal unit tests only; not shipped |
 | `2` | `basic` | `gemini-module-basic` | Reference implementation; 28 functions |
-| `3` | `pascal` | `gemini-module-pascal` | Console IDs published; handlers in M19 Stage 3 |
+| `3` | `pascal` | `gemini-module-pascal` | Console IDs published; handlers are follow-on work |
 | `4` | `comal` | `gemini-module-comal` | Stub — metadata only |
 | `5` | `cobol` | `gemini-module-cobol` | Stub — metadata only |
 | `256` (`0x100`) | `stub` | `gemini-module-stub` | Integration-test stub |
@@ -130,7 +130,7 @@ See [`docs/basic-language.md`](basic-language.md) for Pick semantics of each bui
 
 Namespace constant: `Gemini::kNamespaceIdPascal` / `Gemini::Pascal::*` in [`include/gemini/pascal_function_ids.hpp`](../include/gemini/pascal_function_ids.hpp).
 
-Published for **Apollo Compiler Milestone 5** codegen. Handlers ship in Gemini Milestone 19 Stage 3 (spike module) or with Apollo in steady state.
+Published for a future **Apollo Compiler** `CALL_FUNC` binding. Apollo M5's completed bootstrap binding emits core `PRINT_*` / `INPUT_*` opcodes instead, so Gemini M19 / Apollo M6 did not require these handlers. The steady-state helper module belongs with Apollo.
 
 | ID | Name | Arity | Notes |
 |----|------|-------|-------|

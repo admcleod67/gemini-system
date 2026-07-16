@@ -4,7 +4,7 @@ Technical reference for Gemini System. Paths below are relative to this director
 
 ## VM and bytecode
 
-- **[Bytecode VM](vm.md)** — text `.tbc` format, opcodes, stack, parser output (`LoadedBytecode`), C++ runtime API.
+- **[Bytecode VM and standalone runner](vm.md)** — text `.tbc` format, opcodes, stack, parser/runtime API, `gemini-vm` usage, and verified Apollo workflow.
 
 ## Multi-language runtime
 
@@ -38,7 +38,7 @@ Technical reference for Gemini System. Paths below are relative to this director
 
 ## Roadmap
 
-- **[Project milestones](milestones.md)** — hub index; **Milestones 1–18** completed (Version **1.0.0**); **Milestone 19** standalone VM runner; R83-compat then **Milestone 21** CPU-bound fairness (deferred).
+- **[Project milestones](milestones.md)** — hub index; **Milestones 1–19** completed; next R83 compatibility (M20), then **Milestone 21** CPU-bound fairness (deferred).
 - **[Changelog](../CHANGELOG.md)** — release notes (current: **1.0.0**).
 - **[Milestone detail pages](milestones/)** — one file per milestone (`NN-slug.md` for sortable filenames).
 - **[Compatibility (R83/Pick)](compatibility-r83-pick.md)** — implemented/partial/deferred Gemini compatibility notes versus classic Pick behavior.

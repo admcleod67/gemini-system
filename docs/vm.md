@@ -124,6 +124,27 @@ gemini-vm [--modules PATH] [-h|--help] <program.tbc>
 
 Example: `gemini-vm programs/hello.tbc` prints `Hello, world`. Programs that use only core opcodes (e.g. `PRINT_*`) need no language modules. Programs that emit **`CALL_FUNC`** need a matching module loaded.
 
+### Apollo Compiler workflow
+
+Apollo Compiler Milestone 6 completed its standalone proof against `gemini-vm`. From an Apollo build tree beside this repository:
+
+```bash
+./build/src/tools/apolloc --emit examples/hello.pas \
+  | ../pick-system/build/src/gemini-vm /dev/stdin
+
+./build/src/tools/apolloc --emit examples/count.pas \
+  | ../pick-system/build/src/gemini-vm /dev/stdin
+```
+
+The first command prints `Hello, Gemini!`; the second prints integers 1 through 10. For hosts without `/dev/stdin`, use an intermediate file:
+
+```bash
+./build/src/tools/apolloc --emit examples/hello.pas > hello.tbc
+../pick-system/build/src/gemini-vm hello.tbc
+```
+
+Apollo M5's bootstrap console binding emits core `PRINT_*` / `INPUT_*` opcodes, so these commands do **not** require `--modules`. Pascal namespace **3** IDs remain published for a future `CALL_FUNC` module binding; that migration is follow-on work and was not required to close M19 / Apollo M6.
+
 ### VM entry paths today
 
 | Entry path | Primary files | Pick coupling |
@@ -154,7 +175,7 @@ Example: `gemini-vm programs/hello.tbc` prints `Hello, world`. Programs that use
 | Locks / multi-session | Not used | Session table, cooperative runner |
 | Process UX | `argv → run → exit code` | Login, Tcl REPL, daemon IPC |
 
-Pascal console builtins use **`CALL_FUNC`** against namespace **`3`** ([`pascal_function_ids.hpp`](../include/gemini/pascal_function_ids.hpp)); see [`bytecode.md`](bytecode.md). Sister project **apollo-compiler** Milestone 6 tracks acceptance from the compiler side.
+Pascal namespace **`3`** and its console function IDs are published in [`pascal_function_ids.hpp`](../include/gemini/pascal_function_ids.hpp) for a future **`CALL_FUNC`** binding; see [`bytecode.md`](bytecode.md). Apollo's completed bootstrap binding currently uses core console opcodes.
 
 ## Instruction listing
 

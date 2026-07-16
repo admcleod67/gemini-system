@@ -9,7 +9,7 @@ The implementation remains intentionally incremental, but the platform is now br
 filesystem-backed Pick file semantics, BASIC compiler/shell workflows, and ENGLISH/DICT query foundations. The goal is
 still to grow the system in **small, verifiable steps** (tests, clear boundaries) rather than landing a large stack at once.
 
-A phased **roadmap** (Milestone 1 onward) is summarized in **[`docs/milestones.md`](docs/milestones.md)** (hub); long-form text for each milestone lives under **[`docs/milestones/`](docs/milestones/)**. **Milestones 1–18** are implemented; **Version 1.0.0** is the current stable release (dual Application and Service editions). Next: **Milestone 19** standalone VM runner; then R83 compatibility; CPU-bound fairness deferred to **Milestone 21**. Service Edition install and **Version 1.0 known limitations** are in **[`docs/daemon.md`](docs/daemon.md)**. Release notes: **[`CHANGELOG.md`](CHANGELOG.md)**.
+A phased **roadmap** (Milestone 1 onward) is summarized in **[`docs/milestones.md`](docs/milestones.md)** (hub); long-form text for each milestone lives under **[`docs/milestones/`](docs/milestones/)**. **Milestones 1–19** are implemented; **Version 1.0.0** is the current stable release (dual Application and Service editions), with the standalone VM runner queued for the next release. Next: R83 compatibility (Milestone 20); CPU-bound fairness remains deferred to **Milestone 21**. Service Edition install and **Version 1.0 known limitations** are in **[`docs/daemon.md`](docs/daemon.md)**. Release notes: **[`CHANGELOG.md`](CHANGELOG.md)**.
 
 ## Building
 
@@ -21,14 +21,14 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
-Artifacts include **`gemini-system`** (embedded host with boot and Tcl REPL), **`gemini-daemon`** (long-running service host with IPC), **`gemini-console`** (daemon-attached terminal client), and **`pick-tests`** (unit tests).
+Artifacts include **`gemini-system`** (embedded host with boot and Tcl REPL), **`gemini-daemon`** (long-running service host with IPC), **`gemini-console`** (daemon-attached terminal client), **`gemini-vm`** (Pick-independent `.tbc` runner), and **`pick-tests`** (unit tests).
 
 ### Install (editions)
 
 Install is split into CMake components — see **[Install packaging](docs/daemon.md#install-packaging-service-vs-application)** in the daemon docs (Application and Service recipes).
 
 ```bash
-# Application Edition only (no daemon / console)
+# Application Edition + standalone VM runner (no daemon / console)
 cmake --install build --prefix /tmp/gemini-app --component Runtime
 cmake --install build --prefix /tmp/gemini-app --component Application
 ```

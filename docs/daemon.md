@@ -234,7 +234,7 @@ Milestone 17 splits `cmake --install` into named **components**. Plain `cmake --
 | Component | Contents |
 |-----------|----------|
 | **`Runtime`** | `${CMAKE_INSTALL_DATADIR}/gemini/` bootstrap tree (`ACCOUNTS.json`, accounts, …) and language modules under `…/gemini/modules/` |
-| **`Application`** | `gemini-system` only |
+| **`Application`** | `gemini-system` and Pick-independent `gemini-vm` |
 | **`Service`** | `gemini-daemon`, `gemini-console`, `gemini.service`, `daemon.conf`, and `daemon.conf.example` under `${CMAKE_INSTALL_DATADIR}/doc/gemini/` |
 
 **Application Edition** (no daemon):

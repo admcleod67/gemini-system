@@ -56,7 +56,7 @@
       "module": "gemini-module-pascal",
       "version": "1",
       "shipped": true,
-      "note": "Console IDs published (M19 Stage 1); handlers ship in M19 Stage 3",
+      "note": "Console IDs published; handlers are follow-on work after M19",
       "functions": [
         { "id": 0, "name": "write", "arity": 1 },
         { "id": 1, "name": "writeln", "arity": 1 },
