@@ -5,6 +5,10 @@ Older `v0.x` annotated tags (before 0.17.0) remain in git history.
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-09-14
+
+- Fixed `.tbc` parsing so a colon inside a quoted `PUSH_STR` operand is not treated as a label separator (e.g. `PUSH_STR "Number: "`).
+
 ## [1.1.0] - 2026-07-16
 
 Standalone VM runner release ([Milestone 19](docs/milestones/19-standalone-vm-runner.md)).

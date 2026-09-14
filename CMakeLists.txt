@@ -6,7 +6,7 @@ endif ()
 
 project(
         gemini-system
-        VERSION 1.1.0
+        VERSION 1.1.1
         DESCRIPTION "Gemini System inspired by Pick OS (hosted development build)"
         LANGUAGES CXX
 )

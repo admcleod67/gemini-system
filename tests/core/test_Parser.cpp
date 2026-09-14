@@ -51,6 +51,35 @@ TEST_CASE("parser label and PUSH_STR quoted") {
     CHECK(lb.labels.at("start") == 0);
 }
 
+TEST_CASE("parser PUSH_STR colon inside quoted string is not a label") {
+    Parser parser;
+    std::istringstream in("PUSH_STR \"Number: \"\nHALT");
+    LoadedBytecode lb = parser.parse(in);
+    REQUIRE(lb.program.size() == 2);
+    CHECK(lb.program[0].op == OpCode::PushStr);
+    CHECK(std::get<std::string>(lb.program[0].operand) == "Number: ");
+    CHECK(lb.labels.empty());
+}
+
+TEST_CASE("parser label with PUSH_STR colon inside quoted string") {
+    Parser parser;
+    std::istringstream in("loop: PUSH_STR \"a:b\"\nHALT");
+    LoadedBytecode lb = parser.parse(in);
+    REQUIRE(lb.program.size() == 2);
+    CHECK(lb.program[0].op == OpCode::PushStr);
+    CHECK(std::get<std::string>(lb.program[0].operand) == "a:b");
+    CHECK(lb.labels.at("loop") == 0);
+}
+
+TEST_CASE("parser PUSH_STR escaped quote with colon") {
+    Parser parser;
+    std::istringstream in("PUSH_STR \"say \\\"hi: there\\\"\"\nHALT");
+    LoadedBytecode lb = parser.parse(in);
+    REQUIRE(lb.program.size() == 2);
+    CHECK(lb.program[0].op == OpCode::PushStr);
+    CHECK(std::get<std::string>(lb.program[0].operand) == "say \"hi: there\"");
+}
+
 TEST_CASE("parser ADD CONCAT PRINT_INT PRINT_STR") {
     Parser parser;
     std::istringstream in(

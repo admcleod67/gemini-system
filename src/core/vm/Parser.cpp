@@ -164,8 +164,30 @@ namespace PickVM {
         if (line.empty() || line[0] == '#')
             return out;
 
-        // Label?
-        size_t colon = line.find(':');
+        // Label: first ':' outside a double-quoted string (honour \" and \\ escapes).
+        size_t colon = std::string::npos;
+        bool inQuotes = false;
+        for (size_t i = 0; i < line.size(); ++i) {
+            const char c = line[i];
+            if (inQuotes) {
+                if (c == '\\' && i + 1 < line.size()) {
+                    ++i; // skip escaped character
+                    continue;
+                }
+                if (c == '"') {
+                    inQuotes = false;
+                }
+                continue;
+            }
+            if (c == '"') {
+                inQuotes = true;
+                continue;
+            }
+            if (c == ':') {
+                colon = i;
+                break;
+            }
+        }
         if (colon != std::string::npos) {
             out.label = trim(line.substr(0, colon));
             line = trim(line.substr(colon + 1));
