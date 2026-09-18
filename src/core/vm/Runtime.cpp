@@ -476,6 +476,17 @@ namespace PickVM {
                 break;
             }
 
+            case OpCode::Mod: {
+                const char *ctx = PickVM::opCodeName(instr.op);
+                const int b = intFromStackValue(pop(), ctx);
+                const int a = intFromStackValue(pop(), ctx);
+                if (b == 0) {
+                    throw std::runtime_error("MOD: division by zero");
+                }
+                push(a % b);
+                break;
+            }
+
             case OpCode::Eq: {
                 Value b = pop();
                 Value a = pop();

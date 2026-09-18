@@ -98,7 +98,8 @@ namespace PickVM {
         StoreVar,
         PrintChar,
         InputFlt,
-        CoerceFlt
+        CoerceFlt,
+        Mod
     };
 
     /// BASIC STATUS() value when a record lock conflict is handled or raised (Milestone 10).

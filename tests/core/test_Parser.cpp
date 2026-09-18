@@ -225,6 +225,23 @@ TEST_CASE("parser MUL and DIV") {
     CHECK(lb.program[4].op == OpCode::Mul);
 }
 
+TEST_CASE("parser MOD") {
+    Parser parser;
+    std::istringstream in(
+        "MOD\n"
+        "HALT\n");
+    LoadedBytecode lb = parser.parse(in);
+    REQUIRE(lb.program.size() == 2);
+    CHECK(lb.program[0].op == OpCode::Mod);
+    CHECK(lb.program[1].op == OpCode::Halt);
+}
+
+TEST_CASE("parser MOD takes no operand") {
+    Parser parser;
+    std::istringstream in("MOD 3\nHALT\n");
+    CHECK_THROWS_AS(parser.parse(in), std::runtime_error);
+}
+
 TEST_CASE("parser comparison opcodes") {
     Parser parser;
     std::istringstream in(

@@ -67,7 +67,7 @@ Parser, `InstructionPrint`, `BytecodeText`, `Runtime::step`, and [`docs/vm.md`](
 ### 5. Milestone completion criteria
 
 - [ ] **`PRINT_CHAR`**, **`INPUT_FLT`**, and **`COERCE_FLT`** implemented, documented, and covered by tests
-- [ ] Optional **`MOD`/`IMOD`** either shipped with documented remainder semantics **or** explicitly deferred in this page with a follow-on note
+- [x] Core **`MOD`** shipped with truncated toward-zero semantics; floored **`IMOD`** deferred beyond M20 (see §7)
 - [ ] Existing `PRINT_VAL` / `MAT_*` / `DIM_ARRAY` tests unchanged in intent; full `ctest` green
 - [ ] Consumer notes near-term table marked implemented (or P3 deferred) when closed
 - [ ] Hub / README list M20 implemented when closed
@@ -78,7 +78,7 @@ Parser, `InstructionPrint`, `BytecodeText`, `Runtime::step`, and [`docs/vm.md`](
 
 1. **P0 `PRINT_CHAR`** — opcode, parser, tests (`PUSH_INT 65` / `PRINT_CHAR` → `A`). *Status: implemented.*
 2. **P1 `INPUT_FLT` + P2 `COERCE_FLT`** — align errors with `INPUT_INT` / `COERCE_INT`. *Status: implemented.*
-3. **P3 remainder (optional)** — core `MOD`/`IMOD` or defer. *Status: planned.*
+3. **P3 remainder** — core **`MOD`** with truncated toward-zero integer remainder (C++ `%` / Turbo-style). Floored **`IMOD`** deferred beyond M20. *Status: implemented.*
 4. **Docs + closes M20** — `vm.md` rows; consumer-notes status; hub. **Closes Milestone 20.** *Status: planned.*
 
 Only Stage 4 claims “Closes Milestone 20.”
@@ -88,6 +88,7 @@ Only Stage 4 claims “Closes Milestone 20.”
 ### 7. Follow-on (beyond M20)
 
 - Apollo switches console binding (compiler-side; not this repo’s close criterion)
+- Floored integer remainder (**`IMOD`**) if a consumer needs non-truncated semantics
 - Pascal I/O module / field widths — [M19](19-standalone-vm-runner.md) §9
 - Array copy / `var` parameters, host FS façade, debug metadata — [`apollo-consumer-notes.md`](../apollo-consumer-notes.md) (separate tracks)
 - R83 compatibility — [**Milestone 21**](../compatibility-r83-pick.md) (detail page TBD)

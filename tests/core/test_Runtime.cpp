@@ -526,6 +526,82 @@ TEST_CASE("runtime DIV by zero throws") {
     CHECK_THROWS_AS(rt.run(), std::runtime_error);
 }
 
+TEST_CASE("runtime MOD truncated remainder") {
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, 7},
+        {OpCode::PushInt, 3},
+        {OpCode::Mod, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    Runtime rt;
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<int>(rt.stack()[0]) == 1);
+}
+
+TEST_CASE("runtime MOD truncated negative dividend") {
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, -7},
+        {OpCode::PushInt, 3},
+        {OpCode::Mod, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    Runtime rt;
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<int>(rt.stack()[0]) == -1);
+}
+
+TEST_CASE("runtime MOD truncated negative divisor") {
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, 7},
+        {OpCode::PushInt, -3},
+        {OpCode::Mod, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    Runtime rt;
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<int>(rt.stack()[0]) == 1);
+}
+
+TEST_CASE("runtime MOD division by zero throws") {
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, 1},
+        {OpCode::PushInt, 0},
+        {OpCode::Mod, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    Runtime rt;
+    rt.loadProgram(prog);
+    try {
+        rt.run();
+        FAIL("expected runtime_error");
+    } catch (const std::runtime_error &e) {
+        CHECK(std::string(e.what()).find("MOD:") != std::string::npos);
+    }
+}
+
+TEST_CASE("runtime MOD wrong type throws") {
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, 7},
+        {OpCode::PushStr, std::string{"x"}},
+        {OpCode::Mod, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    Runtime rt;
+    rt.loadProgram(prog);
+    try {
+        rt.run();
+        FAIL("expected runtime_error");
+    } catch (const std::runtime_error &e) {
+        CHECK(std::string(e.what()).find("MOD:") != std::string::npos);
+    }
+}
+
 TEST_CASE("runtime comparison opcodes push integer booleans") {
     std::vector<Instruction> prog = {
         {OpCode::PushInt, 2},

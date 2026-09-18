@@ -20,6 +20,7 @@ namespace PickVM {
             case OpCode::Sub: return "SUB";
             case OpCode::Mul: return "MUL";
             case OpCode::Div: return "DIV";
+            case OpCode::Mod: return "MOD";
             case OpCode::Eq: return "EQ";
             case OpCode::Ne: return "NE";
             case OpCode::Lt: return "LT";
@@ -184,6 +185,7 @@ namespace PickVM {
             case OpCode::Sub:
             case OpCode::Mul:
             case OpCode::Div:
+            case OpCode::Mod:
             case OpCode::Eq:
             case OpCode::Ne:
             case OpCode::Lt:

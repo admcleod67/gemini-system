@@ -27,6 +27,7 @@ For non-`.tbc` loaders (for example, handwritten instruction vectors), source-li
 | `SUB` | Pop `b`, pop `a`, coerce both to int (strings → 0 on failure), push `a - b`. |
 | `MUL` | Pop `b`, pop `a`, coerce both to int (strings → 0 on failure), push `a * b`. |
 | `DIV` | Pop `b`, pop `a`, coerce both to int (strings → 0 on failure), push `a / b` (truncates toward zero). Throws `DIV: divide by zero` when `b` is zero. |
+| `MOD` | Pop `b`, pop `a` (both must be **int**); push truncated toward-zero integer remainder `a % b` (C++ / Turbo-style; sign follows the dividend). Throws `MOD: division by zero` when `b` is zero; wrong stack type throws `MOD: expected int on stack`. Available for handwritten `.tbc` / Apollo. BASIC `MOD` remains module/`CALL_FUNC` (float `fmod`) and does not emit this opcode. |
 | `EQ` | Pop `b`, pop `a`, push `1` if `a == b`, else `0`. Both values must be the same type (int/int or string/string); mixed types throw. |
 | `NE` | Pop `b`, pop `a`, push `1` if `a != b`, else `0`. Both values must be the same type; mixed types throw. |
 | `LT` | Pop `b`, pop `a`, push `1` if `a < b`, else `0`. Both values must be the same type; mixed types throw. |
@@ -76,12 +77,6 @@ For non-`.tbc` loaders (for example, handwritten instruction vectors), source-li
 | `CLOSE_FILE name` | Release binding for file variable `name`. No-op if `name` is not currently open. |
 | `CALL_FUNC ns-id, fn-id, arg-count` | Pop **`arg-count`** stack values (last argument on top), dispatch to the boot-time **`LanguageRegistry`** for namespace **`ns-id`**, function **`fn-id`**. Push the handler's return value. Requires a configured language registry. See [`bytecode.md`](bytecode.md) for encoding, stack order, namespace/function IDs, and **`LANG:`** errors. |
 | `INVOKE_BUILTIN "name"` | Legacy name-based built-in dispatch (BASIC shim → registry). Prefer **`CALL_FUNC`** for new bytecode; see [`basic-language.md`](basic-language.md). |
-
-**Planned additive opcodes** ([Milestone 20](milestones/20-vm-console-numeric-ergonomics.md); not implemented until later stages of that milestone):
-
-| Text | Intended meaning |
-|------|------------------|
-| `MOD` / `IMOD` | Optional integer remainder; BASIC `MOD` via `CALL_FUNC` remains the Pick path until an explicit emit switch. |
 
 Jump targets must refer to defined labels and resolve to valid instruction indices; the parser validates range.
 

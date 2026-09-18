@@ -298,6 +298,9 @@ namespace PickVM {
             } else if (pl.opcode == "DIV") {
                 inst.op = OpCode::Div;
                 requireNoOperand(pl);
+            } else if (pl.opcode == "MOD") {
+                inst.op = OpCode::Mod;
+                requireNoOperand(pl);
             } else if (pl.opcode == "EQ") {
                 inst.op = OpCode::Eq;
                 requireNoOperand(pl);
