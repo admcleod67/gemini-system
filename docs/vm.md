@@ -40,6 +40,7 @@ For non-`.tbc` loaders (for example, handwritten instruction vectors), source-li
 | `PRINT_STR` | Pop string, write to the runtime output stream (no line ending). Available for handwritten `.tbc`; the BASIC compiler emits `PRINT_VAL` instead. |
 | `PRINT_VAL` | Pop a `Value` (int or string), write it to the runtime output stream (no line ending). Emitted by the BASIC compiler for all `PRINT` statements. |
 | `PRINT_EOL` | Write end-of-line to the runtime output stream. |
+| `PRINT_CHAR` | Pop int; write one character (glyph) to the runtime output stream (no line ending). Accepts code points **0–255**; out of range throws `PRINT_CHAR: code point out of range`. Wrong stack type throws `PRINT_CHAR: expected int on stack`. Does not change `PRINT_VAL`. |
 | `INPUT_INT` | Read one input line, parse as int, and push it. Throws `INPUT_INT: end of input` on EOF and `INPUT_INT: invalid integer input` on parse failure. Available for handwritten `.tbc`; the BASIC compiler emits `INPUT_STR` instead. |
 | `INPUT_STR` | Read one input line as a raw string (trimmed), and push it. Emitted by the BASIC compiler for all `INPUT` statements. |
 | `COERCE_INT` | Pop a `Value`, convert to int (`strtol`; empty or non-numeric string → 0), push the resulting int. Emitted by the BASIC compiler after `INPUT_STR` for `%`-suffix variables and after expressions assigned to `%`-suffix variables. |
@@ -74,11 +75,10 @@ For non-`.tbc` loaders (for example, handwritten instruction vectors), source-li
 | `CALL_FUNC ns-id, fn-id, arg-count` | Pop **`arg-count`** stack values (last argument on top), dispatch to the boot-time **`LanguageRegistry`** for namespace **`ns-id`**, function **`fn-id`**. Push the handler's return value. Requires a configured language registry. See [`bytecode.md`](bytecode.md) for encoding, stack order, namespace/function IDs, and **`LANG:`** errors. |
 | `INVOKE_BUILTIN "name"` | Legacy name-based built-in dispatch (BASIC shim → registry). Prefer **`CALL_FUNC`** for new bytecode; see [`basic-language.md`](basic-language.md). |
 
-**Planned additive opcodes** ([Milestone 20](milestones/20-vm-console-numeric-ergonomics.md); not implemented until that milestone ships):
+**Planned additive opcodes** ([Milestone 20](milestones/20-vm-console-numeric-ergonomics.md); not implemented until later stages of that milestone):
 
 | Text | Intended meaning |
 |------|------------------|
-| `PRINT_CHAR` | Pop int; write one character (glyph) to the output stream. Does not change `PRINT_VAL`. |
 | `INPUT_FLT` | Read one input line; parse as float; push `double`. |
 | `COERCE_FLT` | Pop a `Value`; convert to `double` (mirror of `COERCE_INT`). |
 | `MOD` / `IMOD` | Optional integer remainder; BASIC `MOD` via `CALL_FUNC` remains the Pick path until an explicit emit switch. |

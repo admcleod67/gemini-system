@@ -337,6 +337,9 @@ namespace PickVM {
             } else if (pl.opcode == "PRINT_EOL") {
                 inst.op = OpCode::PrintEol;
                 requireNoOperand(pl);
+            } else if (pl.opcode == "PRINT_CHAR") {
+                inst.op = OpCode::PrintChar;
+                requireNoOperand(pl);
             } else if (pl.opcode == "INPUT_INT") {
                 inst.op = OpCode::InputInt;
                 requireNoOperand(pl);

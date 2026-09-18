@@ -95,7 +95,8 @@ namespace PickVM {
         CloseFile,
         SetOnErrorHandler,
         LoadVar,
-        StoreVar
+        StoreVar,
+        PrintChar
     };
 
     /// BASIC STATUS() value when a record lock conflict is handled or raised (Milestone 10).

@@ -76,7 +76,7 @@ Parser, `InstructionPrint`, `BytecodeText`, `Runtime::step`, and [`docs/vm.md`](
 
 ### 6. Suggested implementation stages
 
-1. **P0 `PRINT_CHAR`** — opcode, parser, tests (`PUSH_INT 65` / `PRINT_CHAR` → `A`). *Status: planned.*
+1. **P0 `PRINT_CHAR`** — opcode, parser, tests (`PUSH_INT 65` / `PRINT_CHAR` → `A`). *Status: implemented.*
 2. **P1 `INPUT_FLT` + P2 `COERCE_FLT`** — align errors with `INPUT_INT` / `COERCE_INT`. *Status: planned.*
 3. **P3 remainder (optional)** — core `MOD`/`IMOD` or defer. *Status: planned.*
 4. **Docs + closes M20** — `vm.md` rows; consumer-notes status; hub. **Closes Milestone 20.** *Status: planned.*

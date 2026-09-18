@@ -545,6 +545,15 @@ namespace PickVM {
                 break;
             }
 
+            case OpCode::PrintChar: {
+                const int v = intFromStackValue(pop(), PickVM::opCodeName(instr.op));
+                if (v < 0 || v > 255) {
+                    throw std::runtime_error("PRINT_CHAR: code point out of range");
+                }
+                out().put(static_cast<char>(static_cast<unsigned char>(v)));
+                break;
+            }
+
             case OpCode::CoerceInt: {
                 push(coerceToInt(pop()));
                 break;

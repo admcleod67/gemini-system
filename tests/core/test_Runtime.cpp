@@ -286,6 +286,83 @@ TEST_CASE("runtime PRINT_INT wrong type") {
     CHECK_THROWS_AS(rt.run(), std::runtime_error);
 }
 
+TEST_CASE("runtime PRINT_CHAR writes glyph without newline") {
+    std::ostringstream out;
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, 65},
+        {OpCode::PrintChar, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    Runtime rt;
+    rt.setOutputStream(&out);
+    rt.loadProgram(prog);
+    rt.run();
+    CHECK(out.str() == "A");
+}
+
+TEST_CASE("runtime PRINT_CHAR writes space glyph") {
+    std::ostringstream out;
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, 32},
+        {OpCode::PrintChar, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    Runtime rt;
+    rt.setOutputStream(&out);
+    rt.loadProgram(prog);
+    rt.run();
+    CHECK(out.str() == " ");
+}
+
+TEST_CASE("runtime PRINT_CHAR writes NUL byte") {
+    std::ostringstream out;
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, 0},
+        {OpCode::PrintChar, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    Runtime rt;
+    rt.setOutputStream(&out);
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(out.str().size() == 1);
+    CHECK(out.str()[0] == '\0');
+}
+
+TEST_CASE("runtime PRINT_CHAR wrong type") {
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"x"}},
+        {OpCode::PrintChar, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    Runtime rt;
+    rt.loadProgram(prog);
+    try {
+        rt.run();
+        FAIL("expected runtime_error");
+    } catch (const std::runtime_error &e) {
+        CHECK(std::string(e.what()).find("PRINT_CHAR:") != std::string::npos);
+    }
+}
+
+TEST_CASE("runtime PRINT_CHAR out of range") {
+    for (const int code : {-1, 256}) {
+        std::vector<Instruction> prog = {
+            {OpCode::PushInt, code},
+            {OpCode::PrintChar, Value{}},
+            {OpCode::Halt, Value{}},
+        };
+        Runtime rt;
+        rt.loadProgram(prog);
+        try {
+            rt.run();
+            FAIL("expected runtime_error for code " << code);
+        } catch (const std::runtime_error &e) {
+            CHECK(std::string(e.what()).find("PRINT_CHAR:") != std::string::npos);
+        }
+    }
+}
+
 TEST_CASE("runtime PushInt malformed operand") {
     std::vector<Instruction> prog = {
         {OpCode::PushInt, std::string{"nope"}},
