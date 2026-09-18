@@ -25,23 +25,22 @@ existing `PRINT_VAL` / `DIM_ARRAY` / `MAT_*` semantics (Pick BASIC compatibility
 
 ---
 
-## Near-term ask (post–Milestone 8 Stage 1)
+## Near-term ask (post–Milestone 8 Stage 1) — **implemented (Gemini M20)**
 
-Tracked on the Gemini side as [**Milestone 20 — VM Console and Numeric Ergonomics**](milestones/20-vm-console-numeric-ergonomics.md). Apollo has shipped **compiler-lowered** Wirth ordinal/arithmetic functions (`ord`, `chr`,
+Tracked on the Gemini side as [**Milestone 20 — VM Console and Numeric Ergonomics**](milestones/20-vm-console-numeric-ergonomics.md) (**completed**). Apollo has shipped **compiler-lowered** Wirth ordinal/arithmetic functions (`ord`, `chr`,
 `succ`, `pred`, `odd`, `abs`, `sqr`, `trunc`, `round`) without a language module. The next
-Pascal track is **console I/O fidelity** (Milestone 8 Stage 2). A **small** VM spike would
-unblock that work for every emitter.
+Pascal track is **console I/O fidelity** (Milestone 8 Stage 2). Gemini now provides the core
+opcodes below so emitters can drop the workarounds.
 
-These are **asks**, not opcode encodings. When accepted, Gemini documents them in
-[`vm.md`](vm.md) (normative) under M20, then Apollo can switch its binding table in a
-separate change.
+Normative encodings and errors are in [`vm.md`](vm.md). Apollo can switch its binding table in a
+separate change; Gemini M20 close does **not** require that Apollo emit change in the same release.
 
-| Priority | Ask | Friction today | Suggested shape (illustrative) |
-|----------|-----|----------------|--------------------------------|
-| **P0** | Print a **glyph** from an integer code point | Pascal `char` is stored as `PUSH_INT`; `writeln(c)` / `writeln(' ')` use `PRINT_VAL` → decimal (`65`, `32`) instead of `A` / space | Additive **`PRINT_CHAR`** (pop int, write one character), **or** a documented 1-char-string convention that emitters can rely on |
-| **P1** | **Float input** | `readln` of `real` → `INPUT_STR` + parse via multiply/`strtod` | **`INPUT_FLT`** aligned with `INPUT_INT` / `INPUT_STR` |
-| **P2** | Explicit **int → float** widen | `ConvertF64` emits `LOAD` + `PUSH_FLT 1.0` + `MUL` | **`COERCE_FLT`** (mirror of `COERCE_INT`) |
-| **P3** | Core **integer mod** | `mod` expands to a div/mul/sub sequence | **`MOD`** / **`IMOD`** with documented truncated vs floored semantics |
+| Priority | Ask | Status | Gemini opcode |
+|----------|-----|--------|---------------|
+| **P0** | Print a **glyph** from an integer code point | **Implemented** | **`PRINT_CHAR`** (pop int 0–255, write one character) |
+| **P1** | **Float input** | **Implemented** | **`INPUT_FLT`** |
+| **P2** | Explicit **int → float** widen | **Implemented** | **`COERCE_FLT`** |
+| **P3** | Core **integer mod** | **Implemented** (truncated); floored **`IMOD`** deferred | **`MOD`** (`a % b`, ints only) |
 
 **Explicitly not in this near-term spike**
 
@@ -51,10 +50,10 @@ separate change.
   glyph print and float I/O exist.
 - Host filesystem façade / Pascal `file` I/O (still a larger Gemini host track).
 - Transcendental math (`sin`, `sqrt`, …) → Pascal Stage 1b via module / shared math surface.
+- Floored integer remainder (**`IMOD`**) — deferred beyond M20.
 
 **After the spike ships:** Apollo Milestone 8 Stage 2 updates the console binding table
-(and dialect notes); no front-end IR rewrite required for P0–P2. Gemini M20 close does
-**not** require that Apollo emit change in the same release.
+(and dialect notes); no front-end IR rewrite required for P0–P2.
 
 ---
 
@@ -163,7 +162,7 @@ Not part of the near-term spike — see **BASIC / Pick compatibility** if changi
 
 **Possible direction**
 
-- See **Near-term ask**: **`INPUT_FLT`**, **`COERCE_FLT`**, optional **`MOD`/`IMOD`**.
+- Core **`INPUT_FLT`**, **`COERCE_FLT`**, and truncated **`MOD`** shipped in [Milestone 20](milestones/20-vm-console-numeric-ergonomics.md). Floored **`IMOD`** remains deferred.
 - Document or stabilize **mixed-type arithmetic rules** if opcodes should not depend on
   implicit stack typing.
 
@@ -171,7 +170,7 @@ Not part of the near-term spike — see **BASIC / Pick compatibility** if changi
 
 - Shorter bytecode, clearer semantics for all numeric front-ends.
 
-**Priority:** *ergonomics* (P1–P3 in the near-term table; [Milestone 20](milestones/20-vm-console-numeric-ergonomics.md)).
+**Priority:** *ergonomics* (P1–P3 shipped in [Milestone 20](milestones/20-vm-console-numeric-ergonomics.md); remaining themes below stay open).
 
 ---
 
@@ -205,7 +204,7 @@ Not part of the near-term spike — see **BASIC / Pick compatibility** if changi
 
 - Cleaner separation: VM core vs language-specific I/O; better dialect fidelity.
 
-**Priority:** *capability* for glyph/`INPUT_FLT` (near-term, [Milestone 20](milestones/20-vm-console-numeric-ergonomics.md)); *ergonomics* for module
+**Priority:** *capability* for glyph/`INPUT_FLT` (shipped in [Milestone 20](milestones/20-vm-console-numeric-ergonomics.md)); *ergonomics* for module
 formatting (after primitives exist).
 
 ---
@@ -288,3 +287,4 @@ No Apollo release should **require** the changes listed in this document.
 |------|---------|
 | 2026-03 | Initial consumer backlog (optional VM simplifications; array value params use call-site dim/init/copy on today’s VM). |
 | 2026-09 | Near-term ask after M8 Stage 1: glyph/`PRINT_CHAR`, `INPUT_FLT`, optional `COERCE_FLT`/`MOD`; clarify core vs language-module layering; char-as-decimal `PRINT_VAL` friction. Gemini [Milestone 20](milestones/20-vm-console-numeric-ergonomics.md) tracks P0–P3 as an additive opcode spike. |
+| 2026-09 | Gemini [Milestone 20](milestones/20-vm-console-numeric-ergonomics.md) **completed**: `PRINT_CHAR`, `INPUT_FLT`, `COERCE_FLT`, truncated core `MOD` shipped; floored `IMOD` deferred. Apollo binding-table switch remains a separate compiler change. |

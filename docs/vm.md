@@ -198,4 +198,4 @@ See the **`programs/`** directory (e.g. `hello.tbc`, `stacktest.tbc`) for runnab
 - [Concurrency and record locking](concurrency.md) — lock opcodes in context of the session lock model.
 - [Bytecode contract for external compilers](bytecode.md) — **`CALL_FUNC`** ABI, namespace/function IDs, stack semantics.
 - [Language module ABI](language-modules.md) — writing shared modules for **`register_language`**.
-- [Apollo consumer notes](apollo-consumer-notes.md) — optional evolution backlog; near-term opcodes in [Milestone 20](milestones/20-vm-console-numeric-ergonomics.md).
+- [Apollo consumer notes](apollo-consumer-notes.md) — optional evolution backlog; near-term console/numeric opcodes shipped in [Milestone 20](milestones/20-vm-console-numeric-ergonomics.md) (completed).
