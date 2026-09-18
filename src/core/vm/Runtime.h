@@ -96,7 +96,9 @@ namespace PickVM {
         SetOnErrorHandler,
         LoadVar,
         StoreVar,
-        PrintChar
+        PrintChar,
+        InputFlt,
+        CoerceFlt
     };
 
     /// BASIC STATUS() value when a record lock conflict is handled or raised (Milestone 10).

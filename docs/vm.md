@@ -43,7 +43,9 @@ For non-`.tbc` loaders (for example, handwritten instruction vectors), source-li
 | `PRINT_CHAR` | Pop int; write one character (glyph) to the runtime output stream (no line ending). Accepts code points **0–255**; out of range throws `PRINT_CHAR: code point out of range`. Wrong stack type throws `PRINT_CHAR: expected int on stack`. Does not change `PRINT_VAL`. |
 | `INPUT_INT` | Read one input line, parse as int, and push it. Throws `INPUT_INT: end of input` on EOF and `INPUT_INT: invalid integer input` on parse failure. Available for handwritten `.tbc`; the BASIC compiler emits `INPUT_STR` instead. |
 | `INPUT_STR` | Read one input line as a raw string (trimmed), and push it. Emitted by the BASIC compiler for all `INPUT` statements. |
+| `INPUT_FLT` | Read one input line, parse as floating-point (`std::stod` after trim; full consume required), and push `double`. Throws `INPUT_FLT: end of input` on EOF and `INPUT_FLT: invalid float input` on parse failure. Available for handwritten `.tbc`; the BASIC compiler does not emit this opcode. |
 | `COERCE_INT` | Pop a `Value`, convert to int (`strtol`; empty or non-numeric string → 0), push the resulting int. Emitted by the BASIC compiler after `INPUT_STR` for `%`-suffix variables and after expressions assigned to `%`-suffix variables. |
+| `COERCE_FLT` | Pop a `Value`, convert to `double` (int widen; double pass-through; empty or non-numeric string → `0.0`; numeric prefix accepted), push the resulting float. Mirror of `COERCE_INT` for float. Available for handwritten `.tbc`; the BASIC compiler does not emit this opcode yet. |
 | `CALL n` | Push `ip+1` onto the call stack, then set IP to `n`. Used to implement `GOSUB`. |
 | `RETURN` | Pop the top address from the call stack and set IP to it. Throws `"RETURN without GOSUB"` if the call stack is empty. |
 | `FOR_SETUP name` | Pop `step` (top of stack), then pop `limit`; validate that `step ≠ 0` (throws `"FOR: STEP cannot be zero"`); push a loop frame `{varName=name, limit, step, bodyIP=ip+1}` onto the for-stack; fall through to the body. Used to implement `FOR`. |
@@ -79,8 +81,6 @@ For non-`.tbc` loaders (for example, handwritten instruction vectors), source-li
 
 | Text | Intended meaning |
 |------|------------------|
-| `INPUT_FLT` | Read one input line; parse as float; push `double`. |
-| `COERCE_FLT` | Pop a `Value`; convert to `double` (mirror of `COERCE_INT`). |
 | `MOD` / `IMOD` | Optional integer remainder; BASIC `MOD` via `CALL_FUNC` remains the Pick path until an explicit emit switch. |
 
 Jump targets must refer to defined labels and resolve to valid instruction indices; the parser validates range.
@@ -106,7 +106,7 @@ Jump targets must refer to defined labels and resolve to valid instruction indic
 - **`currentSourceLine()`** / **`sourceLineAtInstruction(ip)`** — source line lookup for debugger tooling.
 - **`isLoaded()`** — true if a non-empty program is loaded.
 - **`setOutputStream(ostream*)`** — where **`PRINT_*`** go; **`nullptr`** means **`std::cout`**.
-- **`setInputStream(istream*)`** — where **`INPUT_STR`** and **`INPUT_INT`** read from; **`nullptr`** means **`std::cin`**.
+- **`setInputStream(istream*)`** — where **`INPUT_STR`**, **`INPUT_INT`**, and **`INPUT_FLT`** read from; **`nullptr`** means **`std::cin`**.
 - **`stack()`** / **`dumpStack()`** — inspection helpers.
 - Runtime keeps a per-loaded-program variable map for `STORE_VAR`/`LOAD_VAR`, a **call stack** for `CALL`/`RETURN`, a **for-stack** for `FOR_SETUP`/`FOR_NEXT`, and an **arrays map** for `DIM_ARRAY`/`LOAD_ARR`/`STORE_ARR`; loading a new program resets all four.
 - When no metadata is supplied (or metadata is shorter than the program), missing entries are treated as source line **`0`** (sentinel for "no source line").

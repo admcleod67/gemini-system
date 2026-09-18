@@ -298,6 +298,40 @@ TEST_CASE("parser INPUT_INT takes no operand") {
     CHECK_THROWS_AS(parser.parse(in), std::runtime_error);
 }
 
+TEST_CASE("parser INPUT_FLT") {
+    Parser parser;
+    std::istringstream in(
+        "INPUT_FLT\n"
+        "HALT\n");
+    LoadedBytecode lb = parser.parse(in);
+    REQUIRE(lb.program.size() == 2);
+    CHECK(lb.program[0].op == OpCode::InputFlt);
+    CHECK(lb.program[1].op == OpCode::Halt);
+}
+
+TEST_CASE("parser INPUT_FLT takes no operand") {
+    Parser parser;
+    std::istringstream in("INPUT_FLT 1.5\nHALT\n");
+    CHECK_THROWS_AS(parser.parse(in), std::runtime_error);
+}
+
+TEST_CASE("parser COERCE_FLT") {
+    Parser parser;
+    std::istringstream in(
+        "COERCE_FLT\n"
+        "HALT\n");
+    LoadedBytecode lb = parser.parse(in);
+    REQUIRE(lb.program.size() == 2);
+    CHECK(lb.program[0].op == OpCode::CoerceFlt);
+    CHECK(lb.program[1].op == OpCode::Halt);
+}
+
+TEST_CASE("parser COERCE_FLT takes no operand") {
+    Parser parser;
+    std::istringstream in("COERCE_FLT x\nHALT\n");
+    CHECK_THROWS_AS(parser.parse(in), std::runtime_error);
+}
+
 TEST_CASE("parser parseFile missing file") {
     Parser parser;
     CHECK_THROWS_AS(parser.parseFile("/nonexistent/pick_system/no_such_file.tbc"), std::runtime_error);

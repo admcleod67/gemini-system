@@ -638,6 +638,71 @@ TEST_CASE("runtime INPUT_INT eof throws") {
     CHECK_THROWS_AS(rt.run(), std::runtime_error);
 }
 
+TEST_CASE("runtime INPUT_FLT reads float from input stream") {
+    std::istringstream in("3.5\n");
+    std::vector<Instruction> prog = {
+        {OpCode::InputFlt, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    Runtime rt;
+    rt.setInputStream(&in);
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<double>(rt.stack()[0]) == doctest::Approx(3.5));
+}
+
+TEST_CASE("runtime INPUT_FLT invalid input throws") {
+    std::istringstream in("xyz\n");
+    std::vector<Instruction> prog = {
+        {OpCode::InputFlt, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    Runtime rt;
+    rt.setInputStream(&in);
+    rt.loadProgram(prog);
+    try {
+        rt.run();
+        FAIL("expected runtime_error");
+    } catch (const std::runtime_error &e) {
+        CHECK(std::string(e.what()).find("INPUT_FLT:") != std::string::npos);
+    }
+}
+
+TEST_CASE("runtime INPUT_FLT eof throws") {
+    std::istringstream in;
+    std::vector<Instruction> prog = {
+        {OpCode::InputFlt, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    Runtime rt;
+    rt.setInputStream(&in);
+    rt.loadProgram(prog);
+    try {
+        rt.run();
+        FAIL("expected runtime_error");
+    } catch (const std::runtime_error &e) {
+        CHECK(std::string(e.what()).find("INPUT_FLT:") != std::string::npos);
+    }
+}
+
+TEST_CASE("runtime INPUT_FLT rejects trailing junk") {
+    std::istringstream in("1.0x\n");
+    std::vector<Instruction> prog = {
+        {OpCode::InputFlt, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    Runtime rt;
+    rt.setInputStream(&in);
+    rt.loadProgram(prog);
+    try {
+        rt.run();
+        FAIL("expected runtime_error");
+    } catch (const std::runtime_error &e) {
+        CHECK(std::string(e.what()).find("INPUT_FLT:") != std::string::npos);
+    }
+}
+
 TEST_CASE("runtime INPUT_STR reads a trimmed line as string") {
     std::istringstream in("  hello world  \n");
     std::vector<Instruction> prog = {
@@ -744,6 +809,71 @@ TEST_CASE("runtime CoerceInt converts numeric string to int") {
     rt.run();
     REQUIRE(rt.stack().size() == 1);
     CHECK(std::get<int>(rt.stack()[0]) == 99);
+}
+
+TEST_CASE("runtime CoerceFlt widens int to double") {
+    std::vector<Instruction> prog = {
+        {OpCode::PushInt, 7},
+        {OpCode::CoerceFlt, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    Runtime rt;
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<double>(rt.stack()[0]) == doctest::Approx(7.0));
+}
+
+TEST_CASE("runtime CoerceFlt converts numeric string to double") {
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"3.14"}},
+        {OpCode::CoerceFlt, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    Runtime rt;
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<double>(rt.stack()[0]) == doctest::Approx(3.14));
+}
+
+TEST_CASE("runtime CoerceFlt yields zero for non-numeric string") {
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"hello"}},
+        {OpCode::CoerceFlt, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    Runtime rt;
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<double>(rt.stack()[0]) == doctest::Approx(0.0));
+}
+
+TEST_CASE("runtime CoerceFlt yields zero for empty string") {
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{""}},
+        {OpCode::CoerceFlt, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    Runtime rt;
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<double>(rt.stack()[0]) == doctest::Approx(0.0));
+}
+
+TEST_CASE("runtime CoerceFlt uses numeric prefix for 12ABC") {
+    std::vector<Instruction> prog = {
+        {OpCode::PushStr, std::string{"12ABC"}},
+        {OpCode::CoerceFlt, Value{}},
+        {OpCode::Halt, Value{}},
+    };
+    Runtime rt;
+    rt.loadProgram(prog);
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<double>(rt.stack()[0]) == doctest::Approx(12.0));
 }
 
 TEST_CASE("runtime CoerceInt yields zero for non-numeric string") {

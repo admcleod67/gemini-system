@@ -346,8 +346,14 @@ namespace PickVM {
             } else if (pl.opcode == "INPUT_STR") {
                 inst.op = OpCode::InputStr;
                 requireNoOperand(pl);
+            } else if (pl.opcode == "INPUT_FLT") {
+                inst.op = OpCode::InputFlt;
+                requireNoOperand(pl);
             } else if (pl.opcode == "COERCE_INT") {
                 inst.op = OpCode::CoerceInt;
+                requireNoOperand(pl);
+            } else if (pl.opcode == "COERCE_FLT") {
+                inst.op = OpCode::CoerceFlt;
                 requireNoOperand(pl);
             } else if (pl.opcode == "JUMP") {
                 inst.op = OpCode::Jump;

@@ -269,6 +269,22 @@ namespace PickVM {
             return pos == trimmed.size();
         }
 
+        bool parseFltLine(const std::string &line, double &value) {
+            std::size_t first = line.find_first_not_of(" \t\r\n");
+            if (first == std::string::npos) {
+                return false;
+            }
+            std::size_t last = line.find_last_not_of(" \t\r\n");
+            const std::string trimmed = line.substr(first, last - first + 1);
+            std::size_t pos = 0;
+            try {
+                value = std::stod(trimmed, &pos);
+            } catch (const std::exception &) {
+                return false;
+            }
+            return pos == trimmed.size();
+        }
+
         /// M15 VM input yield boundary — transport yield occurs in session IpcSessionChannel.
         bool readInputLine(std::istream &in, std::string &line) {
             return static_cast<bool>(std::getline(in, line));
@@ -559,6 +575,11 @@ namespace PickVM {
                 break;
             }
 
+            case OpCode::CoerceFlt: {
+                push(coerceToDouble(pop()));
+                break;
+            }
+
             case OpCode::InputInt: {
                 std::string line;
                 if (!readInputLine(in(), line)) {
@@ -567,6 +588,19 @@ namespace PickVM {
                 int value = 0;
                 if (!parseIntLine(line, value)) {
                     throw std::runtime_error("INPUT_INT: invalid integer input");
+                }
+                push(value);
+                break;
+            }
+
+            case OpCode::InputFlt: {
+                std::string line;
+                if (!readInputLine(in(), line)) {
+                    throw std::runtime_error("INPUT_FLT: end of input");
+                }
+                double value = 0.0;
+                if (!parseFltLine(line, value)) {
+                    throw std::runtime_error("INPUT_FLT: invalid float input");
                 }
                 push(value);
                 break;

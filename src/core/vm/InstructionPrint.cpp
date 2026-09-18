@@ -36,7 +36,9 @@ namespace PickVM {
             case OpCode::PrintChar: return "PRINT_CHAR";
             case OpCode::InputInt: return "INPUT_INT";
             case OpCode::InputStr: return "INPUT_STR";
+            case OpCode::InputFlt: return "INPUT_FLT";
             case OpCode::CoerceInt: return "COERCE_INT";
+            case OpCode::CoerceFlt: return "COERCE_FLT";
             case OpCode::Jump: return "JUMP";
             case OpCode::JumpIfZero: return "JZ";
             case OpCode::Call: return "CALL";
@@ -198,7 +200,9 @@ namespace PickVM {
             case OpCode::PrintChar:
             case OpCode::InputInt:
             case OpCode::InputStr:
+            case OpCode::InputFlt:
             case OpCode::CoerceInt:
+            case OpCode::CoerceFlt:
             case OpCode::Return:
             case OpCode::ClearVars:
             case OpCode::AbsInt:
