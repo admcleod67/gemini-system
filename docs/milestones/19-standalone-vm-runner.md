@@ -171,7 +171,7 @@ No `BootMonitor` banner UX, no catalogue, no `GeminiSession`, no `applyDefaultFi
 
 - Implement the Pascal namespace **3** console handlers and switch Apollo from core console opcodes to `CALL_FUNC`; steady-state module ownership belongs in **apollo-compiler**
 - Optional host filesystem façade (non-Pick) for BASIC/Pascal file I/O
-- Optional multi-language VM ergonomics / capability backlog from Apollo consumer input — see [`apollo-consumer-notes.md`](../apollo-consumer-notes.md) (not a single milestone; prefer additive opcodes and ABI versions so Pick BASIC `MAT_*` / `DIM_ARRAY` semantics stay stable)
+- Optional multi-language VM ergonomics / capability backlog from Apollo consumer input — see [`apollo-consumer-notes.md`](../apollo-consumer-notes.md). Near-term P0–P3 (`PRINT_CHAR`, `INPUT_FLT`, `COERCE_FLT`, optional core `MOD`) is [**Milestone 22**](22-vm-console-numeric-ergonomics.md); remaining themes (array ABI, `var` params, host FS, debug metadata) stay separate tracks. Prefer additive opcodes and ABI versions so Pick BASIC `MAT_*` / `DIM_ARRAY` semantics stay stable.
 - R83 compatibility gap work (within reason) — see [`compatibility-r83-pick.md`](../compatibility-r83-pick.md)
 - CPU-bound cooperative yield — [**Milestone 21**](21-execution-fairness-cpu-bound-yield.md)
 

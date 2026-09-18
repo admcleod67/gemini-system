@@ -2,9 +2,9 @@
 
 ## Milestone 21 — Execution Fairness: CPU-Bound Cooperative Yield
 
-Extend [**Milestone 15**](15-cooperative-multi-session-execution.md) cooperative scheduling so sessions blocked in **CPU-bound** interpreter work (not only at I/O waits) periodically release the execution token. Preserve the single-interpreter-stack invariant: still no preemptive threading or parallel VM stacks. *Status: planned (deferred; after standalone VM and R83-compat work).*
+Extend [**Milestone 15**](15-cooperative-multi-session-execution.md) cooperative scheduling so sessions blocked in **CPU-bound** interpreter work (not only at I/O waits) periodically release the execution token. Preserve the single-interpreter-stack invariant: still no preemptive threading or parallel VM stacks. *Status: planned (deferred; after standalone VM, R83-compat, and the [M22](22-vm-console-numeric-ergonomics.md) opcode spike as scheduling allows).*
 
-Formerly numbered Milestone 19. Renumbered so [**Milestone 19**](19-standalone-vm-runner.md) (standalone VM runner) and R83 compatibility gap closure can precede fairness. Depends on [**Milestone 18**](18-version-1-gemini-system-service.md) (Version 1.0). Do not start while higher-priority post–v1.0 milestones remain open.
+Formerly numbered Milestone 19. Renumbered so [**Milestone 19**](19-standalone-vm-runner.md) (standalone VM runner) and R83 compatibility gap closure can precede fairness. [**Milestone 22**](22-vm-console-numeric-ergonomics.md) is a small additive-opcode track and does not replace this work. Depends on [**Milestone 18**](18-version-1-gemini-system-service.md) (Version 1.0).
 
 ---
 

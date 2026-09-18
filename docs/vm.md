@@ -74,6 +74,15 @@ For non-`.tbc` loaders (for example, handwritten instruction vectors), source-li
 | `CALL_FUNC ns-id, fn-id, arg-count` | Pop **`arg-count`** stack values (last argument on top), dispatch to the boot-time **`LanguageRegistry`** for namespace **`ns-id`**, function **`fn-id`**. Push the handler's return value. Requires a configured language registry. See [`bytecode.md`](bytecode.md) for encoding, stack order, namespace/function IDs, and **`LANG:`** errors. |
 | `INVOKE_BUILTIN "name"` | Legacy name-based built-in dispatch (BASIC shim → registry). Prefer **`CALL_FUNC`** for new bytecode; see [`basic-language.md`](basic-language.md). |
 
+**Planned additive opcodes** ([Milestone 22](milestones/22-vm-console-numeric-ergonomics.md); not implemented until that milestone ships):
+
+| Text | Intended meaning |
+|------|------------------|
+| `PRINT_CHAR` | Pop int; write one character (glyph) to the output stream. Does not change `PRINT_VAL`. |
+| `INPUT_FLT` | Read one input line; parse as float; push `double`. |
+| `COERCE_FLT` | Pop a `Value`; convert to `double` (mirror of `COERCE_INT`). |
+| `MOD` / `IMOD` | Optional integer remainder; BASIC `MOD` via `CALL_FUNC` remains the Pick path until an explicit emit switch. |
+
 Jump targets must refer to defined labels and resolve to valid instruction indices; the parser validates range.
 
 ## Parser API
@@ -194,3 +203,4 @@ See the **`programs/`** directory (e.g. `hello.tbc`, `stacktest.tbc`) for runnab
 - [Concurrency and record locking](concurrency.md) — lock opcodes in context of the session lock model.
 - [Bytecode contract for external compilers](bytecode.md) — **`CALL_FUNC`** ABI, namespace/function IDs, stack semantics.
 - [Language module ABI](language-modules.md) — writing shared modules for **`register_language`**.
+- [Apollo consumer notes](apollo-consumer-notes.md) — optional evolution backlog; near-term opcodes in [Milestone 22](milestones/22-vm-console-numeric-ergonomics.md).

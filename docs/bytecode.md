@@ -161,5 +161,5 @@ The VM forwards name-based calls to the same registry (BASIC shim). **New compil
 - [`language-modules.md`](language-modules.md) — writing a shared module; canonical BASIC module walkthrough
 - [`vm.md`](vm.md) — VM opcode listing
 - [`compiler-architecture.md`](compiler-architecture.md) — in-tree BASIC pipeline
-- [`apollo-consumer-notes.md`](apollo-consumer-notes.md) — optional VM evolution backlog from Apollo (consumer input; not a specification change)
+- [`apollo-consumer-notes.md`](apollo-consumer-notes.md) — optional VM evolution backlog from Apollo (consumer input; not a specification change). Near-term opcodes: [Milestone 22](milestones/22-vm-console-numeric-ergonomics.md).
 - [`milestones/11-multi-language-runtime-infrastructure.md`](milestones/11-multi-language-runtime-infrastructure.md) — milestone context
