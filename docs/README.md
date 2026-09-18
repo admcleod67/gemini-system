@@ -11,7 +11,7 @@ Technical reference for Gemini System. Paths below are relative to this director
 - **[Bytecode contract for external compilers](bytecode.md)** — **`CALL_FUNC`** encoding, namespace/function IDs, stack semantics.
 - **[Language module ABI](language-modules.md)** — **`register_language`**, building shared modules, reference BASIC walkthrough.
 - **[Language namespace schema](schemas/language-namespaces.json)** — machine-readable ID catalogue.
-- **[Apollo consumer notes](apollo-consumer-notes.md)** — optional VM / runtime evolution backlog from Apollo (non-normative; BASIC/`MAT_*` compatibility gate). Near-term P0–P3 tracked as [**Milestone 22**](milestones/22-vm-console-numeric-ergonomics.md).
+- **[Apollo consumer notes](apollo-consumer-notes.md)** — optional VM / runtime evolution backlog from Apollo (non-normative; BASIC/`MAT_*` compatibility gate). Near-term P0–P3 tracked as [**Milestone 20**](milestones/20-vm-console-numeric-ergonomics.md).
 
 ## Shells and host commands
 
@@ -39,7 +39,7 @@ Technical reference for Gemini System. Paths below are relative to this director
 
 ## Roadmap
 
-- **[Project milestones](milestones.md)** — hub index; **Milestones 1–19** completed; next R83 compatibility (M20); [**Milestone 22**](milestones/22-vm-console-numeric-ergonomics.md) VM console/numeric opcodes; then **Milestone 21** CPU-bound fairness (deferred).
+- **[Project milestones](milestones.md)** — hub index; **Milestones 1–19** completed; next [**Milestone 20**](milestones/20-vm-console-numeric-ergonomics.md) VM console/numeric opcodes; then R83 compatibility (M21); **Milestone 22** CPU-bound fairness (deferred).
 - **[Changelog](../CHANGELOG.md)** — release notes (current: **1.0.0**).
 - **[Milestone detail pages](milestones/)** — one file per milestone (`NN-slug.md` for sortable filenames).
 - **[Compatibility (R83/Pick)](compatibility-r83-pick.md)** — implemented/partial/deferred Gemini compatibility notes versus classic Pick behavior.

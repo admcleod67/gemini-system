@@ -1,10 +1,12 @@
 ← [Project milestones index](../milestones.md)
 
-## Milestone 22 — VM Console and Numeric Ergonomics
+## Milestone 20 — VM Console and Numeric Ergonomics
 
 Add a small set of **language-neutral core opcodes** so compiled front-ends (Apollo Pascal first; handwritten `.tbc` and later BASIC welcome) can print a character from an integer code, read a float, and widen int→float without compiler workarounds. Optional core integer remainder. Existing opcode semantics — including Pick BASIC `PRINT_VAL`, `DIM_ARRAY`, and `MAT_*` — stay unchanged. *Status: planned.*
 
 Consumer ask: [`docs/apollo-consumer-notes.md`](../apollo-consumer-notes.md) (near-term P0–P3). Unblocks Apollo Compiler **Milestone 8 Stage 2** (console I/O fidelity) after Apollo has already lowered Wirth ordinal/arithmetic functions in the compiler.
+
+**Next post–v1.0 delivery** after [Milestone 19](19-standalone-vm-runner.md). R83 gap work is [**Milestone 21**](../compatibility-r83-pick.md) (detail page TBD); CPU fairness is deferred [**Milestone 22**](22-execution-fairness-cpu-bound-yield.md).
 
 **Standing invariant:** `gemini-system`, `gemini-daemon`, `gemini-console`, and BASIC `MAT_*` / `DIM_ARRAY` / `PRINT_VAL` behaviour must not regress. Full `ctest` remains green after every stage. Prefer **additive** opcodes only.
 
@@ -38,7 +40,7 @@ Parser, `InstructionPrint`, `BytecodeText`, `Runtime::step`, and [`docs/vm.md`](
 - Host filesystem façade / Pascal `file` I/O ([M19](19-standalone-vm-runner.md) §9)
 - Array value-parameter ABI or `var` array aliases ([consumer notes](../apollo-consumer-notes.md) §1–§2)
 - Debug metadata / source-name mapping (consumer notes §6)
-- R83 gaps ([**Milestone 20**](../compatibility-r83-pick.md)) or CPU-bound yield ([**Milestone 21**](21-execution-fairness-cpu-bound-yield.md))
+- R83 gaps ([**Milestone 21**](../compatibility-r83-pick.md)) or CPU-bound yield ([**Milestone 22**](22-execution-fairness-cpu-bound-yield.md))
 - Requiring Apollo to emit the new opcodes in the same Gemini release (Apollo switches its binding table afterwards)
 
 ---
@@ -68,7 +70,7 @@ Parser, `InstructionPrint`, `BytecodeText`, `Runtime::step`, and [`docs/vm.md`](
 - [ ] Optional **`MOD`/`IMOD`** either shipped with documented remainder semantics **or** explicitly deferred in this page with a follow-on note
 - [ ] Existing `PRINT_VAL` / `MAT_*` / `DIM_ARRAY` tests unchanged in intent; full `ctest` green
 - [ ] Consumer notes near-term table marked implemented (or P3 deferred) when closed
-- [ ] Hub / README list M22 implemented when closed
+- [ ] Hub / README list M20 implemented when closed
 
 ---
 
@@ -77,16 +79,18 @@ Parser, `InstructionPrint`, `BytecodeText`, `Runtime::step`, and [`docs/vm.md`](
 1. **P0 `PRINT_CHAR`** — opcode, parser, tests (`PUSH_INT 65` / `PRINT_CHAR` → `A`). *Status: planned.*
 2. **P1 `INPUT_FLT` + P2 `COERCE_FLT`** — align errors with `INPUT_INT` / `COERCE_INT`. *Status: planned.*
 3. **P3 remainder (optional)** — core `MOD`/`IMOD` or defer. *Status: planned.*
-4. **Docs + closes M22** — `vm.md` rows; consumer-notes status; hub. **Closes Milestone 22.** *Status: planned.*
+4. **Docs + closes M20** — `vm.md` rows; consumer-notes status; hub. **Closes Milestone 20.** *Status: planned.*
 
-Only Stage 4 claims “Closes Milestone 22.”
+Only Stage 4 claims “Closes Milestone 20.”
 
 ---
 
-### 7. Follow-on (beyond M22)
+### 7. Follow-on (beyond M20)
 
 - Apollo switches console binding (compiler-side; not this repo’s close criterion)
 - Pascal I/O module / field widths — [M19](19-standalone-vm-runner.md) §9
 - Array copy / `var` parameters, host FS façade, debug metadata — [`apollo-consumer-notes.md`](../apollo-consumer-notes.md) (separate tracks)
+- R83 compatibility — [**Milestone 21**](../compatibility-r83-pick.md) (detail page TBD)
+- CPU-bound cooperative yield — [**Milestone 22**](22-execution-fairness-cpu-bound-yield.md)
 
 *Status: planned.*

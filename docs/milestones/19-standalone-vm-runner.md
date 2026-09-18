@@ -75,7 +75,7 @@ Rationale (aligned with Apollo Milestone 6): the bootstrap binding proves portab
 - Rewriting the VM from scratch
 - Pascal or Pick **file I/O** as a requirement for the first proof
 - Implementing the future Pascal `CALL_FUNC` helper module (see §2.5)
-- CPU-bound multi-session fairness ([**Milestone 21**](21-execution-fairness-cpu-bound-yield.md))
+- CPU-bound multi-session fairness ([**Milestone 22**](22-execution-fairness-cpu-bound-yield.md))
 - R83 compatibility gap closure ([compatibility notes](../compatibility-r83-pick.md); planned after this milestone)
 - Changing Application/Service edition semantics
 
@@ -171,8 +171,8 @@ No `BootMonitor` banner UX, no catalogue, no `GeminiSession`, no `applyDefaultFi
 
 - Implement the Pascal namespace **3** console handlers and switch Apollo from core console opcodes to `CALL_FUNC`; steady-state module ownership belongs in **apollo-compiler**
 - Optional host filesystem façade (non-Pick) for BASIC/Pascal file I/O
-- Optional multi-language VM ergonomics / capability backlog from Apollo consumer input — see [`apollo-consumer-notes.md`](../apollo-consumer-notes.md). Near-term P0–P3 (`PRINT_CHAR`, `INPUT_FLT`, `COERCE_FLT`, optional core `MOD`) is [**Milestone 22**](22-vm-console-numeric-ergonomics.md); remaining themes (array ABI, `var` params, host FS, debug metadata) stay separate tracks. Prefer additive opcodes and ABI versions so Pick BASIC `MAT_*` / `DIM_ARRAY` semantics stay stable.
+- Optional multi-language VM ergonomics / capability backlog from Apollo consumer input — see [`apollo-consumer-notes.md`](../apollo-consumer-notes.md). Near-term P0–P3 (`PRINT_CHAR`, `INPUT_FLT`, `COERCE_FLT`, optional core `MOD`) is [**Milestone 20**](20-vm-console-numeric-ergonomics.md); remaining themes (array ABI, `var` params, host FS, debug metadata) stay separate tracks. Prefer additive opcodes and ABI versions so Pick BASIC `MAT_*` / `DIM_ARRAY` semantics stay stable.
 - R83 compatibility gap work (within reason) — see [`compatibility-r83-pick.md`](../compatibility-r83-pick.md)
-- CPU-bound cooperative yield — [**Milestone 21**](21-execution-fairness-cpu-bound-yield.md)
+- CPU-bound cooperative yield — [**Milestone 22**](22-execution-fairness-cpu-bound-yield.md)
 
 *Status: implemented.*

@@ -1,10 +1,10 @@
 ← [Project milestones index](../milestones.md)
 
-## Milestone 21 — Execution Fairness: CPU-Bound Cooperative Yield
+## Milestone 22 — Execution Fairness: CPU-Bound Cooperative Yield
 
-Extend [**Milestone 15**](15-cooperative-multi-session-execution.md) cooperative scheduling so sessions blocked in **CPU-bound** interpreter work (not only at I/O waits) periodically release the execution token. Preserve the single-interpreter-stack invariant: still no preemptive threading or parallel VM stacks. *Status: planned (deferred; after standalone VM, R83-compat, and the [M22](22-vm-console-numeric-ergonomics.md) opcode spike as scheduling allows).*
+Extend [**Milestone 15**](15-cooperative-multi-session-execution.md) cooperative scheduling so sessions blocked in **CPU-bound** interpreter work (not only at I/O waits) periodically release the execution token. Preserve the single-interpreter-stack invariant: still no preemptive threading or parallel VM stacks. *Status: planned (deferred; after [M20](20-vm-console-numeric-ergonomics.md) and R83-compat [M21](../compatibility-r83-pick.md) as scheduling allows).*
 
-Formerly numbered Milestone 19. Renumbered so [**Milestone 19**](19-standalone-vm-runner.md) (standalone VM runner) and R83 compatibility gap closure can precede fairness. [**Milestone 22**](22-vm-console-numeric-ergonomics.md) is a small additive-opcode track and does not replace this work. Depends on [**Milestone 18**](18-version-1-gemini-system-service.md) (Version 1.0).
+Formerly numbered Milestone 19, then briefly M21. Renumbered to **M22** so [**Milestone 20**](20-vm-console-numeric-ergonomics.md) (VM console/numeric ergonomics) and **Milestone 21** (R83 compatibility gaps) precede fairness. Depends on [**Milestone 18**](18-version-1-gemini-system-service.md) (Version 1.0).
 
 ---
 
@@ -24,13 +24,13 @@ This is **documented M15 non-goal behaviour**, not a regression. Version 1.0 shi
 
 Operators expect multi-session **responsiveness** not only at idle prompts but also when another terminal runs a runaway or long batch job — within Pick-authentic constraints (one interpreter stack, cooperative model).
 
-M21 adds **voluntary yield inside long-running VM work** so other sessions can acquire the token and make progress, without OS time slices or pthread-per-session execution.
+M22 adds **voluntary yield inside long-running VM work** so other sessions can acquire the token and make progress, without OS time slices or pthread-per-session execution.
 
 ---
 
 ### 3. Scope
 
-#### 3.1 Opcode-budget yield (v1 of M21)
+#### 3.1 Opcode-budget yield (v1 of M22)
 
 - In [`Shell::runBasicUntilStop`](../../src/userland/tcl/Shell.cpp) and/or [`VmDebugService::stepRuntime`](../../src/userland/assembler/VmDebugService.cpp), after every **N** VM steps (configurable constant or daemon setting):
   - `release` execution token (or equivalent yield API on [`GeminiSessionHost`](../../src/userland/tcl/GeminiSessionHost.h))
@@ -95,10 +95,10 @@ M21 adds **voluntary yield inside long-running VM work** so other sessions can a
 
 ### 7. Suggested implementation stages
 
-1. **Opcode-budget yield** — constant N in `runBasicUntilStop`; two-session unit + integration test. **Minimum viable M21.**
+1. **Opcode-budget yield** — constant N in `runBasicUntilStop`; two-session unit + integration test. **Minimum viable M22.**
 2. **BREAK / interrupt** — same-session cancel; document Ctrl-C policy.
 3. **Output backpressure yield** — if IPC output stall reproduces starvation with `PRINT`-heavy loops.
-4. **Docs + closes M21** — daemon/console operator notes; full test suite green.
+4. **Docs + closes M22** — daemon/console operator notes; full test suite green.
 
 ---
 

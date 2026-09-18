@@ -32,7 +32,9 @@ Target delivered: a Pick-authentic, multi-session **Linux service** (UniData-sty
 
 ## Post–Version 1.0
 
+Delivery order (numbers match priority for upcoming work):
+
 - [Milestone 19 — Standalone VM Runner (completed)](milestones/19-standalone-vm-runner.md) — Pick-independent `gemini-vm`; Apollo Compiler M6 proof completed
-- **Milestone 20 — R83 compatibility gaps (planned)** — within reason; track candidates in [`compatibility-r83-pick.md`](compatibility-r83-pick.md) (detail page TBD)
-- [Milestone 21 — Execution Fairness: CPU-Bound Cooperative Yield (planned, deferred)](milestones/21-execution-fairness-cpu-bound-yield.md) — after M19 and R83-compat work; formerly numbered M19
-- [Milestone 22 — VM Console and Numeric Ergonomics (planned)](milestones/22-vm-console-numeric-ergonomics.md) — additive `PRINT_CHAR` / `INPUT_FLT` / `COERCE_FLT` (optional core `MOD`); Apollo consumer P0–P3; does not change BASIC `MAT_*`
+- [Milestone 20 — VM Console and Numeric Ergonomics (planned)](milestones/20-vm-console-numeric-ergonomics.md) — **next**; additive `PRINT_CHAR` / `INPUT_FLT` / `COERCE_FLT` (optional core `MOD`); Apollo consumer P0–P3; does not change BASIC `MAT_*`
+- **Milestone 21 — R83 compatibility gaps (planned)** — within reason; track candidates in [`compatibility-r83-pick.md`](compatibility-r83-pick.md) (detail page TBD)
+- [Milestone 22 — Execution Fairness: CPU-Bound Cooperative Yield (planned, deferred)](milestones/22-execution-fairness-cpu-bound-yield.md) — after M20 and R83-compat (M21); formerly numbered M19 then M21
