@@ -89,7 +89,7 @@ Stack order for `CALL_FUNC`: same as today — last argument on top; arity **1**
 ### 6. Suggested implementation stages
 
 1. **IDs + schema + empty module registration** — publish namespace/function table. *Status: implemented.*
-2. **Handlers + unit tests** — seven functions and domain cases. *Status: planned.*
+2. **Handlers + unit tests** — seven functions and domain cases. *Status: implemented.*
 3. **Docs + closes M21** — bytecode/language-modules/consumer-notes/hub. **Closes Milestone 21.** *Status: planned.*
 
 Only Stage 3 claims “Closes Milestone 21.”

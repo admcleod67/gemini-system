@@ -5,6 +5,7 @@
 #include "BasicLanguageIds.h"
 #include "LanguageModuleBootLog.h"
 
+#include <gemini/math_function_ids.hpp>
 #include <gemini/namespace_ids.hpp>
 
 #include <chrono>
@@ -12,6 +13,7 @@
 #include <fstream>
 #include <sstream>
 #include <string>
+#include <variant>
 #include <vector>
 
 using PickCore::Languages::FunctionId;
@@ -367,7 +369,7 @@ TEST_CASE("LanguageModuleLoader loads pascal comal cobol stub modules") {
     CHECK(cobolMeta->name == "cobol");
 }
 
-TEST_CASE("LanguageModuleLoader loads math module with empty handlers") {
+TEST_CASE("LanguageModuleLoader loads math module with seven handlers") {
     const std::filesystem::path mathPath = mathModulePath();
     if (mathPath.empty() || !std::filesystem::exists(mathPath)) {
         MESSAGE("GEMINI_MATH_MODULE_PATH not configured; skipping");
@@ -393,11 +395,145 @@ TEST_CASE("LanguageModuleLoader loads math module with empty handlers") {
     for (const auto &summary : registry.listNamespaces()) {
         if (summary.id == Gemini::kNamespaceIdMath) {
             foundMath = true;
-            CHECK(summary.functionCount == 0);
+            CHECK(summary.functionCount == 7);
         }
     }
     CHECK(foundMath);
-    CHECK(registry.functionSlotSummaries(Gemini::kNamespaceIdMath).empty());
+
+    const auto slots = registry.functionSlotSummaries(Gemini::kNamespaceIdMath);
+    REQUIRE(slots.size() == 7);
+    for (std::size_t i = 0; i < slots.size(); ++i) {
+        CHECK(slots[i].id == static_cast<FunctionId>(i));
+        CHECK(slots[i].arity == 1);
+        CHECK(slots[i].implemented);
+    }
+}
+
+TEST_CASE("LanguageModuleLoader math dispatch happy paths and coerce") {
+    const std::filesystem::path mathPath = mathModulePath();
+    if (mathPath.empty() || !std::filesystem::exists(mathPath)) {
+        MESSAGE("GEMINI_MATH_MODULE_PATH not configured; skipping");
+        return;
+    }
+
+    const auto modulesDir = uniqueTempDir() / "modules";
+    std::filesystem::create_directories(modulesDir);
+    copyModuleIfPresent(mathPath, modulesDir);
+
+    LanguageRegistry registry;
+    loadLanguageModules(registry, modulesDir);
+
+    const auto asDouble = [](const Value &v) {
+        REQUIRE(std::holds_alternative<double>(v));
+        return std::get<double>(v);
+    };
+
+    {
+        std::vector<Value> stack{9};
+        registry.dispatch(Gemini::kNamespaceIdMath, Gemini::Math::kFnSqrt, stack, 1);
+        REQUIRE(stack.size() == 1);
+        CHECK(asDouble(stack.back()) == doctest::Approx(3.0));
+    }
+    {
+        std::vector<Value> stack{0.0};
+        registry.dispatch(Gemini::kNamespaceIdMath, Gemini::Math::kFnSin, stack, 1);
+        REQUIRE(stack.size() == 1);
+        CHECK(asDouble(stack.back()) == doctest::Approx(0.0));
+    }
+    {
+        std::vector<Value> stack{0.0};
+        registry.dispatch(Gemini::kNamespaceIdMath, Gemini::Math::kFnCos, stack, 1);
+        REQUIRE(stack.size() == 1);
+        CHECK(asDouble(stack.back()) == doctest::Approx(1.0));
+    }
+    {
+        std::vector<Value> stack{0.0};
+        registry.dispatch(Gemini::kNamespaceIdMath, Gemini::Math::kFnTan, stack, 1);
+        REQUIRE(stack.size() == 1);
+        CHECK(asDouble(stack.back()) == doctest::Approx(0.0));
+    }
+    {
+        std::vector<Value> stack{0.0};
+        registry.dispatch(Gemini::kNamespaceIdMath, Gemini::Math::kFnArctan, stack, 1);
+        REQUIRE(stack.size() == 1);
+        CHECK(asDouble(stack.back()) == doctest::Approx(0.0));
+    }
+    {
+        std::vector<Value> stack{1.0};
+        registry.dispatch(Gemini::kNamespaceIdMath, Gemini::Math::kFnLn, stack, 1);
+        REQUIRE(stack.size() == 1);
+        CHECK(asDouble(stack.back()) == doctest::Approx(0.0));
+    }
+    {
+        std::vector<Value> stack{0.0};
+        registry.dispatch(Gemini::kNamespaceIdMath, Gemini::Math::kFnExp, stack, 1);
+        REQUIRE(stack.size() == 1);
+        CHECK(asDouble(stack.back()) == doctest::Approx(1.0));
+    }
+    {
+        std::vector<Value> stack{std::string{"16"}};
+        registry.dispatch(Gemini::kNamespaceIdMath, Gemini::Math::kFnSqrt, stack, 1);
+        REQUIRE(stack.size() == 1);
+        CHECK(asDouble(stack.back()) == doctest::Approx(4.0));
+    }
+}
+
+TEST_CASE("LanguageModuleLoader math domain errors") {
+    const std::filesystem::path mathPath = mathModulePath();
+    if (mathPath.empty() || !std::filesystem::exists(mathPath)) {
+        MESSAGE("GEMINI_MATH_MODULE_PATH not configured; skipping");
+        return;
+    }
+
+    const auto modulesDir = uniqueTempDir() / "modules";
+    std::filesystem::create_directories(modulesDir);
+    copyModuleIfPresent(mathPath, modulesDir);
+
+    LanguageRegistry registry;
+    loadLanguageModules(registry, modulesDir);
+
+    {
+        std::vector<Value> stack{-1.0};
+        CHECK_THROWS_WITH(registry.dispatch(Gemini::kNamespaceIdMath, Gemini::Math::kFnSqrt, stack, 1),
+                          "MATH: SQRT domain");
+    }
+    {
+        std::vector<Value> stack{0.0};
+        CHECK_THROWS_WITH(registry.dispatch(Gemini::kNamespaceIdMath, Gemini::Math::kFnLn, stack, 1),
+                          "MATH: LN domain");
+    }
+    {
+        std::vector<Value> stack{-1.0};
+        CHECK_THROWS_WITH(registry.dispatch(Gemini::kNamespaceIdMath, Gemini::Math::kFnLn, stack, 1),
+                          "MATH: LN domain");
+    }
+}
+
+TEST_CASE("LanguageModuleLoader math CALL_FUNC end-to-end with loaded registry") {
+    const std::filesystem::path mathPath = mathModulePath();
+    if (mathPath.empty() || !std::filesystem::exists(mathPath)) {
+        MESSAGE("GEMINI_MATH_MODULE_PATH not configured; skipping");
+        return;
+    }
+
+    const auto modulesDir = uniqueTempDir() / "modules";
+    std::filesystem::create_directories(modulesDir);
+    copyModuleIfPresent(mathPath, modulesDir);
+
+    LanguageRegistry registry;
+    loadLanguageModules(registry, modulesDir);
+
+    Runtime rt;
+    rt.setLanguageRegistry(&registry);
+    rt.loadProgram({
+        {OpCode::PushFlt, 9.0},
+        makeCallFunc(Gemini::kNamespaceIdMath, Gemini::Math::kFnSqrt, 1),
+        {OpCode::Halt, Value{}},
+    });
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    REQUIRE(std::holds_alternative<double>(rt.stack()[0]));
+    CHECK(std::get<double>(rt.stack()[0]) == doctest::Approx(3.0));
 }
 
 TEST_CASE("LanguageModuleLoader loads basic and language stubs together") {
