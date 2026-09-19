@@ -92,7 +92,7 @@
       "module": "gemini-module-math",
       "version": "1",
       "shipped": true,
-      "note": "Function IDs published (M21 Stage 1); handlers are Milestone 21 Stage 2",
+      "note": "Shared unary transcendentals (Milestone 21); angles in radians; MATH: domain errors for Sqrt/Ln",
       "functions": [
         { "id": 0, "name": "Sqrt", "arity": 1 },
         { "id": 1, "name": "Sin", "arity": 1 },

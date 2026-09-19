@@ -9,7 +9,7 @@ The implementation remains intentionally incremental, but the platform is now br
 filesystem-backed Pick file semantics, BASIC compiler/shell workflows, and ENGLISH/DICT query foundations. The goal is
 still to grow the system in **small, verifiable steps** (tests, clear boundaries) rather than landing a large stack at once.
 
-A phased **roadmap** (Milestone 1 onward) is summarized in **[`docs/milestones.md`](docs/milestones.md)** (hub); long-form text for each milestone lives under **[`docs/milestones/`](docs/milestones/)**. **Milestones 1–20** are implemented; **Version 1.0.0** is the current stable release (dual Application and Service editions). Next: shared math module ([**Milestone 21**](docs/milestones/21-shared-math-language-module.md)); then host filesystem façade (**Milestone 22**); R83 compatibility (**Milestone 23**); CPU-bound fairness remains deferred to **Milestone 24**. Service Edition install and **Version 1.0 known limitations** are in **[`docs/daemon.md`](docs/daemon.md)**. Release notes: **[`CHANGELOG.md`](CHANGELOG.md)**.
+A phased **roadmap** (Milestone 1 onward) is summarized in **[`docs/milestones.md`](docs/milestones.md)** (hub); long-form text for each milestone lives under **[`docs/milestones/`](docs/milestones/)**. **Milestones 1–21** are implemented; **Version 1.0.0** is the current stable release (dual Application and Service editions). Next: host filesystem façade ([**Milestone 22**](docs/milestones/22-host-filesystem-facade.md)); then R83 compatibility (**Milestone 23**); CPU-bound fairness remains deferred to **Milestone 24**. Service Edition install and **Version 1.0 known limitations** are in **[`docs/daemon.md`](docs/daemon.md)**. Release notes: **[`CHANGELOG.md`](CHANGELOG.md)**.
 
 ## Building
 

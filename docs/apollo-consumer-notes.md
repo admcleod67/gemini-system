@@ -49,8 +49,9 @@ separate change; Gemini M20 close does **not** require that Apollo emit change i
 - Pascal field widths / TP-style real formatting → language module or later binding, once
   glyph print and float I/O exist.
 - Host filesystem façade / Pascal `file` I/O → [**Milestone 22**](milestones/22-host-filesystem-facade.md) (Apollo Milestone 8 Stage 3).
-- Transcendental math (`sin`, `sqrt`, …) → [**Milestone 21**](milestones/21-shared-math-language-module.md) shared `math` module (Apollo Stage 1b).
 - Floored integer remainder (**`IMOD`**) — deferred beyond M20.
+
+**Shared math (Milestone 21 — completed):** unary real→real `CALL_FUNC` under namespace **`math`** (`6`): `Sqrt`/`Sin`/`Cos`/`Tan`/`Arctan`/`Ln`/`Exp`. See [`bytecode.md`](bytecode.md) and [`include/gemini/math_function_ids.hpp`](../include/gemini/math_function_ids.hpp). Apollo Stage 1b binds six (`tan` optional); load `gemini-module-math`.
 
 **After the spike ships:** Apollo Milestone 8 Stage 2 updates the console binding table
 (and dialect notes); no front-end IR rewrite required for P0–P2.
@@ -162,8 +163,9 @@ Not part of the near-term spike — see **BASIC / Pick compatibility** if changi
 
 **Possible direction**
 
-- See **Shared math** ([Milestone 21](milestones/21-shared-math-language-module.md)): unary real→real
-  `sqrt` / `sin` / `cos` / `tan` / `arctan` / `ln` / `exp` (Apollo binds six; `tan` included for shared trig / BASIC).
+- **Shared math** ([Milestone 21](milestones/21-shared-math-language-module.md), **completed**): unary real→real
+  `sqrt` / `sin` / `cos` / `tan` / `arctan` / `ln` / `exp` via `CALL_FUNC` namespace **`math`** (`6`).
+  Apollo binds six; `tan` is included for shared trig / BASIC parity.
 - Document or stabilize **mixed-type arithmetic rules** if opcodes should not depend on
   implicit stack typing.
 
@@ -171,7 +173,7 @@ Not part of the near-term spike — see **BASIC / Pick compatibility** if changi
 
 - Shorter bytecode, clearer semantics for all numeric front-ends.
 
-**Priority:** *ergonomics* (P1–P3 shipped in [Milestone 20](milestones/20-vm-console-numeric-ergonomics.md); transcendentals tracked as [Milestone 21](milestones/21-shared-math-language-module.md)).
+**Priority:** *ergonomics* (P1–P3 shipped in [Milestone 20](milestones/20-vm-console-numeric-ergonomics.md); transcendentals shipped in [Milestone 21](milestones/21-shared-math-language-module.md)).
 
 ---
 
@@ -291,3 +293,4 @@ No Apollo release should **require** the changes listed in this document.
 | 2026-09 | Near-term ask after M8 Stage 1: glyph/`PRINT_CHAR`, `INPUT_FLT`, optional `COERCE_FLT`/`MOD`; clarify core vs language-module layering; char-as-decimal `PRINT_VAL` friction. Gemini [Milestone 20](milestones/20-vm-console-numeric-ergonomics.md) tracks P0–P3 as an additive opcode spike. |
 | 2026-09 | Gemini [Milestone 20](milestones/20-vm-console-numeric-ergonomics.md) **completed**: `PRINT_CHAR`, `INPUT_FLT`, `COERCE_FLT`, truncated core `MOD` shipped; floored `IMOD` deferred. Apollo binding-table switch remains a separate compiler change. |
 | 2026-09 | Roadmap: shared math module [Milestone 21](milestones/21-shared-math-language-module.md) (`sqrt`/`sin`/`cos`/`tan`/`arctan`/`ln`/`exp`); host FS façade [Milestone 22](milestones/22-host-filesystem-facade.md); R83→M23; fairness→M24. |
+| 2026-09 | Gemini [Milestone 21](milestones/21-shared-math-language-module.md) **completed**: shared `math` namespace (`6`) and `gemini-module-math` with seven unary handlers and `MATH:` domain errors; Apollo Stage 1b binding remains a compiler change. |

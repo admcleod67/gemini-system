@@ -70,7 +70,7 @@ Registry dispatch uses stable **`LANG:`** prefixes ([`LanguageRegistry.cpp`](../
 | `arg-count` ≠ registered arity, or stack too shallow | `LANG: arity mismatch` |
 | Registry frozen / duplicate registration (module load) | `LANG: registry frozen` / `LANG: duplicate namespace (<id>)` |
 
-Semantic errors inside a handler (for example BASIC `LOG` domain) use language-specific prefixes such as **`BUILTIN:`** and are documented per language.
+Semantic errors inside a handler use language-specific prefixes (for example BASIC **`BUILTIN:`**, shared math **`MATH:`**) and are documented per namespace.
 
 ## Namespace IDs
 
@@ -81,9 +81,10 @@ Semantic errors inside a handler (for example BASIC `LOG` domain) use language-s
 | `3` | `pascal` | `gemini-module-pascal` | Console IDs published; handlers are follow-on work |
 | `4` | `comal` | `gemini-module-comal` | Stub — metadata only |
 | `5` | `cobol` | `gemini-module-cobol` | Stub — metadata only |
+| `6` | `math` | `gemini-module-math` | Shared unary transcendentals; 7 functions |
 | `256` (`0x100`) | `stub` | `gemini-module-stub` | Integration-test stub |
 
-Constants: [`include/gemini/namespace_ids.hpp`](../include/gemini/namespace_ids.hpp). **IDs are immutable once shipped**; new languages take the next free slot from **`6`** upward.
+Constants: [`include/gemini/namespace_ids.hpp`](../include/gemini/namespace_ids.hpp). **IDs are immutable once shipped**; new languages take the next free slot from **`7`** upward.
 
 ## BASIC namespace (`2`) — function table
 
@@ -146,6 +147,26 @@ Published for a future **Apollo Compiler** `CALL_FUNC` binding. Apollo M5's comp
 
 **Example:** `writeln('Hello')` lowers to push string `"Hello"`, then `CALL_FUNC 3, 1, 1`.
 
+## Math namespace (`6`) — function table
+
+Namespace constant: `Gemini::kNamespaceIdMath` / `Gemini::Math::*` in [`include/gemini/math_function_ids.hpp`](../include/gemini/math_function_ids.hpp).
+
+Language-neutral unary **real → real** helpers for any front-end (Apollo Pascal Stage 1b binds six of these; BASIC keeps its own `SIN`/`COS`/`TAN`/`EXP`/`LOG` ids under namespace **`2`**). Load **`gemini-module-math`** via the normal modules path / `gemini-vm --modules`.
+
+All functions: pop one `Value`, coerce to `double` (int / double / numeric string), push `double`. Angles are in **radians**.
+
+| ID | Name | Arity | Notes |
+|----|------|-------|-------|
+| 0 | `Sqrt` | 1 | Negative → `MATH: SQRT domain` |
+| 1 | `Sin` | 1 | radians |
+| 2 | `Cos` | 1 | radians |
+| 3 | `Tan` | 1 | radians; poles may yield ±Inf (IEEE); no domain throw |
+| 4 | `Arctan` | 1 | radians (`std::atan`) |
+| 5 | `Ln` | 1 | natural log; ≤ 0 → `MATH: LN domain` |
+| 6 | `Exp` | 1 | overflow may yield ±Inf (IEEE); no throw solely for overflow |
+
+**Example:** `sqrt(9.0)` lowers to `PUSH_FLT 9`, then `CALL_FUNC 6, 0, 1`.
+
 ## Legacy `INVOKE_BUILTIN`
 
 Handwritten bytecode and older tests may use:
@@ -161,5 +182,6 @@ The VM forwards name-based calls to the same registry (BASIC shim). **New compil
 - [`language-modules.md`](language-modules.md) — writing a shared module; canonical BASIC module walkthrough
 - [`vm.md`](vm.md) — VM opcode listing
 - [`compiler-architecture.md`](compiler-architecture.md) — in-tree BASIC pipeline
-- [`apollo-consumer-notes.md`](apollo-consumer-notes.md) — optional VM evolution backlog from Apollo (consumer input; not a specification change). Near-term console/numeric opcodes shipped in [Milestone 20](milestones/20-vm-console-numeric-ergonomics.md) (completed).
+- [`apollo-consumer-notes.md`](apollo-consumer-notes.md) — optional VM evolution backlog from Apollo (consumer input; not a specification change). Near-term console/numeric opcodes shipped in [Milestone 20](milestones/20-vm-console-numeric-ergonomics.md) (completed); shared math in [Milestone 21](milestones/21-shared-math-language-module.md) (completed).
 - [`milestones/11-multi-language-runtime-infrastructure.md`](milestones/11-multi-language-runtime-infrastructure.md) — milestone context
+- [`milestones/21-shared-math-language-module.md`](milestones/21-shared-math-language-module.md) — shared `math` module

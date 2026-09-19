@@ -29,7 +29,7 @@ Inside **`register_language`**, build a [`LanguageNamespaceDescriptor`](../src/c
 | Field | Purpose |
 |-------|---------|
 | `id` | Stable **`NamespaceId`** (`std::uint32_t`) from [`include/gemini/namespace_ids.hpp`](../include/gemini/namespace_ids.hpp) |
-| `metadata.name` | Short language name (for example `"basic"`, `"pascal"`) |
+| `metadata.name` | Short language name (for example `"basic"`, `"pascal"`, `"math"`) |
 | `metadata.version` | Module version string (for example `"1"`) |
 | `functions` | Dense vector indexed by **`FunctionId`** |
 | `hooks.onInit` / `hooks.onTeardown` | Optional; called with boot **`hostContext`** when non-null |
@@ -97,15 +97,22 @@ Register the subdirectory in [`modules/CMakeLists.txt`](../modules/CMakeLists.tx
 
 The in-tree BASIC compiler emits **`CALL_FUNC`** using these IDs; see [`bytecode.md`](bytecode.md) and [`basic-language.md`](basic-language.md).
 
+### Shared math module
+
+**[`gemini-module-math`](../modules/gemini-math/)** registers namespace **`math`** (id **`6`**) with seven unary real→real handlers (`Sqrt`, `Sin`, `Cos`, `Tan`, `Arctan`, `Ln`, `Exp`). IDs and domain errors (`MATH: SQRT domain`, `MATH: LN domain`) are locked in [`include/gemini/math_function_ids.hpp`](../include/gemini/math_function_ids.hpp) and [`bytecode.md`](bytecode.md). Angles are radians. BASIC continues to emit its own math builtins under namespace **`2`**; Apollo may bind its six-function Pascal set to this module (it may ignore `Tan`).
+
+At cold start, **`SYSTEM LANGUAGES`** should include a line like **`6 math 1 7`**. Standalone: load the module with **`gemini-vm --modules <dir>`** (or the default bootstrap `gemini/modules/` copy).
+
 ### Stub modules
 
 Stub modules (**`gemini-module-pascal`**, **`-comal`**, **`-cobol`**) register metadata and reserve namespace IDs for future compilers. COMAL and COBOL appear in **`SYSTEM LANGUAGES`** with function count **`0`** until handlers ship.
 
-**Pascal (Apollo):** console function IDs are published in [`include/gemini/pascal_function_ids.hpp`](../include/gemini/pascal_function_ids.hpp) and [`bytecode.md`](bytecode.md) (namespace **`3`**: `write`, `writeln`, `read`, `readln`). The in-tree **`gemini-module-pascal`** stub registers the namespace but has **no handlers** (function count **`0`**). Apollo M5's bootstrap binding emits core `PRINT_*` / `INPUT_*` opcodes, and that module-free path completed [Gemini M19](milestones/19-standalone-vm-runner.md) and Apollo M6. A later codegen binding may emit **`CALL_FUNC`** using the published IDs. **Steady state:** build and ship the Pascal helper module with **apollo-compiler** against this ABI; Gemini remains loader + published IDs, not the permanent home of every outside language’s builtins.
+**Pascal (Apollo):** console function IDs are published in [`include/gemini/pascal_function_ids.hpp`](../include/gemini/pascal_function_ids.hpp) and [`bytecode.md`](bytecode.md) (namespace **`3`**: `write`, `writeln`, `read`, `readln`). The in-tree **`gemini-module-pascal`** stub registers the namespace but has **no handlers** (function count **`0`**). Apollo M5's bootstrap binding emits core `PRINT_*` / `INPUT_*` opcodes, and that module-free path completed [Gemini M19](milestones/19-standalone-vm-runner.md) and Apollo M6. A later codegen binding may emit **`CALL_FUNC`** using the published IDs. **Steady state:** build and ship the Pascal helper module with **apollo-compiler** against this ABI; Gemini remains loader + published IDs, not the permanent home of every outside language’s builtins. Transcendental math for Pascal is the shared **`math`** module above, not Pascal namespace **`3`**.
 
 ## See also
 
-- [`bytecode.md`](bytecode.md) — **`CALL_FUNC`** encoding, BASIC and Pascal function tables
+- [`bytecode.md`](bytecode.md) — **`CALL_FUNC`** encoding; BASIC, Pascal, and math function tables
 - [`schemas/language-namespaces.json`](schemas/language-namespaces.json) — machine-readable ID catalogue
 - [`milestones/11-multi-language-runtime-infrastructure.md`](milestones/11-multi-language-runtime-infrastructure.md)
 - [`milestones/19-standalone-vm-runner.md`](milestones/19-standalone-vm-runner.md) — Pick-independent runner; Pascal module ownership
+- [`milestones/21-shared-math-language-module.md`](milestones/21-shared-math-language-module.md) — shared `math` module (completed)

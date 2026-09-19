@@ -36,7 +36,7 @@ Delivery order (numbers match priority for upcoming work):
 
 - [Milestone 19 — Standalone VM Runner (completed)](milestones/19-standalone-vm-runner.md) — Pick-independent `gemini-vm`; Apollo Compiler M6 proof completed
 - [Milestone 20 — VM Console and Numeric Ergonomics (completed)](milestones/20-vm-console-numeric-ergonomics.md) — additive `PRINT_CHAR` / `INPUT_FLT` / `COERCE_FLT` / core `MOD`; Apollo consumer P0–P3
-- [Milestone 21 — Shared Math Language Module (planned)](milestones/21-shared-math-language-module.md) — **next**; `math` namespace `CALL_FUNC` for `sqrt`/`sin`/`cos`/`tan`/`arctan`/`ln`/`exp`; unblocks Apollo transcendentals
-- [Milestone 22 — Host Filesystem Façade (planned)](milestones/22-host-filesystem-facade.md) — host-agnostic FS contract for standalone (and later Pick); unblocks Apollo `file`/`text`
+- [Milestone 21 — Shared Math Language Module (completed)](milestones/21-shared-math-language-module.md) — `math` namespace `CALL_FUNC` for `sqrt`/`sin`/`cos`/`tan`/`arctan`/`ln`/`exp`
+- [Milestone 22 — Host Filesystem Façade (planned)](milestones/22-host-filesystem-facade.md) — **next**; host-agnostic FS contract for standalone (and later Pick); unblocks Apollo `file`/`text`
 - **Milestone 23 — R83 compatibility gaps (planned)** — within reason; track candidates in [`compatibility-r83-pick.md`](compatibility-r83-pick.md) (detail page TBD)
-- [Milestone 24 — Execution Fairness: CPU-Bound Cooperative Yield (planned, deferred)](milestones/24-execution-fairness-cpu-bound-yield.md) — after M21–M23 as scheduling allows; formerly M19 / M21 / M22
+- [Milestone 24 — Execution Fairness: CPU-Bound Cooperative Yield (planned, deferred)](milestones/24-execution-fairness-cpu-bound-yield.md) — after M22–M23 as scheduling allows; formerly M19 / M21 / M22
