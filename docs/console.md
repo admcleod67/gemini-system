@@ -95,7 +95,7 @@ Multiple consoles attached to **`gemini-daemon`** make progress concurrently at 
 - A session blocked in BASIC **`INPUT`** does not prevent another console from running Tcl
 - Round-robin fairness rotates the execution token among idle-at-prompt sessions
 
-**CPU-bound programs:** a session in a long BASIC run (nested loops, no `INPUT`) does not yield; other consoles wait until it finishes. See [Service daemon — known limitations](daemon.md#known-limitations-version-10) and [Milestone 22](milestones/22-execution-fairness-cpu-bound-yield.md) (planned; deferred past M20 and M21 R83-compat).
+**CPU-bound programs:** a session in a long BASIC run (nested loops, no `INPUT`) does not yield; other consoles wait until it finishes. See [Service daemon — known limitations](daemon.md#known-limitations-version-10) and [Milestone 24](milestones/24-execution-fairness-cpu-bound-yield.md) (planned; deferred past M21–M23).
 
 Only one session runs interpreter work at any instant — this is cooperative scheduling, not preemption. See [Service daemon architecture — cooperative execution](daemon.md#cooperative-execution).
 

@@ -39,7 +39,7 @@ Technical reference for Gemini System. Paths below are relative to this director
 
 ## Roadmap
 
-- **[Project milestones](milestones.md)** — hub index; **Milestones 1–20** completed; next R83 compatibility (M21); **Milestone 22** CPU-bound fairness (deferred).
+- **[Project milestones](milestones.md)** — hub index; **Milestones 1–20** completed; next [**Milestone 21**](milestones/21-shared-math-language-module.md) shared math module; then host FS façade (M22); R83 (M23); **Milestone 24** CPU-bound fairness (deferred).
 - **[Changelog](../CHANGELOG.md)** — release notes (current: **1.0.0**).
 - **[Milestone detail pages](milestones/)** — one file per milestone (`NN-slug.md` for sortable filenames).
 - **[Compatibility (R83/Pick)](compatibility-r83-pick.md)** — implemented/partial/deferred Gemini compatibility notes versus classic Pick behavior.

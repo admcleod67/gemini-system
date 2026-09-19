@@ -4,7 +4,7 @@
 
 Deliver the first stable **Version 1.0** Gemini System: a Pick-authentic, multi-session **service edition** and a matching **application edition**, both on the same architecture. Ship reliable daemon-based multi-session operation, integrated language libraries (Tcl, BASIC, PROC, assembler shell), multi-attribute Pick filesystem semantics, and complete **architecture**, **admin**, and **developer** documentation. Define and meet public **release criteria** for the repository and deliverables. *Status: implemented.*
 
-[**Milestone 17**](17-service-integration-deployment.md) closed Linux service integration (config, journald, systemd, admin Tcl, install components). M18 is the **stabilization and documentation capstone** that declares Version 1.0 — not a bucket for new architecture. Avoid sneaking in telnet, SQL, distributed sessions, transaction semantics, or CPU-bound fairness; those belong in post-1.0 milestones ([**Milestone 19**](19-standalone-vm-runner.md) onward; fairness deferred to [**Milestone 22**](22-execution-fairness-cpu-bound-yield.md) after M20–M21).
+[**Milestone 17**](17-service-integration-deployment.md) closed Linux service integration (config, journald, systemd, admin Tcl, install components). M18 is the **stabilization and documentation capstone** that declares Version 1.0 — not a bucket for new architecture. Avoid sneaking in telnet, SQL, distributed sessions, transaction semantics, or CPU-bound fairness; those belong in post-1.0 milestones ([**Milestone 19**](19-standalone-vm-runner.md) onward; fairness deferred to [**Milestone 24**](24-execution-fairness-cpu-bound-yield.md) after M21–M23).
 
 ---
 
@@ -70,7 +70,7 @@ Bring operator and developer docs to a v1.0 bar:
 - **Architecture** — session model, daemon/IPC, cooperative execution (existing [`session.md`](../session.md), [`daemon.md`](../daemon.md); tighten cross-links and edition framing)
 - **Admin** — systemd, config, admin Tcl, session-end contrast, cold restart = fresh sessions (largely M17); edition install recipes; migration notes for operators moving from `gemini-system`-only to Service Edition
 - **Developer** — Tcl / BASIC / PROC / ASM entry points, bytecode/module docs (existing tree under [`docs/`](../README.md)); README and docs hub reflect **1.0** status
-- **Known limitations** — CPU-bound multi-session starvation (I/O yield only); cold restart does not restore sessions; local UDS only — point at [M22](22-execution-fairness-cpu-bound-yield.md) for fairness
+- **Known limitations** — CPU-bound multi-session starvation (I/O yield only); cold restart does not restore sessions; local UDS only — point at [M24](24-execution-fairness-cpu-bound-yield.md) for fairness
 
 Edition naming and residual operator-doc work parked from [M16](16-standalone-edition-application-mode.md) land here. **Stage 3** ships edition glossary, known-limitations trio, Application→Service migration, and docs hub accuracy in operator docs.
 
@@ -104,7 +104,7 @@ Session lifecycle, IPC v1, and cooperative I/O yield remain as documented after 
 ### 4. Non-goals
 
 - New admin verbs, IPC messages, or scheduler/VM yield behaviour
-- CPU-bound multi-session fairness / operator **BREAK** — [**Milestone 22**](22-execution-fairness-cpu-bound-yield.md) **after** v1.0 (deferred past M20 ergonomics and M21 R83-compat)
+- CPU-bound multi-session fairness / operator **BREAK** — [**Milestone 24**](24-execution-fairness-cpu-bound-yield.md) **after** v1.0 (deferred past M21–M23)
 - Remote access beyond local Unix domain sockets (SSH/telnet post-1.0)
 - Hot-reload of language modules without daemon restart
 - Session restore across cold daemon restart
@@ -128,7 +128,7 @@ Session lifecycle, IPC v1, and cooperative I/O yield remain as documented after 
 | [M12–M15](12-session-model-foundation.md) | Session model, daemon, consoles, cooperative I/O yield |
 | [M17](17-service-integration-deployment.md) | Config, systemd, admin Tcl, install components — **prerequisite complete** |
 | [M16 residual](16-standalone-edition-application-mode.md) | Edition naming, migration notes, release checklist |
-| [M22](22-execution-fairness-cpu-bound-yield.md) | Fairness deferred; document CPU starvation as known limit until then |
+| [M24](24-execution-fairness-cpu-bound-yield.md) | Fairness deferred; document CPU starvation as known limit until then |
 
 ---
 

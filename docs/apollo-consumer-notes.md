@@ -48,8 +48,8 @@ separate change; Gemini M20 close does **not** require that Apollo emit change i
   version if BASIC invariants must hold).
 - Pascal field widths / TP-style real formatting → language module or later binding, once
   glyph print and float I/O exist.
-- Host filesystem façade / Pascal `file` I/O (still a larger Gemini host track).
-- Transcendental math (`sin`, `sqrt`, …) → Pascal Stage 1b via module / shared math surface.
+- Host filesystem façade / Pascal `file` I/O → [**Milestone 22**](milestones/22-host-filesystem-facade.md) (Apollo Milestone 8 Stage 3).
+- Transcendental math (`sin`, `sqrt`, …) → [**Milestone 21**](milestones/21-shared-math-language-module.md) shared `math` module (Apollo Stage 1b).
 - Floored integer remainder (**`IMOD`**) — deferred beyond M20.
 
 **After the spike ships:** Apollo Milestone 8 Stage 2 updates the console binding table
@@ -162,7 +162,8 @@ Not part of the near-term spike — see **BASIC / Pick compatibility** if changi
 
 **Possible direction**
 
-- Core **`INPUT_FLT`**, **`COERCE_FLT`**, and truncated **`MOD`** shipped in [Milestone 20](milestones/20-vm-console-numeric-ergonomics.md). Floored **`IMOD`** remains deferred.
+- See **Shared math** ([Milestone 21](milestones/21-shared-math-language-module.md)): locked
+  unary real→real `sqrt` / `sin` / `cos` / `arctan` / `ln` / `exp`.
 - Document or stabilize **mixed-type arithmetic rules** if opcodes should not depend on
   implicit stack typing.
 
@@ -170,7 +171,7 @@ Not part of the near-term spike — see **BASIC / Pick compatibility** if changi
 
 - Shorter bytecode, clearer semantics for all numeric front-ends.
 
-**Priority:** *ergonomics* (P1–P3 shipped in [Milestone 20](milestones/20-vm-console-numeric-ergonomics.md); remaining themes below stay open).
+**Priority:** *ergonomics* (P1–P3 shipped in [Milestone 20](milestones/20-vm-console-numeric-ergonomics.md); transcendentals tracked as [Milestone 21](milestones/21-shared-math-language-module.md)).
 
 ---
 
@@ -220,7 +221,8 @@ formatting (after primitives exist).
 **Typical pattern today (Apollo)**
 
 - No Pascal file I/O in the supported dialect; waiting on a **host-agnostic filesystem
-  façade** before designing opcodes or module calls (Milestone 8 Stage 3).
+  façade** before designing opcodes or module calls (Apollo Milestone 8 Stage 3;
+  Gemini [**Milestone 22**](milestones/22-host-filesystem-facade.md)).
 
 **Possible direction**
 
@@ -233,7 +235,7 @@ formatting (after primitives exist).
 
 - Unblocks `file of T`, `text`, and record files for Pascal and other languages.
 
-**Priority:** *capability* (large cross-cutting host + VM effort; not near-term).
+**Priority:** *capability* (Gemini [**Milestone 22**](milestones/22-host-filesystem-facade.md); large cross-cutting host + VM effort).
 
 ---
 
@@ -288,3 +290,4 @@ No Apollo release should **require** the changes listed in this document.
 | 2026-03 | Initial consumer backlog (optional VM simplifications; array value params use call-site dim/init/copy on today’s VM). |
 | 2026-09 | Near-term ask after M8 Stage 1: glyph/`PRINT_CHAR`, `INPUT_FLT`, optional `COERCE_FLT`/`MOD`; clarify core vs language-module layering; char-as-decimal `PRINT_VAL` friction. Gemini [Milestone 20](milestones/20-vm-console-numeric-ergonomics.md) tracks P0–P3 as an additive opcode spike. |
 | 2026-09 | Gemini [Milestone 20](milestones/20-vm-console-numeric-ergonomics.md) **completed**: `PRINT_CHAR`, `INPUT_FLT`, `COERCE_FLT`, truncated core `MOD` shipped; floored `IMOD` deferred. Apollo binding-table switch remains a separate compiler change. |
+| 2026-09 | Roadmap: shared math module [Milestone 21](milestones/21-shared-math-language-module.md) (`sqrt`/`sin`/`cos`/`arctan`/`ln`/`exp`); host FS façade [Milestone 22](milestones/22-host-filesystem-facade.md); R83→M23; fairness→M24. |

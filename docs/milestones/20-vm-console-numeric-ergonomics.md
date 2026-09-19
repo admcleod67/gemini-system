@@ -6,7 +6,7 @@ Add a small set of **language-neutral core opcodes** so compiled front-ends (Apo
 
 Consumer ask: [`docs/apollo-consumer-notes.md`](../apollo-consumer-notes.md) (near-term P0–P3). Unblocks Apollo Compiler **Milestone 8 Stage 2** (console I/O fidelity) after Apollo has already lowered Wirth ordinal/arithmetic functions in the compiler.
 
-Follows [Milestone 19](19-standalone-vm-runner.md). Next post–v1.0 delivery is **Milestone 21** R83 gaps ([`compatibility-r83-pick.md`](../compatibility-r83-pick.md); detail page TBD); CPU fairness remains deferred [**Milestone 22**](22-execution-fairness-cpu-bound-yield.md).
+Follows [Milestone 19](19-standalone-vm-runner.md). Next post–v1.0 delivery is shared math ([**Milestone 21**](21-shared-math-language-module.md)); then host FS façade ([**Milestone 22**](22-host-filesystem-facade.md)); R83 gaps ([**Milestone 23**](../compatibility-r83-pick.md); detail page TBD); CPU fairness remains deferred [**Milestone 24**](24-execution-fairness-cpu-bound-yield.md).
 
 **Standing invariant:** `gemini-system`, `gemini-daemon`, `gemini-console`, and BASIC `MAT_*` / `DIM_ARRAY` / `PRINT_VAL` behaviour must not regress. Full `ctest` remains green after every stage. Prefer **additive** opcodes only.
 
@@ -37,10 +37,10 @@ Parser, `InstructionPrint`, `BytecodeText`, `Runtime::step`, and [`docs/vm.md`](
 
 - Changing `PRINT_VAL`, `DIM_ARRAY`, `MAT_COPY`, or `MAT_INIT` semantics
 - Pascal field-width / Turbo-style real formatting (language module)
-- Host filesystem façade / Pascal `file` I/O ([M19](19-standalone-vm-runner.md) §9)
+- Host filesystem façade / Pascal `file` I/O ([**Milestone 22**](22-host-filesystem-facade.md))
 - Array value-parameter ABI or `var` array aliases ([consumer notes](../apollo-consumer-notes.md) §1–§2)
 - Debug metadata / source-name mapping (consumer notes §6)
-- R83 gaps ([**Milestone 21**](../compatibility-r83-pick.md)) or CPU-bound yield ([**Milestone 22**](22-execution-fairness-cpu-bound-yield.md))
+- Shared math ([**Milestone 21**](21-shared-math-language-module.md)); R83 gaps ([**Milestone 23**](../compatibility-r83-pick.md)) or CPU-bound yield ([**Milestone 24**](24-execution-fairness-cpu-bound-yield.md))
 - Requiring Apollo to emit the new opcodes in the same Gemini release (Apollo switches its binding table afterwards)
 
 ---
@@ -89,9 +89,10 @@ Only Stage 4 claims “Closes Milestone 20.”
 
 - Apollo switches console binding (compiler-side; not this repo’s close criterion)
 - Floored integer remainder (**`IMOD`**) if a consumer needs non-truncated semantics
-- Pascal I/O module / field widths — [M19](19-standalone-vm-runner.md) §9
-- Array copy / `var` parameters, host FS façade, debug metadata — [`apollo-consumer-notes.md`](../apollo-consumer-notes.md) (separate tracks)
-- R83 compatibility — [**Milestone 21**](../compatibility-r83-pick.md) (detail page TBD)
-- CPU-bound cooperative yield — [**Milestone 22**](22-execution-fairness-cpu-bound-yield.md)
+- Shared math language module — [**Milestone 21**](21-shared-math-language-module.md)
+- Host filesystem façade / Pascal I/O — [**Milestone 22**](22-host-filesystem-facade.md)
+- Array copy / `var` parameters, debug metadata — [`apollo-consumer-notes.md`](../apollo-consumer-notes.md) (separate tracks)
+- R83 compatibility — [**Milestone 23**](../compatibility-r83-pick.md) (detail page TBD)
+- CPU-bound cooperative yield — [**Milestone 24**](24-execution-fairness-cpu-bound-yield.md)
 
 *Status: implemented.*

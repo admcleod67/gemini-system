@@ -176,11 +176,11 @@ Milestone 15 does **not** introduce:
 - Remote telnet/SSH, systemd, admin **`LISTSESSIONS`** ([**Milestone 17**](17-service-integration-deployment.md))
 - Application-edition install/packaging ([**Milestone 17**](17-service-integration-deployment.md)); edition docs in [**Milestone 18**](18-version-1-gemini-system-service.md)
 - Fairness beyond simple round-robin (priority queues, account quotas)
-- Yield inside tight CPU-bound loops with no I/O — see [**Milestone 22**](22-execution-fairness-cpu-bound-yield.md) (deferred post–Version 1.0)
+- Yield inside tight CPU-bound loops with no I/O — see [**Milestone 24**](24-execution-fairness-cpu-bound-yield.md) (deferred post–Version 1.0)
 
 ### Post-M15 follow-ups (deferred)
 
-- **CPU-bound execution fairness** — opcode-budget yield in VM step loops, operator **BREAK** / cancel, optional output-backpressure yield ([**Milestone 22**](22-execution-fairness-cpu-bound-yield.md); after M20 ergonomics and M21 R83-compat)
+- **CPU-bound execution fairness** — opcode-budget yield in VM step loops, operator **BREAK** / cancel, optional output-backpressure yield ([**Milestone 24**](24-execution-fairness-cpu-bound-yield.md); after M21–M23 Apollo/R83 tracks as scheduling allows)
 - Standalone host-native VM runner ([**Milestone 19**](19-standalone-vm-runner.md))
 
 ---

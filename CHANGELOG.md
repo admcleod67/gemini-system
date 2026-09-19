@@ -27,7 +27,7 @@ First stable **Version 1.0** release ([Milestone 18](docs/milestones/18-version-
 - Multi-session **record locks**, cooperative **I/O yield** scheduling, language-module boot
 - Linux service path: daemon config file, journald-ready logging, `gemini.service`, SYSPROG admin Tcl (`LISTSESSIONS` / `STATUS` / `KILLSESSION` / `SHUTDOWN`), CMake **Runtime** / **Application** / **Service** install components
 - Operator docs: edition glossary, Application→Service migration, session-end contrast, cold restart = fresh sessions
-- **Known limitations (v1.0):** CPU-bound multi-session starvation (later: [Milestone 22](docs/milestones/22-execution-fairness-cpu-bound-yield.md)); cold restart does not restore sessions; local Unix domain sockets only
+- **Known limitations (v1.0):** CPU-bound multi-session starvation (later: [Milestone 24](docs/milestones/24-execution-fairness-cpu-bound-yield.md)); cold restart does not restore sessions; local Unix domain sockets only
 
 Operator detail: [`docs/daemon.md`](docs/daemon.md).
 
