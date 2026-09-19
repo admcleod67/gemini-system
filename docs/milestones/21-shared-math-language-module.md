@@ -14,7 +14,7 @@ Consumer context: [`docs/apollo-consumer-notes.md`](../apollo-consumer-notes.md)
 
 ### 1. Purpose and rationale
 
-Wirth ordinal/arithmetic helpers (`abs`, `trunc`, `sqr`, …) and M20 core ops (`COERCE_FLT`, `MOD`, …) already cover compiler-lowered primitives. **Transcendentals** (`sin`, `sqrt`, …) are language-neutral and today live only under the **basic** namespace (partial overlap). Apollo has locked a six-function real→real set and should not reimplement `std::sin` under Pascal namespace **3**.
+Wirth ordinal/arithmetic helpers (`abs`, `trunc`, `sqr`, …) and M20 core ops (`COERCE_FLT`, `MOD`, …) already cover compiler-lowered primitives. **Transcendentals** (`sin`, `sqrt`, …) are language-neutral and today live only under the **basic** namespace (partial overlap). Apollo has locked a six-function real→real Pascal set (`sqrt`/`sin`/`cos`/`arctan`/`ln`/`exp`) and should not reimplement `std::sin` under Pascal namespace **3**. The shared module also includes **`Tan`** so BASIC’s existing `TAN` and a complete trig surface share one implementation; Apollo need not bind `Tan`.
 
 A shared **math** module gives one ABI, one test surface, and one error contract. Language modules stay for dialect behaviour (Pascal I/O formatting; BASIC Pick string/`OCONV` builtins).
 
@@ -31,9 +31,10 @@ All functions are **unary real → real**: pop one `Value`, coerce to `double`, 
 | 0 | `Sqrt` | `std::sqrt` | Negative → `MATH: SQRT domain` (or equivalent locked wording) |
 | 1 | `Sin` | `std::sin` | (no domain reject) |
 | 2 | `Cos` | `std::cos` | (no domain reject) |
-| 3 | `Arctan` | `std::atan` | (no domain reject) |
-| 4 | `Ln` | `std::log` | ≤ 0 → `MATH: LN domain` |
-| 5 | `Exp` | `std::exp` | Overflow may yield ±Inf per IEEE; document; do not throw solely for overflow unless existing BASIC `EXP` policy requires parity |
+| 3 | `Tan` | `std::tan` | (no domain reject; poles may yield ±Inf per IEEE — document) |
+| 4 | `Arctan` | `std::atan` | (no domain reject) |
+| 5 | `Ln` | `std::log` | ≤ 0 → `MATH: LN domain` |
+| 6 | `Exp` | `std::exp` | Overflow may yield ±Inf per IEEE; document; do not throw solely for overflow unless existing BASIC `EXP` policy requires parity |
 
 Exact function-id integers and namespace id are locked in [`language-namespaces.json`](../schemas/language-namespaces.json) and a new `include/gemini/math_function_ids.hpp` (recommended namespace id **6** / `0x00000006`, name `math`, after cobol **5**).
 
@@ -48,9 +49,8 @@ Stack order for `CALL_FUNC`: same as today — last argument on top; arity **1**
 
 #### 2.3 Hard non-goals
 
-- New **core opcodes** for these six functions
+- New **core opcodes** for these seven functions
 - Migrating BASIC `SIN`/`COS`/`TAN`/`EXP`/`LOG` ids onto math in this milestone (optional thin forward is follow-on)
-- Adding BASIC-only `TAN` to the shared set unless a later consumer ask locks it
 - Pascal dialect I/O field widths / `eof`/`eoln` ([M22](22-host-filesystem-facade.md) and Pascal module tracks)
 - Host filesystem façade ([**Milestone 22**](22-host-filesystem-facade.md))
 - R83 gaps ([**Milestone 23**](../compatibility-r83-pick.md)) or CPU fairness ([**Milestone 24**](24-execution-fairness-cpu-bound-yield.md))
@@ -61,7 +61,7 @@ Stack order for `CALL_FUNC`: same as today — last argument on top; arity **1**
 ### 3. Compatibility
 
 - **BASIC / Pick:** existing programs keep emitting basic-namespace math; behaviour unchanged unless an explicit later emit switch is chosen.
-- **Apollo:** success when Gemini documents ids/errors and tests prove the six ops; Apollo binds `sqrt`/`sin`/`cos`/`arctan`/`ln`/`exp` afterwards.
+- **Apollo:** success when Gemini documents ids/errors and tests prove the seven ops; Apollo binds its six (`sqrt`/`sin`/`cos`/`arctan`/`ln`/`exp`) afterwards and may ignore `Tan`.
 - **Standalone runner:** load math with existing `--modules` / default module path; no new CLI required unless docs clarify the module filename.
 
 ---
@@ -79,7 +79,7 @@ Stack order for `CALL_FUNC`: same as today — last argument on top; arity **1**
 
 ### 5. Milestone completion criteria
 
-- [ ] Namespace `math` registered; six functions implemented, documented, and tested
+- [ ] Namespace `math` registered; seven functions implemented, documented, and tested
 - [ ] Domain errors use a stable `MATH:` prefix; radians documented
 - [ ] BASIC math `CALL_FUNC` paths unchanged in intent; full `ctest` green
 - [ ] Consumer notes / hub list M21 implemented when closed
@@ -89,7 +89,7 @@ Stack order for `CALL_FUNC`: same as today — last argument on top; arity **1**
 ### 6. Suggested implementation stages
 
 1. **IDs + schema + empty module registration** — publish namespace/function table. *Status: planned.*
-2. **Handlers + unit tests** — six functions and domain cases. *Status: planned.*
+2. **Handlers + unit tests** — seven functions and domain cases. *Status: planned.*
 3. **Docs + closes M21** — bytecode/language-modules/consumer-notes/hub. **Closes Milestone 21.** *Status: planned.*
 
 Only Stage 3 claims “Closes Milestone 21.”
@@ -98,9 +98,8 @@ Only Stage 3 claims “Closes Milestone 21.”
 
 ### 7. Follow-on (beyond M21)
 
-- Apollo binds Pascal transcendentals to `CALL_FUNC math,…`
+- Apollo binds Pascal transcendentals to `CALL_FUNC math,…` (six-function subset)
 - Optional BASIC thin wrappers or emit migration onto math (preserve old ids)
-- Optional shared `Tan` if locked by a consumer
 - Host filesystem façade — [**Milestone 22**](22-host-filesystem-facade.md)
 - R83 compatibility — [**Milestone 23**](../compatibility-r83-pick.md) (detail page TBD)
 - CPU-bound cooperative yield — [**Milestone 24**](24-execution-fairness-cpu-bound-yield.md)

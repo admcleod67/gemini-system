@@ -162,8 +162,8 @@ Not part of the near-term spike — see **BASIC / Pick compatibility** if changi
 
 **Possible direction**
 
-- See **Shared math** ([Milestone 21](milestones/21-shared-math-language-module.md)): locked
-  unary real→real `sqrt` / `sin` / `cos` / `arctan` / `ln` / `exp`.
+- See **Shared math** ([Milestone 21](milestones/21-shared-math-language-module.md)): unary real→real
+  `sqrt` / `sin` / `cos` / `tan` / `arctan` / `ln` / `exp` (Apollo binds six; `tan` included for shared trig / BASIC).
 - Document or stabilize **mixed-type arithmetic rules** if opcodes should not depend on
   implicit stack typing.
 
@@ -290,4 +290,4 @@ No Apollo release should **require** the changes listed in this document.
 | 2026-03 | Initial consumer backlog (optional VM simplifications; array value params use call-site dim/init/copy on today’s VM). |
 | 2026-09 | Near-term ask after M8 Stage 1: glyph/`PRINT_CHAR`, `INPUT_FLT`, optional `COERCE_FLT`/`MOD`; clarify core vs language-module layering; char-as-decimal `PRINT_VAL` friction. Gemini [Milestone 20](milestones/20-vm-console-numeric-ergonomics.md) tracks P0–P3 as an additive opcode spike. |
 | 2026-09 | Gemini [Milestone 20](milestones/20-vm-console-numeric-ergonomics.md) **completed**: `PRINT_CHAR`, `INPUT_FLT`, `COERCE_FLT`, truncated core `MOD` shipped; floored `IMOD` deferred. Apollo binding-table switch remains a separate compiler change. |
-| 2026-09 | Roadmap: shared math module [Milestone 21](milestones/21-shared-math-language-module.md) (`sqrt`/`sin`/`cos`/`arctan`/`ln`/`exp`); host FS façade [Milestone 22](milestones/22-host-filesystem-facade.md); R83→M23; fairness→M24. |
+| 2026-09 | Roadmap: shared math module [Milestone 21](milestones/21-shared-math-language-module.md) (`sqrt`/`sin`/`cos`/`tan`/`arctan`/`ln`/`exp`); host FS façade [Milestone 22](milestones/22-host-filesystem-facade.md); R83→M23; fairness→M24. |
