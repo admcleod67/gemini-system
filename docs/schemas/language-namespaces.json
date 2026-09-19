@@ -86,6 +86,24 @@
       "functions": []
     },
     {
+      "id": 6,
+      "idHex": "0x00000006",
+      "name": "math",
+      "module": "gemini-module-math",
+      "version": "1",
+      "shipped": true,
+      "note": "Function IDs published (M21 Stage 1); handlers are Milestone 21 Stage 2",
+      "functions": [
+        { "id": 0, "name": "Sqrt", "arity": 1 },
+        { "id": 1, "name": "Sin", "arity": 1 },
+        { "id": 2, "name": "Cos", "arity": 1 },
+        { "id": 3, "name": "Tan", "arity": 1 },
+        { "id": 4, "name": "Arctan", "arity": 1 },
+        { "id": 5, "name": "Ln", "arity": 1 },
+        { "id": 6, "name": "Exp", "arity": 1 }
+      ]
+    },
+    {
       "id": 256,
       "idHex": "0x00000100",
       "name": "stub",

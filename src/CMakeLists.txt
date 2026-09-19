@@ -15,7 +15,7 @@ add_executable(gemini-system Main.cpp)
 target_link_libraries(gemini-system PRIVATE gemini-tcl)
 pick_system_enable_warnings(gemini-system)
 add_dependencies(gemini-system gemini-bootstrap-copy gemini-module-stub gemini-module-basic
-        gemini-module-pascal gemini-module-comal gemini-module-cobol)
+        gemini-module-pascal gemini-module-comal gemini-module-cobol gemini-module-math)
 
 target_compile_definitions(
         gemini-system
@@ -30,7 +30,7 @@ add_executable(gemini-daemon daemon/Main.cpp)
 target_link_libraries(gemini-daemon PRIVATE gemini-tcl)
 pick_system_enable_warnings(gemini-daemon)
 add_dependencies(gemini-daemon gemini-bootstrap-copy gemini-module-stub gemini-module-basic
-        gemini-module-pascal gemini-module-comal gemini-module-cobol)
+        gemini-module-pascal gemini-module-comal gemini-module-cobol gemini-module-math)
 
 target_compile_definitions(
         gemini-daemon

@@ -24,6 +24,9 @@ namespace Gemini {
     /// COBOL helper library (stub until a COBOL compiler ships).
     constexpr NamespaceId kNamespaceIdCobol = 0x00000005;
 
+    /// Shared math transcendentals (gemini-module-math; handlers Milestone 21 Stage 2).
+    constexpr NamespaceId kNamespaceIdMath = 0x00000006;
+
     /// Integration-test stub module (gemini-module-stub).
     constexpr NamespaceId kNamespaceIdStub = 0x00000100;
 } // namespace Gemini

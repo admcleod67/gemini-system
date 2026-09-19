@@ -74,6 +74,14 @@ namespace {
 #endif
     }
 
+    std::filesystem::path mathModulePath() {
+#if defined(GEMINI_MATH_MODULE_PATH)
+        return std::filesystem::path(GEMINI_MATH_MODULE_PATH);
+#else
+        return {};
+#endif
+    }
+
     void copyModuleIfPresent(const std::filesystem::path &src, const std::filesystem::path &modulesDir) {
         if (!src.empty() && std::filesystem::exists(src)) {
             std::filesystem::copy_file(src, modulesDir / src.filename());
@@ -357,6 +365,39 @@ TEST_CASE("LanguageModuleLoader loads pascal comal cobol stub modules") {
     const auto cobolMeta = registry.metadata(Gemini::kNamespaceIdCobol);
     REQUIRE(cobolMeta.has_value());
     CHECK(cobolMeta->name == "cobol");
+}
+
+TEST_CASE("LanguageModuleLoader loads math module with empty handlers") {
+    const std::filesystem::path mathPath = mathModulePath();
+    if (mathPath.empty() || !std::filesystem::exists(mathPath)) {
+        MESSAGE("GEMINI_MATH_MODULE_PATH not configured; skipping");
+        return;
+    }
+
+    const auto modulesDir = uniqueTempDir() / "modules";
+    std::filesystem::create_directories(modulesDir);
+    copyModuleIfPresent(mathPath, modulesDir);
+
+    LanguageRegistry registry;
+    const LanguageModuleLoadReport report = loadLanguageModules(registry, modulesDir);
+    CHECK(report.attempted == 1);
+    CHECK(report.loaded == 1);
+    CHECK(report.failed == 0);
+
+    const auto mathMeta = registry.metadata(Gemini::kNamespaceIdMath);
+    REQUIRE(mathMeta.has_value());
+    CHECK(mathMeta->name == "math");
+    CHECK(mathMeta->version == "1");
+
+    bool foundMath = false;
+    for (const auto &summary : registry.listNamespaces()) {
+        if (summary.id == Gemini::kNamespaceIdMath) {
+            foundMath = true;
+            CHECK(summary.functionCount == 0);
+        }
+    }
+    CHECK(foundMath);
+    CHECK(registry.functionSlotSummaries(Gemini::kNamespaceIdMath).empty());
 }
 
 TEST_CASE("LanguageModuleLoader loads basic and language stubs together") {
