@@ -84,6 +84,14 @@ namespace {
 #endif
     }
 
+    std::filesystem::path hostfsModulePath() {
+#if defined(GEMINI_HOSTFS_MODULE_PATH)
+        return std::filesystem::path(GEMINI_HOSTFS_MODULE_PATH);
+#else
+        return {};
+#endif
+    }
+
     void copyModuleIfPresent(const std::filesystem::path &src, const std::filesystem::path &modulesDir) {
         if (!src.empty() && std::filesystem::exists(src)) {
             std::filesystem::copy_file(src, modulesDir / src.filename());
@@ -534,6 +542,39 @@ TEST_CASE("LanguageModuleLoader math CALL_FUNC end-to-end with loaded registry")
     REQUIRE(rt.stack().size() == 1);
     REQUIRE(std::holds_alternative<double>(rt.stack()[0]));
     CHECK(std::get<double>(rt.stack()[0]) == doctest::Approx(3.0));
+}
+
+TEST_CASE("LanguageModuleLoader loads hostfs module with empty handlers") {
+    const std::filesystem::path hostfsPath = hostfsModulePath();
+    if (hostfsPath.empty() || !std::filesystem::exists(hostfsPath)) {
+        MESSAGE("GEMINI_HOSTFS_MODULE_PATH not configured; skipping");
+        return;
+    }
+
+    const auto modulesDir = uniqueTempDir() / "modules";
+    std::filesystem::create_directories(modulesDir);
+    copyModuleIfPresent(hostfsPath, modulesDir);
+
+    LanguageRegistry registry;
+    const LanguageModuleLoadReport report = loadLanguageModules(registry, modulesDir);
+    CHECK(report.attempted == 1);
+    CHECK(report.loaded == 1);
+    CHECK(report.failed == 0);
+
+    const auto hostfsMeta = registry.metadata(Gemini::kNamespaceIdHostFs);
+    REQUIRE(hostfsMeta.has_value());
+    CHECK(hostfsMeta->name == "hostfs");
+    CHECK(hostfsMeta->version == "1");
+
+    bool foundHostFs = false;
+    for (const auto &summary : registry.listNamespaces()) {
+        if (summary.id == Gemini::kNamespaceIdHostFs) {
+            foundHostFs = true;
+            CHECK(summary.functionCount == 0);
+        }
+    }
+    CHECK(foundHostFs);
+    CHECK(registry.functionSlotSummaries(Gemini::kNamespaceIdHostFs).empty());
 }
 
 TEST_CASE("LanguageModuleLoader loads basic and language stubs together") {

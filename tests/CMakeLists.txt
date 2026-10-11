@@ -71,7 +71,7 @@ add_executable(
 target_include_directories(pick-tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/core)
 target_link_libraries(pick-tests PRIVATE gemini-tcl doctest_headers)
 add_dependencies(pick-tests gemini-module-stub gemini-module-basic gemini-module-pascal gemini-module-comal
-        gemini-module-cobol gemini-module-math)
+        gemini-module-cobol gemini-module-math gemini-module-hostfs)
 target_compile_definitions(
         pick-tests
         PRIVATE "PICK_SYSTEM_VERSION=\"${PROJECT_VERSION}\""
@@ -91,6 +91,7 @@ target_compile_definitions(
                 "GEMINI_COMAL_MODULE_PATH=\"$<TARGET_FILE:gemini-module-comal>\""
                 "GEMINI_COBOL_MODULE_PATH=\"$<TARGET_FILE:gemini-module-cobol>\""
                 "GEMINI_MATH_MODULE_PATH=\"$<TARGET_FILE:gemini-module-math>\""
+                "GEMINI_HOSTFS_MODULE_PATH=\"$<TARGET_FILE:gemini-module-hostfs>\""
 )
 pick_system_enable_warnings(pick-tests)
 

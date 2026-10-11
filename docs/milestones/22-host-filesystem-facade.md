@@ -29,10 +29,36 @@ A **façade** is the shared contract: standalone binds a host-path backend; Pick
 | **Interface** | Abstract host FS operations sufficient for sequential **text**/byte stream I/O: open (read/write/create), read, write, close, and a small stable error model |
 | **Standalone backend** | Default POSIX (or portable C++ filesystem) backend wired from `gemini-vm` when enabled |
 | **Binding** | Runtime or host hook so the façade is injectable (nullable when unbound — console-only programs still run) |
-| **Emitter surface** | Documented `CALL_FUNC` namespace **or** additive opcodes (choose one primary surface in Stage 1 design note; prefer module/`CALL_FUNC` for symmetry with math/Pascal I/O unless core ops prove necessary) |
+| **Emitter surface** | **`CALL_FUNC` namespace `hostfs` (id 7)** — locked in Stage 1; no new core opcodes |
 | **Tests + docs** | Unit/integration tests on standalone; `vm.md` / `language-modules.md` / consumer-notes; hub |
 
-Exact operation names, handle representation (integer fd-like id vs opaque), and path string rules are **locked in Stage 1** of this milestone before handlers ship.
+Exact operation names, handle representation, and path string rules are locked below (Stage 1).
+
+#### 2.1a Design lock (Stage 1)
+
+| Topic | Lock |
+|-------|------|
+| Emitter surface | **`CALL_FUNC` module only** — no new core opcodes |
+| Namespace | name **`hostfs`**, id **`7`** / `0x00000007` |
+| Module | **`gemini-module-hostfs`** (`modules/gemini-hostfs/`) |
+| Handles | Positive **`int`** stack values (1-based dense ids); `0` invalid |
+| Binding | Injectable via language-module **`hostContext`** (pointer to façade); **nullable** — unbound → `HOSTFS: unbound` when handlers exist (Stage 2) |
+| Paths | `std::string` host path; empty rejected; absolute OK; relative → process cwd (optional sandbox root is Stage 2 detail, not VOC) |
+| Errors | Stable **`HOSTFS:`** prefix (distinct from Pick `OPEN:`/`READ:`, `MATH:`, `LANG:`) |
+| Contract header | [`include/gemini/HostFilesystem.hpp`](../../include/gemini/HostFilesystem.hpp); function IDs in [`include/gemini/hostfs_function_ids.hpp`](../../include/gemini/hostfs_function_ids.hpp) |
+
+**Function table (v1)** — sequential byte/text streams. Line / `eof` / `eoln` stay in language layers (Apollo/Pascal follow-on).
+
+| ID | Name | Arity | Stack (top last) | Result |
+|----|------|-------|------------------|--------|
+| 0 | `OpenRead` | 1 | path | handle `int` |
+| 1 | `OpenWrite` | 1 | path | handle `int` (create/truncate) |
+| 2 | `OpenAppend` | 1 | path | handle `int` (create if missing) |
+| 3 | `Read` | 2 | handle, maxBytes | `string` (empty at EOF) |
+| 4 | `Write` | 2 | handle, data | `int` bytes written |
+| 5 | `Close` | 1 | handle | `int` `0` |
+
+Locked error strings for Stage 2 handlers: `HOSTFS: unbound`, `HOSTFS: invalid path`, `HOSTFS: not found`, `HOSTFS: open failed`, `HOSTFS: bad handle`, `HOSTFS: read failed`, `HOSTFS: write failed`, `HOSTFS: close failed`.
 
 #### 2.2 Hard non-goals (v1)
 
@@ -75,9 +101,9 @@ Exact operation names, handle representation (integer fd-like id vs opaque), and
 
 ### 6. Suggested implementation stages
 
-1. **Design lock** — operations, handles, path rules, error prefixes, module vs opcode choice. *Status: planned.*
+1. **Design lock** — operations, handles, path rules, error prefixes, module vs opcode choice; publish IDs + empty module + abstract contract header. *Status: implemented.*
 2. **Standalone backend + binding** — `gemini-vm` can enable host FS; unit tests. *Status: planned.*
-3. **Emitter surface + docs** — IDs/opcodes, consumer-notes, hub. **Closes Milestone 22.** *Status: planned.*
+3. **Emitter surface + docs** — bytecode/language-modules/consumer-notes, hub. **Closes Milestone 22.** *Status: planned.*
 
 Only Stage 3 claims “Closes Milestone 22.” Optional **Pick adapter** is explicitly follow-on unless pulled into a later stage of this page.
 

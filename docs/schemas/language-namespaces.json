@@ -104,6 +104,23 @@
       ]
     },
     {
+      "id": 7,
+      "idHex": "0x00000007",
+      "name": "hostfs",
+      "module": "gemini-module-hostfs",
+      "version": "1",
+      "shipped": true,
+      "note": "Function IDs published (M22 Stage 1); handlers are Milestone 22 Stage 2",
+      "functions": [
+        { "id": 0, "name": "OpenRead", "arity": 1 },
+        { "id": 1, "name": "OpenWrite", "arity": 1 },
+        { "id": 2, "name": "OpenAppend", "arity": 1 },
+        { "id": 3, "name": "Read", "arity": 2 },
+        { "id": 4, "name": "Write", "arity": 2 },
+        { "id": 5, "name": "Close", "arity": 1 }
+      ]
+    },
+    {
       "id": 256,
       "idHex": "0x00000100",
       "name": "stub",

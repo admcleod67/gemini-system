@@ -25,5 +25,13 @@ TEST_CASE("published Gemini ABI matches internal Basic language IDs") {
     CHECK(Gemini::Math::kFnLn == 5U);
     CHECK(Gemini::Math::kFnExp == 6U);
     CHECK(Gemini::Math::kFunctionCount == 7U);
+    CHECK(Gemini::kNamespaceIdHostFs == 0x00000007U);
+    CHECK(Gemini::HostFs::kFnOpenRead == 0U);
+    CHECK(Gemini::HostFs::kFnOpenWrite == 1U);
+    CHECK(Gemini::HostFs::kFnOpenAppend == 2U);
+    CHECK(Gemini::HostFs::kFnRead == 3U);
+    CHECK(Gemini::HostFs::kFnWrite == 4U);
+    CHECK(Gemini::HostFs::kFnClose == 5U);
+    CHECK(Gemini::HostFs::kFunctionCount == 6U);
     CHECK(Gemini::kNamespaceIdStub == 0x00000100U);
 }

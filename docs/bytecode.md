@@ -82,9 +82,10 @@ Semantic errors inside a handler use language-specific prefixes (for example BAS
 | `4` | `comal` | `gemini-module-comal` | Stub — metadata only |
 | `5` | `cobol` | `gemini-module-cobol` | Stub — metadata only |
 | `6` | `math` | `gemini-module-math` | Shared unary transcendentals; 7 functions |
+| `7` | `hostfs` | `gemini-module-hostfs` | Host FS façade IDs published; handlers Milestone 22 Stage 2 |
 | `256` (`0x100`) | `stub` | `gemini-module-stub` | Integration-test stub |
 
-Constants: [`include/gemini/namespace_ids.hpp`](../include/gemini/namespace_ids.hpp). **IDs are immutable once shipped**; new languages take the next free slot from **`7`** upward.
+Constants: [`include/gemini/namespace_ids.hpp`](../include/gemini/namespace_ids.hpp). **IDs are immutable once shipped**; new languages take the next free slot from **`8`** upward.
 
 ## BASIC namespace (`2`) — function table
 
