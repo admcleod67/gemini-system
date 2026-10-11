@@ -120,13 +120,14 @@ gemini-vm [--modules PATH] [-h|--help] <program.tbc>
 |------|-----------|
 | Program | Host filesystem path to text bytecode (`.tbc`) |
 | Console | stdout / stdin (default VM streams) |
-| Filesystem | Unbound — Pick FS opcodes fail if used |
+| Pick filesystem | Unbound — Pick FS opcodes fail if used |
+| Host-path streams | Bound by default (`PosixHostFilesystem` via `Runtime::setHostFilesystem`); use **`CALL_FUNC hostfs`** when `gemini-module-hostfs` is loaded — see [`bytecode.md`](bytecode.md) / [Milestone 22](milestones/22-host-filesystem-facade.md) |
 | Modules | Optional; `--modules PATH`, else `GEMINI_MODULES_PATH`, else `./gemini/modules` |
 | Exit `0` | Clean halt (or `--help`) |
 | Exit `1` | Missing args, parse error, or runtime error (`gemini-vm: …` on stderr) |
 | Exit `130` | Interrupted (`UserInterrupt`) |
 
-Example: `gemini-vm programs/hello.tbc` prints `Hello, world`. Programs that use only core opcodes (e.g. `PRINT_*`) need no language modules. Programs that emit **`CALL_FUNC`** need a matching module loaded.
+Example: `gemini-vm programs/hello.tbc` prints `Hello, world`. Programs that use only core opcodes (e.g. `PRINT_*`) need no language modules. Programs that emit **`CALL_FUNC`** need a matching module loaded. Console-only programs that never call `hostfs` behave as before even though a host-path façade is attached.
 
 ### Apollo Compiler workflow
 

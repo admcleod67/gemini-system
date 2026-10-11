@@ -110,7 +110,7 @@
       "module": "gemini-module-hostfs",
       "version": "1",
       "shipped": true,
-      "note": "Function IDs published (M22 Stage 1); handlers are Milestone 22 Stage 2",
+      "note": "Host-path sequential streams (Milestone 22); HOSTFS: errors; handles are positive ints",
       "functions": [
         { "id": 0, "name": "OpenRead", "arity": 1 },
         { "id": 1, "name": "OpenWrite", "arity": 1 },

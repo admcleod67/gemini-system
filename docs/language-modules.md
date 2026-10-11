@@ -103,6 +103,12 @@ The in-tree BASIC compiler emits **`CALL_FUNC`** using these IDs; see [`bytecode
 
 At cold start, **`SYSTEM LANGUAGES`** should include a line like **`6 math 1 7`**. Standalone: load the module with **`gemini-vm --modules <dir>`** (or the default bootstrap `gemini/modules/` copy).
 
+### Host filesystem module
+
+**[`gemini-module-hostfs`](../modules/gemini-hostfs/)** registers namespace **`hostfs`** (id **`7`**) with six sequential stream handlers (`OpenRead`, `OpenWrite`, `OpenAppend`, `Read`, `Write`, `Close`). IDs and `HOSTFS:` errors are locked in [`include/gemini/hostfs_function_ids.hpp`](../include/gemini/hostfs_function_ids.hpp) and [`bytecode.md`](bytecode.md). Handlers resolve the façade via `Runtime::hostFilesystem()` (`CALL_FUNC` still passes `Runtime*` as `hostContext`). **`gemini-vm`** binds `PosixHostFilesystem` by default.
+
+This surface is **not** Pick record I/O: BASIC `OPEN_FILE` / `READ_REC` and [`PickFS::FileSystem`](../src/core/filesystem/FileSystem.h) are unchanged. At cold start, **`SYSTEM LANGUAGES`** should include a line like **`7 hostfs 1 6`**. Standalone: load with **`gemini-vm --modules <dir>`** (or bootstrap `gemini/modules/`).
+
 ### Stub modules
 
 Stub modules (**`gemini-module-pascal`**, **`-comal`**, **`-cobol`**) register metadata and reserve namespace IDs for future compilers. COMAL and COBOL appear in **`SYSTEM LANGUAGES`** with function count **`0`** until handlers ship.
@@ -111,8 +117,9 @@ Stub modules (**`gemini-module-pascal`**, **`-comal`**, **`-cobol`**) register m
 
 ## See also
 
-- [`bytecode.md`](bytecode.md) — **`CALL_FUNC`** encoding; BASIC, Pascal, and math function tables
+- [`bytecode.md`](bytecode.md) — **`CALL_FUNC`** encoding; BASIC, Pascal, math, and hostfs function tables
 - [`schemas/language-namespaces.json`](schemas/language-namespaces.json) — machine-readable ID catalogue
 - [`milestones/11-multi-language-runtime-infrastructure.md`](milestones/11-multi-language-runtime-infrastructure.md)
 - [`milestones/19-standalone-vm-runner.md`](milestones/19-standalone-vm-runner.md) — Pick-independent runner; Pascal module ownership
 - [`milestones/21-shared-math-language-module.md`](milestones/21-shared-math-language-module.md) — shared `math` module (completed)
+- [`milestones/22-host-filesystem-facade.md`](milestones/22-host-filesystem-facade.md) — hostfs façade (completed)

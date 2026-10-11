@@ -48,10 +48,11 @@ separate change; Gemini M20 close does **not** require that Apollo emit change i
   version if BASIC invariants must hold).
 - Pascal field widths / TP-style real formatting → language module or later binding, once
   glyph print and float I/O exist.
-- Host filesystem façade / Pascal `file` I/O → [**Milestone 22**](milestones/22-host-filesystem-facade.md) (Apollo Milestone 8 Stage 3).
 - Floored integer remainder (**`IMOD`**) — deferred beyond M20.
 
 **Shared math (Milestone 21 — completed):** unary real→real `CALL_FUNC` under namespace **`math`** (`6`): `Sqrt`/`Sin`/`Cos`/`Tan`/`Arctan`/`Ln`/`Exp`. See [`bytecode.md`](bytecode.md) and [`include/gemini/math_function_ids.hpp`](../include/gemini/math_function_ids.hpp). Apollo Stage 1b binds six (`tan` optional); load `gemini-module-math`.
+
+**Host filesystem (Milestone 22 — completed):** `CALL_FUNC` namespace **`hostfs`** (`7`) with `OpenRead`/`OpenWrite`/`OpenAppend`/`Read`/`Write`/`Close`. See [`bytecode.md`](bytecode.md) and [`include/gemini/hostfs_function_ids.hpp`](../include/gemini/hostfs_function_ids.hpp). Apollo Milestone 8 Stage 3 Pascal `file`/`text` binding remains a compiler change; load `gemini-module-hostfs` (`gemini-vm` binds the host-path façade by default).
 
 **After the spike ships:** Apollo Milestone 8 Stage 2 updates the console binding table
 (and dialect notes); no front-end IR rewrite required for P0–P2.
@@ -217,27 +218,28 @@ formatting (after primitives exist).
 **Friction**
 
 - Pascal **`file` / `text`** I/O is a **language** feature but needs a **host** storage
-  contract. A standalone runner may leave filesystem services unbound; Pick-shaped hosts
-  use a different path model.
+  contract. Pick-shaped hosts use a different path model than standalone host paths.
 
 **Typical pattern today (Apollo)**
 
-- No Pascal file I/O in the supported dialect; waiting on a **host-agnostic filesystem
-  façade** before designing opcodes or module calls (Apollo Milestone 8 Stage 3;
-  Gemini [**Milestone 22**](milestones/22-host-filesystem-facade.md)).
+- No Pascal file I/O in the supported dialect yet. Gemini [**Milestone 22**](milestones/22-host-filesystem-facade.md)
+  **completed** the host-agnostic façade (`CALL_FUNC hostfs`, id **7**). Apollo Milestone 8
+  Stage 3 can now design `file`/`text` lowering onto that surface.
 
-**Possible direction**
+**Shipped Gemini surface**
 
-- Shared **FS façade** bindable from standalone and Pick backends (paths, open/read/write
-  or get/put, errors).
-- Later: VM opcodes or module calls that front-ends can target without hard-coding POSIX
-  or VOC paths.
+- Namespace **`hostfs`** / `gemini-module-hostfs`: open/read/write/close with stable
+  **`HOSTFS:`** errors; handles are positive ints; paths are host strings (see
+  [`bytecode.md`](bytecode.md)).
+- **`gemini-vm`** binds `PosixHostFilesystem` by default; Pick `OPEN_FILE` / record I/O
+  remains a separate backend.
 
 **Benefit**
 
-- Unblocks `file of T`, `text`, and record files for Pascal and other languages.
+- Unblocks `file of T`, `text`, and record files for Pascal and other languages once
+  Apollo emits `CALL_FUNC hostfs,…`.
 
-**Priority:** *capability* (Gemini [**Milestone 22**](milestones/22-host-filesystem-facade.md); large cross-cutting host + VM effort).
+**Priority:** *capability* (Gemini [**Milestone 22**](milestones/22-host-filesystem-facade.md) **completed**; Apollo binding remains compiler-side).
 
 ---
 
@@ -294,3 +296,4 @@ No Apollo release should **require** the changes listed in this document.
 | 2026-09 | Gemini [Milestone 20](milestones/20-vm-console-numeric-ergonomics.md) **completed**: `PRINT_CHAR`, `INPUT_FLT`, `COERCE_FLT`, truncated core `MOD` shipped; floored `IMOD` deferred. Apollo binding-table switch remains a separate compiler change. |
 | 2026-09 | Roadmap: shared math module [Milestone 21](milestones/21-shared-math-language-module.md) (`sqrt`/`sin`/`cos`/`tan`/`arctan`/`ln`/`exp`); host FS façade [Milestone 22](milestones/22-host-filesystem-facade.md); R83→M23; fairness→M24. |
 | 2026-09 | Gemini [Milestone 21](milestones/21-shared-math-language-module.md) **completed**: shared `math` namespace (`6`) and `gemini-module-math` with seven unary handlers and `MATH:` domain errors; Apollo Stage 1b binding remains a compiler change. |
+| 2026-10 | Gemini [Milestone 22](milestones/22-host-filesystem-facade.md) **completed**: `hostfs` namespace (`7`) and `gemini-module-hostfs` with open/read/write/close and `HOSTFS:` errors; `gemini-vm` binds host-path streams; Apollo M8 Stage 3 Pascal `file`/`text` binding remains a compiler change. |

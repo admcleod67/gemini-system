@@ -2,9 +2,9 @@
 
 ## Milestone 22 — Host Filesystem Façade
 
-Ship a **host-agnostic filesystem façade** bindable from the standalone runner and (later) Pick-shaped hosts, so compiled languages can target portable file I/O without hard-coding POSIX paths or VOC/Pick logical files. Unblocks Apollo Compiler **Milestone 8 Stage 3** (`file` / `text` dialect work) after console/numeric and shared math tracks. *Status: planned.*
+Ship a **host-agnostic filesystem façade** bindable from the standalone runner and (later) Pick-shaped hosts, so compiled languages can target portable file I/O without hard-coding POSIX paths or VOC/Pick logical files. Unblocks Apollo Compiler **Milestone 8 Stage 3** (`file` / `text` dialect work) after console/numeric and shared math tracks. *Status: implemented.*
 
-Depends on [**Milestone 19**](19-standalone-vm-runner.md) (`gemini-vm` with unbound Pick `FileSystem`). Follows [**Milestone 21**](21-shared-math-language-module.md) in delivery priority. R83 gaps are [**Milestone 23**](../compatibility-r83-pick.md) (detail page TBD); CPU fairness is deferred [**Milestone 24**](24-execution-fairness-cpu-bound-yield.md).
+Depends on [**Milestone 19**](19-standalone-vm-runner.md) (`gemini-vm` with unbound Pick `FileSystem`). Followed [**Milestone 21**](21-shared-math-language-module.md) in delivery priority. R83 gaps are [**Milestone 23**](../compatibility-r83-pick.md) (detail page TBD); CPU fairness is deferred [**Milestone 24**](24-execution-fairness-cpu-bound-yield.md).
 
 **Standing invariant:** Pick [`FileSystem`](../../src/core/filesystem/FileSystem.h) semantics for Application/Service editions must not regress. Existing BASIC `OPEN`/`READ`/`WRITE` paths that use the Pick backend stay byte-identical unless an explicit adapter stage is scoped and tested. Full `ctest` green after every stage.
 
@@ -72,7 +72,7 @@ Locked error strings for Stage 2 handlers: `HOSTFS: unbound`, `HOSTFS: invalid p
 
 ### 3. Compatibility
 
-- **Standalone:** programs that never touch the façade behave as today with FS unbound.
+- **Standalone:** programs that never call `hostfs` behave as today; Pick FS remains unbound while `gemini-vm` binds the host-path façade by default.
 - **Pick hosts:** continue using existing `FileSystem` binding; façade adapter is optional follow-on, not a silent redirect of BASIC record I/O.
 - **Apollo:** success when Gemini documents the contract and standalone tests prove open/read/write/close; Apollo M8 Stage 3 may then design Pascal `file`/`text` lowering.
 
@@ -92,10 +92,10 @@ Locked error strings for Stage 2 handlers: `HOSTFS: unbound`, `HOSTFS: invalid p
 
 ### 5. Milestone completion criteria
 
-- [ ] Façade interface + standalone backend implemented and tested
-- [ ] Documented emitter surface (`CALL_FUNC` and/or opcodes) with stable errors
-- [ ] Pick Application/Service filesystem tests unchanged in intent; full `ctest` green
-- [ ] Consumer notes / hub list M22 implemented when closed
+- [x] Façade interface + standalone backend implemented and tested
+- [x] Documented emitter surface (`CALL_FUNC` and/or opcodes) with stable errors
+- [x] Pick Application/Service filesystem tests unchanged in intent; full `ctest` green
+- [x] Consumer notes / hub list M22 implemented when closed
 
 ---
 
@@ -103,7 +103,7 @@ Locked error strings for Stage 2 handlers: `HOSTFS: unbound`, `HOSTFS: invalid p
 
 1. **Design lock** — operations, handles, path rules, error prefixes, module vs opcode choice; publish IDs + empty module + abstract contract header. *Status: implemented.*
 2. **Standalone backend + binding** — `gemini-vm` can enable host FS; unit tests. *Status: implemented.*
-3. **Emitter surface + docs** — bytecode/language-modules/consumer-notes, hub. **Closes Milestone 22.** *Status: planned.*
+3. **Emitter surface + docs** — bytecode/language-modules/consumer-notes, hub. **Closes Milestone 22.** *Status: implemented.*
 
 Only Stage 3 claims “Closes Milestone 22.” Optional **Pick adapter** is explicitly follow-on unless pulled into a later stage of this page.
 
@@ -117,4 +117,4 @@ Only Stage 3 claims “Closes Milestone 22.” Optional **Pick adapter** is expl
 - R83 compatibility — [**Milestone 23**](../compatibility-r83-pick.md) (detail page TBD)
 - CPU-bound cooperative yield — [**Milestone 24**](24-execution-fairness-cpu-bound-yield.md)
 
-*Status: planned.*
+*Status: implemented.*

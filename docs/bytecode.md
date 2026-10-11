@@ -82,7 +82,7 @@ Semantic errors inside a handler use language-specific prefixes (for example BAS
 | `4` | `comal` | `gemini-module-comal` | Stub — metadata only |
 | `5` | `cobol` | `gemini-module-cobol` | Stub — metadata only |
 | `6` | `math` | `gemini-module-math` | Shared unary transcendentals; 7 functions |
-| `7` | `hostfs` | `gemini-module-hostfs` | Host FS façade IDs published; handlers Milestone 22 Stage 2 |
+| `7` | `hostfs` | `gemini-module-hostfs` | Host-path stream façade; 6 functions |
 | `256` (`0x100`) | `stub` | `gemini-module-stub` | Integration-test stub |
 
 Constants: [`include/gemini/namespace_ids.hpp`](../include/gemini/namespace_ids.hpp). **IDs are immutable once shipped**; new languages take the next free slot from **`8`** upward.
@@ -168,6 +168,29 @@ All functions: pop one `Value`, coerce to `double` (int / double / numeric strin
 
 **Example:** `sqrt(9.0)` lowers to `PUSH_FLT 9`, then `CALL_FUNC 6, 0, 1`.
 
+## Hostfs namespace (`7`) — function table
+
+Namespace constant: `Gemini::kNamespaceIdHostFs` / `Gemini::HostFs::*` in [`include/gemini/hostfs_function_ids.hpp`](../include/gemini/hostfs_function_ids.hpp).
+
+Language-neutral **host-path** sequential stream I/O for front-ends that need open/read/write/close without Pick VOC or logical files. Load **`gemini-module-hostfs`** via the normal modules path / `gemini-vm --modules`. Contract header: [`include/gemini/HostFilesystem.hpp`](../include/gemini/HostFilesystem.hpp).
+
+**Binding:** handlers cast `CALL_FUNC` `hostContext` to `Runtime*` and use `Runtime::hostFilesystem()`. When unbound (null), operations throw `HOSTFS: unbound`. **`gemini-vm`** always binds a `PosixHostFilesystem` before `run()`. Pick Application/Service editions leave host FS null unless a host wires one; Pick `OPEN_FILE` / `FileSystem` is a separate path and is unchanged.
+
+**Paths:** host `string`; empty → `HOSTFS: invalid path`; absolute OK; relative → process cwd. **Handles:** positive dense `int` (1-based); `0` invalid → `HOSTFS: bad handle`. Line / `eof` / `eoln` semantics stay in language layers (Apollo/Pascal follow-on).
+
+| ID | Name | Arity | Stack (top last) | Result / errors |
+|----|------|-------|------------------|-----------------|
+| 0 | `OpenRead` | 1 | path | handle `int`; missing → `HOSTFS: not found` |
+| 1 | `OpenWrite` | 1 | path | handle `int` (create/truncate) |
+| 2 | `OpenAppend` | 1 | path | handle `int` (create if missing) |
+| 3 | `Read` | 2 | handle, maxBytes | `string` (empty at EOF; `maxBytes <= 0` → empty) |
+| 4 | `Write` | 2 | handle, data | `int` bytes written |
+| 5 | `Close` | 1 | handle | `int` `0` |
+
+Other locked failures: `HOSTFS: open failed`, `HOSTFS: read failed`, `HOSTFS: write failed`, `HOSTFS: close failed`.
+
+**Example:** open for write: push path string, then `CALL_FUNC 7, 1, 1`.
+
 ## Legacy `INVOKE_BUILTIN`
 
 Handwritten bytecode and older tests may use:
@@ -183,6 +206,7 @@ The VM forwards name-based calls to the same registry (BASIC shim). **New compil
 - [`language-modules.md`](language-modules.md) — writing a shared module; canonical BASIC module walkthrough
 - [`vm.md`](vm.md) — VM opcode listing
 - [`compiler-architecture.md`](compiler-architecture.md) — in-tree BASIC pipeline
-- [`apollo-consumer-notes.md`](apollo-consumer-notes.md) — optional VM evolution backlog from Apollo (consumer input; not a specification change). Near-term console/numeric opcodes shipped in [Milestone 20](milestones/20-vm-console-numeric-ergonomics.md) (completed); shared math in [Milestone 21](milestones/21-shared-math-language-module.md) (completed).
+- [`apollo-consumer-notes.md`](apollo-consumer-notes.md) — optional VM evolution backlog from Apollo (consumer input; not a specification change). Near-term console/numeric opcodes shipped in [Milestone 20](milestones/20-vm-console-numeric-ergonomics.md) (completed); shared math in [Milestone 21](milestones/21-shared-math-language-module.md) (completed); host FS in [Milestone 22](milestones/22-host-filesystem-facade.md) (completed).
 - [`milestones/11-multi-language-runtime-infrastructure.md`](milestones/11-multi-language-runtime-infrastructure.md) — milestone context
 - [`milestones/21-shared-math-language-module.md`](milestones/21-shared-math-language-module.md) — shared `math` module
+- [`milestones/22-host-filesystem-facade.md`](milestones/22-host-filesystem-facade.md) — hostfs façade
