@@ -20,6 +20,10 @@ namespace PickCore::Languages {
     class LanguageRegistry;
 }
 
+namespace Gemini {
+    class HostFilesystem;
+}
+
 namespace PickFS {
     class FileSystem;
 }
@@ -167,6 +171,10 @@ namespace PickVM {
 
         void setFileSystem(PickFS::FileSystem *fileSystem);
 
+        /// Optional host-path stream façade for `CALL_FUNC hostfs` (Milestone 22). Cleared with nullptr.
+        void setHostFilesystem(Gemini::HostFilesystem *hostFilesystem);
+        [[nodiscard]] Gemini::HostFilesystem *hostFilesystem() const;
+
         /// Optional read-only `@USERNO` / `@ACCOUNT` / `@LOGNAME` / `@DEFDATA` (canonical names). Cleared with empty function.
         using SystemVarReaderFn = std::function<std::optional<Value>(std::string_view canonicalName)>;
         void setSystemVariableReader(SystemVarReaderFn fn);
@@ -204,6 +212,7 @@ namespace PickVM {
         mutable std::ostream *outStream_{nullptr};
         mutable std::istream *inStream_{nullptr};
         PickFS::FileSystem *fileSystem_{nullptr};
+        Gemini::HostFilesystem *hostFilesystem_{nullptr};
         SystemVarReaderFn systemVarReader_;
         BuiltinSystemCallFn builtinSystemCallHandler_;
         const PickCore::Languages::LanguageRegistry *languageRegistry_{nullptr};

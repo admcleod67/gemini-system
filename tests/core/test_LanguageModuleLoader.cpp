@@ -5,6 +5,9 @@
 #include "BasicLanguageIds.h"
 #include "LanguageModuleBootLog.h"
 
+#include "PosixHostFilesystem.h"
+
+#include <gemini/hostfs_function_ids.hpp>
 #include <gemini/math_function_ids.hpp>
 #include <gemini/namespace_ids.hpp>
 
@@ -544,7 +547,7 @@ TEST_CASE("LanguageModuleLoader math CALL_FUNC end-to-end with loaded registry")
     CHECK(std::get<double>(rt.stack()[0]) == doctest::Approx(3.0));
 }
 
-TEST_CASE("LanguageModuleLoader loads hostfs module with empty handlers") {
+TEST_CASE("LanguageModuleLoader loads hostfs module with six handlers") {
     const std::filesystem::path hostfsPath = hostfsModulePath();
     if (hostfsPath.empty() || !std::filesystem::exists(hostfsPath)) {
         MESSAGE("GEMINI_HOSTFS_MODULE_PATH not configured; skipping");
@@ -570,11 +573,122 @@ TEST_CASE("LanguageModuleLoader loads hostfs module with empty handlers") {
     for (const auto &summary : registry.listNamespaces()) {
         if (summary.id == Gemini::kNamespaceIdHostFs) {
             foundHostFs = true;
-            CHECK(summary.functionCount == 0);
+            CHECK(summary.functionCount == 6);
         }
     }
     CHECK(foundHostFs);
-    CHECK(registry.functionSlotSummaries(Gemini::kNamespaceIdHostFs).empty());
+
+    const auto slots = registry.functionSlotSummaries(Gemini::kNamespaceIdHostFs);
+    REQUIRE(slots.size() == 6);
+    for (std::size_t i = 0; i < slots.size(); ++i) {
+        CHECK(slots[i].id == static_cast<FunctionId>(i));
+        CHECK(slots[i].implemented);
+    }
+    CHECK(slots[0].arity == 1);
+    CHECK(slots[3].arity == 2);
+    CHECK(slots[4].arity == 2);
+    CHECK(slots[5].arity == 1);
+}
+
+TEST_CASE("LanguageModuleLoader hostfs dispatch round-trip and unbound") {
+    const std::filesystem::path hostfsPath = hostfsModulePath();
+    if (hostfsPath.empty() || !std::filesystem::exists(hostfsPath)) {
+        MESSAGE("GEMINI_HOSTFS_MODULE_PATH not configured; skipping");
+        return;
+    }
+
+    const auto modulesDir = uniqueTempDir() / "modules";
+    std::filesystem::create_directories(modulesDir);
+    copyModuleIfPresent(hostfsPath, modulesDir);
+
+    LanguageRegistry registry;
+    loadLanguageModules(registry, modulesDir);
+
+    const auto workDir = uniqueTempDir() / "data";
+    std::filesystem::create_directories(workDir);
+    const auto path = (workDir / "out.txt").string();
+
+    Gemini::PosixHostFilesystem hostFs;
+    Runtime rt;
+    rt.setLanguageRegistry(&registry);
+    rt.setHostFilesystem(&hostFs);
+
+    {
+        std::vector<Value> stack{path};
+        registry.dispatch(Gemini::kNamespaceIdHostFs, Gemini::HostFs::kFnOpenWrite, stack, 1, &rt);
+        REQUIRE(stack.size() == 1);
+        REQUIRE(std::holds_alternative<int>(stack.back()));
+        const int handle = std::get<int>(stack.back());
+
+        stack = {handle, std::string{"xyz"}};
+        registry.dispatch(Gemini::kNamespaceIdHostFs, Gemini::HostFs::kFnWrite, stack, 2, &rt);
+        REQUIRE(stack.size() == 1);
+        CHECK(std::get<int>(stack.back()) == 3);
+
+        stack = {handle};
+        registry.dispatch(Gemini::kNamespaceIdHostFs, Gemini::HostFs::kFnClose, stack, 1, &rt);
+        REQUIRE(stack.size() == 1);
+        CHECK(std::get<int>(stack.back()) == 0);
+    }
+
+    {
+        std::vector<Value> stack{path};
+        registry.dispatch(Gemini::kNamespaceIdHostFs, Gemini::HostFs::kFnOpenRead, stack, 1, &rt);
+        const int handle = std::get<int>(stack.back());
+        stack = {handle, 10};
+        registry.dispatch(Gemini::kNamespaceIdHostFs, Gemini::HostFs::kFnRead, stack, 2, &rt);
+        REQUIRE(stack.size() == 1);
+        CHECK(std::get<std::string>(stack.back()) == "xyz");
+        stack = {handle};
+        registry.dispatch(Gemini::kNamespaceIdHostFs, Gemini::HostFs::kFnClose, stack, 1, &rt);
+    }
+
+    rt.setHostFilesystem(nullptr);
+    {
+        std::vector<Value> stack{path};
+        CHECK_THROWS_WITH(
+            registry.dispatch(Gemini::kNamespaceIdHostFs, Gemini::HostFs::kFnOpenRead, stack, 1, &rt),
+            "HOSTFS: unbound");
+    }
+}
+
+TEST_CASE("LanguageModuleLoader hostfs CALL_FUNC end-to-end with loaded registry") {
+    const std::filesystem::path hostfsPath = hostfsModulePath();
+    if (hostfsPath.empty() || !std::filesystem::exists(hostfsPath)) {
+        MESSAGE("GEMINI_HOSTFS_MODULE_PATH not configured; skipping");
+        return;
+    }
+
+    const auto modulesDir = uniqueTempDir() / "modules";
+    std::filesystem::create_directories(modulesDir);
+    copyModuleIfPresent(hostfsPath, modulesDir);
+
+    LanguageRegistry registry;
+    loadLanguageModules(registry, modulesDir);
+
+    const auto workDir = uniqueTempDir() / "data";
+    std::filesystem::create_directories(workDir);
+    const auto path = (workDir / "e2e.txt").string();
+
+    Gemini::PosixHostFilesystem hostFs;
+    Runtime rt;
+    rt.setLanguageRegistry(&registry);
+    rt.setHostFilesystem(&hostFs);
+    // OpenWrite → Write (handle under data); flush by closing via second openRead on path after run.
+    rt.loadProgram({
+        {OpCode::PushStr, path},
+        makeCallFunc(Gemini::kNamespaceIdHostFs, Gemini::HostFs::kFnOpenWrite, 1),
+        {OpCode::PushStr, std::string{"ok"}},
+        makeCallFunc(Gemini::kNamespaceIdHostFs, Gemini::HostFs::kFnWrite, 2),
+        {OpCode::Halt, Value{}},
+    });
+    rt.run();
+    REQUIRE(rt.stack().size() == 1);
+    CHECK(std::get<int>(rt.stack()[0]) == 2);
+
+    const int rh = hostFs.openRead(path);
+    CHECK(hostFs.read(rh, 10) == "ok");
+    hostFs.close(rh);
 }
 
 TEST_CASE("LanguageModuleLoader loads basic and language stubs together") {

@@ -1,5 +1,6 @@
 #include <LanguageModuleLoader.h>
 #include <LanguageRegistry.h>
+#include <PosixHostFilesystem.h>
 
 #include <pickvm/core.hpp>
 
@@ -15,7 +16,8 @@ namespace {
         std::cout << "Usage: " << name << " [--modules PATH] [-h|--help] <program.tbc>\n"
                   << "\n"
                   << "Run a Gemini text bytecode (.tbc) file with console I/O.\n"
-                  << "Does not attach Pick catalogue, Tcl, session table, or filesystem.\n"
+                  << "Does not attach Pick catalogue, Tcl, session table, or Pick filesystem.\n"
+                  << "Host-path stream I/O is available via CALL_FUNC hostfs when that module is loaded.\n"
                   << "\n"
                   << "Options:\n"
                   << "  --modules PATH   Directory of language modules (shared libraries)\n"
@@ -85,8 +87,10 @@ int main(const int argc, char *argv[]) {
         const std::filesystem::path modulesDir = resolveModulesDir(modulesFlag);
         (void) PickCore::Languages::loadLanguageModules(registry, modulesDir, nullptr, nullptr);
 
+        Gemini::PosixHostFilesystem hostFs;
         PickVM::Runtime runtime;
         runtime.setLanguageRegistry(&registry);
+        runtime.setHostFilesystem(&hostFs);
 
         PickVM::Parser parser;
         const PickVM::LoadedBytecode loaded = parser.parseFile(programPath);

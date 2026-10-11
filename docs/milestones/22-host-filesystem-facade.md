@@ -102,7 +102,7 @@ Locked error strings for Stage 2 handlers: `HOSTFS: unbound`, `HOSTFS: invalid p
 ### 6. Suggested implementation stages
 
 1. **Design lock** — operations, handles, path rules, error prefixes, module vs opcode choice; publish IDs + empty module + abstract contract header. *Status: implemented.*
-2. **Standalone backend + binding** — `gemini-vm` can enable host FS; unit tests. *Status: planned.*
+2. **Standalone backend + binding** — `gemini-vm` can enable host FS; unit tests. *Status: implemented.*
 3. **Emitter surface + docs** — bytecode/language-modules/consumer-notes, hub. **Closes Milestone 22.** *Status: planned.*
 
 Only Stage 3 claims “Closes Milestone 22.” Optional **Pick adapter** is explicitly follow-on unless pulled into a later stage of this page.

@@ -368,6 +368,14 @@ namespace PickVM {
         fileSystem_ = fileSystem;
     }
 
+    void Runtime::setHostFilesystem(Gemini::HostFilesystem *const hostFilesystem) {
+        hostFilesystem_ = hostFilesystem;
+    }
+
+    Gemini::HostFilesystem *Runtime::hostFilesystem() const {
+        return hostFilesystem_;
+    }
+
     void Runtime::setSystemVariableReader(SystemVarReaderFn fn) {
         systemVarReader_ = std::move(fn);
     }

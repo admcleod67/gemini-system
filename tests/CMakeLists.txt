@@ -50,6 +50,7 @@ add_executable(
         core/test_LanguageAbi.cpp
         core/test_LanguageRegistryFormat.cpp
         core/test_LanguageModuleLoader.cpp
+        core/test_HostFilesystem.cpp
         core/test_FileSystemLocking.cpp
         basic/test_BasicBytecodeEmitter.cpp
         basic/test_BasicCompiler.cpp
